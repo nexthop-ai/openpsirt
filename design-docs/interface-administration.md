@@ -74,7 +74,8 @@ role on.
 | Webhooks are configured here by administrators, the whole panel hidden from others | The endpoint refuses others |
 | A webhook's address and signing secret are masked, and every field tells a password manager it is not a credential | A chat address carries its token; form history leaks |
 | Suppliers are configured here by administrators, taking a product before an address | A supplier feeding two products is two rows |
-| A publisher's document is uploaded on the suppliers panel: an advisory adds, a statement set replaces, each to the endpoint a script uses; the endpoint refusing the other kind names the right one | |
+| A publisher's document is uploaded on the suppliers panel, each kind to the endpoint a script uses: an advisory replaces the advisory of its name, a statement set its own earlier revision; the endpoint refusing the other kind names the right one | |
+| A statement set takes a publisher typed in place of the one the document names | A document naming none is refused without one |
 | A supplier never reached reads differently from one that failed; what stopped the last attempt is on hover | |
 
 ## The System screen

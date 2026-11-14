@@ -74,6 +74,31 @@ func TestCarryingBringsTheReasoningAndNotTheConclusion(t *testing.T) {
 	})
 }
 
+// What a new line would inherit names the component as the new line's build
+// stated it.
+func TestWhatANewLineWouldInheritNamesWhatItsBuildStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.agreed(t, f.at())
+		was := f.anotherLine(t, "202408", "1.2.3", "4.5.6")
+		next := f.anotherLine(t, "202411", "1.2.4", "4.5.6")
+		var carrier int64
+		if err := f.db.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`"component_id"`).
+			Where(`"build_id" = ?`, next).Limit(1).Scan(ctx, &carrier); err != nil {
+			t.Fatal(err)
+		}
+		f.stated(t, next, map[int64]graph.Described{carrier: {Name: "libfoo-bin", Version: "1.2.4"}})
+
+		offered, err := f.store.WouldCarry(ctx, f.triager, was, next)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(offered.Moved) != 1 || offered.Moved[0].Component != "libfoo-bin" {
+			t.Errorf("the new line was offered %+v, want the decision naming libfoo-bin", offered.Moved)
+		}
+	})
+}
+
 // Two findings at one occurrence on the new line, each holding its own pair of
 // versions. The component version and the consumer version a carried
 // decision is keyed on come from the same one of them: a pair drawn half from

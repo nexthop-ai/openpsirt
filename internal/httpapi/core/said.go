@@ -10,10 +10,11 @@ type SaidBody struct {
 	ID        int64  `json:"id" doc:"Pass as from_statement when starting a decision from this, so a later revision can be noticed"`
 	Publisher string `json:"publisher"`
 	// Source is which kind of document carried it and Identifier the name the
-	// publisher gave that document. An advisory is recognized by its own name;
-	// a statement set carries none, because a publisher issues one.
+	// publisher gave that document: an advisory's name, or a VEX document's
+	// OpenVEX @id or CSAF tracking id, held as its digest where longer than
+	// the column. Empty for a VEX document stating none.
 	Source        EvidenceSource `json:"source" doc:"Which kind of document carried it"`
-	Identifier    string         `json:"identifier,omitempty" doc:"The name the publisher gave the advisory"`
+	Identifier    string         `json:"identifier,omitempty" doc:"The name the publisher gave the document: an advisory's name, or a VEX document's identifier, as sha256: and its digest where longer than 191 characters"`
 	Status        string         `json:"status" doc:"Their statement, in the format's own vocabulary"`
 	Justification string         `json:"justification,omitempty" doc:"The term they gave for it, where the status is one that takes one"`
 	// About is the version the publisher spoke about, where they named one. A

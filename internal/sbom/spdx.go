@@ -71,6 +71,7 @@ var spdxEdges = map[string]spdxDirection{
 	"RUNTIME_DEPENDENCY_OF":  held,
 	"BUILD_DEPENDENCY_OF":    held,
 	"DEV_DEPENDENCY_OF":      held,
+	"OPTIONAL_COMPONENT_OF":  held,
 }
 
 // spdxScopes are the relationship types that name a lifecycle phase as well as
@@ -444,16 +445,7 @@ func (c *reader) spdxRelate(from, kind, to string) error {
 		if direction == holder {
 			from, to = to, from
 		}
-		// Charged against the claim bound rather than the edge one: this is
-		// not an edge, and an unbounded array of them is the same hazard
-		// under a different name.
-		if err := c.claim(); err != nil {
-			return err
-		}
-		if _, stated := c.upstream[from]; !stated {
-			c.upstream[from] = to
-			c.upstreamOrder = append(c.upstreamOrder, from)
-		}
+		return c.derive(from, to)
 	}
 	return nil
 }

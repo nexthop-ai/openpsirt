@@ -323,18 +323,32 @@ func (s *Store) namesIn(ctx context.Context, buildIDs []int64, visible []access.
 		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
-		ColumnExpr(`"c"."name" AS "name"`).
+		// As the build last stated it, its open node else its latest: a
+		// list on a past day holds versions the build has since moved off,
+		// and the row's name can be another product's. Read per inner group
+		// rather than grouped on, since the fallback reads ungrouped columns;
+		// repeated names are dropped below.
+		ColumnExpr(graph.StatedName("sn", `"f"."build_id"`, `"f"."component_id"`, "c") + ` AS "name"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
-		ColumnExpr(`"va"."name" AS "variant"`).
-		GroupExpr(FoldedOn + `, "f"."fixed_in", "c"."name", "st"."name", "va"."name"`).
-		// In the order a reader scans them, so an upgrade names its packages and
-		// its builds the same way on every read.
-		OrderExpr(`"c"."name", "st"."name", "va"."name"`)
+		ColumnExpr(`"va"."name" AS "variant"`)
 	if err := q.Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("read which packages a bump moves: %w", err)
 	}
+	// In the order a reader scans them, so an upgrade names its packages and
+	// its builds the same way on every read.
+	sort.SliceStable(rows, func(i, j int) bool {
+		a, b := rows[i], rows[j]
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		if a.BranchOrTag != b.BranchOrTag {
+			return a.BranchOrTag < b.BranchOrTag
+		}
+		return a.Variant < b.Variant
+	})
 	named := map[string][]string{}
 	seen := map[string]bool{}
 	in := map[string][]Build{}
@@ -421,7 +435,7 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 	for _, row := range rows {
 		ids = append(ids, row.ComponentID)
 	}
-	shipped, err := componentsNamed(ctx, s.db, ids)
+	shipped, err := componentsNamed(ctx, s.db, ids, buildIDs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -441,7 +455,8 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 			BySeverity: bands[row.ComponentID],
 		}
 		group.Worst = worstBand(group.BySeverity)
-		if named, ok := shipped[row.ComponentID]; ok {
+		// The scope is one product's builds.
+		if named, ok := shipped.inProduct(row.ComponentID); ok {
 			group.Component = named.Name
 			group.Version = named.Version
 			group.Upstream = named.UpstreamVersion
@@ -639,7 +654,7 @@ func componentOrder(filter Filter) string {
 // "which of these is nearest" is one this cannot answer and does not pretend
 // to. What it answers is which one closes the most, which is the question
 // somebody choosing between them is actually asking.
-func (s *Store) readAboutPage(ctx context.Context, shipped map[int64]graph.Component, ids []int64,
+func (s *Store) readAboutPage(ctx context.Context, shipped namedComponents, ids []int64,
 	buildIDs []int64, visible []access.Visibility, filter Filter) (map[int64][]Candidate,
 	map[int64]map[string]int, error) {
 
@@ -700,7 +715,7 @@ func (s *Store) readAboutPage(ctx context.Context, shipped map[int64]graph.Compo
 		}
 		per[row.ComponentID] = append(per[row.ComponentID],
 			namedFix{issue: row.Issue, versions: versions})
-		scheme[row.ComponentID] = vercmp.SchemeOf(graph.EcosystemOf(shipped[row.ComponentID].Purl))
+		scheme[row.ComponentID] = vercmp.SchemeOf(graph.EcosystemOf(shipped.rows[row.ComponentID].Purl))
 	}
 	upgrades := make(map[int64][]Candidate, len(per))
 	for component, found := range per {

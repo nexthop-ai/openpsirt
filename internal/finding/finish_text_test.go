@@ -4,7 +4,6 @@
 package finding_test
 
 import (
-	"errors"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -13,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // A scanner writes what it likes to standard error, and its failure and its
@@ -30,7 +30,7 @@ func TestARunEndedInBytesThatAreNotTextIsRecordedOnEveryEngine(t *testing.T) {
 			t.Fatal(err)
 		}
 		said := "could not read /srv/caf\xe9 \xff\xfe\x00and went on \xe2\x82"
-		if err := findings.Finish(ctx, run.ID, "0.112\xff", "db\x00", said, errors.New(said)); err != nil {
+		if err := findings.Finish(ctx, run.ID, "0.112\xff", "db\x00", said, refusal.New(said)); err != nil {
 			t.Fatalf("the end of a run quoting bytes that are not text was refused: %v", err)
 		}
 		var got finding.Run

@@ -4,6 +4,7 @@
 package sbom_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -104,5 +105,45 @@ func TestAPlatformNamedByACPEIsKeptByName(t *testing.T) {
 	}
 	if seen == 0 {
 		t.Fatal("the advisory pointed at nothing, so this checked nothing")
+	}
+}
+
+// A VEX document names who issued it in either format, and that name is
+// what a later document from the same publisher supersedes.
+func TestAVexDocumentNamesItsPublisherInEitherFormat(t *testing.T) {
+	for _, name := range []string{"supplier-product-inside.openvex.json", "supplier-product-inside.csaf.json"} {
+		t.Run(name, func(t *testing.T) {
+			got, err := sbom.ReadStatements(fixture(t, name), sbom.Limits{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Publisher != "Acme Security" || len(got.Claims) == 0 {
+				t.Errorf("read publisher %q and %d claims", got.Publisher, len(got.Claims))
+			}
+		})
+	}
+}
+
+// An author of any shape the format does not give it reads as none, and the
+// claims beside it are read: a build's own claims do not depend on who wrote
+// them.
+func TestAVexAuthorOfTheWrongShapeIsReadAsNone(t *testing.T) {
+	for name, author := range map[string]string{
+		"an array": `["x"]`, "a number": `1`, "a boolean": `true`,
+		"an object": `{"name": "x", "more": [1, {"a": 2}]}`, "null": `null`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			doc := `{"@context": "https://openvex.dev/ns/v0.2.0", "@id": "urn:x", "author": ` + author + `,
+			 "statements": [{"vulnerability": {"name": "CVE-2026-1"},
+			   "products": [{"@id": "pkg:deb/debian/zlib1g@1.3"}], "status": "not_affected",
+			   "justification": "vulnerable_code_not_present"}]}`
+			got, err := sbom.ReadStatements(strings.NewReader(doc), sbom.Limits{})
+			if err != nil {
+				t.Fatalf("an author written as %s refused the document: %v", name, err)
+			}
+			if got.Publisher != "" || len(got.Claims) != 1 {
+				t.Errorf("read publisher %q and %d claims", got.Publisher, len(got.Claims))
+			}
+		})
 	}
 }

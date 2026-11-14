@@ -163,7 +163,7 @@ opening the interface are reading the same sentence.
 
 ```json
 {"scan_id": 1, "state": "failed",
- "failure": "run grype: exec: \"grype\": executable file not found in $PATH",
+ "failure": "the scanner failed (exit status 1): failed to load vulnerability db",
  "components": 106, "placed": 106}
 ```
 

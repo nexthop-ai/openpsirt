@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -58,6 +60,16 @@ func TestASupplierAdvisoryIsEvidenceAndNeverADecision(t *testing.T) {
 		}
 		if taken.Recorded != 1 || taken.Digest == "" || taken.Title == "" {
 			t.Fatalf("the upload reports %+v", taken)
+		}
+		// Ordered against the publisher's other statements by when the
+		// advisory says its revision was released.
+		var said time.Time
+		if err := r.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`"said_at"`).
+			Where(`"source" = ?`, finding.FromAdvisory).Scan(t.Context(), &said); err != nil {
+			t.Fatal(err)
+		}
+		if !said.Equal(time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)) {
+			t.Errorf("the advisory's statement is recorded as said at %v, want its current release date", said)
 		}
 
 		detail := r.WhatPublishersSay(t)
@@ -113,7 +125,9 @@ func TestAnAdvisoryAboutAnotherVersionOffersNothing(t *testing.T) {
 
 func TestUploadingOneAdvisoryLeavesTheOthersStanding(t *testing.T) {
 	// A publisher issues hundreds. Replaced on the publisher alone, the
-	// deployment holds exactly the last document anybody uploaded.
+	// deployment holds exactly the last document anybody uploaded. The two
+	// speak about different versions, so neither statement is newer than the
+	// other about the same thing.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		if got := r.Advised(t, "admin", "one.json",
@@ -121,7 +135,7 @@ func TestUploadingOneAdvisoryLeavesTheOthersStanding(t *testing.T) {
 			t.Fatalf("the first answered %d: %s", got.Code, got.Body.String())
 		}
 		second := r.Advised(t, "admin", "two.json",
-			httpapitest.SupplierAdvisory("EXSA-2026:1002", "known_not_affected", "3.7.0"))
+			httpapitest.SupplierAdvisory("EXSA-2026:1002", "known_not_affected", "3.9.0"))
 		if second.Code != http.StatusCreated {
 			t.Fatalf("the second answered %d: %s", second.Code, second.Body.String())
 		}

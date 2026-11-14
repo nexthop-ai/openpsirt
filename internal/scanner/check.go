@@ -141,12 +141,7 @@ func (r *Runner) checkOne(ctx context.Context, reference string) (*Checking, *wa
 	}
 	replaced.Lag = settle
 	checked, err := findings.CheckReplaced(ctx, replaced, run.ID, result.Reported)
-	settled, done := queue.Settling(ctx)
-	defer done()
-	if finished := findings.Finish(settled, run.ID, result.Version, result.DatabaseVersion,
-		result.Caution, err); finished != nil {
-		r.logger.Error("could not record the end of a check run", "run", run.ID, "error", finished)
-	}
+	r.finish(ctx, findings, run.ID, result, err, "check run")
 	if err != nil {
 		return nil, nil, err
 	}

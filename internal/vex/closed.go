@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	findingkind "github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
@@ -134,7 +135,7 @@ func (s *Store) closed(ctx context.Context, buildID int64, visible []access.Visi
 	for _, row := range held {
 		named = append(named, row.ComponentID)
 	}
-	names, err := s.componentNames(ctx, distinct(named))
+	names, err := s.componentNames(ctx, buildID, distinct(named))
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +420,8 @@ type componentName struct {
 	purl string
 }
 
-func (s *Store) componentNames(ctx context.Context, ids []int64) (map[int64]componentName, error) {
+// componentNames names components as a build states them.
+func (s *Store) componentNames(ctx context.Context, buildID int64, ids []int64) (map[int64]componentName, error) {
 	byID, args := database.InAnyOf(`"c"."id"`, ids)
 	var rows []struct {
 		ID   int64          `bun:"id"`
@@ -428,7 +430,7 @@ func (s *Store) componentNames(ctx context.Context, ids []int64) (map[int64]comp
 	}
 	if err := s.idb().NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`"c"."id", "c"."name", "c"."purl"`).
+		ColumnExpr(`"c"."id", `+graph.BuildName("?", `"c"."id"`, "c")+` AS "name", "c"."purl"`, buildID).
 		Where(byID, args...).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the components closed findings are at: %w", err)

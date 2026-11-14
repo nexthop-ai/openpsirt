@@ -20,6 +20,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -1152,6 +1153,49 @@ func TestTheQueueAndEvidenceNameTheComponentACodeFindingIsPlacedOn(t *testing.T)
 	})
 }
 
+// Every reader of a code finding's component names it as the finding's build
+// stated it, where another product described the package first under another
+// name and version.
+func TestEveryCodeFindingReaderNamesWhatTheBuildStated(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		ctx := t.Context()
+		other := w.DeclareProduct("edge", "Edge")
+		theirs := w.BuildFor(w.DeclareBranchOrTag(other, "main", catalog.Branch, nil),
+			w.DeclareVariant(other, "box", true)).ID
+		w.inventoryAt(t, theirs, "theirs", time.Now().UTC().Add(-3*time.Hour),
+			graph.Described{Purl: "pkg:generic/edge@1.0", Name: "edge", Version: "1.0"},
+			graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "nothing", Version: "99.0"})
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+
+		listed, evidenced := w.placement(t)
+		const path = "src/sonic-frr/frr/bgpd/bgp_attr.c"
+		want := [3]string{"frr", "10.2", "false"}
+		if listed[path] != want || evidenced[path] != want {
+			t.Errorf("the queue places it on %v and the evidence on %v; want %v",
+				listed[path], evidenced[path], want)
+		}
+
+		placed, _, err := componentOf(ctx, w.DB.DB, w.Build.ID, w.frr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if placed.Name != "frr" {
+			t.Errorf("a flaw recorded from it is offered %q; want frr", placed.Name)
+		}
+		alike, err := resembling(ctx, w.DB.DB, w.Build.ID, "src/sonic-frr/frr")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(alike) != 1 || alike[0].Name != "frr" {
+			t.Errorf("the components resembling its directory are %+v; want frr", alike)
+		}
+	})
+}
+
 // placement is where the queue and the evidence say each code finding of the
 // build is placed, by path.
 func (w *world) placement(t *testing.T) (map[string][3]string, map[string][3]string) {
@@ -1216,6 +1260,32 @@ func TestACodeFindingOnARootRenamedSinceIsOnTheBuild(t *testing.T) {
 		}
 		if _, root, err := componentOf(t.Context(), w.DB.DB, w.Build.ID, was); err != nil || !root {
 			t.Errorf("a flaw record reads the former root as the build %v, %v; want true", root, err)
+		}
+	})
+}
+
+func TestACodeFindingOnAVersionMovedOffPairsByTheNameTheBuildStated(t *testing.T) {
+	// Another build described FRR 10.2 first and named the component row; this
+	// build states it as frr, and moves to frr 10.3. The version it left is
+	// replaced by the one it moved to, as the build's inventory names both.
+	eachWorld(t, func(t *testing.T, w *world) {
+		other := w.BuildFor(w.Tag, w.Customer).ID
+		w.inventoryWith(t, other, graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "frrouting", Version: "10.2"})
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		left := w.frr
+		w.inventoryAt(t, w.Build.ID, "inventory-frr-moved", time.Now().UTC().Add(-30*time.Minute),
+			graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"},
+			graph.Described{Purl: "pkg:github/frrouting/frr@10.3", Name: "frr", Version: "10.3"})
+		replaced, err := replacedIn(t.Context(), w.DB.DB, w.Build.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if live := replaced[left]; len(live) != 1 || live[0] != w.frr {
+			t.Errorf("the version the build moved off is replaced by %v, want frr 10.3 (%d)", live, w.frr)
 		}
 	})
 }

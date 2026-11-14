@@ -523,3 +523,109 @@ func TestAScannerFaultIsNotCountedAsAFix(t *testing.T) {
 		}
 	})
 }
+
+// stating renames every component of a snapshot as a build would that states
+// its own names for the same packages.
+func stating(snap graph.Snapshot, rename func(string) string) graph.Snapshot {
+	named := func(d graph.Described) graph.Described {
+		if d.Purl != snap.Root.Purl {
+			d.Name = rename(d.Name)
+		}
+		return d
+	}
+	out := graph.Snapshot{Root: snap.Root}
+	for _, c := range snap.Components {
+		out.Components = append(out.Components, named(c))
+	}
+	for _, d := range snap.Dependencies {
+		out.Dependencies = append(out.Dependencies,
+			graph.Dependency{Parent: named(d.Parent), Child: named(d.Child)})
+	}
+	return out
+}
+
+func TestTwoBuildsStatingAComponentDifferentlyArePairedOnTheComponent(t *testing.T) {
+	// Each build shows the name it stated. The comparison pairs the two on
+	// the component, so a package the later build names in other capitals is
+	// still present rather than fixed and newly arrived, and why something
+	// went is still found.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		f.applied(t,
+			found("CVE-2026-GONE", libnl),
+			found("CVE-2026-STAYS", swss),
+		)
+		earlier := f.build
+
+		later := f.anotherBuild(t, "v2")
+		f.shippedTo(t, later, stating(twoConsumers(), strings.ToUpper))
+		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), []finding.Reported{
+			found("CVE-2026-GONE", libnl),
+			found("CVE-2026-STAYS", swss),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		f.shippedTo(t, later, stating(withoutLibnl(), strings.ToUpper))
+		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), []finding.Reported{
+			found("CVE-2026-STAYS", swss),
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		comparison, err := f.store.Compare(ctx, f.holding(t, access.PublicRead), earlier, later, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(comparison.Newly) != 0 {
+			t.Errorf("a component the later build names differently arrived anew: %+v", comparison.Newly)
+		}
+		if still := entries(comparison.Still); len(still) != 1 || still["CVE-2026-STAYS"].Component != swss.Name {
+			t.Errorf("still present %+v, want CVE-2026-STAYS at %s as the earlier build stated it",
+				comparison.Still, swss.Name)
+		}
+		gone := entries(comparison.Fixed)["CVE-2026-GONE"]
+		if gone.Because != finding.Removed {
+			t.Errorf("the issue that went is %+v, want it gone because %q", gone, finding.Removed)
+		}
+	})
+}
+
+func TestWhyAnEntryWentIsFoundWhereBothBuildsStatedAnotherName(t *testing.T) {
+	// The component row holds the name a third build stated first. Both
+	// builds compared state their own, and the reason an entry went is read
+	// against the row it closed at.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shippedTo(t, f.anotherBuild(t, "v0"), twoConsumers())
+
+		earlier := f.anotherBuild(t, "v1")
+		f.shippedTo(t, earlier, stating(twoConsumers(), strings.ToUpper))
+		if _, err := f.store.Apply(ctx, earlier, f.runOn(t, earlier), []finding.Reported{
+			found("CVE-2026-GONE", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		later := f.anotherBuild(t, "v2")
+		f.shippedTo(t, later, stating(twoConsumers(), strings.ToUpper))
+		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), []finding.Reported{
+			found("CVE-2026-GONE", libnl),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		f.shippedTo(t, later, stating(withoutLibnl(), strings.ToUpper))
+		if _, err := f.store.Apply(ctx, later, f.runOn(t, later), nil); err != nil {
+			t.Fatal(err)
+		}
+
+		comparison, err := f.store.Compare(ctx, f.holding(t, access.PublicRead), earlier, later, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gone, listed := entries(comparison.Fixed)["CVE-2026-GONE"]
+		if !listed || gone.Because != finding.Removed || gone.Component != strings.ToUpper(libnl.Name) {
+			t.Errorf("fixed %+v, closed %+v; want CVE-2026-GONE at %s gone because %q",
+				comparison.Fixed, comparison.Closed, strings.ToUpper(libnl.Name), finding.Removed)
+		}
+	})
+}

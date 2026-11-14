@@ -316,9 +316,25 @@ func TestARecordAsFlawOffersTheComponentItsPrefixWasConfirmedAs(t *testing.T) {
 		if said := offer.Discloses.Said; !slices.Contains(said, findingsapi.AnalyzerSaidBody{Path: "src/a.c", Message: "p is leaked"}) {
 			t.Errorf("an inclusion discloses the messages %+v; want the analyzer's message at src/a.c", said)
 		}
-		if got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
-			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"component":"zlib","summary":"p leaks"}`); got.Code != http.StatusCreated {
+		// The shared row named as another product might have described the
+		// package, so the record answers under the name the build stated.
+		if _, err := r.DB.DB.NewUpdate().Table("component").Set(`"name" = ?`, "nothing").
+			Where(`"name" = ?`, "zlib").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"component":"zlib","summary":"p leaks"}`)
+		if got.Code != http.StatusCreated {
 			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
+		}
+		var recorded struct {
+			Component string `json:"component"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		if recorded.Component != "zlib" {
+			t.Errorf("the flaw record answers at %q; want zlib, as the build stated it", recorded.Component)
 		}
 
 		httpapitest.ApplyRunIn(t, r, "cppcheck/default", time.Now().UTC().Add(-time.Hour),

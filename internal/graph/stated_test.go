@@ -110,3 +110,77 @@ func TestEachBuildHandsTheScannerTheIdentifiersItStated(t *testing.T) {
 		}
 	})
 }
+
+func TestAReplacedVersionPairsByTheNameItsBuildStated(t *testing.T) {
+	// The component row is named by whichever build described the package
+	// first. A build stating it under another name moves to the next version
+	// under that name, and the version it left is replaced by the one it
+	// moved to, as its inventory's changes read it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		other := f.world.BuildFor(f.world.Branch, f.world.Internal).ID
+		holding := func(name, version string) graph.Snapshot {
+			x := graph.Described{Purl: "pkg:npm/x@" + version, Name: name, Version: version}
+			return graph.Snapshot{Root: root, Components: []graph.Described{x},
+				Dependencies: []graph.Dependency{{Parent: root, Child: x}}}
+		}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, other, f.scanOf(t, other), holding("libx", "1")); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), holding("x", "1")); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), holding("x", "2")); err != nil {
+			t.Fatal(err)
+		}
+		replaced, err := graph.Replaced(ctx, f.db, f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(replaced) != 1 {
+			t.Errorf("the build's replaced versions are %v, want the one it moved from", replaced)
+		}
+	})
+}
+
+func TestAComponentHeldUnderTwoNamesPairsByTheLater(t *testing.T) {
+	// A build that held one component under a name, dropped it, and held it
+	// again under another pairs it by the name it last stated, as the
+	// stated-name columns read it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		holding := func(held ...graph.Described) graph.Snapshot {
+			s := graph.Snapshot{Root: root, Components: held}
+			for _, one := range held {
+				s.Dependencies = append(s.Dependencies, graph.Dependency{Parent: root, Child: one})
+			}
+			return s
+		}
+		old := func(name string) graph.Described {
+			return graph.Described{Purl: "pkg:npm/x@1", Name: name, Version: "1"}
+		}
+		other := graph.Described{Purl: "pkg:npm/y@1", Name: "y", Version: "1"}
+		libx := graph.Described{Purl: "pkg:npm/libx@2", Name: "libx", Version: "2"}
+		x := graph.Described{Purl: "pkg:npm/x@2", Name: "x", Version: "2"}
+		for _, s := range []graph.Snapshot{
+			holding(old("libx")), holding(other), holding(old("x")), holding(libx, x),
+		} {
+			if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), s); err != nil {
+				t.Fatal(err)
+			}
+		}
+		ids, err := graph.NewComponents(f.db.DB).Intern(ctx, []graph.Described{old("x"), x})
+		if err != nil {
+			t.Fatal(err)
+		}
+		replaced, err := graph.Replaced(ctx, f.db, f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := replaced[ids[old("x").Identity()]]
+		if len(got) != 1 || got[0] != ids[x.Identity()] {
+			t.Errorf("the version held under two names is replaced by %v, want the one named x (%d)",
+				got, ids[x.Identity()])
+		}
+	})
+}

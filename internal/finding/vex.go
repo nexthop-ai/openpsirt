@@ -91,6 +91,13 @@ type Statement struct {
 	UploadedBy int64      `bun:"uploaded_by,notnull"`
 	UploadedAt time.Time  `bun:"uploaded_at,notnull"`
 	Superseded *time.Time `bun:"superseded_at"`
+	// SaidAt is when the publisher made the statement: its own timestamp,
+	// else its document's, nil where neither states one. OvertakenBy is the
+	// newer statement of theirs about the same product and issue that set
+	// this one aside (REQ-31), nil for one in force or set aside by a
+	// revision of its own document.
+	SaidAt      *time.Time `bun:"said_at"`
+	OvertakenBy *int64     `bun:"overtaken_by"`
 	// DeclinedAt and DeclinedBy are when somebody here declined the
 	// statement, and who. A declined statement closes nothing and is offered
 	// to nobody, and stays readable.
@@ -118,6 +125,7 @@ func StatementOf(claim sbom.Suppression, at sbom.Target) Statement {
 		Status:        string(claim.Status),
 		Justification: claim.Justification,
 		Statement:     claim.Statement,
+		SaidAt:        claim.SaidAt,
 	}
 	switch {
 	case at.Within != nil:
@@ -153,9 +161,9 @@ func packaged(purl string) bool {
 
 // The two kinds of document a third party's judgment arrives in.
 //
-// They differ in what a later upload replaces, which is a property of the
-// document rather than of the claims inside it: a statement set is a
-// publisher's whole answer and an advisory is one announcement among hundreds.
+// Each kind is replaced only by a later upload of its own kind, and the two
+// never replace each other: a VEX document by its own revision, an advisory
+// by the advisory of its name.
 const (
 	// FromVex is a VEX document — OpenVEX or the CSAF VEX profile.
 	FromVex = "vex"
@@ -173,9 +181,10 @@ const (
 // being worked out beside them, so that no caller can record an advisory under
 // a statement set's key.
 type Supplied struct {
-	// Source is FromVex or FromAdvisory, and Identifier the name the publisher
-	// gave the document. An advisory carries one and a statement set does not:
-	// a publisher issues one statement set and hundreds of advisories.
+	// Source is FromVex, FromAdvisory or FromUpstream, and Identifier the name
+	// the publisher gave the document. An advisory carries one; a VEX
+	// document carries one where it states one, and one stating none is
+	// replaced by the publisher's next document stating none.
 	//
 	// The identifier is matched exactly rather than folded. It is an identity
 	// a provider hands over, read out of the document every time, so two
@@ -188,6 +197,9 @@ type Supplied struct {
 	Publisher string
 	Document  string
 	Digest    string
+	// SaidAt is when the document says it was issued, which a statement
+	// stating no time of its own takes. Nil where it states none.
+	SaidAt *time.Time
 	// Arrived is how the document came to be recorded, which the record of
 	// uploads keeps beside the statements. Nil records the statements alone,
 	// which is how an upstream's documents are recorded.
@@ -296,9 +308,9 @@ func (s Statement) PrefillsFor(version string) (outcome string, offers bool) {
 func (from Supplied) valid() error {
 	switch from.Source {
 	case FromVex:
-		if from.Identifier != "" {
-			return refusal.Errorf("a statement set is a publisher's whole answer and is " +
-				"replaced as one, so it is not identified by a document name")
+		if utf8.RuneCountInString(from.Identifier) > MostDocumentName {
+			return refusal.Errorf("the name the publisher gave it is longer than the %d "+
+				"characters this records", MostDocumentName)
 		}
 	case FromAdvisory, FromUpstream:
 		if strings.TrimSpace(from.Identifier) == "" {
@@ -332,15 +344,20 @@ func (from Supplied) valid() error {
 // what it says is written — so "they changed their mind" is a fact the record
 // holds rather than one it silently loses.
 //
-// What it replaces is the document's own kind. A publisher's statement set is
-// their whole answer, so a later one replaces the one before it. One of their
-// advisories is one announcement among hundreds, so it replaces the advisory
-// of the same name and leaves the rest of what they have published standing —
-// and neither kind touches the other, because uploading a publisher's
-// statement set would otherwise set aside every advisory of theirs on record.
+// What it replaces is the earlier revision of the same document: the same
+// kind, publisher and identifier. A publisher issues many VEX documents and
+// many advisories, so a document replaces its own revision and leaves the rest
+// of what they have published standing, and neither kind touches the other.
 //
 // A claim the document repeats word for word keeps its row and stands in the
 // new document. Only a claim it no longer makes is set aside.
+//
+// Across documents, the publisher's newest statement about a product and an
+// issue is the one in force, and their older ones about it are set aside as
+// overtaken (newestStands).
+//
+// A caller recording inside a transaction of its own calls
+// EnsureStatementsLock before it and TakeStatements as its first statement.
 func (s *Store) RecordStatements(ctx context.Context, by access.Subject, productID int64,
 	from Supplied, said []Statement) (recorded, superseded int, err error) {
 
@@ -352,6 +369,14 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 	replace := func(ctx context.Context, tx bun.IDB) error {
 		recorded, superseded = 0, 0
 		now := s.now().UTC().Truncate(time.Microsecond)
+
+		// Taken before anything is read, here and by a caller whose
+		// transaction reads first: two documents recorded at once would each
+		// read the other's statements as absent, and both newest statements
+		// would stand.
+		if err := TakeStatements(ctx, tx); err != nil {
+			return err
+		}
 
 		// A copy of its own on every attempt. The closure is re-run whole
 		// when a transaction is retried, and an attempt that folded, paired
@@ -370,6 +395,15 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			claims[i].WithinAbout = bound.HeadRunes(claims[i].WithinAbout, database.NameWidth)
 			claims[i].Justification = bound.HeadRunes(claims[i].Justification, database.NameWidth)
 			claims[i].Statement = WordsOf(claims[i].Statement)
+			if claims[i].SaidAt == nil {
+				claims[i].SaidAt = from.SaidAt
+			}
+			// A time after this recording is none, so the upload order
+			// decides: kept, a mistyped year or a wrong clock would outrank
+			// every later statement of the publisher's about the subject.
+			if claims[i].SaidAt != nil && claims[i].SaidAt.After(now) {
+				claims[i].SaidAt = nil
+			}
 		}
 
 		// The same bytes read the same way change nothing, so nothing is
@@ -379,14 +413,14 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		var standing []Statement
 		err := tx.NewSelect().Model(&standing).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "placement", "status", "justification").
+				"within_about", "placement", "status", "justification", "said_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
 			Where(`"document_id" = ?`, identifier).
 			Where(`"digest" = ?`, from.Digest).
-			Where(`"superseded_at" IS NULL`).
+			Where(HeldByItsDocument).
 			Scan(ctx)
 		if err != nil {
 			return fmt.Errorf("ask what is already held: %w", err)
@@ -397,9 +431,11 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			return nil
 		}
 		// What stands under this document's key, whatever bytes it arrived
-		// as. A claim the document repeats word for word keeps its row, brought
-		// up to date with the document it now stands in and where it places
-		// its supplier's product. Only a claim the document no longer makes is
+		// as: its publisher and its own identifier, so a supplier's document
+		// is replaced only by a later revision of itself (REQ-31). A claim
+		// the document repeats word for word keeps its row, brought up to
+		// date with the document it now stands in and where it places its
+		// supplier's product. Only a claim the document no longer makes is
 		// set aside, because a superseded claim is what tells everyone holding
 		// an approved decision that cited it that the publisher changed what
 		// they published — and repeated, they did not. A fetched advisory's
@@ -409,30 +445,37 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		var held []Statement
 		heldBy := tx.NewSelect().Model(&held).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "placement", "status", "justification").
+				"within_about", "placement", "status", "justification", "said_at", "superseded_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
-			Where(`"superseded_at" IS NULL`)
-		if from.Source != FromVex {
-			heldBy = heldBy.Where(`"document_id" = ?`, identifier)
-		}
+			Where(`"document_id" = ?`, identifier).
+			Where(HeldByItsDocument)
 		if err := heldBy.Scan(ctx); err != nil {
 			return fmt.Errorf("ask what they said before: %w", err)
 		}
 		repeated, gone, fresh := pairRepeated(held, claims)
 
+		// A claim the document no longer makes is set aside by its revision,
+		// overtaken or not, and nothing brings it back.
 		err = database.IDsInBatches(ctx, gone, func(ctx context.Context, batch []int64) error {
 			_, err := tx.NewUpdate().Model((*Statement)(nil)).
-				Set(`"superseded_at" = ?`, now).
+				Set(`"superseded_at" = COALESCE("superseded_at", ?)`, now).
+				Set(`"overtaken_by" = NULL`).
 				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
 			return err
 		})
 		if err != nil {
 			return fmt.Errorf("set aside what they said before: %w", err)
 		}
-		superseded = len(gone)
+		// Counted where it was in force: one already overtaken changes
+		// nothing anybody reads.
+		for _, row := range held {
+			if _, set := slices.BinarySearch(gone, row.ID); set && row.Superseded == nil {
+				superseded++
+			}
+		}
 
 		for placed, ids := range repeated {
 			err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
@@ -441,6 +484,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 					Set(`"within" = ?`, nullable(placed.Within)).
 					Set(`"within_about" = ?`, nullable(placed.WithinAbout)).
 					Set(`"placement" = ?`, nullable(placed.Placement)).
+					Set(`"said_at" = ?`, placed.SaidAt()).
 					Set(`"document" = ?`, from.Document).
 					Set(`"digest" = ?`, from.Digest).
 					Set(`"restated_at" = ?`, now).
@@ -484,18 +528,35 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		// 1.4 and 1.3. The caller is waiting on the answer, so this is a
 		// request rather than a background pass.
 		//
-		// The batch is sized for the narrowest engine rather than for the
-		// fastest: PostgreSQL binds at most 65,535 parameters in one
-		// statement.
-		for from := 0; from < len(toInsert); from += statementsPerInsert {
-			to := min(from+statementsPerInsert, len(toInsert))
-			batch := toInsert[from:to]
-			if _, err := tx.NewInsert().Model(&batch).Exec(ctx); err != nil {
-				return fmt.Errorf("record what they said: %w", err)
-			}
-			recorded += len(batch)
+		// The identifiers the rows carry afterwards are the ones the store
+		// assigned, on a server numbering in steps as well, because the rows
+		// an upload inserted are told apart from the rows it overtakes by
+		// them.
+		if err := database.InBatches(ctx, tx, toInsert); err != nil {
+			return fmt.Errorf("record what they said: %w", err)
 		}
+		recorded += len(toInsert)
+
+		// Every row the document held, with what it says now: a row moved to
+		// another placement leaves the subject it was about.
+		touched := make([]Statement, 0, len(claims)+len(held))
+		touched = append(touched, claims...)
+		touched = append(touched, held...)
+		inserted := make(map[int64]bool, len(toInsert))
+		for _, one := range toInsert {
+			inserted[one.ID] = true
+		}
+		overtaken, err := newestStands(ctx, tx, productID, publisher, from.Source, touched, inserted, now)
+		if err != nil {
+			return err
+		}
+		superseded += overtaken
 		return nil
+	}
+	if pool, ok := database.Handle(s.db); ok {
+		if err := EnsureStatementsLock(ctx, pool); err != nil {
+			return 0, 0, err
+		}
 	}
 	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		if err := replace(ctx, tx); err != nil {
@@ -692,14 +753,6 @@ func namingTheSamePackage(said []Statement, purl string) []Statement {
 // as a package identifier at all.
 const sourceTree = "generic"
 
-// statementsPerInsert is how many claims one insert states.
-//
-// Bounded by what an engine will bind in one statement rather than by what is
-// fast: PostgreSQL takes 65,535 parameters, and five hundred claims leave room
-// for a hundred and thirty columns each, so a column added to a claim does not
-// make the bound the thing that breaks.
-const statementsPerInsert = 500
-
 // MostPublisher is how long the name of whoever published a statement may be,
 // and MostDocumentName how long the name the publisher gave the document may
 // be.
@@ -730,6 +783,21 @@ func placementOf(one Statement) string {
 // repeated claim takes from the document repeating it.
 type placed struct {
 	WithinPurl, Within, WithinAbout, Placement string
+	// saidAt is when the document says the claim was made, in microseconds
+	// since the epoch, where stated says it does: values, so the claims of
+	// one moment share one write.
+	saidAt int64
+	stated bool
+}
+
+// SaidAt is when the document says the claim was made, nil where it says
+// nothing.
+func (p placed) SaidAt() *time.Time {
+	if !p.stated {
+		return nil
+	}
+	at := time.UnixMicro(p.saidAt).UTC()
+	return &at
 }
 
 // pairRepeated pairs each claim a document makes with a standing row making
@@ -763,7 +831,10 @@ func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statem
 
 	repeated := map[placed][]int64{}
 	keep := func(one Statement, row Statement) {
-		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement}
+		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement, 0, false}
+		if one.SaidAt != nil {
+			at.saidAt, at.stated = one.SaidAt.UnixMicro(), true
+		}
 		repeated[at] = append(repeated[at], row.ID)
 	}
 	// Exact repeats first, so a row recorded before its product was read
@@ -808,7 +879,8 @@ func nullable(value string) any {
 }
 
 // sameReading reports whether two sets of statements say the same things,
-// in any order. Only what a reader derives from the document is compared.
+// in any order. Only what a reader derives from the document is compared,
+// when each was said included.
 func sameReading(held, said []Statement) bool {
 	if len(held) != len(said) {
 		return false
@@ -816,9 +888,13 @@ func sameReading(held, said []Statement) bool {
 	reading := func(rows []Statement) []string {
 		out := make([]string, len(rows))
 		for i, one := range rows {
+			said := ""
+			if one.SaidAt != nil {
+				said = one.SaidAt.UTC().Format(time.RFC3339Nano)
+			}
 			out[i] = strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
 				one.About, one.WithinPurl, one.Within, one.WithinAbout, one.Placement, one.Status,
-				one.Justification, one.Statement}, "\x00")
+				one.Justification, one.Statement, said}, "\x00")
 		}
 		slices.Sort(out)
 		return out

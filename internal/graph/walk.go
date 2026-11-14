@@ -120,7 +120,7 @@ const unplacedSeeds = `"rn"."build_id" = ? AND "rn"."closed_scan_id" IS NULL AND
 			  AND ` + orphaned
 
 // Replaced is the components a build held and holds no longer, each with the
-// live components of the build carrying its name. A finding keeps the
+// live components of the build carrying its name, as the build stated each. A finding keeps the
 // component it opened on, so a rescan at a new version replaces the component
 // and not the finding, and what was found on the old version is counted
 // wherever the present one sits. A component no live one names is left out.
@@ -134,18 +134,25 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 	type named struct {
 		Component int64  `bun:"component_id"`
 		Name      string `bun:"name_folded"`
+		Opened    int64  `bun:"opened_scan_id"`
+		Node      int64  `bun:"id"`
 	}
 	read := func(live bool) ([]named, error) {
 		var rows []named
 		q := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-			ColumnExpr(`"n"."component_id", "c"."name_folded"`).
+			ColumnExpr(`"n"."component_id", `+NodeFolded("n", "c")+` AS "name_folded"`).
 			Where(`"n"."build_id" = ?`, buildID).
 			Distinct()
 		if live {
 			q = q.Where(`"n"."closed_scan_id" IS NULL`)
 		} else {
-			q = q.Where(`"n"."closed_scan_id" IS NOT NULL`)
+			// Oldest first, so the name the build last stated for a
+			// component it held under two is the one kept below, as
+			// BuildFolded reads it.
+			q = q.ColumnExpr(`"n"."opened_scan_id", "n"."id"`).
+				Where(`"n"."closed_scan_id" IS NOT NULL`).
+				OrderExpr(`"n"."opened_scan_id", "n"."id"`)
 		}
 		if err := q.Scan(ctx, &rows); err != nil {
 			return nil, err
@@ -167,11 +174,16 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 		byName[row.Name] = append(byName[row.Name], row.Component)
 	}
 	out := map[int64][]int64{}
+	last := map[int64]string{}
 	for _, row := range closed {
-		if live[row.Component] || len(byName[row.Name]) == 0 {
-			continue
+		if !live[row.Component] {
+			last[row.Component] = row.Name
 		}
-		out[row.Component] = byName[row.Name]
+	}
+	for component, name := range last {
+		if len(byName[name]) > 0 {
+			out[component] = byName[name]
+		}
 	}
 	return out, nil
 }
@@ -460,7 +472,7 @@ func (s *Store) climb(ctx context.Context, buildID int64, componentIDs []int64) 
 	)
 	SELECT "u"."node" AS "node", "e"."parent_id" AS "parent",
 	       "n"."component_id" AS "component_id", "n"."is_root" AS "is_root",
-	       "c"."name" AS "name", "c"."version" AS "version", "c"."purl" AS "purl"
+	       `+NodeName("n", "c")+` AS "name", `+NodeVersion("n", "c")+` AS "version", "c"."purl" AS "purl"
 	FROM "up" AS "u"
 	JOIN "graph_node" AS "n" ON "n"."id" = "u"."node"
 	JOIN "component" AS "c" ON "c"."id" = "n"."component_id"
@@ -500,7 +512,7 @@ func (s *Store) underRoot(ctx context.Context, buildID int64, rows []rise) ([]ri
 	if err := s.db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"n"."id" AS "node", "n"."component_id" AS "component_id", "n"."is_root" AS "is_root"`).
-		ColumnExpr(`"c"."name" AS "name", "c"."version" AS "version", "c"."purl" AS "purl"`).
+		ColumnExpr(NodeName("n", "c")+` AS "name", `+NodeVersion("n", "c")+` AS "version", "c"."purl" AS "purl"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, true).

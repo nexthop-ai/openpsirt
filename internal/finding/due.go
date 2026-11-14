@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -377,6 +378,8 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 			// products, so the join reads the branch or tag's product per row rather
 			// than binding one.
 			Join(rating.For(rating.OnBranchOrTag)).
+			// The name and version the build stated, which the grouping holds.
+			Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			// The consumer, for the versions a decision is keyed on.
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
@@ -398,13 +401,13 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	}
 	// The grouping, which decides what one row is: an issue at a component in
 	// one build, however many occurrences it has there.
-	const grouping = `"v"."identifier", "c"."name", "c"."version", "c"."purl", "f"."urgency_exploited", "p"."name", "p"."display_name", ` +
+	const grouping = `"v"."identifier", "c"."name", "c"."version", "sn"."name", "sn"."version", "c"."purl", "f"."urgency_exploited", "p"."name", "p"."display_name", ` +
 		`"st"."name", "st"."display_name", "va"."name", "va"."display_name", "f"."build_id", "f"."vulnerability_id", "f"."component_id"`
 
 	query := narrow(s.db.NewSelect()).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(graph.NodeName("sn", "c") + ` AS "component"`).
+		ColumnExpr(graph.NodeVersion("sn", "c") + ` AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
 		ColumnExpr(`MIN(` + rating.EffectiveExpr + `) AS "severity"`).
 		ColumnExpr(`"f"."urgency_exploited" AS "exploited"`).
@@ -431,7 +434,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// plan. Then the exploited flag, exploited first, because it is in the
 		// grouping: a merge refiles the gone issue's findings with their flag
 		// as it was, so one component in one build can hold a group of each.
-		OrderExpr(`due, "v"."identifier", "c"."name", "f"."build_id", "c"."version", "f"."component_id", "f"."urgency_exploited" DESC`).
+		OrderExpr(`due, "v"."identifier", "component", "f"."build_id", "version", "f"."component_id", "f"."urgency_exploited" DESC`).
 		Limit(int64(limit)).Offset(int64(offset))
 
 	var late []Late

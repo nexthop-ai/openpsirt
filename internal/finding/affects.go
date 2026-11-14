@@ -90,7 +90,10 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 	if len(standing) == 0 {
 		return nil, ErrNothingOpenThere
 	}
-	component, err := s.ComponentName(ctx, standing[0].ComponentID)
+	// The name the flaw's own build stated, which is what another build of
+	// the product knows the component as. The row's name may be another
+	// product's, and another build may state it for a different package.
+	component, err := s.ComponentNameIn(ctx, standing[0].BuildID, standing[0].ComponentID)
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +173,7 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 		// The flaw's subject and where each added build holds it, read here:
 		// a build that stopped shipping the component since the early check
 		// is refused rather than given a finding under its root.
-		component, err := (&Store{db: tx, now: s.now}).ComponentName(ctx, rows[0].ComponentID)
+		component, err := (&Store{db: tx, now: s.now}).ComponentNameIn(ctx, rows[0].BuildID, rows[0].ComponentID)
 		if err != nil {
 			return err
 		}

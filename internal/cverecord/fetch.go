@@ -152,23 +152,23 @@ func sweep(dir string, now time.Time) {
 var errAbsent = errors.New("not published")
 
 // Build reads a CVE List archive and replaces the snapshot in dir with what it
-// holds, naming each record it left out because it could not be read. from
+// holds, counting the records it left out because they could not be read. from
 // names the archive in the snapshot, for the fetcher to compare against what is
 // published next.
-func Build(archive, dir, from string) ([]error, error) {
+func Build(archive, dir, from string) (Skipped, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, fmt.Errorf("make the CVE record directory: %w", err)
+		return Skipped{}, fmt.Errorf("make the CVE record directory: %w", err)
 	}
 	records, taken, skipped, err := FromArchive(archive, dir)
 	if err != nil {
-		return nil, err
+		return Skipped{}, err
 	}
 	if from == "" {
 		from = filepath.Base(archive)
 	}
 	written, err := os.CreateTemp(dir, ".snapshot-*.jsonl.gz")
 	if err != nil {
-		return nil, fmt.Errorf("make room for the CVE record snapshot: %w", err)
+		return Skipped{}, fmt.Errorf("make room for the CVE record snapshot: %w", err)
 	}
 	err = Write(written, taken, from, records)
 	if closed := written.Close(); err == nil {
@@ -181,7 +181,7 @@ func Build(archive, dir, from string) ([]error, error) {
 	}
 	if err != nil {
 		_ = os.Remove(written.Name())
-		return nil, fmt.Errorf("write the CVE record snapshot: %w", err)
+		return Skipped{}, fmt.Errorf("write the CVE record snapshot: %w", err)
 	}
 	return skipped, nil
 }
@@ -190,12 +190,12 @@ func Build(archive, dir, from string) ([]error, error) {
 // how many, and the first of them. A snapshot built past them narrows nothing
 // on their strength, and the first of them is what tells an operator where to
 // look.
-func Report(logger *slog.Logger, skipped []error) {
-	if len(skipped) == 0 {
+func Report(logger *slog.Logger, skipped Skipped) {
+	if skipped.Count == 0 {
 		return
 	}
 	logger.Error("records in the CVE List archive could not be read and were left out",
-		"skipped", len(skipped), "first", skipped[0])
+		"skipped", skipped.Count, "first", skipped.First)
 }
 
 // latest names the List's newest release, and the day its tag names.

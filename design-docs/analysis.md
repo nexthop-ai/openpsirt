@@ -59,7 +59,7 @@ POST /v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}
 | 200 `already_held` | The same documents for the same series, build and build time, answered as the run repeated |
 | 422 | A document or field unreadable, no analyzer run that ran, every result at a web address, placed results past the byte bound, or a series name too long; the detail names which |
 | 409 | Product, release or variant retired |
-| 503 | Queue past its backlog |
+| 503 | Queue past its backlog, with a retry time; recorded against the series as any refusal is |
 
 ## Bounds
 

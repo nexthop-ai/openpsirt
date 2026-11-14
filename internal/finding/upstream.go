@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -207,8 +208,9 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"ss"."publisher" AS "publisher"`).
 		ColumnExpr(`"v"."identifier" AS "issue"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
+		ColumnExpr(graph.NodeVersion("sn", "c")+` AS "version"`).
 		ColumnExpr(`"ss"."status" AS "status"`).
 		ColumnExpr(`"ss"."document" AS "document"`).
 		ColumnExpr(`"ss"."document_id" AS "document_id"`).

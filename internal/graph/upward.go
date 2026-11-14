@@ -99,8 +99,12 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, buildID int64)
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(`MIN("c"."name") AS "name"`).
-		ColumnExpr(`MIN("c"."version") AS "version"`).
+		Join(StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		// As the build last stated it: a row is shown by this name only where
+		// the tree places it nowhere, which is a component the build no
+		// longer holds, so no node is open.
+		ColumnExpr(`MIN(`+StatedName("sn", "?", `"f"."component_id"`, "c")+`) AS "name"`, buildID).
+		ColumnExpr(`MIN(`+StatedVersion("sn", "?", `"f"."component_id"`, "c")+`) AS "version"`, buildID).
 		ColumnExpr(`MIN("c"."purl") AS "purl"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."vulnerability_id") AS "issues"`).
 		Where(`"f"."build_id" = ?`, buildID).

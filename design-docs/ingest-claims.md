@@ -78,11 +78,21 @@ one claim shape.
 | A CSAF product identifier resolves through its tree once the document closes; an undefined one is dropped, and a claim left with none is refused | |
 | A composite identifier resolves through its relationship to the package, keeping the related product, for all five categories | The product places a statement in a build; one distribution VEX document composes all 1,669 of its identifiers |
 | An OpenVEX product with subcomponents is kept beside each | |
+| An OpenVEX product or subcomponent is named by the first package identifier among its listed `purl` and its `@id`, and by its `@id` where neither is one | Only a package identifier points at a component; key order is the producer's |
+| An OpenVEX statement keeps the impact statement where not affected and the action statement where affected, the other where its own is absent | The format attaches each to one status; key order is the producer's |
 | A CSAF advisory is refused here and read in § Supplier advisories | |
 | The build's suppression reader reads these | One parser bounds the hostile-input surface (REQ-66) |
 | A document is digested as it streams, and past the size bound refused for size before any parse error | |
-| Publisher and advisory names are held without control or format characters, from request, filename or document | A right-to-left override reads reversed beside evidence |
-| Re-uploading from one publisher sets aside what they no longer say, never deleting; each statement keeps its digest | Approvals stay readable |
+| A VEX document's publisher is the one the request names, else the one the document names: an OpenVEX author, a CSAF publisher name. One naming neither is refused | Supersession is keyed on who issued a document (REQ-08); a file name collides between publishers and changes between revisions |
+| A VEX document is replaced only by a later revision of itself: the same publisher and the document's own identifier, an OpenVEX `@id` or a CSAF tracking identifier (REQ-31). A document stating none is keyed on the empty identifier; one longer than a document name is recorded keyed on its SHA-256 digest | Another document from the same supplier covers other products; a file name changes between revisions; an IRI has no length bound |
+| Publisher names, advisory names and VEX document identifiers are held without control or format characters, from request or document | A right-to-left override reads reversed beside evidence |
+| A revision sets aside what the document no longer says, never deleting; each statement keeps its digest | Approvals stay readable |
+| Of one publisher's statements in force in documents of one kind about one product and issue, only the newest stands, whichever document carried it; the older are set aside as overtaken by it (REQ-31). The product is the component at the version named and the product it ships inside | A tool regenerating a document from scratch gives it a new identifier, and its June "affected" must not leave a March "not affected" standing beside it |
+| Newer is by the statement's own time (an OpenVEX statement's `last_updated`, else its `timestamp`), else its document's (an OpenVEX document's `last_updated`, else its `timestamp`; a CSAF `current_release_date`), else the upload order; a time that does not parse, falls outside the years 1000 to 9999 in UTC, or is after the moment the statement is recorded, is none. Equal times go to the later recorded | A document stating no times still orders, by arrival |
+| A revision withdrawing the newest statement restores the newest it overtook; one its own revision withdrew is never restored | The publisher's word is their latest one still said |
+| A revision repeating an overtaken statement keeps its one row, still overtaken, and takes the time the revision states | |
+| Recording statements writes a fresh value into one fixed lock row before the transaction reads anything (`design-docs/database-transactions.md` § Replica coordination) | Each of two documents recorded at once would read the other's statements as absent, and both newest would stand |
+| The same bytes uploaded again record the times the document states where the rows hold none | |
 | The same bytes again write nothing where they read as what stands, and replace it where the reader now derives differently | |
 | A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is `frr` |
 | A shipping-inside product is stored as package identifier, folded name and version | |

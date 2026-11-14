@@ -238,6 +238,16 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 		return nil, nil
 	}
 
+	// Matched as the component lookup matches a typed name: on the fold of
+	// the component's name or the build's own, with the producer's own
+	// spelling naming the one spelled so.
+	named, err := graph.NamedAs(ctx, s.db, name, `"n"."build_id" = ?`, buildID)
+	if err != nil {
+		return nil, err
+	}
+	if len(named) == 0 {
+		return nil, nil
+	}
 	var rows []struct {
 		Version string `bun:"version"`
 		Purl    string `bun:"purl"`
@@ -248,18 +258,16 @@ func (s *Store) VersionsWithIssue(ctx context.Context, subject access.Subject,
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(graph.BuildVersion("?", `"f"."component_id"`, "c")+` AS "version"`, buildID).
 		ColumnExpr(`"c"."purl" AS "purl"`).
-		ColumnExpr(`"c"."name" AS "name"`).
+		ColumnExpr(graph.BuildName("?", `"f"."component_id"`, "c")+` AS "name"`, buildID).
 		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
-		// Matched as the component lookup matches a typed name: on the
-		// fold, with the producer's own spelling naming the one spelled so.
-		Where(`"c"."name_folded" = ?`, graph.Folded(name)).
+		Where(`"f"."component_id" IN (?)`, bun.List(named)).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
-		OrderExpr(`"c"."version", "c"."purl", "c"."name"`).
+		OrderExpr(`"version", "purl", "name"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which versions carry this issue: %w", err)

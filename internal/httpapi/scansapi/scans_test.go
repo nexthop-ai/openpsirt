@@ -375,6 +375,9 @@ func TestNothingIsStoredWhenTheBacklogIsFull(t *testing.T) {
 		if rec.Code != http.StatusServiceUnavailable {
 			t.Fatalf("an upload against a full backlog returned %d, want 503", rec.Code)
 		}
+		if after := rec.Header().Get("Retry-After"); after == "" {
+			t.Error("an upload turned away by a full backlog is not told when to send again")
+		}
 
 		// It has to be refused on arrival rather than after the documents have
 		// been stored and rolled back. Both leave the same rows behind — none

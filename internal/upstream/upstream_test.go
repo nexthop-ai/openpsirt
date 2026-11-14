@@ -63,6 +63,20 @@ func TestAForkTakesWhatItsUpstreamSaysForAnybody(t *testing.T) {
 			t.Error("the statement about the upstream's own build was not recorded for review")
 		}
 
+		// The shared row's name and the builds' version as two products might
+		// state them, so an offer shows what the fork's build stated. A
+		// statement is matched on the row's folded name and version, which
+		// stay.
+		if _, err := w.DB.DB.NewUpdate().Table("component").Set(`"name" = ?`, "nothing").
+			Where(`"purl" = ?`, libnl.Purl).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		const stated = "3.7.0+fork"
+		if _, err := w.DB.DB.NewUpdate().Table("graph_node").Set(`"version" = ?`, stated).
+			Where(`"component_id" IN (SELECT "id" FROM "component" WHERE "purl" = ?)`, libnl.Purl).
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
 		offers, err := w.findings.Offers(t.Context(), w.proposer, w.fork.ID)
 		if err != nil {
 			t.Fatal(err)
@@ -72,6 +86,10 @@ func TestAForkTakesWhatItsUpstreamSaysForAnybody(t *testing.T) {
 			offered = append(offered, one.Issue+" at "+one.Component+" "+one.Version)
 			if one.Issue == portable {
 				t.Errorf("a statement applied by itself is offered for review: %+v", one)
+			}
+			if one.Component != libnl.Name || one.Version != stated {
+				t.Errorf("an offer names %s %s, want %s %s as the fork's build stated it",
+					one.Component, one.Version, libnl.Name, stated)
 			}
 		}
 		if len(offers) != 2 || offers[0].Issue != ownBuild {
@@ -168,6 +186,55 @@ func TestStoppingTrustingAnUpstreamOpensWhatItClosed(t *testing.T) {
 		}
 		if w.statement(portable, finding.PlacedAnybody) != nil {
 			t.Error("a statement of an upstream no longer trusted still stands")
+		}
+	})
+}
+
+// Stopping trusting the upstream sets aside its overtaken statements as well
+// and lets go of what overtook them, so no later recording restores one: the
+// upstream's documents make nothing any more.
+func TestStoppingTrustingAnUpstreamLeavesNothingToRestore(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		ctx := t.Context()
+		said := w.statement(portable, finding.PlacedAnybody)
+		if said == nil {
+			t.Fatal("the upstream's statement was not recorded")
+		}
+		// A newer statement of the upstream's about the same subject, which
+		// overtook it.
+		var newer int64
+		if _, err := w.DB.DB.NewRaw(`INSERT INTO "received_vex_statement" ("product_id", "publisher",
+			"source", "document_id", "vulnerability", "purl", "component", "placement", "about",
+			"status", "justification", "statement_id", "document", "digest", "uploaded_by", "uploaded_at")
+			SELECT "product_id", "publisher", "source", 'newer', "vulnerability", "purl", "component",
+			"placement", "about", "status", "justification", "statement_id", 'newer.json', "digest",
+			"uploaded_by", "uploaded_at" FROM "received_vex_statement" WHERE "id" = ?`, said.ID).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`"id"`).
+			Where(`"document_id" = 'newer'`).Scan(ctx, &newer); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"received_vex_statement"`).
+			Set(`"superseded_at" = ?`, time.Now().UTC()).Set(`"overtaken_by" = ?`, newer).
+			Where(`"id" = ?`, said.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := upstream.NewStore(w.DB.DB).Withdraw(ctx, w.admin, w.fork.ID); err != nil {
+			t.Fatal(err)
+		}
+		var held int
+		if err := w.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`COUNT(*)`).
+			Where(`"product_id" = ?`, w.fork.ID).Where(`"source" = ?`, finding.FromUpstream).
+			Where(finding.HeldByItsDocument).Scan(ctx, &held); err != nil {
+			t.Fatal(err)
+		}
+		if held != 0 {
+			t.Errorf("%d statements of an upstream no longer trusted are still made by their documents", held)
 		}
 	})
 }
@@ -623,6 +690,137 @@ func TestStoppingTrustingAnUpstreamIsSaidAsThatToADecisionCitingIt(t *testing.T)
 		w.read()
 		if got := said(); len(got) != 0 {
 			t.Errorf("trusted again and saying the same, the decision is still told %v", got)
+		}
+	})
+}
+
+// A supplier saying a cited statement again, word for word, in another of its
+// documents leaves the decision citing it untold, and withdrawing it tells
+// the decision, though the same words stand about another product.
+func TestASupplierRepeatingACitedStatementElsewhereTellsNobody(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		ctx := t.Context()
+		claim := *w.statement(ownBuild, "")
+		if err := w.Access.GrantRole(ctx, w.proposer.ID, w.fork.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		recordWithin := func(name string, month time.Month, status, within string) {
+			t.Helper()
+			at := time.Date(2026, month, 1, 0, 0, 0, 0, time.UTC)
+			said := claim
+			said.Status, said.Within = status, within
+			var claims []finding.Statement
+			if status != "" {
+				claims = append(claims, said)
+			}
+			if _, _, err := w.findings.RecordStatements(ctx, w.admin, w.fork.ID, finding.Supplied{
+				Source: finding.FromVex, Identifier: "https://supplier.test/vex/" + name,
+				Publisher: "Supplier", Document: name + ".json", Digest: name + month.String(), SaidAt: &at,
+			}, claims); err != nil {
+				t.Fatal(err)
+			}
+		}
+		record := func(name string, month time.Month, status string) {
+			t.Helper()
+			recordWithin(name, month, status, claim.Within)
+		}
+		told := func() int {
+			t.Helper()
+			if _, _, err := notify.NewWatch(w.DB.DB, slog.New(slog.DiscardHandler)).Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+			rows, _, err := notify.NewStore(w.DB.DB).Waiting(ctx, w.proposer, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			n := 0
+			for _, row := range rows {
+				if row.Kind == notify.StatementRevised && row.ClearedAt == nil {
+					n++
+				}
+			}
+			return n
+		}
+		record("march", time.March, claim.Status)
+		var cited int64
+		if err := w.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`"id"`).
+			Where(`"product_id" = ? AND "source" = ? AND "document" = ?`, w.fork.ID, finding.FromVex, "march.json").
+			Scan(ctx, &cited); err != nil {
+			t.Fatal(err)
+		}
+		w.decisionCiting(w.forkBuild, ownBuild, libnl.Name, triage.NotApplicable,
+			triage.CodeNotInExecutePath, &cited)
+
+		record("june", time.June, claim.Status)
+		if got := told(); got != 0 {
+			t.Errorf("the supplier repeating the statement in another document told the decision %d times", got)
+		}
+		// The same words about the component inside another product leave
+		// the statement the decision cited withdrawn.
+		recordWithin("elsewhere", time.July, claim.Status, "another-product")
+		record("june", time.August, "")
+		record("march", time.September, "")
+		if got := told(); got != 1 {
+			t.Errorf("the statement withdrawn while the same words stand inside another product told the "+
+				"decision %d times, want once", got)
+		}
+	})
+}
+
+// A supplier changing only the reasoning of a cited statement, in another of
+// its documents, tells the decision citing it: the words are part of the
+// evidence an approval was granted against.
+func TestASupplierRewordingACitedStatementTellsTheDecision(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		ctx := t.Context()
+		claim := *w.statement(ownBuild, "")
+		if err := w.Access.GrantRole(ctx, w.proposer.ID, w.fork.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		record := func(name string, month time.Month, words string) {
+			t.Helper()
+			at := time.Date(2026, month, 1, 0, 0, 0, 0, time.UTC)
+			said := claim
+			said.Statement = words
+			if _, _, err := w.findings.RecordStatements(ctx, w.admin, w.fork.ID, finding.Supplied{
+				Source: finding.FromVex, Identifier: "https://supplier.test/vex/" + name,
+				Publisher: "Supplier", Document: name + ".json", Digest: name + month.String(), SaidAt: &at,
+			}, []finding.Statement{said}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		record("march", time.March, "The vulnerable function is never called.")
+		var cited int64
+		if err := w.DB.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`"id"`).
+			Where(`"product_id" = ? AND "source" = ? AND "document" = ?`, w.fork.ID, finding.FromVex, "march.json").
+			Scan(ctx, &cited); err != nil {
+			t.Fatal(err)
+		}
+		w.decisionCiting(w.forkBuild, ownBuild, libnl.Name, triage.NotApplicable,
+			triage.CodeNotInExecutePath, &cited)
+
+		record("june", time.June, "The vulnerable function is called only by a test.")
+		if _, _, err := notify.NewWatch(w.DB.DB, slog.New(slog.DiscardHandler)).Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+		rows, _, err := notify.NewStore(w.DB.DB).Waiting(ctx, w.proposer, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		told := 0
+		for _, row := range rows {
+			if row.Kind == notify.StatementRevised && row.ClearedAt == nil {
+				told++
+			}
+		}
+		if told != 1 {
+			t.Errorf("the supplier rewording the statement told the decision %d times, want once", told)
 		}
 	})
 }

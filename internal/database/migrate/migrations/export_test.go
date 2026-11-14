@@ -231,7 +231,11 @@ func StatementsV0120(engine database.Engine) map[string][]string {
 // StatementsV0130 is v0.13.0's declaration of each table it changes.
 func StatementsV0130(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
-	return map[string][]string{"advisory_issue": advisoryIssueV0130(t)}
+	return map[string][]string{
+		"advisory_issue":         advisoryIssueV0130(t),
+		"graph_node":             graphNodeV0130(t),
+		"received_vex_statement": receivedStatementV0130(t),
+	}
 }
 
 // StopV0130AfterLiveColumn adds the column marking an issue on an advisory
@@ -260,5 +264,49 @@ func StopV0130AfterLiveRule(ctx context.Context, db *database.DB) error {
 		}
 		return u.change(advisoryIssueV0130(u.t), change{table: "advisory_issue",
 			add: []added{{column: "live"}}, constraints: []string{"advisory_issue_live_once"}})
+	})
+}
+
+// StopV0130AfterNodeName adds the name a build stated to each graph node and
+// nothing else: a start of the v0.13.0 upgrade on MySQL or MariaDB that
+// stopped after the first column committed.
+func StopV0130AfterNodeName(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return u.change(graphNodeV0130(u.t), change{table: "graph_node",
+			add: []added{{column: "name"}}})
+	})
+}
+
+// StopV0130BeforeNodeIndex adds every v0.13.0 node column and not the index of
+// the folded name: a start on MySQL or MariaDB that stopped after the last
+// column committed.
+func StopV0130BeforeNodeIndex(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return graphNodeColumnsV0130(u)
+	})
+}
+
+// StopV0130AfterStatementTime adds when each received statement was made and
+// nothing else: a start of the v0.13.0 upgrade on MySQL or MariaDB that
+// stopped after that column committed.
+func StopV0130AfterStatementTime(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return u.change(receivedStatementV0130(u.t), change{table: "received_vex_statement",
+			add: []added{{column: "said_at"}}})
 	})
 }

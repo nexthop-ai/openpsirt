@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -236,9 +237,10 @@ func (s *Store) whereEmbargoed(ctx context.Context,
 	if err := approaching(s.db.NewSelect()).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(catalog.ShownExpr("st")+` AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant"`).

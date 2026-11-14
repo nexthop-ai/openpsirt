@@ -96,7 +96,8 @@ func (s *Store) Grouped(ctx context.Context, subject access.Subject, buildID int
 	}
 	if err := s.db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-		ColumnExpr(`"c"."id", "c"."name", "c"."version", COALESCE("c"."purl", '') AS "purl"`).
+		ColumnExpr(`"c"."id", `+graph.NodeName("n", "c")+` AS "name", `+graph.NodeVersion("n", "c")+
+			` AS "version", COALESCE("c"."purl", '') AS "purl"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, false).

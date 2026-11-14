@@ -28,6 +28,15 @@ this here".
 | Rule | Reason |
 |---|---|
 | A component reached by several parents is one node with several edges | Routes derive from edges |
+| A node holds the name and version its build stated, and the scanner, every screen, list, export and notification read them from it (REQ-08) | The component row is shared across products and holds what the first one stated, so another product's pipeline key would otherwise decide what a build is scanned at and shown with |
+| A node holds its stated name folded as the component's is, indexed with its build | A typed name is looked up within one build or one product's builds |
+| A node holds the source package its build stated, else its stated name, folded as the component's upstream is, indexed with its build; a node written before it was kept takes the row's on its build's next inventory | An assignment rule's source key is looked up within one product's builds (`design-docs/access-assignment.md` § Assignment rules) |
+| A name typed anywhere matches a component's row name or the name a build in scope stated: the component screen, search, the findings list's component, exclude, container and search filters, the trend's component, the decision register and audit log's component, the code-finding queue's component, an assignment rule's container, the source chooser, versions carrying an issue, flaws not analyzed. The list and the trend read every node of the products' builds, closed ones included, since a closed finding sits on a version since replaced | Every screen shows the stated name, and the row can hold another product's. A search adds 6 to 13 ms to a 30 to 53 ms page (`design-docs/data-model-measurements.md` § Stated-name lookup timings) |
+| A typed name is one set of components on the finding: the row's fold, or a component a build stated under it, as an alternative inside the component statement. A rule's container and any lookup by name within builds read the row's fold and the node's fold apart, each led by its own index | Two sets joined by OR on the finding, or one condition across the component and the node, read every open finding or node (`design-docs/data-model-measurements.md` § Stated-name lookup timings) |
+| A flaw recorded by a typed name is keyed on the component row's name, as a scan keys it. Widened to another build, it finds the component there by the name its own build stated | A stated name keys no occurrence, or one flaw recorded and scanned is two findings; another build can state the row's name for a different package |
+| A version a build moved off is paired with the live components of its name as the build stated each: the replaced one by its latest node, a live one by its open node. The trend beneath a replaced version and the code-finding queue read it | The inventory's changes pair the same way, and the row's name can be another product's |
+| A row about a component the build no longer holds reads the name and version of the build's latest node for it, closed included, before the row's: the register, the audit log, a finding's evidence, the findings list on a past day, the packages a build's planned upgrade names, the planned upgrades on a past day, and the tree of somebody's own work | The row's can be another product's; a list of what is open has an open node, and pays nothing for the fallback |
+| A node holding no name or version reads the row's, and the build's next inventory writes the row's into it before comparing, finding such nodes by their empty fold through the build's name index | A node written before the node held them is restated only where the build differs; an inventory with none to fill reads no node |
 | The root, the product itself, is a flagged node excluded from identity and expiry (REQ-08) | Its version changes every build and its name per variant; upward walks stop at the flag |
 | A scan naming no root is filed against the build it was sent for | |
 | The root flag is reconciled every scan | Promoting or demoting a root otherwise leaves two flags or none |
@@ -54,11 +63,13 @@ and names held at a different set of versions.
 
 | Rule | Reason |
 |---|---|
-| Counted by name | An upgrade is one dependency moving |
+| Counted by the name the build stated, folded, as is a comparison of two builds | An upgrade is one dependency moving; the component row's name can be another product's, so grouping by it splits one name in two |
+| In a comparison of two builds, a node holding no name of its own reads the name and version the other build stated for the same component | A build not sent since nodes held a name reads the row's, and one component neither build moved would read as one name gone and another arrived |
 | A name at two versions at once is one entry | A vendored tree ships one routinely |
 | The root is excluded from both sides | Its version is not stored and its name differs per variant |
 | An image held by name is at no version on either side | What each build stated is on the component screen (`design-docs/interface-component.md` § The component screen) |
 | The earliest scan applied to a build has none | |
+| A node whose stated name or version moves is closed and another opened; a node holding none takes the stated ones in place | An earlier scan's changes read its nodes' names, and restated in place would name what a later scan stated; a node holding none was never read by its own name |
 | Worked out when asked, never stored (REQ-20) | |
 
 It is read off the intervals: a node stands before a scan where it opened

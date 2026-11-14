@@ -292,7 +292,9 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule AssignmentRu
 		return 0, 0, err
 	}
 	if rule.Upstream != "" {
-		page = bySource(page, rule.Upstream)
+		if page, err = bySource(ctx, s.db, page, productID, rule.Upstream); err != nil {
+			return 0, 0, err
+		}
 	}
 	if rule.Beneath != "" {
 		// A place in the tree is a walk over one build's edges, and a rule
@@ -371,28 +373,53 @@ func (s *Store) holdableBy(ctx context.Context, teamID, productID int64) ([]acce
 	return append(out, access.Public), nil
 }
 
-// bySource narrows to the components a source-package rule names.
+// bySource narrows to the components a source-package rule names in a
+// product.
 //
 // The source package is the key that matters: one rule naming it catches every
 // binary package built from it, wherever they sit. Falling back to the
 // component's own name where no upstream is recorded, so a rule naming
-// something that records none still matches it.
+// something that records none still matches it. Matched on the component row
+// and on what each of the product's builds stated, since the row holds what
+// the first product to describe the package stated.
+//
+// The stated components are read first, led by the node's build and source
+// fold, and sit as an alternative inside the component statement: two sets
+// joined by OR on the finding's column lose the semijoin on every engine.
 //
 // One expression, used by the sweep and by the preview, because a preview that
 // disagreed with what the rule then does is worse than no preview: it would be
 // a confident wrong answer about a thing nobody can otherwise see.
-func bySource(query *bun.SelectQuery, pattern string) *bun.SelectQuery {
+func bySource(ctx context.Context, db bun.IDB, query *bun.SelectQuery, productID int64,
+	pattern string) (*bun.SelectQuery, error) {
+
 	// The folded columns, not LOWER() over the raw ones: the four engines fold
 	// differently outside ASCII, so asking one to made whether a rule swept a
 	// component depend on which engine was running. Folded on the way in, this
 	// is an equality test and it can use the index.
 	const name = `COALESCE(NULLIF("c"."upstream_folded", ''), "c"."name_folded")`
+	const inProduct = `"n"."build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
+		JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id" WHERE "st"."product_id" = ?)`
+	condition, value := name+` = ?`, pattern
+	var stated []int64
+	var err error
 	if glob, like := globbed(pattern); glob {
-		return query.Where(`"component_id" IN (SELECT "c"."id" FROM "component" AS "c"
-			WHERE `+name+` LIKE ?`+database.LikeClause+`)`, like)
+		condition, value = name+` LIKE ?`+database.LikeClause, like
+		stated, err = graph.SourceMatching(ctx, db, like, inProduct, productID)
+	} else {
+		stated, err = graph.SourcedAs(ctx, db, pattern, inProduct, productID)
 	}
-	return query.Where(`"component_id" IN (SELECT "c"."id" FROM "component" AS "c"
-		WHERE `+name+` = ?)`, pattern)
+	if err != nil {
+		return nil, err
+	}
+	args := []any{value}
+	if len(stated) > 0 {
+		inStated, statedArgs := database.InAnyOf(`"c"."id"`, stated)
+		condition = `(` + condition + ` OR ` + inStated + `)`
+		args = append(args, statedArgs...)
+	}
+	return query.Where(`"f"."component_id" IN (SELECT "c"."id" FROM "component" AS "c"
+		WHERE `+condition+`)`, args...), nil
 }
 
 // globbed says whether a rule's name is a pattern, and what it becomes.
@@ -499,7 +526,9 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 			return nil, err
 		}
 		if upstream != "" {
-			q = bySource(q, upstream)
+			if q, err = bySource(ctx, s.db, q, productID, upstream); err != nil {
+				return nil, err
+			}
 		}
 		if beneath != "" {
 			under, err := s.beneathIn(ctx, productID, beneath)
@@ -517,11 +546,15 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 		return q, nil
 	}
 
+	// Named as each finding's build stated the component: the row holds what
+	// the first product to describe the package stated.
+	shown := graph.StatedName("sn", `"f"."build_id"`, `"f"."component_id"`, "cn")
 	var found Catches
 	names, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "cn" ON "cn"."id" = "f"."component_id"`).
-		ColumnExpr(`DISTINCT "cn"."name" AS "name"`).
-		OrderExpr(`"cn"."name"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		ColumnExpr(`DISTINCT ` + shown + ` AS "name"`).
+		OrderExpr(`"name"`).
 		Limit(int64(sample)))
 	if err != nil {
 		return Catches{}, err
@@ -534,7 +567,8 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	// not how many there are.
 	distinct, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "cn" ON "cn"."id" = "f"."component_id"`).
-		ColumnExpr(`DISTINCT "cn"."name" AS "name"`))
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		ColumnExpr(`DISTINCT ` + shown + ` AS "name"`))
 	if err != nil {
 		return Catches{}, err
 	}
@@ -620,26 +654,21 @@ func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]
 	seen := map[int64]bool{}
 	var under []int64
 	for _, build := range builds {
+		// The component's row name or the name the build stated, read
+		// apart: one condition across the two tables reads every open node
+		// on MySQL. Each read stops one past the cap, so reaching it is
+		// distinguishable from landing on it exactly. The cap is the store's,
+		// not the constant: a store built with a smaller reach that truncates
+		// at the shipped number never trips its own refusal, and applies a
+		// rule to part of what it names.
 		var roots []int64
-		if err := s.db.NewSelect().
-			TableExpr(`"graph_node" AS "n"`).
-			Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-			ColumnExpr(`DISTINCT "n"."component_id"`).
-			Where(`"n"."build_id" = ?`, build).
-			Where(`"n"."closed_scan_id" IS NULL`).
-			Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
-				if glob, like := globbed(name); glob {
-					return q.Where(`"c"."name_folded" LIKE ?`+database.LikeClause, like)
-				}
-				return q.Where(`"c"."name_folded" = ?`, name)
-			}).
-			// One more than the cap, so that reaching it is distinguishable
-			// from landing on it exactly. The cap is the store's, not the
-			// constant: a store built with a smaller reach that truncates at
-			// the shipped number never trips its own refusal, and applies a
-			// rule to part of what it names.
-			Limit(int64(s.reaching())+1).
-			Scan(ctx, &roots); err != nil {
+		var err error
+		if glob, like := globbed(name); glob {
+			roots, err = graph.MatchingAs(ctx, s.db, like, s.reaching()+1, `"n"."build_id" = ?`, build)
+		} else {
+			roots, err = graph.NamedAs(ctx, s.db, name, `"n"."build_id" = ?`, build)
+		}
+		if err != nil {
 			return nil, fmt.Errorf("look for that component: %w", err)
 		}
 		if len(roots) > s.reaching() {

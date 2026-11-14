@@ -115,6 +115,29 @@ func TestTwoRefusalsRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 	})
 }
 
+// A refusal quotes the document it refuses, and a document can hold a NUL
+// and bytes that are not text, which three engines refuse to store.
+func TestARefusalQuotingBytesThatAreNotTextIsRecorded(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		build := fixture.New(t, db).Build.ID
+		sender := access.NewPipeline(1, "ci", access.Scope{})
+		if err := ingest.NewStore(db.DB).Refused(ctx, sender, ingest.Refusal{
+			BuildID: build, Reason: "a name of \"lib\x00c\xff6\"",
+		}); err != nil {
+			t.Fatalf("a refusal quoting a NUL and an invalid byte was not recorded: %v", err)
+		}
+		var reason string
+		if err := db.DB.NewSelect().Table("scan_refusal").Column("reason").
+			Where(`"build_id" = ?`, build).Scan(ctx, &reason); err != nil {
+			t.Fatal(err)
+		}
+		if reason != "a name of \"libc\uFFFD6\"" {
+			t.Errorf("recorded %q", reason)
+		}
+	})
+}
+
 func arriving(buildID int64, hash string, builtAt time.Time) ingest.Arriving {
 	return ingest.Arriving{
 		BuildID: buildID, ContentHash: hash, BuiltAt: builtAt,

@@ -33,7 +33,7 @@ type AdvisoryTakenBody struct {
 	Identifier string `json:"identifier" doc:"The name the publisher gave the advisory"`
 	Title      string `json:"title,omitempty" doc:"What the publisher called it"`
 	Recorded   int    `json:"recorded" doc:"Claims taken from it"`
-	Superseded int    `json:"superseded" doc:"Claims from an earlier upload of this same advisory, set aside rather than deleted"`
+	Superseded int    `json:"superseded" doc:"Claims set aside rather than deleted: those an earlier upload of this same advisory made and this one does not, and the publisher's older claims about a product and vulnerability this advisory states newer"`
 	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
 }
 
@@ -56,8 +56,7 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 			"Uploading the same advisory again sets its earlier claims aside rather than " +
 			"deleting them, so what an approval was granted on the strength of stays " +
 			"readable. It is matched on the name the publisher gave it, so everything else " +
-			"that publisher has issued stays standing — which is the difference from a VEX " +
-			"document, where a publisher's whole statement set is replaced at once.\n\n" +
+			"that publisher has issued stays standing.\n\n" +
 			"A VEX document is refused here and taken by the VEX endpoint instead." +
 			"\n\nAnswers 503 with `Retry-After` when the deployment is already reading as many " +
 			"uploads as it takes at once; send again after that many seconds.",
@@ -114,6 +113,7 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 		advisory.Publisher = strings.TrimSpace(attach.Visible(advisory.Publisher))
 		advisory.Identifier = strings.TrimSpace(attach.Visible(advisory.Identifier))
 		from.Publisher, from.Identifier = advisory.Publisher, advisory.Identifier
+		from.SaidAt = advisory.SaidAt
 		if utf8.RuneCountInString(advisory.Publisher) > finding.MostPublisher {
 			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"who published it is longer than the %d characters this records",

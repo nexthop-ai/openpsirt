@@ -225,7 +225,7 @@ func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64) ([]mo
 		Join(`JOIN "component" AS "tc" ON "tc"."id" = "tn"."component_id"`).
 		ColumnExpr(`"tn"."opened_scan_id" AS "opened"`).
 		ColumnExpr(`"tn"."closed_scan_id" AS "closed"`).
-		ColumnExpr(`"tc"."name_folded" AS "nm"`).
+		ColumnExpr(NodeFolded("tn", "tc")+` AS "nm"`).
 		Where(`"tn"."build_id" = ?`, buildID).
 		Where(`"tn"."is_root" = ?`, false).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -270,12 +270,12 @@ func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64) ([]mo
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"n"."opened_scan_id" AS "opened"`).
 		ColumnExpr(`"n"."closed_scan_id" AS "closed"`).
-		ColumnExpr(`"c"."name_folded" AS "nm"`).
+		ColumnExpr(NodeFolded("n", "c")+` AS "nm"`).
 		// The name as a producer wrote it, for the listing to show. Two
 		// producers writing one dependency in different capitals are one name
 		// here, and either spelling names the same thing on a screen.
-		ColumnExpr(`"c"."name" AS "dsp"`).
-		ColumnExpr(`"c"."version" AS "ver"`).
+		ColumnExpr(NodeName("n", "c")+` AS "dsp"`).
+		ColumnExpr(NodeVersion("n", "c")+` AS "ver"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		// The build's own root is not one of its components, and its version
 		// is not stored, so it can neither arrive nor move.
@@ -630,7 +630,7 @@ func (s *Store) held(ctx context.Context, buildID int64, scanIDs []int64) (map[i
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 		ColumnExpr(`"n"."opened_scan_id" AS "opened"`).
 		ColumnExpr(`"n"."closed_scan_id" AS "closed"`).
-		ColumnExpr(`"c"."name_folded" AS "nm"`).
+		ColumnExpr(NodeFolded("n", "c")+` AS "nm"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."is_root" = ?`, false).
 		Where(`"n"."opened_scan_id" < ?`, latest).

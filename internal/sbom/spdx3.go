@@ -564,12 +564,8 @@ func (c *reader) spdx3Relate(e spdx3Element) error {
 			if e.kinds == "ancestorOf" {
 				from, ancestor = to, e.from
 			}
-			if err := c.claim(); err != nil {
+			if err := c.derive(from, ancestor); err != nil {
 				return err
-			}
-			if _, stated := c.upstream[from]; !stated {
-				c.upstream[from] = ancestor
-				c.upstreamOrder = append(c.upstreamOrder, from)
 			}
 		}
 		return nil

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -295,6 +296,59 @@ func TestAClaimAboutComponentsInsideAProductTargetsTheComponents(t *testing.T) {
 	 "products": [{"@id": "pkg:deb/debian/openssl@3.0.14"}]}`))
 	if !coversAny(alone[0], graph.Described{Purl: "pkg:deb/debian/openssl@3.0.14"}) {
 		t.Error("a claim about a product alone missed it")
+	}
+}
+
+// A product names itself by an IRI and by the package identifier it lists,
+// and the package identifier is what points at a component, whichever key
+// comes first.
+func TestAProductsListedPackageIdentifierOutranksItsIRI(t *testing.T) {
+	const iri = `"@id": "https://vendor.example/p/router"`
+	const purl = `"identifiers": {"purl": "pkg:deb/debian/zlib@1.3"}`
+	for name, product := range map[string]string{
+		"the IRI first":                 `{` + iri + `, ` + purl + `}`,
+		"the package identifier first":  `{` + purl + `, ` + iri + `}`,
+		"as a subcomponent, IRI first":  `{"@id": "pkg:oci/image@sha256%3Aabc", "subcomponents": [{` + iri + `, ` + purl + `}]}`,
+		"as a subcomponent, purl first": `{"@id": "pkg:oci/image@sha256%3Aabc", "subcomponents": [{` + purl + `, ` + iri + `}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
+			 "products": [`+product+`]}`))
+			if !coversAny(got[0], graph.Described{Purl: "pkg:deb/debian/zlib@1.3?arch=amd64"}) {
+				t.Errorf("the claim points at %+v and missed the package it lists", got[0].Targets)
+			}
+		})
+	}
+
+	// An IRI alone still names the product, as the source tree it calls
+	// itself.
+	alone := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "not_affected",
+	 "products": [{`+iri+`}]}`))
+	if len(alone[0].Targets) != 1 || alone[0].Targets[0].Purl != "https://vendor.example/p/router" {
+		t.Errorf("a product named by an IRI alone points at %+v", alone[0].Targets)
+	}
+}
+
+// The words a statement keeps are the ones its status takes: an impact
+// statement for not affected and an action statement for affected, whichever
+// the producer wrote first.
+func TestAStatementKeepsTheWordsItsStatusTakes(t *testing.T) {
+	const impact = `"impact_statement": "the code is never reached"`
+	const action = `"action_statement": "upgrade to 1.3.1"`
+	cases := []struct{ status, keys, want string }{
+		{"not_affected", impact + `, ` + action, "the code is never reached"},
+		{"not_affected", action + `, ` + impact, "the code is never reached"},
+		{"affected", impact + `, ` + action, "upgrade to 1.3.1"},
+		{"affected", action + `, ` + impact, "upgrade to 1.3.1"},
+		{"affected", impact, "the code is never reached"},
+		{"not_affected", action, "upgrade to 1.3.1"},
+	}
+	for _, c := range cases {
+		got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "`+c.status+`", `+
+			c.keys+`, "products": [{"@id": "pkg:deb/debian/zlib@1.3"}]}`))
+		if got[0].Statement != c.want {
+			t.Errorf("%s with %s kept %q, want %q", c.status, c.keys, got[0].Statement, c.want)
+		}
 	}
 }
 
@@ -596,4 +650,63 @@ func coversAny(s sbom.Suppression, d graph.Described) bool {
 		}
 	}
 	return false
+}
+
+func TestAStatementTimeOutsideTheStoredYearsIsNoTime(t *testing.T) {
+	// A tool's unset time is the year 1, which MySQL and MariaDB cannot store.
+	// Read as no time, the statement is ordered by its upload; kept, recording
+	// it fails on two engines.
+	read, err := sbom.ReadStatements(strings.NewReader(`{"@context":"https://openvex.dev/ns/v0.2.0",
+		"@id":"https://example.test/vex/1","author":"Example","timestamp":"0001-01-01T00:00:00Z",
+		"statements":[
+		  {"timestamp":"2026-03-01T00:00:00Z","vulnerability":{"name":"CVE-2026-1"},
+		   "status":"not_affected","products":[{"@id":"pkg:deb/debian/zlib1g@1.3"}]},
+		  {"timestamp":"9999-12-31T23:30:00-01:00","vulnerability":{"name":"CVE-2026-2"},
+		   "status":"affected","products":[{"@id":"pkg:deb/debian/zlib1g@1.3"}]}]}`), sbom.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read.SaidAt != nil {
+		t.Errorf("a document dated the year 1 reads as said at %v, want no time", read.SaidAt)
+	}
+	if len(read.Claims) != 2 {
+		t.Fatalf("read %d claims, want 2", len(read.Claims))
+	}
+	if at := read.Claims[0].SaidAt; at == nil || !at.Equal(time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("a statement dated March 2026 reads as said at %v", at)
+	}
+	if at := read.Claims[1].SaidAt; at != nil {
+		t.Errorf("a statement dated past 9999 in UTC reads as said at %v, want no time", at)
+	}
+}
+
+func TestAnOpenVEXTimeIsWhenItLastChanged(t *testing.T) {
+	// The format's timestamp is when a document or statement was first
+	// issued and last_updated when it last changed, so a revision in place
+	// is as new as its last change.
+	read, err := sbom.ReadStatements(strings.NewReader(`{"@context":"https://openvex.dev/ns/v0.2.0",
+		"@id":"https://example.test/vex/1","author":"Example",
+		"timestamp":"2026-01-01T00:00:00Z","last_updated":"2026-09-01T00:00:00Z",
+		"statements":[
+		  {"timestamp":"2026-02-01T00:00:00Z","last_updated":"2026-08-01T00:00:00Z",
+		   "vulnerability":{"name":"CVE-2026-1"},
+		   "status":"not_affected","products":[{"@id":"pkg:deb/debian/zlib1g@1.3"}]},
+		  {"last_updated":"not a time","timestamp":"2026-03-01T00:00:00Z",
+		   "vulnerability":{"name":"CVE-2026-2"},
+		   "status":"affected","products":[{"@id":"pkg:deb/debian/zlib1g@1.3"}]}]}`), sbom.Limits{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if at := read.SaidAt; at == nil || !at.Equal(time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("a document last updated in September reads as said at %v", at)
+	}
+	if len(read.Claims) != 2 {
+		t.Fatalf("read %d claims, want 2", len(read.Claims))
+	}
+	if at := read.Claims[0].SaidAt; at == nil || !at.Equal(time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("a statement last updated in August reads as said at %v", at)
+	}
+	if at := read.Claims[1].SaidAt; at == nil || !at.Equal(time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("a statement whose last update does not parse reads as said at %v, want its timestamp", at)
+	}
 }

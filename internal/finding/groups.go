@@ -460,7 +460,12 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	if err != nil {
 		return nil, 0, err
 	}
-	shipped, err := componentsNamed(ctx, s.db, components)
+	// Each row is named as the build it links to stated it.
+	pageBuilds := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		pageBuilds = append(pageBuilds, row.BuildID)
+	}
+	shipped, err := componentsNamed(ctx, s.db, components, pageBuilds)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -531,7 +536,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 			// It happens where every way up runs past the bound, and the
 			// honest answer is the half we hold rather than none of it.
 			if group.Owner == "" && group.Parent == "" && row.ConsumerID != nil {
-				if consumer, held := shipped[*row.ConsumerID]; held {
+				if consumer, held := shipped.at(*row.ConsumerID, row.BuildID); held {
 					group.Parent = consumer.Name
 				}
 			}
@@ -562,7 +567,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 // are one product's: the word the line states and the word it is compared
 // against are both decisions that team made.
 func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]string,
-	shipped map[int64]graph.Component, floor MinimumSeverity) Group {
+	shipped namedComponents, floor MinimumSeverity) Group {
 
 	group := Group{
 		Fold: row.Fold, Packages: row.Packages, Consumers: row.pullers(),
@@ -590,7 +595,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		// otherwise read "CVE-2026-74280 · linux-image" fifty times.
 		group.Summary = firstLineOf(issue.Description)
 	}
-	if component, held := shipped[row.ComponentID]; held {
+	if component, held := shipped.at(row.ComponentID, row.BuildID); held {
 		group.Component, group.Version = component.Name, component.Version
 		group.Ecosystem = graph.EcosystemOf(component.Purl)
 		group.Namespace = graph.NamespaceOf(component.Purl)

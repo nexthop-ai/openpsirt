@@ -139,6 +139,7 @@ finding.CodeFindingFlaw.Unlink A helper over a narrowed read: undoing a flaw rec
 finding.CodeFindingFlawAt A helper over a narrowed read: the flaw record at an occurrence, read inside the analysis transactions after their own authorization. Routes use CodeFindingFlawFor and CodeFindingFlawManaged, which take a subject.
 finding.CoveredInBuild A helper over a narrowed read: it reads only at the visibilities its caller passes, which the VEX documents work out for their reader.
 finding.Describing A background pass: an analyzer run marks the flaw records it describes before writing their source.
+finding.EnsureStatementsLock A background pass: it makes the row VEX recording waits on, before an upload or an upstream fetch the caller authorized.
 finding.FoldsNamed A helper over a narrowed read: it resolves a component name to its folds within builds the caller already resolved with a subject.
 finding.HandBack Who is asking: it hands back work when a sign-in or a change of role mode takes reading away from its holder.
 finding.InTheFold Not varying by reader: the components one component folds together with, a fact of the graph. Read inside reads and writes that authorized the build.
@@ -167,7 +168,7 @@ finding.Store.Begin A background pass: it records that a scanner run started.
 finding.Store.Builds Not varying by reader: which builds a scope names. The scope's product was resolved for the caller first.
 finding.Store.BuildsForWithin A helper over a narrowed read: the upgrade write reads it inside its own transaction after authorizing the product.
 finding.Store.CheckReplaced A background pass: it records what a replaced inventory held that no scan saw.
-finding.Store.ComponentName Not varying by reader: what one component is called, for an answer about a row the caller already wrote or was authorized for.
+finding.Store.ComponentNameIn Not varying by reader: what a build calls one component, for an answer about a row the caller already wrote or was authorized for.
 finding.Store.Finish A background pass: it records how a scanner run ended.
 finding.Store.HandBackUnread A background pass: it hands back, inside a write that took reading away, the work that write left with a holder who no longer reads it.
 finding.Store.LabelsOn A helper over a narrowed read: the finding detail reads it after authorizing the finding.
@@ -182,6 +183,7 @@ finding.Sweeper.CatchUp A background pass: the daily catch-up queues a sweep for
 finding.Sweeper.CatchUpOnce A background pass: one run of the daily catch-up.
 finding.Sweeper.Once A background pass: it claims one queued sweep and places a batch of it.
 finding.Sweeper.Run A background pass: the assignment sweeper claims queued sweeps until none is waiting.
+finding.TakeStatements A background pass: it makes every other VEX recording wait, inside a write the caller authorized.
 finding.Vulnerabilities.ByName Not varying by reader: resolving a name to an issue. Every route asks who may be told of it before answering.
 finding.Vulnerabilities.DatesOf Not varying by reader: when an issue was published, as OSV states. Read beside the issue after the caller was told of it.
 finding.Vulnerabilities.IDsByName Not varying by reader: resolving names to issues, the list form of ByName.
@@ -192,11 +194,15 @@ graph.ApplyWithin A background pass: ingest applies an inventory's graph to a bu
 graph.ComponentAsIn Not varying by reader: resolving a component name inside a build its callers already resolved for the subject, within their own transaction.
 graph.Components.Intern A background pass: ingest files the components a graph names, shared by every product that ships them.
 graph.IsRoot Not varying by reader: whether a component is a build's root, for a scope its caller already resolved.
+graph.MatchingAs Not varying by reader: resolving a component pattern among nodes its caller narrowed to a build of a product it resolved for the subject.
+graph.NamedAs Not varying by reader: resolving a component name among nodes its caller narrowed to a build or product it resolved for the subject.
 graph.Reaching Not varying by reader: every component at or beneath each start in a build, for the grouped list after it read the groups with a subject.
 graph.Replaced Not varying by reader: which components of a build replaced others by name, for a build its caller already resolved.
 graph.ReplacedWithin Not varying by reader: the replaced components beneath a start in a build its caller already resolved.
 graph.RootAmong Not varying by reader: whether a walk starts from a build's root, for a build its caller already resolved.
 graph.RootsOf Not varying by reader: the roots of builds its callers already resolved for the subject.
+graph.SourceMatching Not varying by reader: resolving a source pattern among nodes its caller narrowed to the builds of a product it resolved for the subject.
+graph.SourcedAs Not varying by reader: resolving a source package name among nodes its caller narrowed to the builds of a product it resolved for the subject.
 graph.StatedImages A helper over a narrowed read: the image versions a build states, for claims about a build the caller already authorized.
 graph.StatedVersions A helper over a narrowed read: the versions builds state for images, for the across-builds read after it narrowed the builds with a subject.
 graph.Store.ComponentAs Not varying by reader: resolving a component name inside a build the route resolved for the caller first.

@@ -111,6 +111,66 @@ func TestANameAtANewVersionMovedRatherThanArrivedAndWent(t *testing.T) {
 	})
 }
 
+func TestAMoveIsGroupedByTheNameTheBuildStated(t *testing.T) {
+	// The component row holds the name the first product to describe a
+	// package stated. Grouped by the row, one dependency the build calls
+	// libz at both versions reads as one arrival and one departure, under
+	// two names, where the build shows one name moving.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		old := graph.Described{Purl: "pkg:generic/libz@1.3", Name: "zlib", Version: "1.3"}
+		other := f.world.BuildFor(f.world.Branch, f.world.Internal).ID
+		if _, err := fixtures.ApplyGraph(ctx, f.db, other, f.scanOf(t, other), graph.Snapshot{
+			Root: root, Components: []graph.Described{old},
+			Dependencies: []graph.Dependency{{Parent: root, Child: old}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		stated := old
+		stated.Name = "libz"
+		applied(t, f, graph.Snapshot{
+			Root: root, Components: []graph.Described{stated},
+			Dependencies: []graph.Dependency{{Parent: root, Child: stated}},
+		})
+		bumped := graph.Described{Purl: "pkg:generic/libz@1.3.1", Name: "libz", Version: "1.3.1"}
+		next := graph.Snapshot{
+			Root: root, Components: []graph.Described{bumped},
+			Dependencies: []graph.Dependency{{Parent: root, Child: bumped}},
+		}
+		if got, want := delta(t, f, applied(t, f, next)), (graph.Delta{Changed: 1}); got != want {
+			t.Errorf("an upgrade of a name the build stated reported %+v, want %+v", got, want)
+		}
+	})
+}
+
+func TestALaterRestatedNameLeavesAnEarlierScansChangesAlone(t *testing.T) {
+	// An earlier scan's changes read the names its nodes hold, so a later
+	// scan stating another name for the same component opens a node of its
+	// own rather than renaming one an earlier change reads.
+	each(t, func(t *testing.T, f *fixture) {
+		one := graph.Snapshot{Root: root, Components: []graph.Described{at("zlib", "1.3")},
+			Dependencies: []graph.Dependency{{Parent: root, Child: at("zlib", "1.3")}}}
+		applied(t, f, one)
+		bumped := at("zlib", "1.3.1")
+		upgrade := applied(t, f, graph.Snapshot{Root: root, Components: []graph.Described{bumped},
+			Dependencies: []graph.Dependency{{Parent: root, Child: bumped}}})
+		if got, want := delta(t, f, upgrade), (graph.Delta{Changed: 1}); got != want {
+			t.Fatalf("the upgrade reported %+v, want %+v", got, want)
+		}
+		renamed := bumped
+		renamed.Name = "libz"
+		restated := applied(t, f, graph.Snapshot{Root: root, Components: []graph.Described{renamed},
+			Dependencies: []graph.Dependency{{Parent: root, Child: renamed}}})
+		if got, want := delta(t, f, upgrade), (graph.Delta{Changed: 1}); got != want {
+			t.Errorf("after a later scan stated another name, the upgrade reports %+v, want %+v", got, want)
+		}
+		if got, want := delta(t, f, restated), (graph.Delta{Added: 1, Removed: 1}); got != want {
+			t.Errorf("the scan stating another name reported %+v, want %+v", got, want)
+		}
+	})
+}
+
 func TestANameAlreadyShippedAtAnotherVersionMovedRatherThanArrived(t *testing.T) {
 	// A name at two versions at once is what a vendored tree produces, and it
 	// is the case a comparison of name sets alone gets wrong: the name was

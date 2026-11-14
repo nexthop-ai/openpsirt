@@ -122,11 +122,17 @@ func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filte
 	}
 	if f.Component != "" {
 		kinds, args := kindsOf(kind.Decisions, "cf")
+		// The component's row name or the name its build stated, which is
+		// the one each row shows.
+		folded := graph.Folded(f.Component)
 		q = q.Where(`EXISTS (SELECT 1 FROM "finding" AS "cf"`+
 			` JOIN "component" AS "cc" ON "cc"."id" = "cf"."component_id"`+
-			` WHERE `+finding.DecisionOccurrenceFiledAt("de", "cf")+` AND "cc"."name_folded" = ?`+
+			` WHERE `+finding.DecisionOccurrenceFiledAt("de", "cf")+
+			` AND ("cc"."name_folded" = ? OR EXISTS (SELECT 1 FROM "graph_node" AS "cn"`+
+			` WHERE "cn"."build_id" = "cf"."build_id" AND "cn"."is_root" IN (FALSE, TRUE)`+
+			` AND "cn"."component_id" = "cf"."component_id" AND "cn"."name_folded" = ?))`+
 			` AND `+kinds+`)`,
-			append([]any{graph.Folded(f.Component)}, args...)...)
+			append([]any{folded, folded}, args...)...)
 	}
 	// One build, with the build's own product required to be the one that
 	// made the decision: an occurrence identity carries no product, so the match
@@ -455,11 +461,13 @@ func (s *Store) aboutEach(ctx context.Context, occurrences []DecisionOccurrence)
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
 		ColumnExpr(`"earliest"."decision_occurrence_id" AS "decision_occurrence_id"`).
 		ColumnExpr(`"v"."identifier" AS "issue"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`"c"."version" AS "version"`).
-		ColumnExpr(`COALESCE("uc"."name", ?) AS "consumer"`, "").
+		ColumnExpr(graph.StatedName("sn", `"f"."build_id"`, `"f"."component_id"`, "c")+` AS "component"`).
+		ColumnExpr(graph.StatedVersion("sn", `"f"."build_id"`, `"f"."component_id"`, "c")+` AS "version"`).
+		ColumnExpr(`COALESCE(`+graph.StatedName("sun", `"f"."build_id"`, `"f"."consumer_id"`, "uc")+`, ?) AS "consumer"`, "").
 		ColumnExpr(`"p"."name" AS "product"`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product_name"`).
 		Scan(ctx, &rows)

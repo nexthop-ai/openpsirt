@@ -8,8 +8,10 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +39,9 @@ func listArchive(t *testing.T, records map[string][]byte) string {
 	t.Helper()
 	var inner bytes.Buffer
 	w := zip.NewWriter(&inner)
-	for name, body := range records {
+	// In name order, so which member comes first is known.
+	for _, name := range slices.Sorted(maps.Keys(records)) {
+		body := records[name]
 		f, err := w.Create("cves/2026/31xxx/" + name)
 		if err != nil {
 			t.Fatal(err)
@@ -49,17 +53,24 @@ func listArchive(t *testing.T, records map[string][]byte) string {
 	if err := w.Close(); err != nil {
 		t.Fatal(err)
 	}
+	return wrap(t, inner.Bytes())
+}
+
+// wrap writes an archive holding inner as its one member, cves.zip, the way
+// the List publishes, and names it.
+func wrap(t *testing.T, inner []byte) string {
+	t.Helper()
 	path := filepath.Join(t.TempDir(), "2026-10-07_all_CVEs_at_midnight.zip.zip")
 	out, err := os.Create(path) //nolint:gosec // G304: a path under the test's own directory
 	if err != nil {
 		t.Fatal(err)
 	}
 	outer := zip.NewWriter(out)
-	f, err := outer.Create("cves.zip")
+	f, err := outer.CreateHeader(&zip.FileHeader{Name: "cves.zip", Method: zip.Store})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.Write(inner.Bytes()); err != nil {
+	if _, err := f.Write(inner); err != nil {
 		t.Fatal(err)
 	}
 	if err := outer.Close(); err != nil {
@@ -69,6 +80,21 @@ func listArchive(t *testing.T, records map[string][]byte) string {
 		t.Fatal(err)
 	}
 	return path
+}
+
+// built builds a snapshot from an archive into a directory of its own and
+// reads it back, failing the test where either fails.
+func built(t *testing.T, archive string) *cverecord.Snapshot {
+	t.Helper()
+	dir := t.TempDir()
+	if _, err := cverecord.Build(archive, dir, ""); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := cverecord.NewHeld(dir).Current()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return snapshot
 }
 
 var kernelEntry = map[string]any{
@@ -155,14 +181,7 @@ func TestAThirdPartysAffectedLineStopsTheAuthoritysNarrowing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir := t.TempDir()
-	if _, err := cverecord.Build(listArchive(t, map[string][]byte{"CVE-2026-5.json": body}), dir, ""); err != nil {
-		t.Fatal(err)
-	}
-	snapshot, err := cverecord.NewHeld(dir).Current()
-	if err != nil {
-		t.Fatal(err)
-	}
+	snapshot := built(t, listArchive(t, map[string][]byte{"CVE-2026-5.json": body}))
 	zlib := graph.Described{Name: "zlib", Version: "1.3.2", Purl: "pkg:generic/zlib@1.3.2",
 		CPE: "cpe:2.3:a:zlib:zlib:1.3.2:*:*:*:*:*:*:*"}
 	if snapshot.Decide([]string{"CVE-2026-5"}, zlib).Narrows() {
@@ -180,17 +199,10 @@ func TestALineWithStatusChangesReadFromAnArchiveNarrowsNothing(t *testing.T) {
 			"changes": []map[string]any{{"at": "1.5", "status": "affected"}},
 		}},
 	})
-	dir := t.TempDir()
-	if _, err := cverecord.Build(listArchive(t, map[string][]byte{
+	snapshot := built(t, listArchive(t, map[string][]byte{
 		"CVE-2026-7.json":     body,
 		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T00:00:00Z", kernelEntry),
-	}), dir, ""); err != nil {
-		t.Fatal(err)
-	}
-	snapshot, err := cverecord.NewHeld(dir).Current()
-	if err != nil {
-		t.Fatal(err)
-	}
+	}))
 	zlib := graph.Described{Name: "zlib", Version: "1.7", Purl: "pkg:generic/zlib@1.7",
 		CPE: "cpe:2.3:a:zlib:zlib:1.7:*:*:*:*:*:*:*"}
 	if snapshot.Decide([]string{"CVE-2026-7"}, zlib).Narrows() {
@@ -276,8 +288,8 @@ func TestARecordThatCannotBeReadIsLeftOutAndTheRestBuilt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("one unreadable record stopped the snapshot: %v", err)
 	}
-	if len(skipped) != 1 || !strings.Contains(skipped[0].Error(), "CVE-2026-8.json") {
-		t.Errorf("left out %v, want the one unreadable record named", skipped)
+	if skipped.Count != 1 || skipped.First == nil || !strings.Contains(skipped.First.Error(), "CVE-2026-8.json") {
+		t.Errorf("left out %+v, want the one unreadable record named", skipped)
 	}
 	snapshot, err := cverecord.NewHeld(dir).Current()
 	if err != nil {
@@ -285,6 +297,25 @@ func TestARecordThatCannotBeReadIsLeftOutAndTheRestBuilt(t *testing.T) {
 	}
 	if snapshot.Len() != 1 {
 		t.Errorf("kept %d records, want the one that read", snapshot.Len())
+	}
+}
+
+// What is kept of the records left out is how many there were and the first,
+// however many an archive holds that cannot be read.
+func TestRecordsLeftOutAreCountedAndOnlyTheFirstKept(t *testing.T) {
+	dir := t.TempDir()
+	skipped, err := cverecord.Build(listArchive(t, map[string][]byte{
+		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T00:00:00Z", kernelEntry),
+		"CVE-2026-8.json":     []byte("not a record"),
+		"CVE-2026-9.json":     []byte("not a record"),
+		"CVE-2026-10.json":    []byte("not a record"),
+	}), dir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The archive holds them in name order, so the first is CVE-2026-10.
+	if skipped.Count != 3 || skipped.First == nil || !strings.Contains(skipped.First.Error(), "CVE-2026-10.json") {
+		t.Errorf("left out %+v, want three counted and the first kept", skipped)
 	}
 }
 
@@ -304,7 +335,7 @@ func TestAMomentOfUpdateWithNoOffsetIsReadAsUTC(t *testing.T) {
 	skipped, err := cverecord.Build(listArchive(t, map[string][]byte{
 		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-08T10:00:00", kernelEntry),
 	}), dir, "")
-	if err != nil || len(skipped) != 0 {
+	if err != nil || skipped.Count != 0 {
 		t.Fatalf("a moment with no offset was not read: %v %v", skipped, err)
 	}
 	snapshot, err := cverecord.NewHeld(dir).Current()

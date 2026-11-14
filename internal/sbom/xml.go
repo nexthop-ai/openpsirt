@@ -46,15 +46,151 @@ type boundedXML struct {
 	space string
 }
 
-// newBoundedXML reads r as XML, at most maxBytes of it and nested at most
-// maxDepth deep.
+// newBoundedXML reads r as XML, at most maxBytes of it, nested at most
+// maxDepth deep, and with no element's start or end tag longer than mostTag.
 func newBoundedXML(r io.Reader, maxBytes int64, maxDepth int) *boundedXML {
 	src := docread.NewSource(r)
 	return &boundedXML{
-		dec:      xml.NewDecoder(docread.Cap(src, maxBytes)),
+		dec:      xml.NewDecoder(&tagGuard{r: docread.Cap(src, maxBytes), most: mostTag}),
 		maxDepth: maxDepth,
 		src:      src,
 	}
+}
+
+// mostTag is the longest an element's start or end tag may be, in bytes.
+//
+// The decoder holds a start tag's every attribute before it returns the
+// element, so a tag as long as the size bound allows holds many times that
+// bound before any check here sees it: a 16 MiB tag of empty attributes
+// allocated 985 MiB. Far above any producer's tag, which is a few hundred
+// bytes at the top-level element's namespace declarations.
+const mostTag = 64 << 10
+
+// tagGuard refuses a document one of whose start or end tags runs past most
+// bytes, as the decoder reads the tag rather than once it has returned it.
+//
+// It follows the document's markup only as far as telling where a tag ends:
+// an attribute value may hold a closing angle bracket inside its quotes, and
+// a comment, a character data section or a processing instruction is ended
+// by its own terminator and is not a tag. None of those is bounded here,
+// because the decoder holds each as the bytes it is, which the size bound
+// already bounds. A declaration ends what the guard reads: the reader refuses
+// the document when the decoder returns one, so no tag after it is read, and
+// the refusal names the declaration whatever follows it.
+type tagGuard struct {
+	r    io.Reader
+	most int
+	// state is where in the markup the last byte read left the guard, and
+	// opened is what follows an opening angle bracket while it still could
+	// begin a comment or a character data section.
+	state  markup
+	opened []byte
+	// length is how much of the tag being read has been read, quote the quote
+	// an attribute value inside it opened, and last the two bytes before this
+	// one, which end a comment or a character data section.
+	length int
+	quote  byte
+	last   [2]byte
+}
+
+// markup is where a document's reader stands: between tags, or inside one of
+// the constructs an opening angle bracket begins.
+type markup int
+
+const (
+	inText markup = iota
+	afterOpening
+	inBang
+	inTag
+	inComment
+	inCharData
+	inInstruction
+	inDeclaration
+)
+
+// The openings that begin a comment and a character data section, after the
+// angle bracket.
+const (
+	commentOpening  = "!--"
+	charDataOpening = "![CDATA["
+)
+
+func (g *tagGuard) Read(p []byte) (int, error) {
+	n, err := g.r.Read(p)
+	for _, c := range p[:n] {
+		if refused := g.step(c); refused != nil {
+			return 0, refused
+		}
+	}
+	return n, err
+}
+
+// step moves the guard past one byte of the document.
+func (g *tagGuard) step(c byte) error {
+	ended := g.last
+	g.last = [2]byte{g.last[1], c}
+	switch g.state {
+	case inText:
+		if c == '<' {
+			g.state = afterOpening
+		}
+	case afterOpening:
+		switch c {
+		case '!':
+			g.state, g.opened = inBang, append(g.opened[:0], c)
+		case '?':
+			g.state = inInstruction
+		default:
+			g.state, g.length, g.quote = inTag, 1, 0
+			return g.tag(c)
+		}
+	case inBang:
+		g.opened = append(g.opened, c)
+		switch {
+		case string(g.opened) == commentOpening:
+			g.state, g.last = inComment, [2]byte{}
+		case string(g.opened) == charDataOpening:
+			g.state, g.last = inCharData, [2]byte{}
+		case !strings.HasPrefix(commentOpening, string(g.opened)) &&
+			!strings.HasPrefix(charDataOpening, string(g.opened)):
+			// Nothing after it is read: the reader refuses the declaration.
+			g.state = inDeclaration
+		}
+	case inComment:
+		if c == '>' && ended == [2]byte{'-', '-'} {
+			g.state = inText
+		}
+	case inCharData:
+		if c == '>' && ended == [2]byte{']', ']'} {
+			g.state = inText
+		}
+	case inInstruction:
+		if c == '>' && ended[1] == '?' {
+			g.state = inText
+		}
+	case inTag:
+		g.length++
+		return g.tag(c)
+	}
+	return nil
+}
+
+// tag moves the guard past one byte of a start or end tag.
+func (g *tagGuard) tag(c byte) error {
+	if g.length > g.most {
+		return refusal.Errorf("an element's tag is longer than the %d byte limit", g.most)
+	}
+	switch {
+	case g.quote != 0:
+		if c == g.quote {
+			g.quote = 0
+		}
+	case c == '"' || c == '\'':
+		g.quote = c
+	case c == '>':
+		g.state = inText
+	}
+	return nil
 }
 
 // refused states what went wrong under what, as docread.JSON does.
@@ -105,6 +241,11 @@ func blank(text xml.CharData) bool {
 func (x *boundedXML) root() (xml.StartElement, error) {
 	for {
 		tok, err := x.token()
+		// The decoder states a document cut off inside an element in words,
+		// and one holding no element at all as a bare end of file.
+		if errors.Is(err, io.EOF) {
+			return xml.StartElement{}, refusal.New("the document holds no top-level element")
+		}
 		if err != nil {
 			return xml.StartElement{}, err
 		}

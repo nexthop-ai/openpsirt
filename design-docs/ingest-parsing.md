@@ -36,6 +36,7 @@ depth, and documents per scan. Each is configuration, never a constant.
 | Bounds are sized and tested against the largest real input (REQ-09), and set from what reading costs | An edge holds about half a kilobyte while read and a component about 1.3 KB, so round numbers several times the largest producer (two million edges, a quarter of a million components) accept 1.3 GB, past what the chart ships as a limit, and kill the background reader after the 202. The budget is about 250 MB a document, the server's share of a pod it shares with the scanner; a test measures per-unit cost |
 | Edges have their own bound | A thousand components can declare a million edges |
 | Nesting is bounded everywhere, unread parts included | |
+| An XML element's start or end tag is bounded at 64 KiB, refused as the decoder reads it; a comment, character data section, processing instruction or declaration is not a tag, and nothing after a declaration is bounded, because the declaration is refused when the decoder returns it | The decoder holds every attribute before returning the element: a 16 MiB tag allocated 985 MiB unbounded and 3 MiB bounded |
 | A document of exactly the size bound is read; the reader asks one byte past it before refusing | |
 | An oversized document, a third party's VEX included, is refused as oversized | Truncated, it fails as malformed and its digest covers only part |
 | The component bound is charged where a component is read, never where recorded | The header pass records nothing, so components nested in the root would be walked unbounded inside the request |
@@ -85,6 +86,7 @@ changed.
 | Two components sharing an identifier | |
 | An unreadable build time | It orders scans |
 | Past any bound | |
+| An empty document, or one ending partway through a value | Said in those words; a bare end of file reads as a fault of the server |
 | Anything but whitespace after the top-level value (in XML, anything but layout and comments after the top-level element), in an inventory, suppression document or advisory | Two concatenated documents read as the first |
 | A document type declaration in XML | `design-docs/ingest-formats.md` § CycloneDX encoded as XML |
 

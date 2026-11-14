@@ -4,8 +4,11 @@
 package finding_test
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -236,8 +239,7 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 }
 
 func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T) {
-	// A publisher's statement set is their whole answer and is replaced as
-	// one. An advisory is one announcement among hundreds, so keyed on the
+	// An advisory is one announcement among hundreds, so keyed on the
 	// publisher alone every advisory of theirs on record would be set aside
 	// the moment the next one arrived — and the deployment would hold exactly
 	// the last document anybody uploaded.
@@ -374,8 +376,9 @@ func TestAnAdvisoryWithNoNameOfItsOwnIsRefusedByTheStore(t *testing.T) {
 		}{
 			{"an advisory carrying no name", finding.Supplied{
 				Source: finding.FromAdvisory, Publisher: "Example"}},
-			{"a statement set carrying one", finding.Supplied{
-				Source: finding.FromVex, Identifier: "EXSA-2026:1", Publisher: "Example"}},
+			{"a VEX document's identifier longer than the column", finding.Supplied{
+				Source: finding.FromVex, Publisher: "Example",
+				Identifier: strings.Repeat("x", finding.MostDocumentName+1)}},
 			{"a document of no kind", finding.Supplied{Publisher: "Example"}},
 			{"a document naming nobody", finding.Supplied{Source: finding.FromVex}},
 			{"an advisory name longer than the column", finding.Supplied{
@@ -539,6 +542,271 @@ func TestTheSameDocumentReadDifferentlyReplacesWhatStands(t *testing.T) {
 		}
 		if len(said) != 1 {
 			t.Errorf("the statement under the name it is read as now: %d found", len(said))
+		}
+	})
+}
+
+// A revision moving a statement to another product leaves the subject it was
+// about, and the publisher's statement it had overtaken there stands again.
+// Set aside again by a revision withdrawing it, an overtaken statement is not
+// counted, because nothing in force changed.
+func TestAStatementMovedAwayRestoresWhatItOvertook(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		record := func(id, digest string, said ...finding.Statement) int {
+			t.Helper()
+			_, setAside, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: id,
+					Document: id + ".json", Digest: digest}, said)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return setAside
+		}
+		about := func(status string) finding.Statement {
+			return finding.Statement{Vulnerability: "CVE-2026-1", Purl: "pkg:deb/debian/zlib1g@1.3",
+				Component: "zlib1g", About: "1.3", Status: status}
+		}
+		inForce := func(id string) int {
+			t.Helper()
+			var n int
+			if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`COUNT(*)`).
+				Where(`"document_id" = ?`, id).Where(`"superseded_at" IS NULL`).Scan(ctx, &n); err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
+
+		record("older", "sha256:1", about("affected"))
+		if setAside := record("newer", "sha256:2", about("not_affected")); setAside != 1 {
+			t.Errorf("the newer document set aside %d statements, want the older one", setAside)
+		}
+		placed := about("not_affected")
+		placed.WithinPurl, placed.Within, placed.WithinAbout = "pkg:generic/appliance@2", "appliance", "2"
+		placed.Placement = finding.PlacedInside
+		record("newer", "sha256:3", placed)
+		if inForce("older") != 1 || inForce("newer") != 1 {
+			t.Errorf("after the newer statement moved to another product, %d of the older"+
+				" and %d of the newer are in force, want one each", inForce("older"), inForce("newer"))
+		}
+
+		// Overtaken again, then withdrawn by its own revision.
+		record("newest", "sha256:4", about("not_affected"))
+		if setAside := record("older", "sha256:5"); setAside != 0 {
+			t.Errorf("withdrawing an overtaken statement counted %d set aside, want none", setAside)
+		}
+	})
+}
+
+// The same bytes uploaded again bring a statement recorded before its time
+// was kept up to date with the time its document states.
+func TestTheSameDocumentAgainRecordsWhenItWasSaid(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		said := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+		record := func() {
+			t.Helper()
+			if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: "march",
+					Document: "march.json", Digest: "sha256:1", SaidAt: &said},
+				[]finding.Statement{{Vulnerability: "CVE-2026-1", Purl: "pkg:deb/debian/zlib1g@1.3",
+					Component: "zlib1g", About: "1.3", Status: "not_affected"}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		record()
+		// As an older release recorded it, with no time.
+		if _, err := f.db.DB.NewUpdate().Table("received_vex_statement").Set(`"said_at" = NULL`).
+			Where(`"document_id" = ?`, "march").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		record()
+		var at []time.Time
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("said_at").
+			Where(`"document_id" = ?`, "march").Where(`"said_at" IS NOT NULL`).Scan(ctx, &at); err != nil {
+			t.Fatal(err)
+		}
+		if len(at) != 1 || !at[0].Equal(said) {
+			t.Errorf("the statement uploaded again records it was said at %v, want %v", at, said)
+		}
+	})
+}
+
+// A statement dated the epoch keeps that time when a revision repeats it,
+// rather than reading as dated nothing.
+func TestAStatementDatedTheEpochKeepsItsTime(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		epoch := time.Unix(0, 0).UTC()
+		record := func(digest string) {
+			t.Helper()
+			if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: "epoch",
+					Document: "epoch.json", Digest: digest, SaidAt: &epoch},
+				[]finding.Statement{{Vulnerability: "CVE-2026-1", Purl: "pkg:deb/debian/zlib1g@1.3",
+					Component: "zlib1g", About: "1.3", Status: "not_affected"}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		record("sha256:1")
+		record("sha256:2")
+		var at []time.Time
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("said_at").
+			Where(`"document_id" = ?`, "epoch").Where(`"said_at" IS NOT NULL`).Scan(ctx, &at); err != nil {
+			t.Fatal(err)
+		}
+		if len(at) != 1 || !at[0].Equal(epoch) {
+			t.Errorf("the statement a revision repeated records it was said at %v, want the epoch", at)
+		}
+	})
+}
+
+// A statement dated after the moment it is recorded is ordered by its upload,
+// so a mistyped year does not outrank every later statement from the
+// publisher about the subject.
+func TestAStatementDatedInTheFutureIsOrderedByItsUpload(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		record := func(id, status string, said *time.Time) int {
+			t.Helper()
+			_, setAside, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: id,
+					Document: id + ".json", Digest: "sha256:" + id, SaidAt: said},
+				[]finding.Statement{{Vulnerability: "CVE-2026-1", Purl: "pkg:deb/debian/zlib1g@1.3",
+					Component: "zlib1g", About: "1.3", Status: status}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return setAside
+		}
+		typo := time.Now().UTC().AddDate(36, 0, 0)
+		record("typo", "not_affected", &typo)
+		if setAside := record("later", "affected", nil); setAside != 1 {
+			t.Errorf("a later upload set aside %d statements, want the one dated in the future", setAside)
+		}
+		var standing []string
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("document_id").
+			Where(`"superseded_at" IS NULL`).Scan(ctx, &standing); err != nil {
+			t.Fatal(err)
+		}
+		if len(standing) != 1 || standing[0] != "later" {
+			t.Errorf("in force: %v, want the later upload's statement alone", standing)
+		}
+	})
+}
+
+// Documents about one subject recorded at once leave one statement standing:
+// each waits for the others, so none reads another's statement as absent.
+func TestTwoDocumentsRecordedAtOnceLeaveOneStatementStanding(t *testing.T) {
+	servers(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		if err := finding.EnsureStatementsLock(ctx, f.db.DB); err != nil {
+			t.Fatal(err)
+		}
+		const documents = 6
+		for round := range 5 {
+			issue := fmt.Sprintf("CVE-2026-%d", 100+round)
+			var wg sync.WaitGroup
+			failed := make([]error, documents)
+			start := make(chan struct{})
+			for i := range documents {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					<-start
+					id := fmt.Sprintf("round-%d-document-%d", round, i)
+					_, _, failed[i] = f.store.RecordStatements(ctx, who, f.productID,
+						finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: id,
+							Document: id + ".json", Digest: "sha256:" + id},
+						[]finding.Statement{{Vulnerability: issue, Purl: "pkg:deb/debian/zlib1g@1.3",
+							Component: "zlib1g", About: "1.3", Status: "not_affected"}})
+				}()
+			}
+			close(start)
+			wg.Wait()
+			for i, err := range failed {
+				if err != nil {
+					t.Fatalf("round %d, document %d: %v", round, i, err)
+				}
+			}
+			var standing int
+			if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).ColumnExpr(`COUNT(*)`).
+				Where(`"vulnerability" = ?`, strings.ToLower(issue)).Where(`"superseded_at" IS NULL`).
+				Scan(ctx, &standing); err != nil {
+				t.Fatal(err)
+			}
+			if standing != 1 {
+				t.Errorf("round %d: %d statements about one subject stand, want one", round, standing)
+			}
+		}
+	})
+}
+
+// A statement its own document withdrew stays withdrawn when the statement
+// that overtook it is withdrawn in turn: nothing the publisher still says
+// about the subject stands.
+func TestAStatementItsDocumentWithdrewStaysWithdrawn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		record := func(id string, month time.Month, status string) {
+			t.Helper()
+			said := time.Date(2026, month, 1, 0, 0, 0, 0, time.UTC)
+			var claims []finding.Statement
+			if status != "" {
+				claims = append(claims, finding.Statement{Vulnerability: "CVE-2026-1",
+					Purl: "pkg:deb/debian/zlib1g@1.3", Component: "zlib1g", About: "1.3", Status: status})
+			}
+			if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: id,
+					Document: id + ".json", Digest: "sha256:" + id + month.String(), SaidAt: &said},
+				claims); err != nil {
+				t.Fatal(err)
+			}
+		}
+		record("a", time.March, "not_affected")
+		record("b", time.June, "affected")
+		record("a", time.July, "")
+		record("b", time.August, "")
+		var standing []string
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("document_id").
+			Where(`"superseded_at" IS NULL`).Scan(ctx, &standing); err != nil {
+			t.Fatal(err)
+		}
+		if len(standing) != 0 {
+			t.Errorf("after both documents withdrew their statements, %v still stand", standing)
+		}
+	})
+}
+
+// Two statements dated the same moment, which date-only stamps make common,
+// go to the one recorded later.
+func TestStatementsDatedTheSameMomentGoToTheLaterRecorded(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		day := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+		for _, said := range []struct{ id, status string }{{"first", "affected"}, {"second", "not_affected"}} {
+			if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+				finding.Supplied{Source: finding.FromVex, Publisher: "Debian", Identifier: said.id,
+					Document: said.id + ".json", Digest: "sha256:" + said.id, SaidAt: &day},
+				[]finding.Statement{{Vulnerability: "CVE-2026-1", Purl: "pkg:deb/debian/zlib1g@1.3",
+					Component: "zlib1g", About: "1.3", Status: said.status}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		var standing []string
+		if err := f.db.DB.NewSelect().TableExpr(`"received_vex_statement"`).Column("document_id").
+			Where(`"superseded_at" IS NULL`).Scan(ctx, &standing); err != nil {
+			t.Fatal(err)
+		}
+		if len(standing) != 1 || standing[0] != "second" {
+			t.Errorf("of two statements dated the same day, %v stand, want the later recorded", standing)
 		}
 	})
 }

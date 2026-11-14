@@ -531,3 +531,71 @@ func TestAnXMLReaderThatFailsPartwayIsAFaultNotARefusal(t *testing.T) {
 		}
 	}
 }
+
+// A start tag carrying more attributes than any producer writes is refused as
+// the decoder reads it: the decoder holds every attribute of a tag before it
+// returns the element, many times the bytes the document spent on them.
+func TestAnXMLStartTagLongerThanTheBoundIsRefused(t *testing.T) {
+	var tag strings.Builder
+	for i := range 100_000 {
+		tag.WriteString(" a")
+		tag.WriteString(strings.Repeat("x", i%7))
+		tag.WriteString(`=""`)
+	}
+	// A closing angle bracket inside an attribute value does not end the tag.
+	bracketed := strings.Repeat(` b=">"`, 20_000)
+	for name, doc := range map[string]string{
+		"the top-level element": `<bom xmlns="http://cyclonedx.org/schema/bom/1.6"` + tag.String() + `></bom>`,
+		"the top-level element, its values bracketed": `<bom xmlns="http://cyclonedx.org/schema/bom/1.6"` +
+			bracketed + `></bom>`,
+		"an element inside it": strings.Replace(minimalXML, `<component type="library" bom-ref="a">`,
+			`<component type="library" bom-ref="a"`+tag.String()+`>`, 1),
+		// The guard reads on past a comment and a character data section.
+		"after a comment": `<!-- c --><bom xmlns="http://cyclonedx.org/schema/bom/1.6"` + tag.String() + `></bom>`,
+		"after a character data section": strings.Replace(minimalXML, `<components>`,
+			`<components><![CDATA[x]]><component type="library"`+tag.String()+`/>`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := sbom.ReadHeader(strings.NewReader(doc), sbom.Limits{})
+			if strings.HasPrefix(name, "the top-level element") && (!refusal.In(err) || !strings.Contains(err.Error(), "byte limit")) {
+				t.Errorf("a header read answered %v, want the tag refused for its length", err)
+			}
+			if _, err := sbom.Read(strings.NewReader(doc), sbom.Limits{}); !refusal.In(err) ||
+				!strings.Contains(err.Error(), "byte limit") {
+				t.Errorf("a read answered %v, want the tag refused for its length", err)
+			}
+		})
+	}
+}
+
+// Telling where a tag ends follows quoting, and a comment, a character data
+// section and a processing instruction end at their own terminators, so
+// markup a producer may write is never counted as one long tag.
+func TestXMLMarkupAroundTagsIsNotCountedAsATag(t *testing.T) {
+	long := strings.Repeat("y", 70<<10)
+	doc := strings.Replace(minimalXML, `<components>`,
+		`<components><!-- it's "quoted" > `+long+` -->`+
+			`<?producer note='unbalanced " > `+long+`?>`+
+			`<![CDATA[ a < b " ' > `+long+` ]]>`, 1)
+	doc = strings.Replace(doc, `<purl>`, `<purl note="a > b">`, 1)
+	if _, err := sbom.Read(strings.NewReader(doc), sbom.Limits{}); err != nil {
+		t.Fatalf("a document with long markup around its tags answered %v", err)
+	}
+}
+
+// A document holding no element is refused in words, never as the end of
+// file a connection cut short reports. One cut off inside an element the
+// decoder states in words of its own.
+func TestAnXMLDocumentHoldingNoElementIsRefusedInWords(t *testing.T) {
+	for name, c := range map[string]struct{ doc, want string }{
+		"before any element": {`<?xml version="1.0"?><!-- nothing -->`, "no top-level element"},
+		"inside an element":  {minimalXML[:strings.Index(minimalXML, "<components>")], "unexpected EOF"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := sbom.Read(strings.NewReader(c.doc), sbom.Limits{})
+			if !refusal.In(err) || !strings.Contains(err.Error(), c.want) {
+				t.Errorf("answered %v, want a refusal saying %q", err, c.want)
+			}
+		})
+	}
+}

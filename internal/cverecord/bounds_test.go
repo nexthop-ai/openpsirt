@@ -296,34 +296,15 @@ func rewritten(t *testing.T, edit func(end []byte, size int)) string {
 	return path
 }
 
-// wrapped writes an archive holding an archive as its one member, cves.zip,
-// the way the List publishes, and names it.
+// wrapped writes an archive holding the archive at innerPath as its one
+// member, cves.zip, the way the List publishes, and names it.
 func wrapped(t *testing.T, innerPath string) string {
 	t.Helper()
 	inner, err := os.ReadFile(innerPath) //nolint:gosec // G304: a path under the test's own directory
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(t.TempDir(), "outer.zip")
-	f, err := os.Create(path) //nolint:gosec // G304: a path under the test's own directory
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := zip.NewWriter(f)
-	member, err := w.CreateHeader(&zip.FileHeader{Name: "cves.zip", Method: zip.Store})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := member.Write(inner); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return path
+	return wrap(t, inner)
 }
 
 // refusedEverywhere asserts that an archive is refused for its member count
@@ -413,27 +394,7 @@ func innerSized(t *testing.T, n int) string {
 	if n < bare {
 		t.Fatalf("no inner archive is %d bytes", n)
 	}
-	body := inner(strings.Repeat("c", n-bare))
-	path := filepath.Join(t.TempDir(), "list.zip")
-	out, err := os.Create(path) //nolint:gosec // G304: a path under the test's own directory
-	if err != nil {
-		t.Fatal(err)
-	}
-	w := zip.NewWriter(out)
-	f, err := w.Create("cves.zip")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.Write(body); err != nil {
-		t.Fatal(err)
-	}
-	if err := w.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := out.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return path
+	return wrap(t, inner(strings.Repeat("c", n-bare)))
 }
 
 func TestAnInnerArchiveLargerThanTheBoundIsRefusedAndRemoved(t *testing.T) {
@@ -511,4 +472,108 @@ func TestASnapshotWithNoMomentIsNotWritten(t *testing.T) {
 	if err := cverecord.Write(&buf, time.Time{}, "", records(1)); err == nil {
 		t.Error("a snapshot with no moment was written")
 	}
+}
+
+// directorySize is the size an archive's directory end states for its
+// directory.
+func directorySize(t *testing.T, path string) int {
+	t.Helper()
+	raw, err := os.ReadFile(path) //nolint:gosec // G304: a path under the test's own directory
+	if err != nil {
+		t.Fatal(err)
+	}
+	return int(binary.LittleEndian.Uint32(raw[bytes.LastIndex(raw, []byte("PK\x05\x06"))+12:]))
+}
+
+func TestAnArchiveWhoseDirectoryIsLargerThanTheBoundIsRefusedBeforeItIsOpened(t *testing.T) {
+	// A reader holds every entry's name, extra field and comment, each up to
+	// sixty-four kilobytes, so the count of entries alone does not bound what
+	// opening an archive holds.
+	most := directorySize(t, zipOf(t, 4, ""))
+	cverecord.LowerBounds(t, cverecord.Bounds{Directory: int64(most)})
+	if err := cverecord.CountMembers(zipOf(t, 4, "")); err != nil {
+		t.Fatalf("a directory at the bound answered %v", err)
+	}
+	cverecord.LowerBounds(t, cverecord.Bounds{Directory: int64(most - 1)})
+	refusedEverywhere(t, zipOf(t, 4, ""))
+}
+
+func TestAnArchiveStatingMoreMembersThanTheBoundIsRefusedBeforeItIsOpened(t *testing.T) {
+	// A reader sizes the list it walks the directory into from the count the
+	// directory states, before it walks.
+	cverecord.LowerBounds(t, cverecord.Bounds{Members: 1000})
+	boundtest.Edges(t, 1000, func(n int) error {
+		return cverecord.CountMembers(rewritten(t, func(end []byte, _ int) {
+			binary.LittleEndian.PutUint16(end[8:], uint16(n))  //nolint:gosec // G115: a small test count
+			binary.LittleEndian.PutUint16(end[10:], uint16(n)) //nolint:gosec // G115: a small test count
+		}))
+	}, cverecord.IsTooLarge)
+}
+
+// asZip64 writes an archive of four empty members whose directory end defers
+// to a zip64 record stating stated members, and names it.
+func asZip64(t *testing.T, stated uint64) string {
+	t.Helper()
+	path := zipOf(t, 4, "")
+	raw, err := os.ReadFile(path) //nolint:gosec // G304: a path under the test's own directory
+	if err != nil {
+		t.Fatal(err)
+	}
+	at := bytes.LastIndex(raw, []byte("PK\x05\x06"))
+	end := append([]byte{}, raw[at:]...)
+	size := binary.LittleEndian.Uint32(end[12:])
+	offset := binary.LittleEndian.Uint32(end[16:])
+
+	record := make([]byte, 56)
+	copy(record, "PK\x06\x06")
+	binary.LittleEndian.PutUint64(record[4:], 44)
+	binary.LittleEndian.PutUint64(record[24:], stated)
+	binary.LittleEndian.PutUint64(record[32:], stated)
+	binary.LittleEndian.PutUint64(record[40:], uint64(size))
+	binary.LittleEndian.PutUint64(record[48:], uint64(offset))
+	locus := make([]byte, 20)
+	copy(locus, "PK\x06\x07")
+	binary.LittleEndian.PutUint64(locus[8:], uint64(at)) //nolint:gosec // G115: a small test archive
+	binary.LittleEndian.PutUint32(locus[16:], 1)
+	binary.LittleEndian.PutUint16(end[8:], 0xffff)
+	binary.LittleEndian.PutUint16(end[10:], 0xffff)
+
+	out := append(append(append(raw[:at:at], record...), locus...), end...)
+	if err := os.WriteFile(path, out, 0o600); err != nil { //nolint:gosec // G703: a path under the test's own directory
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestAZip64ArchiveStatingMoreMembersThanTheBoundIsRefusedBeforeItIsOpened(t *testing.T) {
+	// Past sixteen bits the count a reader sizes its list from is the zip64
+	// record's.
+	opened, err := zip.OpenReader(asZip64(t, 4))
+	if err != nil {
+		t.Fatalf("a reader does not open the archive, so it tests nothing: %v", err)
+	}
+	if len(opened.File) != 4 {
+		t.Fatalf("a reader found %d members", len(opened.File))
+	}
+	_ = opened.Close()
+	cverecord.LowerBounds(t, cverecord.Bounds{Members: 100_000})
+	boundtest.Edges(t, 100_000, func(n int) error {
+		return cverecord.CountMembers(asZip64(t, uint64(n))) //nolint:gosec // G115: a positive test count
+	}, cverecord.IsTooLarge)
+}
+
+func TestAnArchiveWhoseRecordsInflatePastTheBoundIsRefusedBeforeAnyIsRead(t *testing.T) {
+	// Each record is bounded on its own, and the sum of what they state they
+	// inflate to bounds what reading them all decompresses.
+	body := published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry)
+	most := 2*len(body) + 64
+	cverecord.LowerBounds(t, cverecord.Bounds{RecordBytes: uint64(most)}) //nolint:gosec // G115: a positive test size
+	boundtest.Edges(t, most, func(n int) error {
+		padded := append(append([]byte{}, body...), bytes.Repeat([]byte(" "), n-2*len(body))...)
+		_, _, _, err := cverecord.FromArchive(listArchive(t, map[string][]byte{
+			"CVE-2026-31589.json": body,
+			"CVE-2026-31590.json": padded,
+		}), t.TempDir())
+		return err
+	}, cverecord.IsTooLarge)
 }

@@ -82,9 +82,48 @@ func issuesNamed(ctx context.Context, db bun.IDB, subject access.Subject,
 	return held, nil
 }
 
+// namedComponents is a page's components, each named as a build stated it.
+type namedComponents struct {
+	rows map[int64]graph.Component
+	said statedBy
+}
+
+// at is the component as buildID stated it, and whether it was read.
+func (n namedComponents) at(componentID, buildID int64) (graph.Component, bool) {
+	c, held := n.rows[componentID]
+	if !held {
+		return c, false
+	}
+	return n.said.as(c, buildID), true
+}
+
+// inProduct is the component as the latest of the builds asked about stated
+// it, and whether it was read, for a page over one product's builds.
+func (n namedComponents) inProduct(componentID int64) (graph.Component, bool) {
+	c, held := n.rows[componentID]
+	if !held {
+		return c, false
+	}
+	return n.said.asLatest(c), true
+}
+
 // componentsNamed reads what these components are, including the upstream they
-// were cut from where one is known.
-func componentsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]graph.Component, error) {
+// were cut from where one is known, with the name and version these builds
+// stated for them.
+func componentsNamed(ctx context.Context, db bun.IDB, ids, buildIDs []int64) (namedComponents, error) {
+	rows, err := componentRows(ctx, db, ids)
+	if err != nil {
+		return namedComponents{}, err
+	}
+	said, err := statedNames(ctx, db, buildIDs, ids)
+	if err != nil {
+		return namedComponents{}, err
+	}
+	return namedComponents{rows: rows, said: said}, nil
+}
+
+// componentRows reads these components' rows.
+func componentRows(ctx context.Context, db bun.IDB, ids []int64) (map[int64]graph.Component, error) {
 	held := map[int64]graph.Component{}
 	if len(ids) == 0 {
 		return held, nil
@@ -99,4 +138,98 @@ func componentsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]gr
 		held[component.ID] = component
 	}
 	return held, nil
+}
+
+// statedBy is the name and version builds stated for components, read off
+// their open nodes. The component row holds what the first product to
+// describe a package stated, so a row shown by its own name would show
+// another product's words.
+type statedBy struct {
+	// pair is keyed by build, then component.
+	pair map[[2]int64]graph.Component
+	// latest is, among the builds asked about, an open node, else the node
+	// opened last, for a page whose rows span one product's builds and name
+	// none of them.
+	latest map[int64]graph.Component
+}
+
+// statedNames reads what these builds stated these components are called and
+// at which version: the open node's, else the build's latest node's, so a row
+// closed since is named as its build last stated it, as graph.StatedName
+// names it. A node holding neither predates the node holding them and is left
+// out, so the row's stands.
+func statedNames(ctx context.Context, db bun.IDB, buildIDs, componentIDs []int64) (statedBy, error) {
+	said := statedBy{pair: map[[2]int64]graph.Component{}, latest: map[int64]graph.Component{}}
+	if len(buildIDs) == 0 || len(componentIDs) == 0 {
+		return said, nil
+	}
+	var rows []struct {
+		ID          int64  `bun:"id"`
+		BuildID     int64  `bun:"build_id"`
+		ComponentID int64  `bun:"component_id"`
+		Name        string `bun:"name"`
+		Version     string `bun:"version"`
+		Opened      int64  `bun:"opened_scan_id"`
+		Closed      *int64 `bun:"closed_scan_id"`
+	}
+	if err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."id", "n"."build_id", "n"."component_id", "n"."name", "n"."version"`).
+		ColumnExpr(`"n"."opened_scan_id", "n"."closed_scan_id"`).
+		Where(`"n"."build_id" IN (?)`, bun.List(buildIDs)).
+		Where(`"n"."component_id" IN (?)`, bun.List(componentIDs)).
+		// Both values of the root flag, so the index led by the build, the
+		// flag and the component answers it, as graph.BuildName's does.
+		Where(`"n"."is_root" IN (FALSE, TRUE)`).
+		Where(`"n"."name" IS NOT NULL`).
+		Scan(ctx, &rows); err != nil {
+		return said, fmt.Errorf("read what these builds call these components: %w", err)
+	}
+	// An open node outranks a closed one, then the later opened, then the
+	// later written, which is the order graph.StatedName reads them in.
+	type rank struct {
+		open         bool
+		opened, node int64
+	}
+	above := func(a, b rank) bool {
+		if a.open != b.open {
+			return a.open
+		}
+		if a.opened != b.opened {
+			return a.opened > b.opened
+		}
+		return a.node > b.node
+	}
+	byPair := map[[2]int64]rank{}
+	byComponent := map[int64]rank{}
+	for _, row := range rows {
+		named := graph.Component{Name: row.Name, Version: row.Version}
+		at := rank{open: row.Closed == nil, opened: row.Opened, node: row.ID}
+		pair := [2]int64{row.BuildID, row.ComponentID}
+		if held, ok := byPair[pair]; !ok || above(at, held) {
+			byPair[pair], said.pair[pair] = at, named
+		}
+		if held, ok := byComponent[row.ComponentID]; !ok || above(at, held) {
+			byComponent[row.ComponentID], said.latest[row.ComponentID] = at, named
+		}
+	}
+	return said, nil
+}
+
+// as is the component named as the build stated it, or as the row where the
+// build holds no node stating it. Never another build's word: a page spans
+// products, and another build's is another product's.
+func (s statedBy) as(c graph.Component, buildID int64) graph.Component {
+	if named, held := s.pair[[2]int64{buildID, c.ID}]; held {
+		c.Name, c.Version = named.Name, named.Version
+	}
+	return c
+}
+
+// asLatest is the component named as the latest of the builds asked about
+// stated it, or as the row. Only for builds of one product.
+func (s statedBy) asLatest(c graph.Component) graph.Component {
+	if named, held := s.latest[c.ID]; held {
+		c.Name, c.Version = named.Name, named.Version
+	}
+	return c
 }

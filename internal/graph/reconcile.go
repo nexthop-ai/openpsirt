@@ -17,9 +17,48 @@ import (
 //
 // A node that is still present is written only where what the scan says about
 // it differs from the row: its root flag, or the identifiers the build stated
-// for it. An unchanged rebuild writes nothing.
+// for it. An unchanged rebuild writes nothing. A node whose stated name or
+// version moved is closed and another opened, because an earlier scan's
+// inventory changes read the node's name: restated in place, they would name
+// what a later scan stated.
 func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	wanted map[int64]stated) (map[int64]int64, int, int, error) {
+
+	// The nodes holding no name, read before they are given the row's. Each
+	// takes the name the build states in place: it never held one of its
+	// own, so no earlier change reads one.
+	var unnamed []int64
+	if err := tx.NewSelect().TableExpr(`"graph_node"`).ColumnExpr(`"id"`).
+		Where(`"build_id" = ?`, buildID).
+		Where(`"closed_scan_id" IS NULL`).
+		Where(`"name_folded" IS NULL`).
+		Scan(ctx, &unnamed); err != nil {
+		return nil, 0, 0, fmt.Errorf("read the nodes holding no name: %w", err)
+	}
+	filled := make(map[int64]bool, len(unnamed))
+	for _, id := range unnamed {
+		filled[id] = true
+	}
+
+	// A node written before the name and version were kept holds neither,
+	// and reads the component row's. It is given the row's here, in one
+	// statement for the build: compared bare, every one of them reads as
+	// restated, and a real image is hundreds of thousands of statements.
+	// The comparison below then restates only those the build states
+	// differently. Found by the fold, which the build's name index holds,
+	// and never left empty, so a build is searched once and not on every
+	// scan.
+	if _, err := tx.NewUpdate().TableExpr(`"graph_node"`).
+		Set(`"name" = (SELECT "c"."name" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
+		Set(`"version" = (SELECT "c"."version" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
+		Set(`"name_folded" = COALESCE((SELECT "c"."name_folded" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id"), '')`).
+		Set(`"source_folded" = COALESCE((SELECT COALESCE(NULLIF("c"."upstream_folded", ''), "c"."name_folded") FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id"), '')`).
+		Where(`"build_id" = ?`, buildID).
+		Where(`"closed_scan_id" IS NULL`).
+		Where(`"name_folded" IS NULL`).
+		Exec(ctx); err != nil {
+		return nil, 0, 0, fmt.Errorf("give older nodes the name and version they read: %w", err)
+	}
 
 	var open []Node
 	err := tx.NewSelect().Model(&open).
@@ -42,6 +81,11 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	var gone []int64
 	for _, node := range open {
 		if says, keep := wanted[node.ComponentID]; keep {
+			if (node.Name != says.name || node.Version != says.version) && !filled[node.ID] {
+				// Closed below, and opened again as missing.
+				gone = append(gone, node.ID)
+				continue
+			}
 			nodeIDs[node.ComponentID] = node.ID
 			if node.IsRoot != says.isRoot {
 				reroot[node.ID] = says.isRoot
@@ -49,7 +93,9 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			if node.Purl != says.purl || node.CPE != says.cpe ||
 				node.UpstreamName != says.upstreamName ||
 				node.UpstreamVersion != says.upstreamVersion ||
-				node.Repository != says.repository {
+				node.Repository != says.repository ||
+				node.Name != says.name || node.Version != says.version ||
+				node.SourceFolded != says.sourceFolded() {
 				restated[node.ID] = says
 			}
 			continue
@@ -68,6 +114,8 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			Purl: says.purl, CPE: says.cpe,
 			UpstreamName: says.upstreamName, UpstreamVersion: says.upstreamVersion,
 			Repository: says.repository,
+			Name:       says.name, Version: says.version, NameFolded: Folded(says.name),
+			SourceFolded: says.sourceFolded(),
 		})
 	}
 	// One statement per node. A build restates an identifier rarely, and
@@ -80,6 +128,10 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			Set(`"upstream_name" = ?`, nullable(says.upstreamName)).
 			Set(`"upstream_version" = ?`, nullable(says.upstreamVersion)).
 			Set(`"repository" = ?`, nullable(says.repository)).
+			Set(`"name" = ?`, says.name).
+			Set(`"version" = ?`, says.version).
+			Set(`"name_folded" = ?`, Folded(says.name)).
+			Set(`"source_folded" = ?`, says.sourceFolded()).
 			Where(`"id" = ?`, id).Exec(ctx); err != nil {
 			return nil, 0, 0, fmt.Errorf("record what the build states about a component: %w", err)
 		}
@@ -140,6 +192,17 @@ type stated struct {
 	purl, cpe                     string
 	upstreamName, upstreamVersion string
 	repository                    string
+	name, version                 string
+}
+
+// sourceFolded is the source package the build stated, else the name it
+// stated, folded: the node's counterpart of the component row's upstream fold,
+// else its name fold, which an assignment rule's source pattern reads.
+func (s stated) sourceFolded() string {
+	if folded := Folded(s.upstreamName); folded != "" {
+		return folded
+	}
+	return Folded(s.name)
 }
 
 // nullable is a stated identifier as the column holds it: absent where the

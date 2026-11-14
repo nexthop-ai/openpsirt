@@ -71,7 +71,7 @@ without its suppressions reports every carried patch as open.
 | Conflict | Something newer, or with the same build time, is held; or the product, branch or tag, or variant is retired |
 | Unprocessable | The inventory cannot be read at all, or more suppression documents arrived than one scan may carry |
 | Payload too large | Over twice the document bound, refused unread where the length is declared |
-| Service unavailable | Too much is waiting, or the server reads `upload.max-concurrent` uploads already; the second carries a retry time |
+| Service unavailable | Too much is waiting, or the server reads `upload.max-concurrent` uploads already; both carry a retry time |
 
 | Rule | Reason |
 |---|---|
@@ -129,11 +129,13 @@ Nightly scans are transient; tagged releases are kept and fetched back
 
 | Stream kind | Contents | Reason |
 |---|---|---|
-| Nightly branch | Deleted once read | The next night supersedes it |
+| Nightly branch | Deleted once nothing reads it again | The next night supersedes it |
 | Tagged release | Inventory and suppressions kept | A re-scan years later needs both, or it undoes every argument |
 
 | Rule | Reason |
 |---|---|
+| A branch scan's contents go when it is applied, when the build applies a newer scan, when it is older than the scan the build shows, and after its last attempt is refused. A last attempt failing for a fault of this server keeps them until the build applies a newer scan | A re-send writes the bytes anew; a job put back after a fault reads them again |
+| A branch scan set aside for a newer one not yet applied keeps its contents | It is read again if the newer one fails |
 | Kind, size and hash of what arrived outlive the contents | Recovery is a re-send, which the hash checks |
 | A released document answers 410, and on screen is no link | |
 | A document is read a part at a time, so one released mid-read ends in an error: the reader fails, and a download already answered 200 ends short and is logged | Part of a document is never parsed as all of it |
@@ -159,7 +161,8 @@ describe in one transaction (REQ-06).
 
 | Hazard | Guard |
 |---|---|
-| A scan read after a newer one applied | Recorded as overtaken, never failed, and not applied (REQ-06) |
+| A scan read after a newer one applied | Recorded as overtaken and not applied (REQ-06). A read failing because the newer one let go of its documents is overtaken too; any other failure, a refusal of what was sent included, is recorded against the scan |
+| A job run again after its apply committed | The build already shows the scan, so the read changes nothing and the scan stays applied; checked before its documents are looked for, since a branch's are gone. A branch's documents, and those of the scans it passed, are released then if the first attempt stopped before releasing them |
 | Which is newer | The later build time, then the later arrival; a re-send at one build time with new judgments whose first read failed is applied on retry |
 | Scans out of identifier order | Intervals are stamped with scan identifiers, so scans apply in identifier order; a lower one than last applied is overtaken, a re-sent failure gets a new identifier, and a job waiting on a replaced scan is set aside |
 | A newer scan arrives during a parse | Asked again after the build row is taken, as well as before |

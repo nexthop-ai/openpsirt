@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // decidedSets is what a VEX read of one build knows about the open findings of
@@ -207,7 +208,10 @@ func readDecided(ctx context.Context, db bun.IDB, productID, buildID int64, visi
 	byComponent, componentArgs := database.InAnyOf(`"c"."id"`, held)
 	if err := db.NewSelect().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`"c"."id", "c"."name", COALESCE("c"."purl", '') AS "purl"`).
+		// Named as the build stated it, which is what a statement about the
+		// build publishes; the version stays the one decisions are keyed on.
+		ColumnExpr(`"c"."id", `+graph.BuildName("?", `"c"."id"`, "c")+` AS "name"`, buildID).
+		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
 		ColumnExpr(heldComponent+` AS "version"`).
 		Where(byComponent, componentArgs...).
 		Scan(ctx, &components); err != nil {

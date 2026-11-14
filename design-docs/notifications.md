@@ -42,6 +42,7 @@ changes nothing (REQ-49).
 | Derived every sweep, never remembered | Otherwise every path that approves, withdraws, sends back or lapses must clear it, and one forgets |
 | A condition that returns is a new row | "Cleared, then came back" stays visible |
 | What a cleared condition says is an event told in the clearing transaction under every rule of an event: its undisclosed marks, product and issue kept, refused unattributed, and nobody who has left told | One path writes events, so none drops a mark |
+| A condition about a finding names its component by the component row's name; its sentence and link name the one its build stated | A build restating its components would otherwise clear every standing alert and raise it again, telling everybody twice |
 | Acknowledging a condition hides it, never resolves it, and the screen shows which | The thing is still true |
 | A standing condition's sentence, link, undisclosed mark, product and issue are restated each sweep on the same row | Its sentence carries a count, and every read narrows by those |
 | Everybody holding a condition is handed a list each sweep, even empty | A condition clears only by being left off, so a demoted administrator would go on being told |

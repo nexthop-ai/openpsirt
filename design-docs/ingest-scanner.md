@@ -41,6 +41,14 @@ references, and a producer controls the first.
 | Addresses per match | Bounded apart, since the two multiply |
 | One execution's wall-clock time | A stalled scanner fails as a run; the bound stays under one hold (`design-docs/queue.md`), and the process refuses to start otherwise |
 
+| A run ending without a report | Its receipt says |
+|---|---|
+| The scanner exited or was killed | How it ended and the end of what it said |
+| The wall-clock bound passed | The bound and the end of what it said |
+| Its caller ended it: a shutdown, a lost claim, a caller's own deadline | That the scan could not be completed; the cause goes to the log, since it says nothing about the inventory |
+| The scanner never started | That the scan could not be completed; the executable and the operating system's error go to the log, as configuration |
+| The scanner's report could not be read | That the scan could not be completed; the decoder's error goes to the log, since it quotes the report |
+
 ## Ratings a report carries
 
 A report states ratings of one issue from several sources and two scorable
@@ -112,7 +120,7 @@ scanner's data and read whole (REQ-12, REQ-31); what a scan does with it is
 | `openpsirt records import` reads an archive fetched another way | |
 | The snapshot is replaced by rename | A scan reads old or new, never half |
 | An unreadable snapshot is an error, never no records | |
-| An unreadable record is left out and the rest built; the count and first are logged; no readable record builds nothing | The record narrows nothing, which is conservative |
+| An unreadable record is left out and the rest built; the count and first are kept and logged, nothing more; no readable record builds nothing | The record narrows nothing, which is conservative; an archive holds as many unreadable members as it has members |
 | An update moment without offset is UTC | |
 | It lives on the scanner's volume, per replica or shared | |
 | Scratch files over two hours old are removed when a fetch starts | A younger one may be an import in progress |
@@ -124,8 +132,10 @@ scanner's data and read whole (REQ-12, REQ-31); what a scan does with it is
 |---|---|
 | Download | 8 GiB, against 622 MB on 2026-10-07, removed past it |
 | Archive inside | 8 GiB, on disk, removed once read |
-| Files in an archive | Four million, counted by walking entries before opening, which holds every entry in memory |
-| One archive record | 16 MiB |
+| Files in an archive | Four million, counted by walking entries before opening, which holds every entry in memory; the count the directory states is held to it as well, because opening sizes a list from it |
+| An archive's directory | 512 MiB, summed while walking entries, against 44,333,424 bytes for 425,189 members on 2026-11-12; opening holds every name, extra field and comment |
+| One archive record | 16 MiB, against 2,402,038 bytes for the largest on 2026-11-12 |
+| Every archive record | 32 GiB as each states it inflates to, summed before any is read, against 3,550,142,419 bytes on 2026-11-12; a member inflating past what it states fails to read |
 | Snapshot records | A million |
 | One snapshot record | 4 MiB as encoded |
 | Snapshot | 128 MiB decompressed, against 534 KB compressed on 2026-10-07; the bound is on what reading it holds in memory, and a carried bundle is a file from outside |

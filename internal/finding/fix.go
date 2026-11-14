@@ -16,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -500,22 +501,30 @@ func (s *Store) packagesIn(ctx context.Context, buildID int64,
 	}
 	var rows []named
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	// Each fold's names sit wholly in one batch, so ordering each batch by
-	// name orders every fold's list.
+	// Each fold's components sit wholly in one batch. A component is named as
+	// the build last stated it, its open node else its latest, so a version
+	// the build moved off reads the build's name and never another
+	// product's: read per component, then deduplicated and ordered here.
 	if err := database.IDsInBatches(ctx, folds, func(ctx context.Context, batch []string) error {
-		var some []named
-		if err := s.db.NewSelect().
+		held := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Where(kinds, kindArgs...).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			ColumnExpr(FoldedOn+` AS "fold"`).
 			ColumnExpr(PerFold(SourceName)+` AS "upstream"`).
-			ColumnExpr(`"c"."name" AS "name"`).
+			ColumnExpr(`"f"."component_id" AS "component_id"`).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(FoldedOn+" IN (?)", bun.List(batch)).
-			GroupExpr(FoldedOn+`, "c"."name"`).
-			OrderExpr(`"c"."name"`).
+			GroupExpr(FoldedOn + `, "f"."component_id"`)
+		var some []named
+		if err := s.db.NewSelect().
+			TableExpr(`(?) AS "g"`, held).
+			Join(`JOIN "component" AS "c" ON "c"."id" = "g"."component_id"`).
+			Join(graph.StatedJoin("sn", "?", `"g"."component_id"`), buildID).
+			ColumnExpr(`"g"."fold" AS "fold"`).
+			ColumnExpr(`"g"."upstream" AS "upstream"`).
+			ColumnExpr(graph.StatedName("sn", "?", `"g"."component_id"`, "c")+` AS "name"`, buildID).
 			Scan(ctx, &some); err != nil {
 			return err
 		}
@@ -527,9 +536,17 @@ func (s *Store) packagesIn(ctx context.Context, buildID int64,
 	out := make(map[string]packages, len(folds))
 	for _, row := range rows {
 		one := out[row.Fold]
-		one.Upstream = row.Upstream
-		one.Components = append(one.Components, row.Name)
+		if one.Upstream == "" || row.Upstream < one.Upstream {
+			one.Upstream = row.Upstream
+		}
+		if !slices.Contains(one.Components, row.Name) {
+			one.Components = append(one.Components, row.Name)
+		}
 		out[row.Fold] = one
+	}
+	for fold, one := range out {
+		slices.Sort(one.Components)
+		out[fold] = one
 	}
 	return out, nil
 }

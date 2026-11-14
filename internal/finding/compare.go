@@ -14,14 +14,20 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // Changed is one issue that differs between two builds.
 type Changed struct {
 	Vulnerability string `bun:"vulnerability"`
-	Component     string `bun:"component"`
-	Severity      string `bun:"severity"`
+	// Component is the name the build stated, which is what a reader sees.
+	// Named is the component row's name, which the two builds are paired on:
+	// each build states its own, so pairing on what either stated splits one
+	// component into a fix and a new arrival.
+	Component string `bun:"component"`
+	Named     string `bun:"named" json:"-"`
+	Severity  string `bun:"severity"`
 	// Because says why it went, for something that is no longer there. The
 	// four explanations are different sentences to whoever reads a release
 	// note: upgraded, patched, the component removed, and superseded — which
@@ -155,7 +161,9 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 			// it publishes, which is the copy that leaves the building.
 			Join(rating.Here, productID).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-			ColumnExpr(`"c"."name" AS "component"`).
+			Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+			ColumnExpr(`"c"."name" AS "named"`).
+			ColumnExpr(`MIN(`+graph.NodeName("sn", "c")+`) AS "component"`).
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COALESCE("f"."closed_because", '') AS "because"`).
 			ColumnExpr(`MIN(COALESCE("f"."arrived_from", '')) AS "arrived_from"`).
@@ -182,7 +190,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 		return nil, fmt.Errorf("read what the later build has: %w", err)
 	}
 
-	key := func(c Changed) string { return pairKey(c.Vulnerability, c.Component) }
+	key := func(c Changed) string { return pairKey(c.Vulnerability, c.Named) }
 	here := map[string]Changed{}
 	for _, c := range now {
 		here[key(c)] = c
@@ -293,7 +301,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-			ColumnExpr(`"c"."name" AS "component"`).
+			ColumnExpr(`"c"."name" AS "named"`).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" = ?`, access.Private).
 			Where(`"f"."closed_at" IS NULL`).
@@ -311,11 +319,11 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	}
 	here := make(map[string]bool, len(now))
 	for _, c := range now {
-		here[pairKey(c.Vulnerability, c.Component)] = true
+		here[pairKey(c.Vulnerability, c.Named)] = true
 	}
 	gone := make([]Changed, 0, len(was))
 	for _, c := range was {
-		if !here[pairKey(c.Vulnerability, c.Component)] {
+		if !here[pairKey(c.Vulnerability, c.Named)] {
 			gone = append(gone, c)
 		}
 	}
@@ -340,7 +348,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 		return 0, err
 	}
 	for i := range gone {
-		gone[i].Because = why[pairKey(gone[i].Vulnerability, gone[i].Component)].Because
+		gone[i].Because = why[pairKey(gone[i].Vulnerability, gone[i].Named)].Because
 	}
 	return len(onlyFixes(gone)), nil
 }
@@ -374,8 +382,8 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Vis
 	}
 	wanted := make(map[string]bool, len(fixed))
 	for _, c := range fixed {
-		wanted[pairKey(c.Vulnerability, c.Component)] = true
-		why[pairKey(c.Vulnerability, c.Component)] = Gone{Because: Unexplained}
+		wanted[pairKey(c.Vulnerability, c.Named)] = true
+		why[pairKey(c.Vulnerability, c.Named)] = Gone{Because: Unexplained}
 	}
 
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
@@ -390,9 +398,9 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Vis
 				seenIssue[c.Vulnerability] = true
 				issues = append(issues, c.Vulnerability)
 			}
-			if !seenComponent[c.Component] {
-				seenComponent[c.Component] = true
-				components = append(components, c.Component)
+			if !seenComponent[c.Named] {
+				seenComponent[c.Named] = true
+				components = append(components, c.Named)
 			}
 		}
 
@@ -458,8 +466,8 @@ type Gone struct {
 	ClosedRun int64
 }
 
-// pairKey identifies an issue at a component by name, which is what a
-// comparison is drawn in: one line per issue in a component, whatever versions
+// pairKey identifies an issue at a component by the component row's name,
+// which is what a comparison is drawn in: one line per issue in a component, whatever versions
 // either side is at.
 //
 // One spelling, because the entries and the explanations for them are matched

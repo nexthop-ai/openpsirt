@@ -4,8 +4,11 @@
 package notify_test
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -539,4 +542,127 @@ func TestACriticalASupplierAnswersIsNotTold(t *testing.T) {
 			t.Errorf("the triager was told %q about an occurrence a supplier answers", told)
 		}
 	})
+}
+
+// An alert standing over a finding is identified by the component, so a build
+// restating the component's name moves what the alert says and leaves the
+// alert standing, rather than clearing it and telling everybody again.
+func TestAnAlertStandsWhereTheBuildRestatesTheComponentsName(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		rights := access.NewStore(db.DB)
+		released := w.BuildFor(w.Tag, w.Customer)
+		triager := recordPerson(t, rights, "triager@example.com", false, w.Product.ID, access.PublicTriage)
+
+		stated := func(name string, at int) {
+			t.Helper()
+			statedAs(t, db, released.ID, graph.Described{
+				Purl: "pkg:generic/libnl@3.7.0", Name: name, Version: "3.7.0"}, at)
+		}
+		standing := func() []int64 {
+			t.Helper()
+			if _, _, err := notify.NewWatch(db.DB, quiet).Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+			rows, _, err := notify.NewStore(db.DB).Waiting(ctx, asksByID(t, db, triager), 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var ids []int64
+			for _, row := range rows {
+				if row.Kind == notify.CriticalOnRelease {
+					ids = append(ids, row.ID)
+				}
+			}
+			return ids
+		}
+
+		stated("libnl", 1)
+		critical(t, db, released.ID, "CVE-2026-SHIPPED", "critical")
+		before := standing()
+		if len(before) != 1 {
+			t.Fatalf("the triager was told %v, want one alert", before)
+		}
+		stated("LibNL", 2)
+		if after := standing(); !slices.Equal(after, before) {
+			t.Errorf("restating the component's name turned alert %v into %v", before, after)
+		}
+	})
+}
+
+// A disclosure alert is identified by the component as well, so a build
+// restating the component's name leaves the alert standing and moves what it
+// says to the name the build stated.
+func TestADisclosureAlertStandsWhereTheBuildRestatesTheComponentsName(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		rights := access.NewStore(db.DB)
+		admin := recordPerson(t, rights, "admin@example.com", true, 0, "")
+		owner, err := rights.Ensure(ctx, "owner@example.com", "Owner", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		standing := func() map[int64]string {
+			t.Helper()
+			if _, _, err := notify.NewWatch(db.DB, quiet).Once(ctx); err != nil {
+				t.Fatal(err)
+			}
+			rows, _, err := notify.NewStore(db.DB).Waiting(ctx, asksByID(t, db, admin), 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			said := map[int64]string{}
+			for _, row := range rows {
+				if row.Kind == notify.DisclosureDue {
+					said[row.ID] = row.Body
+				}
+			}
+			return said
+		}
+
+		statedAs(t, db, w.Build.ID, graph.Described{
+			Purl: "pkg:generic/libnl@1.0", Name: "libnl", Version: "1.0"}, 1)
+		embargoedAt(t, db, w.Build.ID, "SONIC-2026-0001", "libnl", owner.PartyID,
+			time.Now().UTC().Add(-24*time.Hour))
+		before := standing()
+		if len(before) != 1 {
+			t.Fatalf("the administrator was told %v, want one disclosure alert", before)
+		}
+		statedAs(t, db, w.Build.ID, graph.Described{
+			Purl: "pkg:generic/libnl@1.0", Name: "LibNL", Version: "1.0"}, 2)
+		after := standing()
+		if !slices.Equal(slices.Sorted(maps.Keys(after)), slices.Sorted(maps.Keys(before))) {
+			t.Fatalf("restating the component's name turned alert %v into %v", before, after)
+		}
+		for id, body := range after {
+			if !strings.Contains(body, " at LibNL ") {
+				t.Errorf("alert %d says %q, want the name the build stated", id, body)
+			}
+		}
+	})
+}
+
+// statedAs records a scan of the build stating one component under its root,
+// built the given number of hours apart from the others a test records.
+func statedAs(t *testing.T, db *database.DB, buildID int64, component graph.Described, at int) {
+	t.Helper()
+	ctx := t.Context()
+	scan, _, err := ingest.NewStore(db.DB).Record(ctx, ingest.Arriving{
+		BuildID: buildID, ContentHash: fmt.Sprintf("restated-%d", at),
+		BuiltAt: time.Now().UTC().Add(time.Duration(at-3) * time.Hour), ParserVersion: "test",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}
+	if _, err := fixture.ApplyGraph(ctx, db.DB, buildID, scan.ID, graph.Snapshot{
+		Root: root, Components: []graph.Described{component},
+		Dependencies: []graph.Dependency{{Parent: root, Child: component}},
+	}); err != nil {
+		t.Fatal(err)
+	}
 }

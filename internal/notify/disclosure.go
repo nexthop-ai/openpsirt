@@ -101,16 +101,23 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Where(`"de"."state" = ?`, triage.Approved).
 		// And the statement it cited is no longer what that publisher says.
 		Where(`"ss"."superseded_at" IS NOT NULL`).
-		// An upstream's statement the upstream says again, word for word, is
-		// current again: trusting an upstream once more records what it says
-		// as new rows, and the ground under the decision has not moved.
-		Where(`NOT ("ss"."source" = ? AND EXISTS (SELECT 1 FROM "received_vex_statement" AS "sn"
+		// A statement its publisher says again, word for word, reasoning
+		// included, in a row in force is current again, and the ground under
+		// the decision has not moved: another document of theirs overtaking it
+		// with the same claim records a row of its own, as trusting an
+		// upstream once more does.
+		Where(`NOT EXISTS (SELECT 1 FROM "received_vex_statement" AS "sn"
 			WHERE "sn"."product_id" = "ss"."product_id" AND "sn"."publisher" = "ss"."publisher"
 			  AND "sn"."source" = "ss"."source" AND "sn"."vulnerability" = "ss"."vulnerability"
 			  AND "sn"."component" = "ss"."component" AND "sn"."about" = "ss"."about"
+			  AND COALESCE("sn"."purl", '') = COALESCE("ss"."purl", '')
+			  AND COALESCE("sn"."within_purl", '') = COALESCE("ss"."within_purl", '')
+			  AND COALESCE("sn"."within", '') = COALESCE("ss"."within", '')
+			  AND COALESCE("sn"."within_about", '') = COALESCE("ss"."within_about", '')
 			  AND "sn"."status" = "ss"."status"
 			  AND COALESCE("sn"."justification", '') = COALESCE("ss"."justification", '')
-			  AND "sn"."superseded_at" IS NULL))`, finding.FromUpstream).
+			  AND COALESCE("sn"."statement_id", 0) = COALESCE("ss"."statement_id", 0)
+			  AND "sn"."superseded_at" IS NULL)`).
 		// Whether it was set aside because the product stopped trusting its
 		// upstream, which is said as that rather than as the upstream
 		// changing its mind.
@@ -176,6 +183,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		BranchOrTag     string    `bun:"branch_or_tag"`
 		Variant         string    `bun:"variant"`
 		Component       string    `bun:"component"`
+		Named           string    `bun:"named"`
 		Vulnerability   string    `bun:"vulnerability"`
 		ProductID       int64     `bun:"product_id"`
 		VulnerabilityID int64     `bun:"vulnerability_id"`
@@ -250,7 +258,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 			// One condition per occurrence, because the link and whoever holds the
 			// work are per occurrence.
 			About: identify(about, row.Product, row.BranchOrTag, row.Variant,
-				row.Vulnerability, row.Component),
+				row.Vulnerability, row.Named),
 			Body: body,
 			Link: weblink.Finding(row.Product, row.BranchOrTag, row.Variant,
 				row.Vulnerability, row.Component, ""),

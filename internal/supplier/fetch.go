@@ -738,7 +738,13 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, feed Feed, one 
 	sum := sha256.Sum256(body)
 	statements := ours(advisory, ships)
 	var recorded int
+	if err := finding.EnsureStatementsLock(ctx, f.db); err != nil {
+		return 0, err
+	}
 	err := database.Within(ctx, f.db, func(ctx context.Context, tx bun.IDB) error {
+		if err := finding.TakeStatements(ctx, tx); err != nil {
+			return err
+		}
 		// Asked inside the transaction rather than trusted from before it. A
 		// pass takes minutes, and a supplier withdrawn during one goes on
 		// fetching and recording — which is the request leaving this
@@ -759,6 +765,7 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, feed Feed, one 
 				Source:     finding.FromAdvisory,
 				Identifier: advisory.Identifier,
 				Publisher:  advisory.Publisher,
+				SaidAt:     advisory.SaidAt,
 				// The address it was fetched from, where an upload records the
 				// name a client gave the file. Both answer "which document was
 				// this", and for a fetched one the address is the answer that

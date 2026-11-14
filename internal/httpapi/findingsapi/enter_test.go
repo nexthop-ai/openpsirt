@@ -122,6 +122,35 @@ func TestAFlawInOurOwnProductIsRecordedAndReadBackLikeAnyOther(t *testing.T) {
 	})
 }
 
+// A flaw recorded at a component is answered under the name its build stated,
+// never under the shared row's.
+func TestARecordedFlawIsAnsweredUnderTheNameItsBuildStated(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		if _, err := r.DB.DB.NewUpdate().Table("component").Set(`"name" = ?`, "nothing").
+			Where(`"purl" = ?`, httpapitest.SeededLib.Purl).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		body := `{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],` +
+			`"component":"` + httpapitest.SeededLib.Name + `",` +
+			`"summary":"The netlink parser trusts a length it never checks.","severity":"high"}`
+		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings", body)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
+		}
+		var recorded struct {
+			Component string `json:"component"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
+			t.Fatalf("decode: %v (%s)", err, got.Body.String())
+		}
+		if recorded.Component != httpapitest.SeededLib.Name {
+			t.Errorf("the flaw is answered at %q, want %q as the build stated it",
+				recorded.Component, httpapitest.SeededLib.Name)
+		}
+	})
+}
+
 func TestWhatIsApproachingDisclosureIsAnsweredOnlyToWhoMaySeeIt(t *testing.T) {
 	// Every row is a finding nobody has announced, so the list is a disclosure
 	// in its own right. A product somebody may not read undisclosed work in

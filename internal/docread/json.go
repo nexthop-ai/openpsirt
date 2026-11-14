@@ -169,17 +169,39 @@ func (s *Source) Refused(what string, err error) error {
 	return refusal.Errorf("%s: %w", what, err)
 }
 
-// Token reads the next token, stating a document that ends inside a value in
-// words.
+// endOfInput is the syntax error the decoder states an input ending partway
+// with, taken from the decoder so that its wording is never copied here.
+var endOfInput = func() string {
+	var syntax *json.SyntaxError
+	if errors.As(json.Unmarshal(nil, new(any)), &syntax) {
+		return syntax.Error()
+	}
+	return ""
+}()
+
+// Token reads the next token, stating a document that is empty or ends inside
+// a value in words.
 //
-// The decoder reports that as the same end-of-file error a database driver
+// The decoder reports either as the same end-of-file error a database driver
 // returns for a connection cut short, and a caller that tells the two apart by
 // the error's identity answers the sender's malformed file as a fault of its
-// own.
+// own. The decoder states a document cut off in three ways: inside a string or
+// a literal as an unexpected end of file, after a delimiter as the syntax
+// error a whole-document decode gives an empty input, and after a key, or
+// before anything at all, as a plain end of file. The depth says which of
+// empty and cut off the last is.
 func (b *JSON) Token() (json.Token, error) {
 	tok, err := b.dec.Token()
-	if errors.Is(err, io.ErrUnexpectedEOF) && b.src.err == nil {
-		return nil, refusal.New("the document ends partway through a value")
+	if err != nil && b.src.err == nil {
+		var syntax *json.SyntaxError
+		switch {
+		case errors.Is(err, io.ErrUnexpectedEOF),
+			errors.As(err, &syntax) && syntax.Error() == endOfInput,
+			errors.Is(err, io.EOF) && b.depth > 0:
+			return nil, refusal.New("the document ends partway through a value")
+		case errors.Is(err, io.EOF):
+			return nil, refusal.New("the document is empty")
+		}
 	}
 	// Every string a document carries may reach the database, and the query
 	// builder refuses a NUL on two of the engines. The decoder has already
@@ -207,7 +229,7 @@ func (b *JSON) End() error {
 	if err != nil {
 		return err
 	}
-	return refusal.Errorf("the document continues after its top-level value with %v", tok)
+	return refusal.Errorf("the document continues after its top-level value with %s", quoted(tok))
 }
 
 func (b *JSON) enter() error {
@@ -228,6 +250,14 @@ func (b *JSON) Object(fn func(key string) error) error {
 		return err
 	}
 	defer b.leave()
+	return b.members(bounded, fn)
+}
+
+// members reads the members of an object whose opening brace has been read,
+// calling fn with each key, and consumes the closing brace. Every walk of an
+// object reads its members here, so a bounded key is bounded wherever its
+// object is read or walked past.
+func (b *JSON) members(bounded bool, fn func(key string) error) error {
 	n := 0
 	for b.dec.More() {
 		tok, err := b.Token()
@@ -236,7 +266,7 @@ func (b *JSON) Object(fn func(key string) error) error {
 		}
 		key, ok := tok.(string)
 		if !ok {
-			return refusal.Errorf("object key is %v, not a string", tok)
+			return refusal.Errorf("object key is %s, not a string", quoted(tok))
 		}
 		if err := b.member(bounded, &n); err != nil {
 			return err
@@ -250,6 +280,13 @@ func (b *JSON) Object(fn func(key string) error) error {
 	}
 	return b.close()
 }
+
+// quoted is a token of the document as a refusal quotes it. A string or a
+// number token is as long as the document lets it be.
+func quoted(tok json.Token) string { return bound.Head(fmt.Sprint(tok), MostQuoted) }
+
+// skipEach is a member reader that walks past every value.
+func (b *JSON) skipEach(string) error { return b.Skip() }
 
 // Array reads one array, calling fn per element. fn consumes that element.
 func (b *JSON) Array(fn func() error) error {
@@ -273,9 +310,7 @@ func (b *JSON) open(want json.Delim) error {
 		return err
 	}
 	if tok != want {
-		// The token is the document's own, and a string token is as long as
-		// the document lets it be.
-		return refusal.Errorf("want %v, got %s", want, bound.Head(fmt.Sprint(tok), MostQuoted))
+		return refusal.Errorf("want %v, got %s", want, quoted(tok))
 	}
 	return b.enter()
 }
@@ -289,6 +324,7 @@ func (b *JSON) close() error {
 // Str reads one string. A null reads as empty, which is how a producer that
 // emits a field it has no value for is treated the same as one that omits it.
 func (b *JSON) Str() (string, error) {
+	b.pending = false
 	tok, err := b.Token()
 	if err != nil {
 		return "", err
@@ -299,7 +335,7 @@ func (b *JSON) Str() (string, error) {
 	case nil:
 		return "", nil
 	default:
-		return "", refusal.Errorf("want a string, got %v", v)
+		return "", refusal.Errorf("want a string, got %s", quoted(v))
 	}
 }
 
@@ -310,6 +346,7 @@ func (b *JSON) Str() (string, error) {
 // a name in the next is common enough that reading only one of the two would
 // refuse documents that are perfectly well formed.
 func (b *JSON) StringOrObject(fn func(key string) error) (string, error) {
+	bounded := b.bag()
 	tok, err := b.Token()
 	if err != nil {
 		return "", err
@@ -324,26 +361,13 @@ func (b *JSON) StringOrObject(fn func(key string) error) (string, error) {
 			return "", refusal.Errorf("want a string or an object, got %v", v)
 		}
 	default:
-		return "", refusal.Errorf("want a string or an object, got %v", v)
+		return "", refusal.Errorf("want a string or an object, got %s", quoted(v))
 	}
 	if err := b.enter(); err != nil {
 		return "", err
 	}
 	defer b.leave()
-	for b.dec.More() {
-		key, err := b.Token()
-		if err != nil {
-			return "", err
-		}
-		name, ok := key.(string)
-		if !ok {
-			return "", refusal.Errorf("object key is %v, not a string", key)
-		}
-		if err := fn(name); err != nil {
-			return "", err
-		}
-	}
-	return "", b.close()
+	return "", b.members(bounded, fn)
 }
 
 // Skip consumes one value of any shape, descending through it so that nesting
@@ -354,32 +378,39 @@ func (b *JSON) Skip() error {
 	if err != nil {
 		return err
 	}
+	return b.past(bounded, tok)
+}
+
+// StringOrSkip reads one string, and walks past a value of any other shape,
+// answering empty: for a field nothing else read depends on, where a
+// misshapen value is no reason to refuse the document.
+func (b *JSON) StringOrSkip() (string, error) {
+	bounded := b.bag()
+	tok, err := b.Token()
+	if err != nil {
+		return "", err
+	}
+	if v, ok := tok.(string); ok {
+		return v, nil
+	}
+	return "", b.past(bounded, tok)
+}
+
+// past walks past the rest of the value tok opens, if it opens one.
+func (b *JSON) past(bounded bool, tok json.Token) error {
 	delim, ok := tok.(json.Delim)
 	if !ok {
 		return nil
 	}
-	bounded = bounded && delim == '{'
 	if err := b.enter(); err != nil {
 		return err
 	}
 	defer b.leave()
-	n := 0
+	if delim == '{' {
+		return b.members(bounded, b.skipEach)
+	}
 	for b.dec.More() {
-		if delim == '{' {
-			tok, err := b.Token() // the key
-			if err != nil {
-				return err
-			}
-			if err := b.member(bounded, &n); err != nil {
-				return err
-			}
-			if key, ok := tok.(string); ok {
-				b.under(key)
-			}
-		}
-		err := b.Skip()
-		b.pending = false
-		if err != nil {
+		if err := b.Skip(); err != nil {
 			return err
 		}
 	}
@@ -399,6 +430,7 @@ func (b *JSON) Skip() error {
 // refers to, and a document doing that in a field whose text is all this reads
 // has nothing here to offer rather than being broken.
 func (b *JSON) Each(fn func(string) error) error {
+	bounded := b.bag()
 	tok, err := b.Token()
 	if err != nil {
 		return err
@@ -414,21 +446,13 @@ func (b *JSON) Each(fn func(string) error) error {
 				return err
 			}
 			defer b.leave()
-			for b.dec.More() {
-				if _, err := b.Token(); err != nil { // the key
-					return err
-				}
-				if err := b.Skip(); err != nil {
-					return err
-				}
-			}
-			return b.close()
+			return b.members(bounded, b.skipEach)
 		}
 		if v != '[' {
 			return refusal.Errorf("want a string or an array, got %v", v)
 		}
 	default:
-		return refusal.Errorf("want a string or an array, got %v", v)
+		return refusal.Errorf("want a string or an array, got %s", quoted(v))
 	}
 	if err := b.enter(); err != nil {
 		return err
@@ -449,6 +473,7 @@ func (b *JSON) Each(fn func(string) error) error {
 // Int reads one integer. A null reads as absent; a fraction, or a value past
 // what 32 bits hold, is refused.
 func (b *JSON) Int() (*int, error) {
+	b.pending = false
 	tok, err := b.Token()
 	if err != nil {
 		return nil, err
@@ -457,19 +482,20 @@ func (b *JSON) Int() (*int, error) {
 	case json.Number:
 		n, err := strconv.ParseInt(string(v), 10, 32)
 		if err != nil {
-			return nil, refusal.Errorf("want an integer, got %s", bound.Head(string(v), MostQuoted))
+			return nil, refusal.Errorf("want an integer, got %s", quoted(v))
 		}
 		i := int(n)
 		return &i, nil
 	case nil:
 		return nil, nil
 	default:
-		return nil, refusal.Errorf("want an integer, got %s", bound.Head(fmt.Sprint(v), MostQuoted))
+		return nil, refusal.Errorf("want an integer, got %s", quoted(v))
 	}
 }
 
 // Bool reads one boolean. A null reads as absent.
 func (b *JSON) Bool() (*bool, error) {
+	b.pending = false
 	tok, err := b.Token()
 	if err != nil {
 		return nil, err
@@ -480,7 +506,7 @@ func (b *JSON) Bool() (*bool, error) {
 	case nil:
 		return nil, nil
 	default:
-		return nil, refusal.Errorf("want a boolean, got %s", bound.Head(fmt.Sprint(v), MostQuoted))
+		return nil, refusal.Errorf("want a boolean, got %s", quoted(v))
 	}
 }
 
@@ -488,6 +514,7 @@ func (b *JSON) Bool() (*bool, error) {
 // format that tells an absent list from an empty one states the absence as
 // null.
 func (b *JSON) ArrayOrNull(fn func() error) (bool, error) {
+	b.pending = false
 	tok, err := b.Token()
 	if err != nil {
 		return false, err
@@ -496,7 +523,7 @@ func (b *JSON) ArrayOrNull(fn func() error) (bool, error) {
 		return false, nil
 	}
 	if tok != json.Delim('[') {
-		return false, refusal.Errorf("want an array, got %s", bound.Head(fmt.Sprint(tok), MostQuoted))
+		return false, refusal.Errorf("want an array, got %s", quoted(tok))
 	}
 	if err := b.enter(); err != nil {
 		return false, err

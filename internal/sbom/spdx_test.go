@@ -179,6 +179,7 @@ func TestARelationshipStatedEitherWayRoundIsTheSameEdge(t *testing.T) {
 		{"RUNTIME_DEPENDENCY_OF", strings.Replace(reverse, "%s", "RUNTIME_DEPENDENCY_OF", 1)},
 		{"OPTIONAL_DEPENDENCY_OF", strings.Replace(reverse, "%s", "OPTIONAL_DEPENDENCY_OF", 1)},
 		{"PROVIDED_DEPENDENCY_OF", strings.Replace(reverse, "%s", "PROVIDED_DEPENDENCY_OF", 1)},
+		{"OPTIONAL_COMPONENT_OF", strings.Replace(reverse, "%s", "OPTIONAL_COMPONENT_OF", 1)},
 	} {
 		t.Run(tc.stated, func(t *testing.T) {
 			body := strings.Replace(minimalSPDX,
@@ -743,17 +744,10 @@ func TestWhatTheDocumentSaysItIsAboutIsBounded(t *testing.T) {
 	// A top-level array of references, read on the header pass that runs
 	// inside the upload request. It was the one array with neither a skip
 	// above it nor a bound in it.
-	var b strings.Builder
-	b.WriteString(`{"spdxVersion": "SPDX-2.3", "documentDescribes": [`)
-	for i := range 50 {
-		if i > 0 {
-			b.WriteString(",")
-		}
-		b.WriteString(`"SPDXRef-a"`)
-	}
-	b.WriteString(`]}`)
+	doc := repeated(`{"spdxVersion": "SPDX-2.3", "documentDescribes": [`,
+		`"SPDXRef-a"`, 50, `]}`)
 
-	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 10}); err == nil {
+	if _, err := sbom.Read(strings.NewReader(doc), sbom.Limits{MaxComponents: 10}); err == nil {
 		t.Fatal("fifty references passed a bound of ten")
 	} else if !strings.Contains(err.Error(), "component limit") {
 		t.Errorf("refused with %q", err)
@@ -761,7 +755,7 @@ func TestWhatTheDocumentSaysItIsAboutIsBounded(t *testing.T) {
 
 	// And the header pass walks past them rather than holding them, since it
 	// resolves no root.
-	header, err := sbom.ReadHeader(strings.NewReader(b.String()), sbom.Limits{MaxComponents: 10})
+	header, err := sbom.ReadHeader(strings.NewReader(doc), sbom.Limits{MaxComponents: 10})
 	if err != nil {
 		t.Fatalf("a header read charged a bound for something it does not keep: %v", err)
 	}
@@ -771,18 +765,11 @@ func TestWhatTheDocumentSaysItIsAboutIsBounded(t *testing.T) {
 }
 
 func TestARootStatedByRelationshipIsBoundedToo(t *testing.T) {
-	var b strings.Builder
-	b.WriteString(`{"spdxVersion": "SPDX-2.3", "relationships": [`)
-	for i := range 50 {
-		if i > 0 {
-			b.WriteString(",")
-		}
-		b.WriteString(`{"spdxElementId": "SPDXRef-DOCUMENT", "relatedSpdxElement": "SPDXRef-a",` +
-			` "relationshipType": "DESCRIBES"}`)
-	}
-	b.WriteString(`]}`)
+	doc := repeated(`{"spdxVersion": "SPDX-2.3", "relationships": [`,
+		`{"spdxElementId": "SPDXRef-DOCUMENT", "relatedSpdxElement": "SPDXRef-a",`+
+			` "relationshipType": "DESCRIBES"}`, 50, `]}`)
 
-	if _, err := sbom.Read(strings.NewReader(b.String()), sbom.Limits{MaxEdges: 10}); err == nil {
+	if _, err := sbom.Read(strings.NewReader(doc), sbom.Limits{MaxEdges: 10}); err == nil {
 		t.Fatal("fifty statements passed a bound of ten")
 	} else if !strings.Contains(err.Error(), "dependency limit") {
 		t.Errorf("refused with %q", err)

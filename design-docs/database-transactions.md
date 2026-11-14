@@ -29,6 +29,7 @@ and the one in-memory lock stops a process migrating twice.
 | A scan and a replaced-inventory check of one build | The check writes a fresh value into the build's row before reading, since a check is never the build's last run, so each waits for the other and a cluster conflicts the two (`design-docs/findings-closure.md` § Replaced inventories) |
 | Two scans merging overlapping issues | Each takes every issue it names by writing a fresh value into its row, and goes again where one is no longer its own issue, so the second waits and a cluster conflicts the two (`design-docs/findings-issues.md` § Merged issues) |
 | Two uploads checking the room left | The upload's transaction writes a fresh value into one fixed lock row before summing what is held, so the second waits and a cluster conflicts the two at certification. A write of the value already held is not written on MySQL and MariaDB, so never certified |
+| Two documents recording a publisher's statements | The transaction writes a fresh value into one fixed lock row as its first statement, so the second waits and a cluster conflicts the two. First, because MySQL and MariaDB fix what a transaction reads at its first read (`design-docs/ingest-claims.md` § Administrator-supplied VEX) |
 | An administrator changing a setting | Read per request, so it applies on every replica at once |
 
 ## Retryable transactions

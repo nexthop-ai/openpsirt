@@ -6,6 +6,7 @@ package sbom
 import (
 	"io"
 	"strings"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -14,9 +15,9 @@ import (
 // Reading a supplier's CSAF security advisory, the third document a third
 // party's judgment arrives in beside OpenVEX and CSAF-VEX.
 //
-// A VEX document is a statement set: what a publisher says about everything at
-// once. An advisory is an announcement about one issue, and a publisher issues
-// one per issue. The claims inside are the same shape — a status per product
+// A VEX document is a set of statements, each about one issue and one
+// product. An advisory is an announcement about one issue, and a publisher
+// issues one per issue. The claims inside are the same shape — a status per product
 // identifier, resolved through the same tree — so the same reader reads both
 // and what differs is the document around them.
 //
@@ -42,6 +43,9 @@ type Advisory struct {
 	// Title is what the publisher called it, which is what a reader recognizes
 	// it by where the identifier is a serial number.
 	Title string
+	// SaidAt is when the publisher says its current revision was released,
+	// nil where it states no date that parses.
+	SaidAt *time.Time
 	// Claims are what it says about each product it names, in the shape every
 	// other third-party judgment here arrives in.
 	Claims []Suppression
@@ -88,6 +92,7 @@ func ReadAdvisory(r io.Reader, lim Limits) (Advisory, error) {
 		Identifier: strings.TrimSpace(read.identifier),
 		Publisher:  strings.TrimSpace(read.publisher),
 		Title:      strings.TrimSpace(read.title),
+		SaidAt:     read.released,
 		Claims:     claims,
 	}, nil
 }

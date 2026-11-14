@@ -524,18 +524,24 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 	}
 	// A security advisory is listed beside the VEX documents and says
 	// nothing this reads, so it is recorded as read with nothing kept.
-	said, err := sbom.ReadSuppressions(bytes.NewReader(body), r.limits)
+	read, err := sbom.ReadStatements(bytes.NewReader(body), r.limits)
 	switch {
 	case errors.Is(err, sbom.ErrWrongProfile):
-		said = nil
+		read = sbom.Statements{}
 	case err != nil:
 		return false, unreadable{err: err}
 	}
-	statements := statementsOf(said, ours)
+	statements := statementsOf(read.Claims, ours)
 	sum := sha256.Sum256(body)
 	digest := hex.EncodeToString(sum[:])
 	moved := false
+	if err := finding.EnsureStatementsLock(ctx, r.db); err != nil {
+		return false, err
+	}
 	err = database.Within(ctx, r.db, func(ctx context.Context, tx bun.IDB) error {
+		if err := finding.TakeStatements(ctx, tx); err != nil {
+			return err
+		}
 		still, err := standing(ctx, tx, up)
 		if err != nil {
 			return err
@@ -556,8 +562,10 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 				return err
 			}
 		}
+		from := supplied(up, tracking, one.address, digest)
+		from.SaidAt = read.SaidAt
 		if _, _, err := finding.NewStore(tx).RecordStatements(ctx, recordedAs(up), up.ProductID,
-			supplied(up, tracking, one.address, digest), statements); err != nil {
+			from, statements); err != nil {
 			return err
 		}
 		now := r.now().Truncate(time.Microsecond)
@@ -603,7 +611,13 @@ func recordedAt(ctx context.Context, tx bun.IDB, up Upstream, address string) (D
 // withdraw sets aside everything a document the upstream stopped listing said,
 // and forgets it was read.
 func (r *Reader) withdraw(ctx context.Context, up Upstream, address string) error {
+	if err := finding.EnsureStatementsLock(ctx, r.db); err != nil {
+		return err
+	}
 	return database.Within(ctx, r.db, func(ctx context.Context, tx bun.IDB) error {
+		if err := finding.TakeStatements(ctx, tx); err != nil {
+			return err
+		}
 		still, err := standing(ctx, tx, up)
 		if err != nil {
 			return err

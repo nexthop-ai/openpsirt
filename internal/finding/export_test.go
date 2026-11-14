@@ -84,3 +84,10 @@ func NewStoreDrawing(db bun.IDB, numbers ...int64) *Store {
 	}
 	return s
 }
+
+// StatedAs is statedAs, for a measurement of what the stated-name half of a
+// typed-name filter costs.
+func StatedAs(ctx context.Context, db bun.IDB, products []int64, all bool,
+	condition string, args ...any) ([]int64, error) {
+	return statedAs(ctx, db, products, all, condition, args...)
+}

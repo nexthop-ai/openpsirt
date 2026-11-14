@@ -274,6 +274,7 @@ still recorded (REQ-88).
 | A data date is the scanner's database build time, or the run's start where it names none | |
 | It runs on the first scanner data dated at least the settle delay after the replacement, a setting shipping at two days; data dated earlier hands the job back for six hours | An issue reaches the scanner's data up to a day after publication |
 | The scheduling pass asks for checks owed by the newest data any scan has used, fifty at a time, newest inventory first | A backlog never holds the queue |
+| The scheduling pass asks for checks whether or not asking for re-scans failed, and reports both failures | The two share nothing |
 | A check whose job ran out of attempts is not asked for again until an operator puts the job back | One that always fails would hold the worker with a scan of two inventories every cycle |
 | A scan of what a build holds is always claimed before a check | |
 | An issue is dated by its published date from OSV (`design-docs/findings-issues.md` § Issue dates), or by when this deployment first carried it where OSV has none | |

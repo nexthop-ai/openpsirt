@@ -113,6 +113,8 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
 		Join(`JOIN "product" AS "pr" ON "pr"."id" = "st"."product_id"`).
+		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
+		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
 		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr("CASE WHEN "+finding.VersionsMatch+` THEN 1 ELSE 0 END AS "exact"`).
@@ -120,11 +122,11 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		Apply(catalog.BuildNames("pr", "st", "va")).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(`"c"."name" AS "component"`).
-		ColumnExpr(`"c"."version" AS "version"`).
+		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
+		ColumnExpr(graph.NodeVersion("sn", "c")+` AS "version"`).
 		ColumnExpr(`"c"."purl" AS "purl"`).
 		ColumnExpr(`"f"."consumer_id" AS "consumer_id"`).
-		ColumnExpr(`COALESCE("uc"."name", '') AS "consumer"`).
+		ColumnExpr(`COALESCE(`+graph.NodeName("sun", "uc")+`, '') AS "consumer"`).
 		ColumnExpr(`"f"."fix_state" AS "fix_state"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
@@ -133,7 +135,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
-		OrderExpr(`"de"."id", exact DESC, "st"."name", "va"."name", "c"."name"`).
+		OrderExpr(`"de"."id", exact DESC, "st"."name", "va"."name", `+graph.NodeName("sn", "c")).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what these decision occurrences are about: %w", err)

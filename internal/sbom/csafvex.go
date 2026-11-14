@@ -6,6 +6,7 @@ package sbom
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -133,7 +134,9 @@ type csafReader struct {
 	publisher  string
 	identifier string
 	title      string
-	tree       map[string]named
+	// released is when the document says its current revision was released.
+	released *time.Time
+	tree     map[string]named
 	// joined is a composite product identifier and the package it refers to.
 	// Kept apart from the tree because the package it names may be defined
 	// after it, and because a relationship may carry an identifier of its own
@@ -304,8 +307,8 @@ func (r *csafReader) wrongProfile() error {
 			"versions it names", ErrWrongProfile)
 	case strings.EqualFold(said, vexProfile):
 		return fmt.Errorf("%w: that is a VEX document rather than a security advisory. "+
-			"It is read as VEX statements, where a publisher's whole statement set "+
-			"supersedes what they said before", ErrWrongProfile)
+			"It is read as VEX statements, where a revision of the same document "+
+			"replaces what it said before", ErrWrongProfile)
 	default:
 		return fmt.Errorf("%w: a CSAF document of category %q, which is not one this reads",
 			ErrWrongProfile, trim(said))
@@ -336,12 +339,20 @@ func (r *csafReader) document() error {
 			})
 		case "tracking":
 			return r.b.Object(func(field string) error {
-				if field != "id" {
+				switch field {
+				case "id":
+					value, err := r.b.Str()
+					r.identifier = value
+					return err
+				case "current_release_date":
+					// Read leniently: a date that does not parse dates
+					// nothing, and the upload order decides.
+					value, err := r.b.StringOrSkip()
+					r.released = stampOf(value)
+					return err
+				default:
 					return r.b.Skip()
 				}
-				value, err := r.b.Str()
-				r.identifier = value
-				return err
 			})
 		default:
 			return r.b.Skip()

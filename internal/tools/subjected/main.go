@@ -299,25 +299,32 @@ func queryingNames(all []declared) map[string]bool {
 }
 
 // calledBy is every name a body calls, in the form nameOf gives a declaration.
-// A call through an imported package's name is another package's, and left
-// out.
+// A function or method handed to a call as a value counts as called, since the
+// callee runs it. A call through an imported package's name is another
+// package's, and left out.
 func calledBy(body *ast.BlockStmt, imported map[string]bool) []string {
 	var called []string
-	ast.Inspect(body, func(node ast.Node) bool {
-		call, ok := node.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		switch fun := call.Fun.(type) {
+	reached := func(fun ast.Expr) {
+		switch fun := fun.(type) {
 		case *ast.Ident:
 			called = append(called, fun.Name)
 		case *ast.SelectorExpr:
 			// A name the parser resolved to a declaration in this file is a
 			// local, whatever import it shares a name with.
 			if pkg, ok := fun.X.(*ast.Ident); ok && pkg.Obj == nil && imported[pkg.Name] {
-				return true
+				return
 			}
 			called = append(called, "."+fun.Sel.Name)
+		}
+	}
+	ast.Inspect(body, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		reached(call.Fun)
+		for _, arg := range call.Args {
+			reached(arg)
 		}
 		return true
 	})

@@ -253,18 +253,26 @@ func (r *Runner) scan(ctx context.Context, reference string, records *cverecord.
 	outcome, result, err := r.assess(ctx, buildID, run.ID, components, records, findings)
 	// The run is recorded as having ended either way. A scanner that stopped
 	// working is otherwise indistinguishable from a product that stopped
-	// having problems — and a shutdown that canceled the scan must not also
-	// cancel the record of it, or the run is left open for ever.
-	settled, done := queue.Settling(ctx)
-	defer done()
-	if finished := findings.Finish(settled, run.ID, result.Version, result.DatabaseVersion,
-		result.Caution, err); finished != nil {
-		r.logger.Error("could not record the end of a scan run", "run", run.ID, "error", finished)
-	}
+	// having problems.
+	r.finish(ctx, findings, run.ID, result, err, "scan run")
 	if err != nil {
 		return nil, err
 	}
 	return outcome, nil
+}
+
+// finish records the end of a run, logging where it cannot. Recorded under a
+// context of its own, because a shutdown that canceled the run must not also
+// cancel the record of it, or the run is left open for ever. what names the
+// run in the log.
+func (r *Runner) finish(ctx context.Context, findings *finding.Store, runID int64, result Result,
+	cause error, what string) {
+	settled, done := queue.Settling(ctx)
+	defer done()
+	if err := findings.Finish(settled, runID, result.Version, result.DatabaseVersion,
+		result.Caution, cause); err != nil {
+		r.logger.Error("could not record the end of a "+what, "run", runID, "error", err)
+	}
 }
 
 // assess writes the inventory, runs the scanner over it, and records what came

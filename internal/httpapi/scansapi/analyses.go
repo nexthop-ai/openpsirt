@@ -93,7 +93,10 @@ func registerAnalyses(api huma.API, in core.Deps) {
 			"A dependency or secret scanner's run is left out and named on the receipt; this " +
 			"upload takes static analysis alone, and refuses one holding nothing else. A result at an " +
 			"http or https address is dropped and counted as `web-address`; an upload whose every result " +
-			"is at one, a web scanner's, is refused.",
+			"is at one, a web scanner's, is refused.\n\n" +
+			"Answers 503 with `Retry-After` when the deployment is already reading as many " +
+			"uploads as it takes at once, or when as many analyzer runs as it holds are waiting " +
+			"to be applied; send again after that many seconds.",
 		Tags:         []string{"Ingest"},
 		MaxBodyBytes: analysisLimits(in).MaxCompressed + core.Envelope,
 		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
@@ -134,8 +137,7 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	// series, as far as the upload got in naming it.
 	seriesName := strings.TrimSpace(parts.Series)
 	refused := func(answer error) error {
-		var said huma.StatusError
-		if errors.As(answer, &said) && said.GetStatus() < http.StatusInternalServerError {
+		if turnedAway(answer) {
 			analysisRefused(ctx, in, subject, named, seriesName, answer.Error())
 		}
 		return answer
@@ -153,31 +155,11 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 			len(files), most)))
 	}
 
-	var retired string
-	switch {
-	case named.ProductRetired:
-		retired = fmt.Sprintf("product %q", input.Product)
-	case named.BranchOrTagRetired:
-		retired = fmt.Sprintf("release %q of %q", input.BranchOrTag, input.Product)
-	case named.VariantRetired:
-		retired = fmt.Sprintf("variant %q of %q", input.Variant, input.Product)
+	if err := retiredRefusal(named, input.Product, input.BranchOrTag, input.Variant, "analysis"); err != nil {
+		return nil, refused(err)
 	}
-	if retired != "" {
-		return nil, refused(huma.NewError(http.StatusConflict, fmt.Sprintf(
-			"%s is retired and takes no analysis; declare it again to bring it back", retired)))
-	}
-
-	depth, err := in.Queue.Depth(ctx, queue.Analyze)
-	if err != nil {
-		return nil, core.WentWrong(in.Logger, "cannot tell how much work is waiting", err)
-	}
-	limit, err := in.Queue.Backlog(ctx)
-	if err != nil {
-		return nil, core.WentWrong(in.Logger, "cannot tell how much work may wait", err)
-	}
-	if depth >= limit {
-		return nil, huma.NewError(http.StatusServiceUnavailable,
-			fmt.Sprintf("%d analyzer runs are already waiting to be applied; try again shortly", depth))
+	if err := backlogged(ctx, in, queue.Analyze, "analyzer runs", "applied"); err != nil {
+		return nil, refused(err)
 	}
 
 	given, err := statedBeside(parts)
@@ -241,7 +223,7 @@ func uploadAnalysis(ctx context.Context, in core.Deps, input *AnalysisInput) (*A
 	})
 	switch {
 	case errors.Is(err, queue.ErrBacklogFull):
-		return nil, huma.NewError(http.StatusServiceUnavailable, err.Error())
+		return nil, refused(busy(err.Error()))
 	case errors.As(err, &turned):
 		return nil, refused(huma.Error422UnprocessableEntity(err.Error()))
 	case err != nil:

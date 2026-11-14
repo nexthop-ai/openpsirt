@@ -7,11 +7,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
 )
 
@@ -48,6 +50,10 @@ func TestMain(m *testing.M) {
 		syscall.Exit(1)
 	case "empty":
 		fmt.Print(`{"matches":[],"descriptor":{"version":"0.112.0"}}`)
+	case "stall":
+		// Says something, then never finishes.
+		fmt.Fprint(os.Stderr, "still matching")
+		time.Sleep(time.Minute)
 	case "environment":
 		// What it was given, one name per line, where the run keeps what a
 		// scanner says, bounded short: the value only for the scanner's own
@@ -97,6 +103,9 @@ func TestAReportPastTheLimitFailsTheRun(t *testing.T) {
 	if !strings.Contains(err.Error(), "report limit") {
 		t.Errorf("the failure does not name the limit it hit: %v", err)
 	}
+	if !refusal.In(err) {
+		t.Errorf("the limit the report hit is not stated for the producer: %v", err)
+	}
 }
 
 func TestAReportInsideTheLimitIsRead(t *testing.T) {
@@ -137,6 +146,10 @@ func TestAFailedScannersLastWordsAreItsReason(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "the database is out of date") {
 		t.Errorf("the failure does not carry the scanner's last words: %v", err)
+	}
+	// Published on the producer's receipt, which publishes only a refusal.
+	if !refusal.In(err) {
+		t.Errorf("the scanner's last words are not stated for the producer: %v", err)
 	}
 }
 
@@ -219,5 +232,62 @@ func TestTheScannersUpdateCheckIsAnOperatorsToTurnOn(t *testing.T) {
 	if !strings.Contains(result.Caution, "GRYPE_CHECK_FOR_APP_UPDATE=true") ||
 		strings.Contains(result.Caution, "GRYPE_CHECK_FOR_APP_UPDATE=false") {
 		t.Errorf("the operator's setting did not reach the scanner as written:\n%s", result.Caution)
+	}
+}
+
+// What a failed run publishes is how the scanner ended and what it said. The
+// executable's path is the operator's configuration, and a scanner that never
+// started is told only in the log.
+func TestAFailedRunPublishesNoExecutablePath(t *testing.T) {
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatalf("the test binary: %v", err)
+	}
+	_, failed := scanning(t, "complaint-and-fail", scanner.Limits{MaxComplaint: 256})
+	if !refusal.In(failed) || strings.Contains(failed.Error(), self) {
+		t.Errorf("a scanner that exited 1 is published as %v", failed)
+	}
+	if !strings.Contains(failed.Error(), "exit status 1") {
+		t.Errorf("how the scanner ended is not said: %v", failed)
+	}
+
+	missing := filepath.Join(t.TempDir(), "grype")
+	_, unstarted := scanner.Grype{Path: missing}.Scan(t.Context(), strings.NewReader(`{"components":[]}`))
+	if unstarted == nil || refusal.In(unstarted) {
+		t.Errorf("a scanner that never started is published as %v", unstarted)
+	}
+	if !strings.Contains(unstarted.Error(), missing) {
+		t.Errorf("the log is not told which executable failed: %v", unstarted)
+	}
+}
+
+// A run past its own bound is the producer's to hear about, with what the
+// scanner said. A run its caller ended, by shutting down or losing its claim,
+// says nothing about the inventory and is a fault.
+func TestARunEndedByItsCallerIsNotPublished(t *testing.T) {
+	t.Setenv(beingTheScanner, "stall")
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatalf("the test binary: %v", err)
+	}
+	inventory := func() *strings.Reader { return strings.NewReader(`{"components":[]}`) }
+
+	_, outlasted := scanner.Grype{Path: self, Timeout: 300 * time.Millisecond}.Scan(t.Context(), inventory())
+	if !refusal.In(outlasted) || !strings.Contains(outlasted.Error(), "did not finish within") {
+		t.Errorf("a run past its own bound is published as %v", outlasted)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	time.AfterFunc(300*time.Millisecond, cancel)
+	_, ended := scanner.Grype{Path: self, Timeout: time.Minute}.Scan(ctx, inventory())
+	if ended == nil || refusal.In(ended) {
+		t.Errorf("a run its caller ended is published as %v", ended)
+	}
+
+	short, stop := context.WithTimeout(t.Context(), 300*time.Millisecond)
+	defer stop()
+	_, deadline := scanner.Grype{Path: self, Timeout: time.Minute}.Scan(short, inventory())
+	if deadline == nil || refusal.In(deadline) {
+		t.Errorf("a run past its caller's deadline is published as %v", deadline)
 	}
 }

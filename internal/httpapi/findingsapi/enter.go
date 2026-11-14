@@ -179,7 +179,7 @@ func registerEntry(api huma.API, in core.Deps) {
 			return nil, refusedFlaw(in, err)
 		}
 
-		component, err := finding.NewStore(in.DB.DB).ComponentName(ctx, rows[0].ComponentID)
+		component, err := finding.NewStore(in.DB.DB).ComponentNameIn(ctx, rows[0].BuildID, rows[0].ComponentID)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "what carries it could not be read", err)
 		}

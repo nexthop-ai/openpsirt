@@ -4,13 +4,19 @@
 package graph_test
 
 import (
+	"context"
+	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unicode/utf8"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -570,6 +576,166 @@ func TestAComponentIsStoredWithoutSurroundingSpace(t *testing.T) {
 			if got != strings.TrimSpace(got) || got == "" {
 				t.Errorf("the %s is stored as %q", column, got)
 			}
+		}
+	})
+}
+
+// A package identifier names one component whatever version field a report
+// puts beside it, so the component row holds what the first report stated.
+// Another product's pipeline key stating it first decides neither the name
+// and version this build is scanned at nor the ones its screens show.
+func TestAnotherProductsScanDecidesNeitherTheNameNorTheVersionABuildIsScannedAt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		other := f.world.DeclareProduct("edge", "Edge")
+		theirs := f.world.BuildFor(f.world.DeclareBranchOrTag(other, "main", catalog.Branch, nil),
+			f.world.DeclareVariant(other, "box", true)).ID
+		holding := func(d graph.Described) graph.Snapshot {
+			return graph.Snapshot{
+				Root:         root,
+				Components:   []graph.Described{d},
+				Dependencies: []graph.Dependency{{Parent: root, Child: d}},
+			}
+		}
+		const purl = "pkg:deb/debian/openssl@3.0.11-1?distro=debian-12"
+		first := graph.Described{Purl: purl, Name: "nothing", Version: "99.0"}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, theirs, f.scanOf(t, theirs), holding(first)); err != nil {
+			t.Fatal(err)
+		}
+		ours := graph.Described{Purl: purl, Name: "openssl", Version: "3.0.11-1"}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), holding(ours)); err != nil {
+			t.Fatal(err)
+		}
+
+		for build, want := range map[int64]graph.Described{f.buildID: ours, theirs: first} {
+			listed, err := f.store.CurrentComponents(ctx, build)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(listed) != 1 || listed[0].Name != want.Name || listed[0].Version != want.Version {
+				t.Errorf("build %d is scanned as %+v, want %s at %s", build, listed, want.Name, want.Version)
+			}
+		}
+		_, kids, err := f.store.Roots(ctx, everyone(f), f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(kids) != 1 || kids[0].Name != "openssl" || kids[0].Version != "3.0.11-1" {
+			t.Errorf("the build's tree shows %+v, want openssl at 3.0.11-1", kids)
+		}
+
+		// A name somebody types finds the component by the build's own word,
+		// in any capitals, and by the row's.
+		for _, typed := range []string{"OpenSSL", "nothing"} {
+			id, err := f.store.ComponentAs(ctx, f.buildID, typed, graph.Choice{})
+			if err != nil || id != listed(t, f, f.buildID) {
+				t.Errorf("typed %q, the build's component lookup answered %d, %v", typed, id, err)
+			}
+		}
+		found, err := f.store.Search(ctx, everyone(f), f.buildID, "openss", 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(found) != 1 || found[0].Name != "openssl" {
+			t.Errorf("searching the build for the name it stated answered %+v", found)
+		}
+
+		// Restated, the build's own word moves with it.
+		ours.Version = "3.0.11-2"
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), holding(ours)); err != nil {
+			t.Fatal(err)
+		}
+		listed, err := f.store.CurrentComponents(ctx, f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(listed) != 1 || listed[0].Version != "3.0.11-2" {
+			t.Errorf("restated, the build is scanned as %+v", listed)
+		}
+	})
+}
+
+// listed is the one component a build holds.
+func listed(t *testing.T, f *fixture, build int64) int64 {
+	t.Helper()
+	var held []int64
+	if err := f.db.DB.NewSelect().Table("graph_node").Column("component_id").
+		Where(`"build_id" = ?`, build).Where(`"is_root" = ?`, false).
+		Where(`"closed_scan_id" IS NULL`).Scan(t.Context(), &held); err != nil || len(held) != 1 {
+		t.Fatalf("the build holds %v, %v, want one component", held, err)
+	}
+	return held[0]
+}
+
+// nodeUpdates counts the statements updating graph nodes one at a time.
+type nodeUpdates struct{ n atomic.Int64 }
+
+func (h *nodeUpdates) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	// Matched with its quoting folded, because MySQL and MariaDB quote with
+	// backticks.
+	query := strings.ReplaceAll(e.Query, "`", `"`)
+	if strings.HasPrefix(query, `UPDATE "graph_node"`) && strings.Contains(query, `WHERE ("id" =`) {
+		h.n.Add(1)
+	}
+	return ctx
+}
+
+func (h *nodeUpdates) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// A node written before it held the name and version its build stated reads
+// the component row's. The next inventory restates only those the build
+// states differently, rather than every node it holds.
+func TestANodeHoldingNoStatedNameIsRestatedOnlyWhereTheBuildDiffers(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		snap := graph.Snapshot{Root: root}
+		for i := range 5 {
+			d := graph.Described{Name: fmt.Sprintf("lib%d", i), Version: "1.0",
+				Purl: fmt.Sprintf("pkg:deb/debian/lib%d@1.0", i)}
+			snap.Components = append(snap.Components, d)
+			snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: root, Child: d})
+		}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"graph_node"`).
+			Set(`"name" = NULL`).Set(`"version" = NULL`).Set(`"name_folded" = NULL`).
+			Set(`"source_folded" = NULL`).
+			Where(`"build_id" = ?`, f.buildID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		snap.Components[0].Version = "1.0-1"
+		counted := &nodeUpdates{}
+		hooked := dbtest.Hooked(f.db, counted)
+		if _, err := fixtures.ApplyGraph(ctx, hooked, f.buildID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		if got := counted.n.Load(); got != 1 {
+			t.Errorf("%d nodes were restated one at a time, want the one the build states differently", got)
+		}
+		listed, err := f.store.CurrentComponents(ctx, f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range listed {
+			want := "1.0"
+			if d.Name == "lib0" {
+				want = "1.0-1"
+			}
+			if d.Version != want {
+				t.Errorf("%s is scanned at %q, want %q", d.Name, d.Version, want)
+			}
+		}
+		unsourced, err := f.db.DB.NewSelect().TableExpr(`"graph_node"`).
+			Where(`"build_id" = ?`, f.buildID).Where(`"closed_scan_id" IS NULL`).
+			Where(`"is_root" = ?`, false).
+			Where(`("source_folded" IS NULL OR "source_folded" = '')`).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if unsourced != 0 {
+			t.Errorf("%d nodes hold no source fold after the next inventory", unsourced)
 		}
 	})
 }

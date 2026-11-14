@@ -66,3 +66,43 @@ func TestAReaderThatFailsPartwayIsAFaultNotARefusal(t *testing.T) {
 		})
 	}
 }
+
+// A reader that fails after a whole document, while the trailing read looks
+// for anything past the top-level value, is a fault of whatever was read from
+// as much as one failing partway is.
+func TestAReaderThatFailsAfterTheDocumentIsAFaultNotARefusal(t *testing.T) {
+	released := errors.New("the document was let go while it was read")
+	read := map[string]struct {
+		doc     string
+		reading func(io.Reader) error
+	}{
+		"an inventory": {
+			`{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}`,
+			func(r io.Reader) error {
+				_, err := sbom.Read(r, sbom.Limits{})
+				return err
+			},
+		},
+		"suppressions": {
+			`{"@context":"https://openvex.dev/ns/v0.2.0","statements":[]}`,
+			func(r io.Reader) error {
+				_, err := sbom.ReadSuppressions(r, sbom.Limits{})
+				return err
+			},
+		},
+	}
+	for name, c := range read {
+		t.Run(name, func(t *testing.T) {
+			if err := c.reading(strings.NewReader(c.doc)); err != nil {
+				t.Fatalf("the whole document read alone answered %v", err)
+			}
+			err := c.reading(&failing{r: strings.NewReader(c.doc), err: released})
+			if !errors.Is(err, released) {
+				t.Errorf("a reader failing after the document answered %v", err)
+			}
+			if refusal.In(err) {
+				t.Errorf("a reader failing after the document was refused as the sender's fault: %v", err)
+			}
+		})
+	}
+}

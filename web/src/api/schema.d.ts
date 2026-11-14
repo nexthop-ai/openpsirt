@@ -2987,6 +2987,8 @@ export interface paths {
          *
          *     A dependency or secret scanner's run is left out and named on the receipt; this upload takes static analysis alone, and refuses one holding nothing else. A result at an http or https address is dropped and counted as `web-address`; an upload whose every result is at one, a web scanner's, is refused.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once, or when as many analyzer runs as it holds are waiting to be applied; send again after that many seconds.
+         *
          *     Requires: security-testing-triage on the product. A pipeline key covering this product, branch and variant sends without it, and is how a build sends.
          */
         post: operations["upload-analysis"];
@@ -3969,7 +3971,7 @@ export interface paths {
          *
          *     Returns 202 before the documents are parsed. A success here means they were accepted for processing, not that they were valid. Poll `GET .../sboms` to find out whether they parsed and what the scan found.
          *
-         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
+         *     Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once, or when as many scans as it holds are waiting to be read; send again after that many seconds.
          *
          *     Requires: public-triage or private-triage or security-testing-triage on the product. A pipeline key covering this product, branch and variant sends without any of these, and is how a build sends.
          */
@@ -6231,7 +6233,7 @@ export interface paths {
          *
          *     An advisory is about the versions it names. Where it says a vulnerability is fixed in one version, that is not a statement about another, so a claim naming a version is shown against every version of that component and offers a prefill only at the version it named.
          *
-         *     Uploading the same advisory again sets its earlier claims aside rather than deleting them, so what an approval was granted on the strength of stays readable. It is matched on the name the publisher gave it, so everything else that publisher has issued stays standing — which is the difference from a VEX document, where a publisher's whole statement set is replaced at once.
+         *     Uploading the same advisory again sets its earlier claims aside rather than deleting them, so what an approval was granted on the strength of stays readable. It is matched on the name the publisher gave it, so everything else that publisher has issued stays standing.
          *
          *     A VEX document is refused here and taken by the VEX endpoint instead.
          *
@@ -6533,7 +6535,7 @@ export interface paths {
         };
         /**
          * List uploaded VEX documents
-         * @description Returns every VEX document uploaded to this product, newest first, taken or turned away: who uploaded it, what became of it, and how many statements it recorded and set aside. The newest copy taken from each publisher is marked `current`.
+         * @description Returns every VEX document uploaded to this product, newest first, taken or turned away: who uploaded it, what became of it, and how many statements it recorded and set aside. The newest copy taken of each document, by its publisher and identifier, is marked `current`.
          *
          *     Uploads made before v0.11.0 are not listed. Their statements still apply.
          *
@@ -6551,7 +6553,7 @@ export interface paths {
          *
          *     What a document adds over what the scanner already reports is the reasoning. The status is in the fix state already.
          *
-         *     Uploading again from the same publisher sets aside what they said before rather than deleting it, so what an approval was granted on the strength of stays readable.
+         *     Uploading a later revision of the same document sets aside what the earlier one said rather than deleting it, so what an approval was granted on the strength of stays readable. Another document from the same publisher replaces nothing of this one, and of the publisher's statements about one product and vulnerability, the newest stands, whichever document carried it: by the statement's own time, its `last_updated` else its `timestamp`, else its document's, else the upload order; a time after the upload is none. A document is its publisher and its own identifier: an OpenVEX `@id` or a CSAF tracking id. The publisher is the `publisher` parameter, else the one the document names: an OpenVEX author or a CSAF publisher name. A document naming none is refused unless the parameter names one.
          *
          *     OpenVEX and CSAF-VEX both read. The two say the same thing in different shapes — one puts the status on a statement, the other in which list a product identifier appears in — and both become the same claim here, because what a publisher is saying does not depend on which file they wrote it in. Which of the two a document is decides itself; anything else is refused with a sentence rather than half-read.
          *
@@ -7978,7 +7980,7 @@ export interface components {
             recorded: number;
             /**
              * Format: int64
-             * @description Claims from an earlier upload of this same advisory, set aside rather than deleted
+             * @description Claims set aside rather than deleted: those an earlier upload of this same advisory made and this one does not, and the publisher's older claims about a product and vulnerability this advisory states newer
              */
             superseded: number;
             /** @description What the publisher called it */
@@ -10626,9 +10628,9 @@ export interface components {
             document: string;
             /** @description The supplier whose feed fetched it. Absent where somebody uploaded it */
             fetched_by?: string;
-            /** @description The name the publisher gave the advisory. Absent for a VEX document, which a publisher issues one of */
+            /** @description The name the publisher gave the document. Absent for a VEX document stating none */
             identifier?: string;
-            /** @description The publisher the document names, as it is matched. Empty where it was turned away before that was read */
+            /** @description The publisher its statements are recorded under, as it is matched: the one the upload named, else the one the document names. Empty where it was turned away before that was read */
             publisher: string;
             /** @description Why it was turned away, as the sender was told */
             reason?: string;
@@ -15311,7 +15313,7 @@ export interface components {
              * @description Pass as from_statement when starting a decision from this, so a later revision can be noticed
              */
             id: number;
-            /** @description The name the publisher gave the advisory */
+            /** @description The name the publisher gave the document: an advisory's name, or a VEX document's identifier, as sha256: and its digest where longer than 191 characters */
             identifier?: string;
             /** @description The term they gave for it, where the status is one that takes one */
             justification?: string;
@@ -15900,7 +15902,7 @@ export interface components {
             readonly $schema?: string;
             /** @description The document's digest, which is how a revision is noticed later */
             digest: string;
-            /** @description The publisher the document names */
+            /** @description The publisher the statements were recorded under: the one the request names, else the one the document names */
             publisher: string;
             /**
              * Format: int64
@@ -15909,7 +15911,7 @@ export interface components {
             recorded: number;
             /**
              * Format: int64
-             * @description This publisher's previous statements, set aside rather than deleted
+             * @description Statements set aside rather than deleted: those the earlier revision of this document made and this one does not, and the publisher's older statements about a product and issue this document states newer
              */
             superseded: number;
         };
@@ -27548,7 +27550,7 @@ export interface operations {
     "upload-vex-statements": {
         parameters: {
             query?: {
-                /** @description The publisher, where the document does not name itself. At most 191 characters */
+                /** @description The publisher, in place of the one the document names. Required where the document names none. At most 191 characters */
                 publisher?: string;
             };
             header?: never;

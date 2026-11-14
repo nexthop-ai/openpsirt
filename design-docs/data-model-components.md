@@ -155,6 +155,9 @@ product.
 | Rule | Reason |
 |---|---|
 | The row holds what the first report stated; no later report writes its identifiers | One product's `distro=debian-13` matched another's Debian 12 package against the wrong advisories |
+| The name and version a build states are held on its node, and shown from it | `design-docs/data-model-graph.md` § The dependency graph |
+| A name somebody types matches the fold of the row's name or of the build's stated one | `design-docs/data-model-graph.md` § The dependency graph lists where |
+| Occurrence identity, claim matching, the keys a bulk decision and a reaffirmation match on, and a decision's expiry read the row's name and version | Identity has to be stable, so a decision follows a package from build to build whatever a later report calls it |
 | What a build states for matching is held on its node: the package identifier with qualifiers, the platform enumeration, the source package and its version | Two products ship one version built for two releases |
 | The scanner is given the node's statement, gaps filled from other builds of the same product, earliest first; a build's claim is matched against the same | Matched against the row, a claim misses a binary another product described first |
 | A VEX statement names the component by the node's identifier | |

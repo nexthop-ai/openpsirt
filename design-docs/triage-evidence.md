@@ -96,7 +96,7 @@ rejecting the absence of a fix as a signal.
 | Statements are resolved once into distinct pairs by `UNION`, and the list joins that | As a correlated `EXISTS` per finding the filter ran past five minutes on 281,884 findings and 1,854 statements |
 | The issue identifier is folded on write | A function on the indexed side defeats the index |
 | Only standing statements narrow; a superseded row stays readable | |
-| A later upload sets aside its own kind: a set replaces the set, an advisory the advisory of its name (`design-docs/ingest-claims.md` § Supplier advisories) | |
+| A later upload sets aside its own kind: a VEX document its earlier revision, an advisory the advisory of its name, and either the publisher's older statements about a product and issue it states newer (`design-docs/ingest-claims.md` § Administrator-supplied VEX, § Supplier advisories) | |
 | The same bytes again change nothing | Supersession notifies holders of approvals citing it |
 | Shown against the package named, type and namespace compared, never the version | A short name such as `parser` is many packages |
 | The version a statement was made about is stored and shown beside it | A supplier names the fixing version; some state it only as a branch |

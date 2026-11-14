@@ -20,8 +20,9 @@ import (
 type Record struct {
 	// ID is the record's identifier, as the record spells it.
 	ID string `json:"id"`
-	// Affected is every entry the record's numbering authority wrote, in the
-	// record's order. Kept whole for a record that is kept at all: an entry
+	// Affected is every entry of the record's containers, the numbering
+	// authority's first and then each third party's, in the record's order,
+	// without commit-range lines. Kept whole for a record that is kept at all: an entry
 	// with only affected lines is what stops another entry's unaffected line
 	// narrowing a version both describe.
 	Affected []Entry `json:"affected"`

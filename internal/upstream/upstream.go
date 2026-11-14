@@ -232,8 +232,20 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, productID 
 		return nil, err
 	}
 	var out *Upstream
+	// Made where this opens the transaction; a caller recording inside its
+	// own makes it before, and takes it first.
+	if pool, ok := database.Handle(s.db); ok {
+		if err := finding.EnsureStatementsLock(ctx, pool); err != nil {
+			return nil, err
+		}
+	}
 	err := database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
 		out = nil
+		// Taken first, as recording statements takes it, so a recording
+		// in flight never restores what this sets aside.
+		if err := finding.TakeStatements(ctx, tx); err != nil {
+			return err
+		}
 		held, err := s.of(ctx, tx, productID)
 		if err != nil || held == nil {
 			return err
@@ -250,11 +262,13 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, productID 
 // forget removes an upstream and what has been read of it, and sets aside
 // every statement it made.
 func (s *Store) forget(ctx context.Context, tx bun.IDB, held *Upstream, now time.Time) error {
+	// Overtaken ones included, so nothing restores them.
 	if _, err := tx.NewUpdate().Model((*finding.Statement)(nil)).
-		Set(`"superseded_at" = ?`, now).
+		Set(`"superseded_at" = COALESCE("superseded_at", ?)`, now).
+		Set(`"overtaken_by" = NULL`).
 		Where(`"product_id" = ?`, held.ProductID).
 		Where(`"source" = ?`, finding.FromUpstream).
-		Where(`"superseded_at" IS NULL`).
+		Where(finding.HeldByItsDocument).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("set aside what an upstream said: %w", err)
 	}

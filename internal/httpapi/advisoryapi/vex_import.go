@@ -35,9 +35,9 @@ type statementParts struct {
 
 // StatementsTakenBody is the record of what one VEX document changed.
 type StatementsTakenBody struct {
-	Publisher  string `json:"publisher" doc:"The publisher the document names"`
+	Publisher  string `json:"publisher" doc:"The publisher the statements were recorded under: the one the request names, else the one the document names"`
 	Recorded   int    `json:"recorded" doc:"Statements taken from it"`
-	Superseded int    `json:"superseded" doc:"This publisher's previous statements, set aside rather than deleted"`
+	Superseded int    `json:"superseded" doc:"Statements set aside rather than deleted: those the earlier revision of this document made and this one does not, and the publisher's older statements about a product and issue this document states newer"`
 	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
 }
 
@@ -106,9 +106,17 @@ func registerVexImport(api huma.API, in core.Deps) {
 			"prefill.\n\n" +
 			"What a document adds over what the scanner already reports is the " +
 			"reasoning. The status is in the fix state already.\n\n" +
-			"Uploading again from the same publisher sets aside what they said before rather " +
-			"than deleting it, so what an approval was granted on the strength of stays " +
-			"readable.\n\n" +
+			"Uploading a later revision of the same document sets aside what the earlier one " +
+			"said rather than deleting it, so what an approval was granted on the strength of " +
+			"stays readable. Another document from the same publisher replaces nothing of this " +
+			"one, and of the publisher's statements about one product and vulnerability, the " +
+			"newest stands, whichever document carried it: by the statement's own time, its " +
+			"`last_updated` else its `timestamp`, else its document's, else the upload order; a " +
+			"time after the upload is none. A " +
+			"document is its publisher and its own identifier: an OpenVEX `@id` or a CSAF " +
+			"tracking id. The publisher is the `publisher` parameter, else the one the " +
+			"document names: an OpenVEX author or a CSAF publisher name. A document naming none " +
+			"is refused unless the parameter names one.\n\n" +
 			"OpenVEX and CSAF-VEX both read. The two say the same thing in different " +
 			"shapes — one puts the status on a statement, the other in which list a product " +
 			"identifier appears in — and both become the same claim here, because what a " +
@@ -134,7 +142,7 @@ func registerVexImport(api huma.API, in core.Deps) {
 		})},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
-		Publisher string `query:"publisher" maxLength:"191" doc:"The publisher, where the document does not name itself. At most 191 characters"`
+		Publisher string `query:"publisher" maxLength:"191" doc:"The publisher, in place of the one the document names. Required where the document names none. At most 191 characters"`
 		RawBody   huma.MultipartFormFiles[statementParts]
 	}) (*struct{ Body StatementsTakenBody }, error) {
 		in := core.Of(ctx, in)
@@ -149,10 +157,10 @@ func registerVexImport(api huma.API, in core.Deps) {
 		from := finding.Supplied{
 			Source: finding.FromVex, Document: documentName(file.Filename), Arrived: &finding.Arrival{},
 		}
-		var said []sbom.Suppression
+		var said sbom.Statements
 		digest, err := uploaded(in, file, func(r io.Reader) error {
 			var err error
-			said, err = sbom.ReadSuppressions(r, in.Limits.OrDefault())
+			said, err = sbom.ReadStatements(r, in.Limits.OrDefault())
 			return err
 		})
 		if err != nil {
@@ -167,17 +175,41 @@ func registerVexImport(api huma.API, in core.Deps) {
 		// into one, and the later upload would set aside statements it has
 		// nothing to do with.
 		//
-		// The fallback is the name the client gave the file it uploaded, so
-		// the bound has to hold there too — that is the path with nothing
-		// else guarding it.
+		// The request names it first, so one publisher's documents can be
+		// kept apart by release; else the document's own author. The file
+		// name never stands in: two publishers' files of one name would set
+		// aside each other's statements, and a revision under a new name
+		// would set aside nothing. The document's name has nothing else
+		// guarding its width.
 		//
 		// Either way it is shown wherever the evidence is, so it is held
 		// without the characters that reorder or hide text.
 		publisher := strings.TrimSpace(attach.Visible(input.Publisher))
 		if publisher == "" {
-			publisher = strings.TrimSpace(attach.Visible(file.Filename))
+			publisher = strings.TrimSpace(attach.Visible(said.Publisher))
 		}
 		from.Publisher = publisher
+		// What a statement stating no time of its own was made at, which
+		// orders it against the publisher's other documents.
+		from.SaidAt = said.SaidAt
+		// What a later upload replaces is a revision of the same document:
+		// the publisher and the document's own identifier. Held without
+		// characters that reorder or hide text, as the publisher is, and then
+		// matched exactly, because it is read out of the document every time.
+		// One longer than the column is held as its digest: an OpenVEX
+		// identifier is an IRI of any length, and a revision states the same
+		// one, so its digest keys it as well.
+		from.Identifier = strings.TrimSpace(attach.Visible(said.Identifier))
+		if utf8.RuneCountInString(from.Identifier) > finding.MostDocumentName {
+			sum := sha256.Sum256([]byte(from.Identifier))
+			from.Identifier = "sha256:" + hex.EncodeToString(sum[:])
+		}
+		if publisher == "" {
+			refused := huma.Error422UnprocessableEntity(
+				"the document names no publisher; name it with ?publisher=")
+			turnedAway(ctx, in, by, product.ID, from, refused)
+			return nil, refused
+		}
 		if utf8.RuneCountInString(publisher) > finding.MostPublisher {
 			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
 				"who published it is longer than the %d characters this records; "+
@@ -185,7 +217,7 @@ func registerVexImport(api huma.API, in core.Deps) {
 			turnedAway(ctx, in, by, product.ID, from, refused)
 			return nil, refused
 		}
-		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, from, said,
+		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, from, said.Claims,
 			"VEX statements from "+publisher)
 		if err != nil {
 			turnedAway(ctx, in, by, product.ID, from, err)
@@ -224,8 +256,14 @@ func recordSupplied(ctx context.Context, in core.Deps, by access.Subject, produc
 
 	statements := statementsOf(said)
 	var recorded, superseded int
+	if err := finding.EnsureStatementsLock(ctx, in.DB); err != nil {
+		return 0, 0, core.NotRecorded(in.Log(), err)
+	}
 	if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
 		in := core.Of(ctx, in)
+		if err := finding.TakeStatements(ctx, tx); err != nil {
+			return core.NotRecorded(in.Logger, err)
+		}
 		product, err := catalog.NewStore(tx).ProductByName(ctx, productName)
 		if err != nil {
 			return core.Absent(in.Logger, err, "that product could not be looked up", core.NoSuchProduct)

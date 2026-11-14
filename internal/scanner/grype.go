@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -23,6 +24,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
@@ -120,7 +122,7 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	if timeout <= 0 {
 		timeout = DefaultTimeout
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeoutCause(ctx, timeout, errOutlasted)
 	defer cancel()
 
 	limits := g.Limits.OrDefault()
@@ -145,13 +147,13 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	cmd.WaitDelay = waitDelay
 
 	if err := background.Run(cmd); err != nil {
-		return Result{}, fmt.Errorf("run %s: %w: %s", g.executable(), err, tail(errs.String()))
+		return Result{}, g.failed(ctx, timeout, err, errs.String())
 	}
 	// A report past its ceiling fails the run and complaints past theirs do
 	// not: a report read in part reads as a product that stopped having
 	// problems, while a scanner with a lot to say still scanned.
 	if out.over {
-		return Result{}, fmt.Errorf("the scanner wrote more than the %d byte report limit",
+		return Result{}, refusal.Errorf("the scanner wrote more than the %d byte report limit",
 			limits.MaxOutput)
 	}
 	// Read from the buffer rather than from a copy of it. A second full copy
@@ -166,6 +168,32 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	// nothing is watching — as nothing is here.
 	result.Caution = tail(strings.TrimSpace(errs.String()))
 	return result, nil
+}
+
+// errOutlasted is the cause a run's own wall-clock bound ends it with, told
+// apart from the caller's context ending first.
+var errOutlasted = errors.New("the scanner outlasted its bound")
+
+// failed says why a run of the scanner ended without a report.
+//
+// What the scanner said is published on the producer's receipt, because it is
+// what tells them why, as is how it ended. A run the caller ended, by shutting
+// down or losing its claim, says nothing about the producer's inventory, and
+// is a fault. Where it never started, the error names the executable and what
+// the operating system said of it, which is configuration and stays in the
+// log.
+func (g Grype) failed(ctx context.Context, timeout time.Duration, err error, said string) error {
+	switch cause := context.Cause(ctx); {
+	case errors.Is(cause, errOutlasted):
+		return refusal.Errorf("the scanner did not finish within %s: %s", timeout, tail(said))
+	case cause != nil:
+		return fmt.Errorf("run %s, ended by its caller: %w", g.executable(), cause)
+	}
+	var exited *exec.ExitError
+	if errors.As(err, &exited) {
+		return refusal.Errorf("the scanner failed (%s): %s", exited.ProcessState, tail(said))
+	}
+	return fmt.Errorf("run %s: %w", g.executable(), err)
 }
 
 // matchDetail is how the scanner says it reached one match.
@@ -371,7 +399,7 @@ func matches(decoder *json.Decoder, limits Limits, result *Result) error {
 	for decoder.More() {
 		read++
 		if read > limits.MaxMatches {
-			return fmt.Errorf("the scanner reported more than the %d match limit", limits.MaxMatches)
+			return refusal.Errorf("the scanner reported more than the %d match limit", limits.MaxMatches)
 		}
 		var match grypeMatch
 		if err := decoder.Decode(&match); err != nil {
@@ -734,7 +762,7 @@ func references(limits Limits, lists ...[]string) ([]finding.Reference, error) {
 				continue
 			}
 			if len(kept) >= limits.MaxReferences {
-				return nil, fmt.Errorf(
+				return nil, refusal.Errorf(
 					"one match points at more than the %d reference limit", limits.MaxReferences)
 			}
 			seen[url] = true

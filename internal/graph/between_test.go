@@ -208,3 +208,52 @@ func TestAKeyReadsWhatOnlyTheBuildsItMaySendToShipped(t *testing.T) {
 		}
 	})
 }
+
+func TestAComponentABuildNotSentSinceNodesHeldNamesIsPairedByWhatTheOtherStated(t *testing.T) {
+	// A tag read before nodes held the name a build stated reads the
+	// component row's, which the first product to describe the package
+	// stated. The branch it was cut from, sent since, states its own name
+	// for the same component, and that is no change.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		tag := taggedBuild(t, f)
+		first := graph.Described{Purl: "pkg:generic/libz@1.3", Name: "zlib", Version: "1.3"}
+		appliedTo(t, f, tag, holding(first))
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"graph_node"`).
+			Set(`"name" = NULL`).Set(`"version" = NULL`).Set(`"name_folded" = NULL`).
+			Where(`"build_id" = ?`, tag).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		stated := first
+		stated.Name = "libz"
+		applied(t, f, holding(stated))
+
+		if got := between(t, f, tag, f.buildID); len(got) != 0 {
+			t.Errorf("one component neither build moved differs by %v", spelled(got))
+		}
+	})
+}
+
+func TestAComparisonIsGroupedByTheNameEachBuildStated(t *testing.T) {
+	// The component row holds the name the first product to describe a
+	// package stated. Grouped by the row, one dependency both builds call
+	// libz reads as one arrival and one departure, under two names.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		old := graph.Described{Purl: "pkg:generic/libz@1.3", Name: "zlib", Version: "1.3"}
+		other := f.world.BuildFor(f.world.Branch, f.world.Internal).ID
+		if _, err := fixtures.ApplyGraph(ctx, f.db, other, f.scanOf(t, other), holding(old)); err != nil {
+			t.Fatal(err)
+		}
+		tag := taggedBuild(t, f)
+		stated := old
+		stated.Name = "libz"
+		appliedTo(t, f, tag, holding(stated))
+		applied(t, f, holding(graph.Described{Purl: "pkg:generic/libz@1.3.1", Name: "libz", Version: "1.3.1"}))
+
+		got := spelled(between(t, f, tag, f.buildID))
+		if want := []string{"changed libz [1.3] -> [1.3.1]"}; strings.Join(got, "; ") != strings.Join(want, "; ") {
+			t.Errorf("the difference reads %v, want %v", got, want)
+		}
+	})
+}

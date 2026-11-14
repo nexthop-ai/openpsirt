@@ -76,6 +76,14 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 			}
 		}
 
+		// The shared rows named as another product described the packages, so
+		// the tree shows the names this build stated.
+		for _, c := range []graph.Described{curl, openssl, zlib} {
+			if _, err := f.db.DB.NewUpdate().Table("component").Set(`"name" = ?`, "nothing-"+c.Name).
+				Where(`"purl" = ?`, c.Purl).Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
 		rows, complete, err := f.store.Ours(t.Context(), holder, f.buildID)
 		if err != nil {
 			t.Fatalf("somebody who holds work but reads nothing was refused the tree: %v", err)
@@ -125,6 +133,61 @@ func TestTheTreeSeenUpwardIsOnlyTheirOwnWork(t *testing.T) {
 		}
 		if len(empty) != 0 {
 			t.Errorf("somebody who holds nothing was drawn %d nodes", len(empty))
+		}
+	})
+}
+
+// Work on a component the build no longer holds is placed nowhere, and drawn
+// under the name and version the build last stated, never the shared row's.
+func TestWorkOnAComponentTheBuildDroppedIsDrawnAsTheBuildStatedIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		snap := tree()
+		snap.Components = append(snap.Components, zlib)
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		findings := finding.NewStore(f.db.DB)
+		run, err := findings.Begin(ctx, finding.Run{
+			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
+			DatabaseVersion: "2026-08-28", RanHere: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := findings.Apply(ctx, f.buildID, run.ID, []finding.Reported{{
+			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
+			Component: zlib, FixState: finding.FixedUpstream, FixedIn: "2.0",
+		}}); err != nil {
+			t.Fatal(err)
+		}
+		const party = 77
+		boss := access.NewPerson(1, "boss", false,
+			map[int64][]access.Role{*f.scope.ProductID: {access.PublicTriage, access.Assigner}}, 1)
+		component, err := f.store.ComponentAs(ctx, f.buildID, zlib.Name, graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		to := int64(party)
+		if _, _, err := findings.Assign(ctx, boss, f.buildID, issueID(t, f, "CVE-2026-1"),
+			component, &to, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Table("graph_node").Set(`"closed_scan_id" = "opened_scan_id"`).
+			Where(`"build_id" = ?`, f.buildID).Where(`"component_id" = ?`, component).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Table("component").Set(`"name" = ?`, "nothing").
+			Set(`"version" = ?`, "99.0").Where(`"id" = ?`, component).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		rows, _, err := f.store.Ours(ctx, access.NewPerson(2, "holder", false, nil, party), f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].Placed || rows[0].Component != zlib.Name || rows[0].Version != zlib.Version {
+			t.Errorf("work placed nowhere is drawn as %+v, want %s %s", rows, zlib.Name, zlib.Version)
 		}
 	})
 }
