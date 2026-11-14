@@ -415,8 +415,8 @@ func exportedIn(d ast.Decl) []string {
 }
 
 // satisfiesSomething covers the names a standard interface calls, and the
-// query hook's the database library calls, which are reached by the runtime
-// or by that library rather than by anything written here.
+// query hooks the database library calls. The runtime or that library calls
+// them, and nothing written here does.
 func satisfiesSomething(name string) bool {
 	switch name {
 	case "Error", "String", "Unwrap", "Is", "As",

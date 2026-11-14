@@ -42,10 +42,9 @@ func TestEverySettingOfferedIsOneSomebodyCanSet(t *testing.T) {
 
 func TestNothingOfferedComesBackWithoutAValue(t *testing.T) {
 	// `default: true` with an empty value is the screen saying "nobody has set
-	// this" and then not saying what applies instead. Three settings did: the
-	// disclosure periods reported blank while 90 days, 30 days and 14 days
-	// were what the deployment enforced, because the switch behind the shipped
-	// value had 22 arms and the list had 27 names.
+	// this" and then not saying what applies instead. A setting the switch
+	// behind the shipped value has no arm for comes back that way, while the
+	// deployment enforces a value it does not show.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		var offered struct {
 			Items []struct {

@@ -22,8 +22,7 @@ import (
 // The deployment's separation-of-duties gate (REQ-24): what counts as a
 // deferral standing on its own, how long an occurrence has been put off across every
 // decision that put it off, and the one function every write path asks before it
-// records anything. It sat in the file that renders the review queue, which is
-// the screen the gate produces work for rather than the rule itself.
+// records anything.
 
 // DeferredAt is the total time each of several occurrences of one issue in one
 // product has been put off, across every deferral ever recorded about it, keyed

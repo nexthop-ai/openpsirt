@@ -61,8 +61,8 @@ const askInterval = time.Minute
 //
 // Some of them may be absent because what they work on is not configured:
 // the mail sender, the chat sender, the attachment sweeper, the published
-// directory writer, the CVE record fetcher and the published documents
-// writer. The rest always run, and only the ones that may be absent are
+// directory writer, the CVE record fetcher, the published documents writer
+// and the signing key's watch. The rest always run, and only the ones that may be absent are
 // guarded, so a guard is a condition that can be false.
 //
 // Grouped rather than passed one at a time. A call site with a parameter per
