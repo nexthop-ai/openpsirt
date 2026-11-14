@@ -350,13 +350,16 @@ runs shared the servers.
 A product's findings file read as the export reads it, 200 groups a page,
 by `TestMeasureAFindingsFileReadInOneSnapshot`: 12,000 issue-at-component
 groups over two builds of 34 consumers, above the 7,374 a real switch image
-carried. One engine at a time, no writer beside it.
+carried. One engine at a time, no writer beside it, each read after an
+unmeasured read of every page, so neither measured read meets a cold cache.
+PostgreSQL ran on CI's image and settings with a 4 GB data directory, since the
+file's seed does not fit beside other tests in the shared server's 1 GB.
 
 | Engine | In one snapshot | One statement a page | Slowest page in the snapshot |
 |---|---|---|---|
-| SQLite | 15.9 s | 16.0 s | 423 ms |
-| PostgreSQL 16 | 14.7 s | 9.6 s | 403 ms |
-| MySQL 8.4 | 44.3 s | 44.2 s | 1.59 s |
-| MariaDB 11.4 | 36.8 s | 36.8 s | 848 ms |
+| SQLite | 14.4 s | 14.6 s | 372 ms |
+| PostgreSQL 16 | 13.3 s | 12.7 s | 328 ms |
+| MySQL 8.4 | 41.9 s | 42.2 s | 1.00 s |
+| MariaDB 11.4 | 37.0 s | 37.0 s | 913 ms |
 
 The slowest engine reads the file in under a tenth of the ten-minute ceiling.

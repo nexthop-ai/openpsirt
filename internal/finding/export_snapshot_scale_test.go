@@ -26,6 +26,10 @@ const exportPage = 200
 // the list's groups at the file's page size, inside one read-only snapshot,
 // and the same pages read one statement each outside one. A file is cut at the
 // export ceiling, so the whole read has to sit well inside it.
+//
+// An unmeasured read of every page comes first, so neither measured read is
+// the first over a freshly seeded database: measured first, the snapshot
+// paid for a cold cache the second read did not.
 func TestMeasureAFindingsFileReadInOneSnapshot(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -56,6 +60,7 @@ func TestMeasureAFindingsFileReadInOneSnapshot(t *testing.T) {
 			}
 		}
 
+		read(db)
 		at := time.Now()
 		var rows, pages int
 		var slowest time.Duration
