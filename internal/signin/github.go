@@ -228,7 +228,11 @@ func (g *GitHub) get(ctx context.Context, token *oauth2.Token, url string, into 
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode >= http.StatusInternalServerError {
+	// A server error or a rate limit, the primary one being a 403 with no
+	// requests left, says nothing about who this is.
+	if resp.StatusCode >= http.StatusInternalServerError ||
+		resp.StatusCode == http.StatusTooManyRequests ||
+		(resp.StatusCode == http.StatusForbidden && resp.Header.Get("X-RateLimit-Remaining") == "0") {
 		return unanswered(fmt.Errorf("github answered %s", resp.Status))
 	}
 	if resp.StatusCode != http.StatusOK {
