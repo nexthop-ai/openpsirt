@@ -210,6 +210,11 @@ func TestAProviderNobodyConfiguredIsNotThere(t *testing.T) {
 			if rec.Code != http.StatusNotFound {
 				t.Errorf("%s answered %d, want 404", path, rec.Code)
 			}
+			// A problem document, as every refusal that is not a refused
+			// sign-in is.
+			if kind := rec.Header().Get("Content-Type"); kind != "application/problem+json" {
+				t.Errorf("%s answered as %q: %s", path, kind, rec.Body.String())
+			}
 		}
 	})
 }
