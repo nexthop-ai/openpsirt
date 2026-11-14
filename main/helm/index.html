@@ -925,6 +925,15 @@ auth:
 </table>
 <p><code>existingSecret</code> is the recommended form. A value in <code>values.yaml</code> is kept in
 the release history and usually in version control.</p>
+<p>A changed value rolls the pods through a checksum on the pod template, salted
+so that nobody reading the Deployment can test guesses at a password. The
+chart keeps a random salt in the Secret <code>&lt;fullname&gt;-rollout-salt</code>, which stays
+through upgrades and an uninstall. A render with no cluster, <code>helm template</code>
+or Argo CD, cannot read it back and rolls the pods on every render: set
+<code>rolloutSalt</code> to a long random value there. <code>&lt;fullname&gt;</code> is the name the
+chart's resources share: <code>fullnameOverride</code> where set, otherwise the release
+name followed by <code>-</code> and the chart name (<code>nameOverride</code> where set) unless the
+release name holds it, cut to 63 characters.</p>
 <table>
 <thead>
 <tr>

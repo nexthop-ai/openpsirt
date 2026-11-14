@@ -1292,7 +1292,9 @@ against the working directory the output states.</p>
 series of its own, named once per analyzer as <code>--series TOOL=NAME</code>: for
 example <code>--series clang=clang-sa --series cppcheck=cppcheck-all</code>. The tool is
 the name its output gives it, in any case. <code>write</code> stores each analyzer's run
-in a file of its own, the analyzer's name before the extension.</p>
+in a file of its own, the analyzer's name before the extension, in lower case
+with every character other than letters, digits, <code>.</code>, <code>_</code> and <code>-</code> written as
+<code>-</code>.</p>
 <h4 id="scanners-this-upload-refuses">Scanners this upload refuses<a class="headerlink" href="#scanners-this-upload-refuses" title="Permanent link">&para;</a></h4>
 <p>This upload takes static analysis of the product's own code. These kinds of
 tool that write SARIF are sent elsewhere or not at all:</p>
@@ -1399,7 +1401,11 @@ openpsirt-upload upload \
 </tr>
 <tr>
 <td><code>--url</code></td>
-<td>The deployment's address, where <code>OPENPSIRT_URL</code> is not set</td>
+<td>The deployment's address, where <code>OPENPSIRT_URL</code> is not set. A plain <code>http</code> address is refused unless it is this machine, because the key would cross the network unencrypted</td>
+</tr>
+<tr>
+<td><code>--allow-http</code></td>
+<td>Send to a plain <code>http</code> address that is not this machine, inside a network you trust. The client says so each time</td>
 </tr>
 <tr>
 <td><code>--output</code></td>

@@ -2015,7 +2015,14 @@ name in each, side by side in the tables below: the variable, which starts
 process starts with nothing set but a database — and a value that is set and
 cannot be read stops the process with the setting named, rather than falling
 back to the default. A switch spelled wrongly that silently reads as its
-opposite is worse than a refusal to start.</p>
+opposite is worse than a refusal to start. For the same reason, a variable
+starting <code>OPENPSIRT_</code> that names no setting stops the process, naming it. The
+variables Kubernetes gives a pod for a Service whose name starts <code>openpsirt</code>,
+named <code>&lt;SERVICE&gt;_SERVICE_HOST</code>, <code>&lt;SERVICE&gt;_PORT</code> and more, are not settings
+and are left alone where the value has a service link's shape: an address, a
+port number, a protocol, or <code>tcp://&lt;address&gt;:&lt;port&gt;</code>. So are the
+address and key <a href="../security-testing/">openpsirt-upload</a> reads, and the
+variables of the test suite and of the interface's development server.</p>
 <p>In the environment, a switch takes <code>true</code> or <code>false</code> (also <code>1</code>, <code>0</code>, <code>t</code>, <code>f</code>,
 in any case). A duration is written as Go reads it: <code>30s</code>, <code>5m</code>, <code>12h</code>. A
 number is a positive whole number; zero reads as unset everywhere, so it is
@@ -2134,7 +2141,7 @@ openpsirt migrate up --config /etc/openpsirt/openpsirt.toml
 </tr>
 <tr>
 <td>The environment</td>
-<td>Any variable starting <code>OPENPSIRT_</code> set beside the file is refused at startup, naming every one, even when it is empty. Unset them</td>
+<td>Any other variable starting <code>OPENPSIRT_</code> set beside the file is refused at startup, naming every one, even when it is empty. Kubernetes service links, the address and key openpsirt-upload reads, and the variables of the test suite and the interface's development server are left alone. Unset the rest</td>
 </tr>
 <tr>
 <td>Permissions</td>
@@ -2150,7 +2157,7 @@ openpsirt migrate up --config /etc/openpsirt/openpsirt.toml
 </tr>
 <tr>
 <td>Kubernetes</td>
-<td>A pod gets variables for every Service in its namespace, named <code>&lt;SERVICE&gt;_SERVICE_HOST</code>, <code>&lt;SERVICE&gt;_PORT</code> and more. For a Service called <code>openpsirt</code> they start <code>OPENPSIRT_</code>, and are refused beside a file. A pod configured by file sets <code>enableServiceLinks: false</code></td>
+<td>A pod gets variables for every Service in its namespace, named <code>&lt;SERVICE&gt;_SERVICE_HOST</code>, <code>&lt;SERVICE&gt;_PORT</code> and more. For a Service called <code>openpsirt</code> they start <code>OPENPSIRT_</code>, and are left alone, beside a file or not</td>
 </tr>
 </tbody>
 </table>
@@ -2586,7 +2593,7 @@ username, and two providers issuing them independently cannot be told apart.</p>
 <tr>
 <td><code>OPENPSIRT_OIDC_ISSUER</code></td>
 <td><code>signin.oidc.issuer</code></td>
-<td>The provider's issuer address. Empty means no provider. <strong>Every endpoint the provider publishes must be on this host</strong> — the authorization endpoint, the token endpoint and the keys endpoint — and the process refuses to start where one is not. Providers that publish their keys elsewhere, Google among them, are refused: a discovery document names the addresses this deployment will send people to, and it arrives over the network</td>
+<td>The provider's issuer address. Empty means no provider. <strong>Every endpoint the provider publishes must be on this host and port</strong> — the authorization endpoint, the token endpoint and the keys endpoint — and the process refuses to start where one is not. Providers that publish their keys elsewhere, Google among them, are refused: a discovery document names the addresses this deployment will send people to, and it arrives over the network</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -5407,6 +5414,42 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <tr>
 <td>An issue taken off an advisory and put back keeps every stretch it was on, so an advisory issued during any of them is read as naming it. v0.12.0 kept only the last stretch, and the upgrade cannot recover an earlier one</td>
 <td>Nothing the upgrade can do. Where v0.12.0 saw an issue taken off, put back and taken off again, an advisory issued during an earlier stretch is read as not naming it: what went out is shown to readers who may not see that issue, and a rename that issuance should refuse is allowed</td>
+</tr>
+<tr>
+<td>A variable starting <code>OPENPSIRT_</code> that names no setting stops the process at startup, naming it. v0.12.0 ignored it, so a misspelled setting kept its default</td>
+<td>Correct or unset each variable the refusal names. Kubernetes service links are not refused</td>
+</tr>
+<tr>
+<td>A database URL with a port, no user name and no database, whose query holds an unescaped <code>@</code> followed by a host, such as <code>postgres://u:12?a=b@db</code>, is refused at startup as a password cut short. An <code>@</code> in a parameter naming a user or a credential, such as <code>user</code> or <code>password</code>, is not. v0.12.0 handed the driver the host <code>u</code></td>
+<td>Percent-encode each <code>/</code>, <code>?</code>, <code>#</code> and <code>@</code> in the user name and password, as <code>%2F</code>, <code>%3F</code>, <code>%23</code> and <code>%40</code></td>
+</tr>
+<tr>
+<td>An object store endpoint, <code>OPENPSIRT_DIRECTORY_URL</code>, <code>OPENPSIRT_OIDC_ISSUER</code> or <code>openpsirt-upload --url</code> with an <code>@</code> in its path is refused, since a password holding an unescaped <code>/</code>, <code>?</code> or <code>#</code>, such as <code>https://key:12/ab@minio:9000</code>, reads that way. v0.12.0 read the host as <code>key</code></td>
+<td>Percent-encode each <code>/</code>, <code>?</code>, <code>#</code> and <code>@</code> in the user name and password, and an <code>@</code> in a path as <code>%40</code></td>
+</tr>
+<tr>
+<td>A sign-in provider whose discovery document names an endpoint on another port of the issuer's host stops the process at startup. v0.12.0 compared the host name alone</td>
+<td>Have the provider publish its endpoints on the issuer's port, or set the issuer to the address that serves them</td>
+</tr>
+<tr>
+<td>An upstream whose stored address has an <code>@</code> in its path, fragment or a query key is not read, and is refused as an address an upstream cannot have. v0.12.0 read it</td>
+<td>Trust the upstream again at its address with each such <code>@</code> written as <code>%40</code></td>
+</tr>
+<tr>
+<td>A published directory and an attachment store with one bucket name are refused at startup where either endpoint is unset or the two hosts share a resolved address, and two folders are compared with their links followed. v0.12.0 compared the endpoints as written</td>
+<td>Give the directory a bucket or a folder of its own</td>
+</tr>
+<tr>
+<td><code>openpsirt-upload</code> refuses a plain <code>http</code> address that is not this machine. v0.12.0 sent the key over it unencrypted</td>
+<td>Use the <code>https</code> address. Inside a network you trust, give <code>--allow-http</code></td>
+</tr>
+<tr>
+<td><code>openpsirt-upload write</code> names each analyzer's file with the analyzer's name in lower-case letters, digits, <code>.</code>, <code>_</code> and <code>-</code>, every other character a <code>-</code> and no <code>.</code> at either end. v0.12.0 wrote the name as the analyzer gave it</td>
+<td>Look for the new name where a script picks the file up by its name</td>
+</tr>
+<tr>
+<td>The Helm chart salts the checksum that rolls the pods when a chart-held secret changes, and keeps the salt in the Secret <code>&lt;fullname&gt;-rollout-salt</code>, where <code>&lt;fullname&gt;</code> is the name the chart's resources share: <code>fullnameOverride</code> where set, otherwise the release name followed by <code>-</code> and the chart name (<code>nameOverride</code> where set) unless the release name holds it, cut to 63 characters. The first upgrade rolls the pods once</td>
+<td>Where the chart is rendered with no cluster, <code>helm template</code> or Argo CD, set <code>rolloutSalt</code> to a long random value, or the pods roll on every render</td>
 </tr>
 </tbody>
 </table>
