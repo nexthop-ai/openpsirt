@@ -199,7 +199,9 @@ func TestAReleaseMissingAnEngineIsRefused(t *testing.T) {
 // A tag that is not a release is refused before anything is read.
 func TestATagThatIsNoReleaseIsRefused(t *testing.T) {
 	root, migrations := tree(t)
-	for _, tag := range []string{"v0.2.0-4-gabc1234", "0.2.0", "v0.2"} {
+	for _, tag := range []string{"v0.2.0-4-gabc1234", "0.2.0", "v0.2",
+		// One release has one spelling, so none is frozen under a second.
+		"v0.02.0", "v00.2.0", "v0.2.00", "v0.2.0-rc.01"} {
 		if _, err := Check(root, migrations, tag); err == nil {
 			t.Errorf("%q was read as a release", tag)
 		}
@@ -465,5 +467,19 @@ func TestABaselineRecordListingAFileIsRefused(t *testing.T) {
 	write(t, filepath.Join(root, "v0.1.0", Files), "baseline\n"+string(content))
 	if _, err := Read(root, "v0.1.0"); err == nil || !strings.Contains(err.Error(), "baseline") {
 		t.Errorf("a baseline listing files answered %v", err)
+	}
+}
+
+// A file is a migration only where it is Go and not a test, for the last a
+// release records as much as for the files it owns, so the two cannot
+// disagree over an editor's leftover.
+func TestOnlyASourceFileCountsAsAMigration(t *testing.T) {
+	names := []string{"00046_v0120.go", "00047_v0130.go.orig", "00047_notes.md", "00048_v0130_test.go"}
+	if got := Highest(names); got != 46 {
+		t.Errorf("the highest migration among %v is %d, want 46", names, got)
+	}
+	if owned := Owned(names, 45, 47, "v0130"); slices.Contains(owned, "00047_v0130.go.orig") ||
+		slices.Contains(owned, "00047_notes.md") {
+		t.Errorf("a file that is no migration was owned: %v", owned)
 	}
 }

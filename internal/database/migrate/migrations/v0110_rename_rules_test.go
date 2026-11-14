@@ -20,20 +20,7 @@ func seedRulesV0100(t *testing.T, ctx context.Context, db *database.DB) rulesV01
 	t.Helper()
 	declared := worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
-	id := func(query string, args ...any) int64 {
-		t.Helper()
-		var out int64
-		if err := db.DB.NewRaw(query, args...).Scan(ctx, &out); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-		return out
-	}
+	exec, id := seeding(t, ctx, db)
 	person, product := declared.Person.ID, declared.Product.ID
 	exec(`INSERT INTO "party" ("kind") VALUES (?)`, "team")
 	party := id(`SELECT MAX("id") FROM "party"`)

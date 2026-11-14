@@ -19,6 +19,7 @@ import (
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/saved"
+	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // fixture is the seeded world with a place to keep filters against.
@@ -39,6 +40,14 @@ func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	})
 }
 
+// limitedTo sets how many filters one person may keep.
+func limitedTo(t *testing.T, db *database.DB, n string) {
+	t.Helper()
+	if _, _, err := setting.NewStore(db.DB).Change(t.Context(), setting.SavedPerPerson, n); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // The length a prepared deferral defers for, at the store.
 //
 // A deferral is the one outcome that needs a date, and what is kept is the
@@ -55,7 +64,7 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 		// Without a length, the form opens with the outcome chosen and no
 		// date, which cannot be submitted — a prefill that half-fires.
 		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, "someday",
-			"component=linux", saved.Filter{Outcome: "deferred", Reasoning: "Not this quarter."}, 0)
+			"component=linux", saved.Filter{Outcome: "deferred", Reasoning: "Not this quarter."})
 		if err == nil {
 			t.Fatal("a deferral with no length was kept")
 		}
@@ -69,7 +78,7 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 		// deferral.
 		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID,
 			"gone", "component=linux", saved.Filter{Outcome: "wont-fix",
-				Reasoning: "Not built into this image.", DeferDays: 90}, 0)
+				Reasoning: "Not built into this image.", DeferDays: 90})
 		if err == nil {
 			t.Fatal("a length was kept beside an outcome that is not a deferral")
 		}
@@ -80,7 +89,7 @@ func TestAPreparedDeferralHasToCarryHowLongItDefersFor(t *testing.T) {
 		// With both, it is kept and read back.
 		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
 			"quarter", "component=linux", saved.Filter{Outcome: "deferred",
-				Reasoning: "Waiting on the next kernel bump.", DeferDays: 90}, 0)
+				Reasoning: "Waiting on the next kernel bump.", DeferDays: 90})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +116,7 @@ func TestAPreparedDecisionHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 		// dismissal saying nothing, and the person who submits it is the one
 		// putting their name to it.
 		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID, "kernel", "component=linux",
-			saved.Filter{Outcome: "not-applicable", Justification: "vulnerable_code_not_present"}, 0)
+			saved.Filter{Outcome: "not-applicable", Justification: "vulnerable_code_not_present"})
 		if err == nil {
 			t.Fatal("a prefill with no reasoning was kept")
 		}
@@ -120,7 +129,7 @@ func TestAPreparedDecisionHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 			"component=linux", saved.Filter{
 				Outcome: "deferred", Reasoning: "Waiting on the next kernel bump.",
 				DeferDays: 90,
-			}, 0)
+			})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -132,7 +141,7 @@ func TestAPreparedDecisionHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 		// half-fires, so nothing prepared is nothing carried.
 		half, err := f.store.SaveFilterPreparing(t.Context(), person.ID, "plain",
 			"component=linux", saved.Filter{Justification: "vulnerable_code_not_present",
-				DeferDays: 30}, 0)
+				DeferDays: 30})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -144,7 +153,7 @@ func TestAPreparedDecisionHasToCarryTheWordsSomebodyWillSign(t *testing.T) {
 		// prefill goes with it, or one fires on a filter somebody had made
 		// ordinary.
 		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
-			"kernel", "component=linux", saved.Filter{}, 0); err != nil {
+			"kernel", "component=linux", saved.Filter{}); err != nil {
 			t.Fatal(err)
 		}
 		mine, _, err := f.store.SavedFilters(t.Context(), person.ID, 0)
@@ -172,7 +181,7 @@ func TestAFilterMayNotPrepareADecisionTheDecisionStoreWouldRefuse(t *testing.T) 
 			t.Fatal(err)
 		}
 		keeps := func(name string, prepares saved.Filter) error {
-			_, err := f.store.SaveFilterPreparing(t.Context(), person.ID, name, "component=linux", prepares, 0)
+			_, err := f.store.SaveFilterPreparing(t.Context(), person.ID, name, "component=linux", prepares)
 			return err
 		}
 
@@ -227,19 +236,20 @@ func TestOnePersonMayNotKeepAnUnboundedNumberOfFilters(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		limitedTo(t, f.DB, "2")
 		for _, name := range []string{"first", "second"} {
 			if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
-				name, "component=linux", saved.Filter{}, 2); err != nil {
+				name, "component=linux", saved.Filter{}); err != nil {
 				t.Fatal(err)
 			}
 		}
 		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
-			"third", "component=linux", saved.Filter{}, 2); err == nil {
+			"third", "component=linux", saved.Filter{}); err == nil {
 			t.Error("a filter past the limit was kept")
 		}
 		// Replacing one of their own is not how a table fills up.
 		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
-			"first", "component=busybox", saved.Filter{}, 2); err != nil {
+			"first", "component=busybox", saved.Filter{}); err != nil {
 			t.Errorf("replacing a filter they already keep was refused: %v", err)
 		}
 
@@ -284,7 +294,7 @@ func TestASaveLosingTheRaceForANewNameReplacesTheWinner(t *testing.T) {
 		})
 
 		if _, err := saved.NewStore(hooked).SaveFilterPreparing(t.Context(), person.ID,
-			"kernel", "component=linux-image", saved.Filter{}, 10); err != nil {
+			"kernel", "component=linux-image", saved.Filter{}); err != nil {
 			t.Errorf("the save that lost the race answered %v", err)
 		}
 		// Landed, the rival made the save's add a duplicate; held behind the
@@ -324,7 +334,7 @@ func TestAKeptFilterHoldsNoScope(t *testing.T) {
 			t.Fatal(err)
 		}
 		kept, err := f.store.SaveFilterPreparing(t.Context(), person.ID, "kernel",
-			"?"+strings.Join(asked, "&"), saved.Filter{}, 0)
+			"?"+strings.Join(asked, "&"), saved.Filter{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -369,17 +379,18 @@ func TestTwoNewFiltersAtOnceStopAtTheLimit(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		limitedTo(t, f.DB, "2")
 		if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID,
-			"first", "component=linux", saved.Filter{}, 2); err != nil {
+			"first", "component=linux", saved.Filter{}); err != nil {
 			t.Fatal(err)
 		}
 		hooked, rival := dbtest.RivalAfterRead(t, f.DB, "saved_filter", "saved_filter", 2*time.Second, func() error {
 			_, err := f.store.SaveFilterPreparing(context.Background(), person.ID,
-				"second", "component=busybox", saved.Filter{}, 2)
+				"second", "component=busybox", saved.Filter{})
 			return err
 		})
 		_, one := saved.NewStore(hooked).SaveFilterPreparing(t.Context(), person.ID,
-			"third", "component=openssl", saved.Filter{}, 2)
+			"third", "component=openssl", saved.Filter{})
 		other := rival()
 		if (one == nil) == (other == nil) {
 			t.Errorf("two saves at the limit answered %v and %v, want one of them refused", one, other)
@@ -404,7 +415,7 @@ func TestASavedFilterNamedAsADotSegmentIsRefused(t *testing.T) {
 		}
 		for _, name := range []string{".", ".."} {
 			if _, err := f.store.SaveFilterPreparing(t.Context(), person.ID, name,
-				"component=linux", saved.Filter{}, 0); !refusal.In(err) {
+				"component=linux", saved.Filter{}); !refusal.In(err) {
 				t.Errorf("a filter named %q answered %v, want a refusal", name, err)
 			}
 		}

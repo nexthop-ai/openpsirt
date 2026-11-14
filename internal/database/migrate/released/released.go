@@ -48,7 +48,9 @@ type Record struct {
 	Baseline bool
 }
 
-var release = regexp.MustCompile(`^v(\d+)\.(\d+)\.(\d+)(-rc\.\d+)?$`)
+// release is a release tag. Each number is written without leading zeros,
+// so one release has one spelling and v0.010.0 is no second v0.10.0.
+var release = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-rc\.(0|[1-9]\d*))?$`)
 
 // Base is the release a tag names. A release candidate is checked against
 // the record of the release it precedes, since a database it built applies
@@ -112,11 +114,29 @@ func Number(name string) int64 {
 	return n
 }
 
+// source reports whether a file of the migrations directory is one the binary
+// is built from: Go, and not a test. Nothing else there is a migration or a
+// declaration, whatever its name.
+func source(name string) bool {
+	return strings.HasSuffix(name, ".go") && !strings.HasSuffix(name, "_test.go")
+}
+
+// Highest is the highest migration number among the source files named.
+func Highest(names []string) int64 {
+	var highest int64
+	for _, name := range names {
+		if n := Number(name); n > highest && source(name) {
+			highest = n
+		}
+	}
+	return highest
+}
+
 // codeOf is the release code a file of table declarations carries, and
 // whether the file is one: a Go source file, not a test, whose name before
 // the first underscore is a code as Code writes one.
 func codeOf(name string) (string, bool) {
-	if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+	if !source(name) {
 		return "", false
 	}
 	code, _, found := strings.Cut(name, "_")
@@ -135,7 +155,7 @@ var releaseCode = regexp.MustCompile(`^v\d{3,}$`)
 func Owned(names []string, previous, last int64, code string) []string {
 	var out []string
 	for _, name := range names {
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+		if !source(name) {
 			continue
 		}
 		if n := Number(name); n > previous && n <= last {
@@ -313,7 +333,7 @@ func replaced(migrations string, r *Record) ([]string, error) {
 	}
 	var faults []string
 	for _, name := range names {
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+		if !source(name) {
 			continue
 		}
 		n := Number(name)

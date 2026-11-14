@@ -9,6 +9,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -36,9 +37,25 @@ var flock = syscall.Flock
 // holder rewrites it as it takes the lock.
 func lockFile(ctx context.Context, path string, logger *slog.Logger) (unlock, error) {
 	path = filepath.Clean(path)
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	// Never through a link, symbolic or hard, and only a regular file: the
+	// holder truncates it and writes into it, so a link planted beside the
+	// database would have that written into whatever it points at.
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open the migration lock beside the database: %w", err)
+	}
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("read the migration lock beside the database: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		_ = file.Close()
+		return nil, fmt.Errorf("the migration lock beside the database is not a regular file: %s", path)
+	}
+	if st, ok := info.Sys().(*syscall.Stat_t); !ok || st.Nlink != 1 {
+		_ = file.Close()
+		return nil, fmt.Errorf("the migration lock beside the database has another name: %s", path)
 	}
 
 	waits := waiting{logger: logger, since: time.Now()}
@@ -63,7 +80,7 @@ func lockFile(ctx context.Context, path string, logger *slog.Logger) (unlock, er
 			_ = file.Close()
 			return nil, ctx.Err()
 		}
-		waits.still(func() string { return heldBy(path) })
+		waits.still(func() string { return heldBy(file) })
 		select {
 		case <-ctx.Done():
 			_ = file.Close()
@@ -72,6 +89,10 @@ func lockFile(ctx context.Context, path string, logger *slog.Logger) (unlock, er
 		}
 	}
 }
+
+// heldByMost is the most of the lock file a waiter reads: more than a
+// holder writes.
+const heldByMost = 512
 
 // recordHolder writes which process holds the lock into the lock file.
 //
@@ -90,12 +111,15 @@ func recordHolder(file *os.File) {
 
 // heldBy reads which process the lock file says holds it, in the form the
 // server engines' holder takes, or nothing where the file records nobody.
-func heldBy(path string) string {
-	recorded, err := os.ReadFile(filepath.Clean(path))
-	if err != nil {
+// Read through the descriptor that was checked, never the path again, which
+// could name something else by now.
+func heldBy(file *os.File) string {
+	recorded := make([]byte, heldByMost)
+	n, err := file.ReadAt(recorded, 0)
+	if err != nil && !errors.Is(err, io.EOF) {
 		return ""
 	}
-	if held := strings.TrimSpace(string(recorded)); held != "" {
+	if held := strings.TrimSpace(string(recorded[:n])); held != "" {
 		return " by " + held
 	}
 	return ""

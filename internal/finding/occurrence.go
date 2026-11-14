@@ -153,7 +153,7 @@ func (s *Store) OccurrenceFor(ctx context.Context, subject access.Subject, build
 		Where(Decidable).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
-		OrderExpr("component_upstream, consumer_upstream").
+		OrderExpr(`"component_upstream", "consumer_upstream"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is open at that occurrence: %w", err)
@@ -499,7 +499,7 @@ func (s *Store) OccurrencesFor(ctx context.Context, subject access.Subject, buil
 		ColumnExpr(`COALESCE(`+graph.StatedName("sun", `"f"."build_id"`, `"f"."consumer_id"`, "uc")+`, '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
 		Apply(inFoldOf(buildID, vulnerabilityID, componentID, visible)).
-		OrderExpr(`consumer, "occurrence_identity", component_upstream, consumer_upstream`).
+		OrderExpr(`"consumer", "occurrence_identity", "component_upstream", "consumer_upstream"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where this sits: %w", err)

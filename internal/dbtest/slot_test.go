@@ -411,3 +411,20 @@ func TestAStaleDatabaseThatWillNotDropLeavesTheLeaseStanding(t *testing.T) {
 		}
 	})
 }
+
+// The clean writes a database's name into its statements between quotes, so
+// only a name this harness could have made reaches them. One another account
+// made under the prefix is left.
+func TestTheCleanDropsOnlyANameTheHarnessMakes(t *testing.T) {
+	for _, name := range []string{slotName(harnessPrefix, "schema", 3), harnessPrefix + "pkg_01_ab12"} {
+		if !harnessMade(name) {
+			t.Errorf("%q was read as a name the harness never makes", name)
+		}
+	}
+	for _, name := range []string{harnessPrefix + `x" WITH OWNER "y`, harnessPrefix + "X", harnessPrefix + "a-b",
+		harnessPrefix + "a`b"} {
+		if harnessMade(name) {
+			t.Errorf("%q was read as a name the harness makes", name)
+		}
+	}
+}

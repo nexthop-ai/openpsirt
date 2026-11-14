@@ -136,13 +136,8 @@ func registerSaved(api huma.API, in core.Deps) {
 				DeferDays:     input.Body.Prepares.DeferDays,
 			}
 		}
-		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.SavedPerPerson,
-			setting.DefaultSavedPerPerson)
-		if err != nil {
-			return nil, core.WentWrong(in.Logger, "that filter could not be kept", err)
-		}
 		if _, err := store.SaveFilterPreparing(ctx, who.ID, input.Name,
-			input.Body.Query, prepares, cap); err != nil {
+			input.Body.Query, prepares); err != nil {
 			return nil, core.Asked(in.Logger, err)
 		}
 		return &struct{}{}, nil

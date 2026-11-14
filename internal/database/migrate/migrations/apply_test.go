@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -136,12 +135,11 @@ func TestMigratingReadsNothingFromTheWorkingDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var highest int64
+	var files []string
 	for _, name := range names {
-		if n := released.Number(name.Name()); n > highest && !strings.HasSuffix(name.Name(), "_test.go") {
-			highest = n
-		}
+		files = append(files, name.Name())
 	}
+	highest := released.Highest(files)
 	if highest == 0 {
 		t.Fatal("no migration was found beside this test, so there is nothing to compare against")
 	}

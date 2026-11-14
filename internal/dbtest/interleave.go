@@ -66,18 +66,44 @@ func RivalAfterRead(t *testing.T, db *database.DB, read, write string, wait time
 	if db.Stats().MaxOpenConnections == 1 {
 		t.Skip("one connection: nothing lands between a read and a write")
 	}
-	hook := &afterRead{read: read, write: write, wait: wait, rival: rival, done: make(chan error, 1),
-		blocked: lockWaiter(db)}
+	hook := &afterRead{read: read, write: write, rivalSeam: newSeam(db, wait, rival)}
+	return hook.hooked(t, db, hook, "the rival never ran, so nothing landed between the read and the write")
+}
+
+// rivalSeam is what every seam shares: the rival, when it fires, and how its
+// answer reaches the test. A seam keeps only the rule arming it.
+type rivalSeam struct {
+	wait    time.Duration
+	rival   func() error
+	done    chan error
+	blocked func(context.Context) bool
+
+	mu    sync.Mutex
+	fired bool
+}
+
+func newSeam(db *database.DB, wait time.Duration, rival func() error) rivalSeam {
+	return rivalSeam{wait: wait, rival: rival, done: make(chan error, 1), blocked: lockWaiter(db)}
+}
+
+// hooked is a handle over db's connections watched by hook, and the function
+// waiting for the rival, which fails the test with missed where it never ran.
+func (s *rivalSeam) hooked(t *testing.T, db *database.DB, hook bun.QueryHook,
+	missed string) (*bun.DB, func() error) {
+
 	hooked := bun.NewDB(db.DB.DB, db.Dialect()).WithQueryHook(hook)
 	var answer error
 	var waited sync.Once
 	finished := func() error {
 		waited.Do(func() {
-			if !hook.started() {
-				t.Error("the rival never ran, so nothing landed between the read and the write")
+			s.mu.Lock()
+			fired := s.fired
+			s.mu.Unlock()
+			if !fired {
+				t.Error(missed)
 				return
 			}
-			answer = <-hook.done
+			answer = <-s.done
 		})
 		return answer
 	}
@@ -85,46 +111,45 @@ func RivalAfterRead(t *testing.T, db *database.DB, read, write string, wait time
 	return hooked, finished
 }
 
-type afterRead struct {
-	read    string
-	write   string
-	wait    time.Duration
-	rival   func() error
-	done    chan error
-	blocked func(context.Context) bool
-
-	mu    sync.Mutex
-	armed bool
-	fired bool
+// fireIf starts the rival the first time due answers true, and waits for it
+// as awaitRival does. due runs under the seam's lock, so a seam's arming
+// state is guarded by it too.
+func (s *rivalSeam) fireIf(ctx context.Context, due func() bool) {
+	s.mu.Lock()
+	fire := !s.fired && due()
+	if fire {
+		s.fired = true
+	}
+	s.mu.Unlock()
+	if !fire {
+		return
+	}
+	landed := make(chan error, 1)
+	go func() { landed <- s.rival() }()
+	if err, ok := awaitRival(ctx, landed, s.wait, s.blocked); ok {
+		s.done <- err
+	} else {
+		go func() { s.done <- <-landed }()
+	}
 }
 
-func (h *afterRead) started() bool {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.fired
+// afterRead arms on a read of one table and fires on the next write to
+// another.
+type afterRead struct {
+	read  string
+	write string
+	armed bool
+	rivalSeam
 }
 
 func (h *afterRead) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
 	verb := verbOf(e.Query)
-	h.mu.Lock()
-	if verb == "SELECT" && names(e.Query, h.read) {
-		h.armed = true
-	}
-	fire := h.armed && !h.fired && writes(verb) && names(e.Query, h.write)
-	if fire {
-		h.fired = true
-	}
-	h.mu.Unlock()
-	if !fire {
-		return ctx
-	}
-	landed := make(chan error, 1)
-	go func() { landed <- h.rival() }()
-	if err, ok := awaitRival(ctx, landed, h.wait, h.blocked); ok {
-		h.done <- err
-	} else {
-		go func() { h.done <- <-landed }()
-	}
+	h.fireIf(ctx, func() bool {
+		if verb == "SELECT" && names(e.Query, h.read) {
+			h.armed = true
+		}
+		return h.armed && writes(verb) && names(e.Query, h.write)
+	})
 	return ctx
 }
 
@@ -216,57 +241,20 @@ func RivalAfterSelect(t *testing.T, db *database.DB, read string, wait time.Dura
 	if db.Stats().MaxOpenConnections == 1 {
 		t.Skip("one connection: nothing lands between two reads")
 	}
-	hook := &afterSelect{read: read, wait: wait, rival: rival, done: make(chan error, 1),
-		blocked: lockWaiter(db)}
-	hooked := bun.NewDB(db.DB.DB, db.Dialect()).WithQueryHook(hook)
-	var answer error
-	var waited sync.Once
-	finished := func() error {
-		waited.Do(func() {
-			hook.mu.Lock()
-			fired := hook.fired
-			hook.mu.Unlock()
-			if !fired {
-				t.Error("the rival never ran, so nothing landed after the read")
-				return
-			}
-			answer = <-hook.done
-		})
-		return answer
-	}
-	t.Cleanup(func() { _ = finished() })
-	return hooked, finished
+	hook := &afterSelect{read: read, rivalSeam: newSeam(db, wait, rival)}
+	return hook.hooked(t, db, hook, "the rival never ran, so nothing landed after the read")
 }
 
+// afterSelect arms once a read of one table has run, and fires before the
+// statement after it.
 type afterSelect struct {
-	read    string
-	wait    time.Duration
-	rival   func() error
-	done    chan error
-	blocked func(context.Context) bool
-
-	mu    sync.Mutex
+	read  string
 	armed bool
-	fired bool
+	rivalSeam
 }
 
 func (h *afterSelect) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
-	h.mu.Lock()
-	fire := h.armed && !h.fired
-	if fire {
-		h.fired = true
-	}
-	h.mu.Unlock()
-	if !fire {
-		return ctx
-	}
-	landed := make(chan error, 1)
-	go func() { landed <- h.rival() }()
-	if err, ok := awaitRival(ctx, landed, h.wait, h.blocked); ok {
-		h.done <- err
-	} else {
-		go func() { h.done <- <-landed }()
-	}
+	h.fireIf(ctx, func() bool { return h.armed })
 	return ctx
 }
 

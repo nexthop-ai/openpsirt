@@ -88,11 +88,15 @@ func BuildVersion(build, componentID, component string) string {
 // the build, the flag and the component answers it on PostgreSQL, which has no
 // index led by the build and the component: without it, each row read every
 // node of the build, 830 ms for 60 components of a build with 62,001 nodes.
+//
+// The column is quoted whole before it is placed, so no literal here opens
+// inside a quoted name.
 func statedColumn(column, build, componentID, component string) string {
-	return `COALESCE((SELECT "sn"."` + column + `" FROM "graph_node" AS "sn"` +
+	quoted := `"` + column + `"`
+	return `COALESCE((SELECT "sn".` + quoted + ` FROM "graph_node" AS "sn"` +
 		` WHERE "sn"."build_id" = ` + build + ` AND "sn"."is_root" IN (FALSE, TRUE)` +
 		` AND "sn"."component_id" = ` + componentID +
-		` ORDER BY "sn"."opened_scan_id" DESC, "sn"."id" DESC LIMIT 1), "` + component + `"."` + column + `")`
+		` ORDER BY "sn"."opened_scan_id" DESC, "sn"."id" DESC LIMIT 1), "` + component + `".` + quoted + `)`
 }
 
 // NamedAs answers the components a name somebody typed names among the open

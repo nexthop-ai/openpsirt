@@ -1092,7 +1092,7 @@ func neighborsAt(query *bun.SelectQuery, readable []access.Visibility,
 		// contains no branches is a list, and the reader never learns the
 		// build has containers in it at all.
 		// The identifier last, so two components of one name keep one order.
-		OrderExpr(`CASE WHEN COALESCE("kids"."n", 0) > 0 THEN 0 ELSE 1 END, findings DESC, ` +
+		OrderExpr(`CASE WHEN COALESCE("kids"."n", 0) > 0 THEN 0 ELSE 1 END, "findings" DESC, ` +
 			NodeName("fn", "c") + `, "c"."id"`)
 }
 

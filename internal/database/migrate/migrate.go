@@ -257,9 +257,7 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 		db.SetMaxOpenConns(1)
 		defer func() {
 			db.SetMaxOpenConns(width)
-			if db.Pool.MaxIdle > 0 {
-				db.SetMaxIdleConns(db.Pool.MaxIdle)
-			}
+			db.RestoreIdle()
 		}()
 	}
 
@@ -268,7 +266,7 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 		return err
 	}
 	defer func() {
-		err := release(context.WithoutCancel(ctx))
+		err := releaseWithin(ctx, release)
 		switch {
 		case err == nil:
 		case failed == nil:
@@ -284,6 +282,18 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 	}()
 
 	return fn(ctx)
+}
+
+// releaseWithin releases the migration lock within resetWait, whatever
+// happened to ctx, and a release answering past it is reported. An unlock
+// statement outliving its context has its connection closed by both
+// drivers, which ends the session and frees the lock on the server. A
+// keep-alive use still running leaves the connection to be closed once that
+// use ends.
+func releaseWithin(ctx context.Context, release unlock) error {
+	releasing, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+	defer cancel()
+	return release(releasing)
 }
 
 func prepare(db *database.DB) error {

@@ -107,15 +107,17 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			if !subject.Reads(access.Private, product) {
 				return nil, core.NoSuchFinding()
 			}
-			named, issued, err := namedCase(ctx, in, product, issue)
-			if err != nil {
-				return nil, err
-			}
 			var person *access.Account
 			var added bool
+			var named, issued string
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
-				rights := access.NewStore(tx)
 				var err error
+				// Named where the record is written, so it carries the names
+				// the case has when the grant lands.
+				if named, issued, err = namedCase(ctx, in, tx, product, issue); err != nil {
+					return err
+				}
+				rights := access.NewStore(tx)
 				if person, err = core.PersonNamed(ctx, a.Logger, rights, input.Identity); err != nil {
 					return err
 				}
@@ -185,11 +187,11 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			if !subject.Reads(access.Private, product) {
 				return nil, core.NoSuchFinding()
 			}
-			named, issued, err := namedCase(ctx, in, product, issue)
-			if err != nil {
-				return nil, err
-			}
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+				named, issued, err := namedCase(ctx, in, tx, product, issue)
+				if err != nil {
+					return err
+				}
 				rights := access.NewStore(tx)
 				person, err := core.PersonNamed(ctx, a.Logger, rights, input.Identity)
 				if err != nil {
@@ -287,12 +289,12 @@ func caseAt(ctx context.Context, in core.Deps, product, vulnerability string) (
 // name whose head is a real identifier resolves, and composing the record from
 // it writes seven hundred characters into a column sized for three names. The
 // row it resolved to is the thing the record is about anyway.
-func namedCase(ctx context.Context, in core.Deps, productID, issueID int64) (string, string, error) {
-	product, err := catalog.NewStore(in.DB.DB).ProductByID(ctx, productID)
+func namedCase(ctx context.Context, in core.Deps, db bun.IDB, productID, issueID int64) (string, string, error) {
+	product, err := catalog.NewStore(db).ProductByID(ctx, productID)
 	if err != nil {
 		return "", "", core.WentWrong(in.Logger, "that product could not be looked up", err)
 	}
-	issues, err := finding.NewVulnerabilities(in.DB.DB).NamesByID(ctx, []int64{issueID})
+	issues, err := finding.NewVulnerabilities(db).NamesByID(ctx, []int64{issueID})
 	if err != nil {
 		return "", "", core.WentWrong(in.Logger, "that issue could not be looked up", err)
 	}

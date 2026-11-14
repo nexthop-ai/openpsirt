@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -233,6 +234,21 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 	}
 
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		// Asked again here, because what the advisory covers decides both
+		// who may write it and whether the issue is on it, and it moves
+		// under an edit.
+		if err := s.mayWrite(ctx, tx, subject, row, "mark a release affected"); err != nil {
+			return err
+		}
+		covered, err := coveredBy(ctx, tx, subject, row.ID)
+		if err != nil {
+			return err
+		}
+		if !slices.ContainsFunc(covered, func(one Covered) bool {
+			return one.ProductID == named.ID && one.IssueID == issue.ID
+		}) {
+			return ErrNoSuchIssue
+		}
 		now := s.now().UTC().Truncate(time.Microsecond)
 		// Every mark on this release filed under any name of the issue, the
 		// way the document reads them: a mark set before the issue merged
@@ -290,7 +306,8 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 		return reopen(ctx, tx, row, subject.ID, now)
 	})
 	switch {
-	case errors.Is(err, ErrNoSuchRelease):
+	case errors.Is(err, ErrNoSuchRelease), errors.Is(err, ErrNoSuchIssue),
+		errors.Is(err, access.ErrDenied):
 		return err
 	case err != nil:
 		return fmt.Errorf("mark a release affected: %w", err)

@@ -200,6 +200,7 @@ server, safely beside running tests.
 | The locks are the database's name and that name without its last part | The second is an older harness's per-package slot lock |
 | The drop happens under the locks, released after | A binary starting meanwhile takes another slot |
 | A database named for no slot is dropped | |
+| A name holding anything but lower-case letters, digits and underscores is left and reported | The name is written into the statement between quotes, and the harness makes no other |
 | On PostgreSQL a database is marked not a template before its drop | A test marks a stale database a template to have its drop refused, and a binary killed before its cleanup leaves the mark. A lease's own housekeeping leaves the mark, so the refusal reaches it |
 
 ## Measurement databases

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"slices"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -361,4 +362,11 @@ func StopV0130AfterEndedByColumn(ctx context.Context, db *database.DB) error {
 		return u.change(decisionOccurrenceV0130(u.t), change{table: "decision_occurrence",
 			add: []added{{column: "ended_by"}}})
 	})
+}
+
+// ShortLockWaits is ctx with a migration's attempts at a lock one second
+// long, and the pauses between them a tenth of a second, doubling to a fifth.
+func ShortLockWaits(ctx context.Context) context.Context {
+	return context.WithValue(ctx, waitsKey{}, lockWaits{attemptSeconds: 1,
+		pause: 100 * time.Millisecond, most: 200 * time.Millisecond})
 }

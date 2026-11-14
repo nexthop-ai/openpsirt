@@ -60,7 +60,7 @@ func TestOpenTellsMySQLFromMariaDB(t *testing.T) {
 		switch db.Server.Engine {
 		case database.MySQL, database.MariaDB:
 			raw := db.Server.Raw
-			isMaria := containsFold(raw, "mariadb")
+			isMaria := strings.Contains(strings.ToLower(raw), "mariadb")
 			if isMaria && db.Server.Engine != database.MariaDB {
 				t.Errorf("server says MariaDB (%q) but was identified as %s", raw, db.Server.Engine)
 			}
@@ -86,27 +86,8 @@ func TestSimpleQueryRunsEverywhere(t *testing.T) {
 	})
 }
 
-func containsFold(haystack, needle string) bool {
-	lower := func(s string) string {
-		b := []byte(s)
-		for i := range b {
-			if b[i] >= 'A' && b[i] <= 'Z' {
-				b[i] += 'a' - 'A'
-			}
-		}
-		return string(b)
-	}
-	h, n := lower(haystack), lower(needle)
-	for i := 0; i+len(n) <= len(h); i++ {
-		if h[i:i+len(n)] == n {
-			return true
-		}
-	}
-	return false
-}
-
-// SQLite is opened in write-ahead-log mode with NORMAL syncing, and a URL
-// may add pragmas of its own after those, the last setting of a name winning.
+// SQLite is opened in write-ahead-log mode with NORMAL syncing and a busy
+// timeout of a minute, and a URL's own pragma replaces the one of its name.
 func TestSQLiteIsOpenedForSpeedAndAURLMayOverrideIt(t *testing.T) {
 	read := func(t *testing.T, url, pragma string) string {
 		t.Helper()
@@ -128,8 +109,31 @@ func TestSQLiteIsOpenedForSpeedAndAURLMayOverrideIt(t *testing.T) {
 	if got := read(t, base+"?_pragma=synchronous(OFF)", "synchronous"); got != "0" {
 		t.Errorf("synchronous with the URL's own pragma = %q, wanted 0 (OFF)", got)
 	}
+	if got := read(t, base, "busy_timeout"); got != "60000" {
+		t.Errorf("busy_timeout = %q, wanted 60000", got)
+	}
+	// The driver runs busy_timeout first whatever the order, so a URL's own
+	// lands beside the default and, without the replacement, either wins.
+	if got := read(t, base+"?_pragma=busy_timeout(100)", "busy_timeout"); got != "100" {
+		t.Errorf("busy_timeout with the URL's own pragma = %q, wanted 100", got)
+	}
+	// A file of its own: leaving write-ahead-log mode needs the file to
+	// itself, and the handles above stay open until the test ends.
+	if got := read(t, "sqlite://"+t.TempDir()+"/rollback.db?_pragma=journal_mode%3DDELETE",
+		"journal_mode"); got != "delete" {
+		t.Errorf("journal_mode with the URL's own pragma = %q, wanted delete", got)
+	}
+	// The driver runs the rest sorted by text, so main.synchronous runs
+	// before the default synchronous and loses without the replacement.
+	if got := read(t, base+"?_pragma=main.synchronous(OFF)", "synchronous"); got != "0" {
+		t.Errorf("synchronous with the URL's own pragma naming its schema = %q, wanted 0 (OFF)", got)
+	}
 	if got := read(t, base, "foreign_keys"); got != "1" {
 		t.Errorf("foreign_keys = %q, wanted 1", got)
+	}
+	// A pragma with no value reads the setting and leaves the default set.
+	if got := read(t, base+"?_pragma=foreign_keys", "foreign_keys"); got != "1" {
+		t.Errorf("foreign_keys with the URL reading it = %q, wanted 1", got)
 	}
 }
 
@@ -331,6 +335,10 @@ func TestARequiredTransportIsImposedOnEveryConnection(t *testing.T) {
 		{"mariadb://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=1", "", true, "", ""},
 		{"mysql://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=false", "", true, "tls=true", ""},
 		{"mysql://u:p@db/openpsirt?tls=true&allowFallbackToPlaintext=true", "", false, "allowFallbackToPlaintext=true", ""},
+		// The driver's password is not escaped and its database starts at the
+		// last slash, so a password holding ")/" and "?" hides nothing.
+		{"mysql://u:a%29%2F%3Fb@db/openpsirt?tls=true&allowFallbackToPlaintext=true", "", true, "", ""},
+		{"mysql://u:a%29%2F%3Fb@db/openpsirt?tls=preferred", "", true, "tls=skip-verify", "tls=preferred"},
 		{"mysql://u:p@db/openpsirt", "", false, "tls=preferred", ""},
 	} {
 		target, err := database.ParseURL(c.url)

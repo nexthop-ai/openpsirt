@@ -107,7 +107,7 @@ func bareColumns(text string, columns map[string]bool) []bareColumn {
 
 // isColumnAt reports whether the word at text[start:end] stands where a
 // column can: not a function's name, not a qualifier, and not the word a
-// placeholder mark or a cast opens.
+// placeholder mark, a formatting verb or a cast opens.
 func isColumnAt(text string, start, end int) bool {
 	if end < len(text) && text[end] == '.' {
 		return false
@@ -119,7 +119,8 @@ func isColumnAt(text string, start, end int) bool {
 	if next < len(text) && text[next] == '(' {
 		return false
 	}
-	if start > 0 && text[start-1] == '?' {
+	if start > 0 && (text[start-1] == '?' || text[start-1] == '%' || text[start-1] == ']') {
+		// A placeholder's word, or a formatting verb: %s, %[2]s.
 		return false
 	}
 	if start > 1 && text[start-2:start] == "::" {

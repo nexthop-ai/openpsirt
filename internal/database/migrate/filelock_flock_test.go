@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"testing"
@@ -113,5 +114,102 @@ func TestAWaiterTakesTheFileLockWhenItsHolderLetsGo(t *testing.T) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("the waiter did not take the lock within 5s of its release")
+	}
+}
+
+// A waiter names the holder from the file it opened and checked, never from
+// whatever its path names by the time it asks.
+func TestAWaiterReadsTheHolderFromTheFileItChecked(t *testing.T) {
+	restore := waitLogEvery
+	waitLogEvery = 50 * time.Millisecond
+	t.Cleanup(func() { waitLogEvery = restore })
+
+	dir := t.TempDir()
+	path := dir + "/locked.db" + lockSuffix
+	release, err := lockFile(t.Context(), path, slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatalf("the first holder could not take the lock: %v", err)
+	}
+	defer func() { _ = release(context.Background()) }()
+
+	said := &lines{}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	stopped := make(chan struct{})
+	go func() {
+		defer close(stopped)
+		_, _ = lockFile(ctx, path, said.logger())
+	}()
+	deadline := time.Now().Add(5 * time.Second)
+	for !strings.Contains(said.String(), "process ") && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	const secret = "something the service user keeps"
+	victim := dir + "/kept"
+	if err := os.WriteFile(victim, []byte(secret+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(victim, path); err != nil {
+		t.Fatal(err)
+	}
+	before := len(said.String())
+	for len(said.String()) == before && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	<-stopped
+	if strings.Contains(said.String(), secret) {
+		t.Errorf("the waiter named the holder from what its path pointed at:\n%s", said.String())
+	}
+	if len(said.String()) == before {
+		t.Error("the waiter said nothing after the path was swapped, so this checked nothing")
+	}
+}
+
+// The lock file is never opened through a link or as anything but a regular
+// file. The holder truncates it and writes into it, so a link planted beside
+// the database would clobber the file it points at.
+func TestTheFileLockIsNeverTakenThroughALink(t *testing.T) {
+	dir := t.TempDir()
+	victim := dir + "/kept"
+	const kept = "something the service user keeps\n"
+	if err := os.WriteFile(victim, []byte(kept), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := dir + "/linked.db" + lockSuffix
+	if err := os.Symlink(victim, path); err != nil {
+		t.Fatal(err)
+	}
+	if release, err := lockFile(t.Context(), path, slog.New(slog.DiscardHandler)); err == nil {
+		_ = release(context.Background())
+		t.Error("the migration lock was taken through a link")
+	}
+	if got, err := os.ReadFile(filepath.Clean(victim)); err != nil || string(got) != kept {
+		t.Errorf("the file the link points at now holds %q (%v)", got, err)
+	}
+
+	hard := dir + "/hard.db" + lockSuffix
+	if err := os.Link(victim, hard); err != nil {
+		t.Fatal(err)
+	}
+	if release, err := lockFile(t.Context(), hard, slog.New(slog.DiscardHandler)); err == nil {
+		_ = release(context.Background())
+		t.Error("the migration lock was taken through a hard link")
+	}
+	if got, err := os.ReadFile(filepath.Clean(victim)); err != nil || string(got) != kept {
+		t.Errorf("the file the hard link names now holds %q (%v)", got, err)
+	}
+
+	pipe := dir + "/pipe.db" + lockSuffix
+	if err := syscall.Mkfifo(pipe, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if release, err := lockFile(t.Context(), pipe, slog.New(slog.DiscardHandler)); err == nil {
+		_ = release(context.Background())
+		t.Error("the migration lock was taken on a named pipe")
 	}
 }

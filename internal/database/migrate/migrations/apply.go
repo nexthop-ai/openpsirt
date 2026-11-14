@@ -35,7 +35,8 @@ func types(ctx context.Context) (*columnTypes, error) {
 	return t, nil
 }
 
-// apply runs a migration's statements in order, naming the one that failed.
+// apply runs a migration's statements in order, naming the one that failed,
+// each with its wait for a lock bounded (waits.go).
 //
 // It also makes a re-run resume rather than collide, on the two engines that
 // cannot roll one back. The baseline is registered in the library's
@@ -86,7 +87,7 @@ func apply(ctx context.Context, tx *sql.Tx, statements []string) error {
 				continue
 			}
 		}
-		if _, err := tx.ExecContext(ctx, stmt); err != nil {
+		if err := execWaiting(ctx, tx, stmt); err != nil {
 			return fmt.Errorf("%s: %w", firstLine(stmt), err)
 		}
 	}
@@ -98,7 +99,7 @@ func apply(ctx context.Context, tx *sql.Tx, statements []string) error {
 // MySQL and MariaDB spell this `DROP INDEX "n" ON "t"`; the other two take the
 // index name alone and refuse the table.
 func dropIndex(ctx context.Context, tx *sql.Tx, table, name string) error {
-	if _, err := tx.ExecContext(ctx, dropIndexStatement(ctx, table, name)); err != nil {
+	if err := execWaiting(ctx, tx, dropIndexStatement(ctx, table, name)); err != nil {
 		return fmt.Errorf("drop index %s: %w", name, err)
 	}
 	return nil
@@ -140,10 +141,7 @@ func alreadyMade(ctx context.Context, tx *sql.Tx, stmt string) (bool, error) {
 		return exists(ctx, tx, asking, mysqlIndexProbe, m[2], m[1])
 	}
 	if m := addsColumn.FindStringSubmatch(stmt); m != nil {
-		return exists(ctx, tx, asking,
-			`SELECT 1 FROM "information_schema"."COLUMNS"
-			 WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ?`,
-			m[1], m[2])
+		return exists(ctx, tx, asking, mysqlColumnProbe, m[1], m[2])
 	}
 	return false, nil
 }
@@ -152,6 +150,15 @@ func alreadyMade(ctx context.Context, tx *sql.Tx, stmt string) (bool, error) {
 // name: the table, then the index.
 const mysqlIndexProbe = `SELECT 1 FROM "information_schema"."STATISTICS"
 			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "INDEX_NAME" = ? LIMIT 1`
+
+// mysqlColumnProbe and postgresColumnProbe ask whether a table holds a column
+// of a name: the table, then the column. A condition appended narrows it.
+const (
+	mysqlColumnProbe = `SELECT 1 FROM "information_schema"."COLUMNS"
+			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ?`
+	postgresColumnProbe = `SELECT 1 FROM "information_schema"."columns"
+			WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "column_name" = ?`
+)
 
 // exists reports whether a query answers a row. Asking names the question in
 // an error.

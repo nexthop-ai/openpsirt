@@ -135,7 +135,7 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
 		Apply(readableFindingsBy(subject, "f", `"st"."product_id"`)).
-		OrderExpr(`"de"."id", exact DESC, "st"."name", "va"."name", `+graph.NodeName("sn", "c")).
+		OrderExpr(`"de"."id", "exact" DESC, "st"."name", "va"."name", `+graph.NodeName("sn", "c")).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what these decision occurrences are about: %w", err)

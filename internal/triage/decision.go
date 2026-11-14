@@ -5,7 +5,6 @@ package triage
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"slices"
 	"strings"
@@ -605,7 +604,7 @@ func (s *Store) intoReturned(ctx context.Context, subject access.Subject, decisi
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", doing, err)
 	}
-	if err := movedAll(moved, len(ids), doing); err != nil {
+	if err := database.MovedAll(moved, len(ids), doing); err != nil {
 		return nil, err
 	}
 	if err := s.sayOn(ctx, subject, returned.ID, because, now); err != nil {
@@ -1138,7 +1137,7 @@ func Restamp(ctx context.Context, db bun.IDB, decisionID int64, read int) error 
 		return fmt.Errorf("%s: %w", doing, err)
 	}
 	if read != 0 {
-		return movedAll(result, 1, doing)
+		return database.MovedAll(result, 1, doing)
 	}
 	n, err := database.Affected(result)
 	if err != nil {
@@ -1175,18 +1174,4 @@ func (s *Store) stampsOf(ctx context.Context, decisionIDs []int64) (map[int64]in
 		return nil, fmt.Errorf("read the decisions' stamps: %w", err)
 	}
 	return out, nil
-}
-
-// movedAll reads an update that matched on what the transaction read. Fewer
-// rows than were read means some moved since, which is a lost race for the
-// retry helper to take again.
-func movedAll(result sql.Result, want int, doing string) error {
-	n, err := database.Affected(result)
-	if err != nil {
-		return fmt.Errorf("%s: %w", doing, err)
-	}
-	if n != int64(want) {
-		return fmt.Errorf("%s: %w", doing, database.ErrGoAgain)
-	}
-	return nil
 }

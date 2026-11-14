@@ -731,3 +731,15 @@ func SeedTheirs(t *testing.T, r *Reach) (disclosed, undisclosed string) {
 	}
 	return disclosed, undisclosed
 }
+
+// Over is r serving every request through db, as handed to the handlers: a
+// handle a test hooks, so a rival lands at one point in what a handler does.
+// What the test itself reads and writes through r.DB is left as it is.
+func (r *Reach) Over(db *database.DB) *Reach {
+	deps := r.Deps
+	deps.DB = db
+	with := *r
+	with.Handler = r.built.Serving(deps)
+	with.Deps = deps
+	return &with
+}

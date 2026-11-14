@@ -62,6 +62,7 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 			madeUp[word] = true
 		}
 	}
+	// named is every name a query may write: declared and invented.
 	named := make(map[string]bool, len(columns)+len(madeUp))
 	for word := range columns {
 		named[word] = true
@@ -69,6 +70,7 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 	for word := range madeUp {
 		named[word] = true
 	}
+	everyName := named
 	ast.Inspect(file, func(node ast.Node) bool {
 		lit, ok := node.(*ast.BasicLit)
 		if !ok || lit.Kind != token.STRING {
@@ -108,10 +110,11 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 		examined++
 		bad = append(bad, unquotedColumns(text, columns, path, at)...)
 		// A declared column is read above; an invented one is read here,
-		// where a reference qualifies it.
+		// where a reference qualifies it and where it stands alone.
 		if production {
 			qualified++
 			bad = append(bad, qualifiedIn(text, madeUp, path, at)...)
+			bad = append(bad, unquotedColumns(text, madeUp, path, at)...)
 		}
 		return true
 	})
@@ -214,7 +217,13 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 			if len(parts) > 0 {
 				examined++
 				text := withoutSQLComments(joined(parts))
-				for _, bare := range bareColumns(text, columns) {
+				written := columns
+				if production {
+					// An invented name standing alone, as an ordering by an
+					// expression's alias writes one, is read as a column is.
+					written = everyName
+				}
+				for _, bare := range bareColumns(text, written) {
 					one, whole := pieceAt(parts, bare.start, bare.end)
 					if whole && columnsRead[one.pos] {
 						continue

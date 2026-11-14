@@ -74,6 +74,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped and PostgreSQL refuses it in a timestamp column. PostgreSQL casts to a zoned timestamp, MySQL and MariaDB to a six-digit datetime, SQLite to nothing |
 | The test harness | It names each engine to choose a connection and report which ran, never to write a query |
 | Seeing a seam's rival wait on a lock | No portable statement reports another session's lock wait. PostgreSQL's activity view names the wait; InnoDB lists a transaction waiting, joined to its session for the database, since other binaries hold databases on the same server |
+| Bounding a lock wait, reading that the bound passed, and naming the sessions with a transaction open | Each engine names the bound and reports its passing differently, and lists open transactions in a catalog of its own. MySQL and MariaDB's bound belongs to the session, so it is put back |
 | Leasing the harness's slots | A named lock on MySQL and MariaDB, a numbered advisory lock on PostgreSQL, each held for the connection |
 | Numbering the rows of one insert on MySQL | MySQL reports only the first identifier; the rest are counted in the server's step, read from the inserting session. The branch asks which statements the dialect can write |
 | Writing a batch whose identifiers nobody reads | PostgreSQL takes one array a column; the others take a list of rows (`design-docs/database-queries.md` § Bulk inserts) |
@@ -88,6 +89,8 @@ every engine. Engine-specific code lives in these places and no others.
 | Lifting the time bounds on a snapshot | PostgreSQL ends a session idle inside a transaction, and from version 17 a transaction past a length, each by a server setting; a snapshot sits idle while its file is written and lasts as long as the file. The settings are read from the server's own list, which holds only the ones it knows. MySQL and MariaDB end any session idle past `wait_timeout`, in a transaction or not; its default of eight hours is far past the export ceiling, it is left as the server sets it, and a server set below the two-minute stall bound cuts a file. MariaDB also ends a transaction idle past `idle_transaction_timeout` or `idle_readonly_transaction_timeout`, both off by default; it has no setting scoped to one transaction, so they are left as the server sets them, and either set below the stall bound cuts a file |
 | Refreshing planner statistics in a deployment | `ANALYZE` with `SKIP_LOCKED` on PostgreSQL, `ANALYZE TABLE` under a bound on lock waits on MySQL and MariaDB, each table named from the catalog. SQLite is asked at start, after an upgrade and after every scan (`design-docs/database-schema.md` § Planner statistics) |
 | Reading the planner's estimate of a table in a test | PostgreSQL's catalog, InnoDB's statistics tables, SQLite's own table |
+| Reading the schema as written in a schema test | SQLite alone hands back each statement as typed, and lists a table's indexes with their columns, through its own catalog |
+| Reading a session's SQL mode in a test of connection setup | MySQL and MariaDB hold it in a session variable |
 | A test choosing which engine it runs on | Allowed anywhere: it selects an engine and branches no query |
 | A release's upgrade | Changing an existing table is spelled per engine (`design-docs/database-upgrades.md` § Release upgrades). The catalog is asked which indexes, columns and foreign keys a table holds |
 | When PostgreSQL vacuums the finding table | A storage setting of PostgreSQL's alone (`design-docs/database-schema.md` § Indexes) |
@@ -106,6 +109,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Rule | Reason |
 |---|---|
 | The server is asked what it is, whatever the URL says | A MySQL-protocol connection may be MySQL or MariaDB. Believing the URL applies the wrong floor. MariaDB names itself in its version string |
+| PostgreSQL's version is read from its version number setting, never its version sentence | A pre-release names its version with no dot, and the first dotted number in the sentence is the compiler's |
 | A server below the floor stops the process at start, naming the version found and the version required | Otherwise it fails later, in whichever query first needs what the server lacks |
 | The connection is asked what encryption it negotiated | It stops a start only where the deployment requires encryption (§ Connection encryption) |
 
@@ -124,6 +128,7 @@ offers; the other connects in cleartext unless asked.
 | Required is imposed on every connection the pool opens | A transport that can fall back (`sslmode` `prefer` or `allow`, `tls=preferred`, or none named) is replaced by one that cannot. One asking for cleartext, or `allowFallbackToPlaintext` true, is refused. A MySQL value is read as the driver reads it: any case, 0 and 1 as false and true |
 | A PostgreSQL URL naming no mode is judged by `PGSSLMODE` | The driver takes the environment's mode there. A mode is appended only where that one is weak, so `verify-full` is never replaced |
 | A PostgreSQL key is read as the driver reads it | Decoded, last value of a repeat wins, every repeat judged. A pair the URL parser cannot read is refused, naming the setting |
+| A MySQL connection string's settings are found where the driver finds them | After the first `?` following the last `/`. Its password is not escaped and may hold both |
 | The driver's parsed configuration is the last word on PostgreSQL | It merges a service file above the environment and under the URL, which can supply a mode the URL does not show. Every attempt it makes, first and each fallback, must be encrypted |
 | A server that will not say is refused under required | |
 | Required against SQLite is refused | A file opened directly has no connection to encrypt |
@@ -202,8 +207,10 @@ model's reflected table.
 | Planner statistics refreshed at start, after an upgrade and after every scan | SQLite gathers none unless asked. On 361,429 findings the review queue took 4.1 s and the list of what is running out 2.5 s without them, 0.08 s and 0.13 s with them, and a whole analysis 0.66 s. After every scan, because a scan changes how rows divide: analyzed only on growth, the findings list took 2.1 s instead of 0.57 s. Sampling the first rows of each index took 71 ms and misjudged which findings were assigned |
 | A connection lives a minute, and a refresh closes the idle ones | A connection reads statistics when it opens and never again. Across a refresh the review queue took 4.1 s on every connection but the one that analyzed |
 
-The pragmas are set on the connection string, and a URL may add its own after
-them. The test harness adds `synchronous(OFF)`.
+The pragmas are set on the connection string, and a URL's own pragma replaces
+the one of its name. The driver runs the list sorted, `busy_timeout` first and
+the rest by their text, so two entries for one name run in an order neither
+chose. The test harness sets `synchronous(OFF)`.
 
 ## Test harness
 

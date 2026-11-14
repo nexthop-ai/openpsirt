@@ -30,20 +30,7 @@ func seedTriageV0100(t *testing.T, ctx context.Context, db *database.DB) triageV
 	t.Helper()
 	declared := worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
-	id := func(query string, args ...any) int64 {
-		t.Helper()
-		var out int64
-		if err := db.DB.NewRaw(query, args...).Scan(ctx, &out); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-		return out
-	}
+	exec, id := seeding(t, ctx, db)
 	person, product := declared.Person.ID, declared.Product.ID
 	exec(`INSERT INTO "vulnerability" ("identifier", "identifier_folded", "exploited", "first_seen_at", "issue_id")
 		VALUES (?, ?, ?, ?, ?)`, "cve-2026-4500", "cve-2026-4500", false, at, 0)
@@ -129,20 +116,7 @@ func seedIncidentsV0100(t *testing.T, ctx context.Context, db *database.DB) inci
 	t.Helper()
 	worldBeforeV0110(t, ctx, db)
 	at := time.Date(2026, 10, 20, 3, 0, 0, 0, time.UTC)
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
-	id := func(query string, args ...any) int64 {
-		t.Helper()
-		var out int64
-		if err := db.DB.NewRaw(query, args...).Scan(ctx, &out); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-		return out
-	}
+	exec, id := seeding(t, ctx, db)
 	person := id(`SELECT "id" FROM "person" WHERE "identity" = ?`, world.PersonIdentity)
 	product := id(`SELECT "id" FROM "product" WHERE "name" = ?`, world.ProductName)
 	tag := id(`SELECT "id" FROM "stream" WHERE "product_id" = ? AND "name" = ?`, product, world.TagName)
@@ -283,8 +257,9 @@ func stopAt(t *testing.T, after string, start func() (bool, error)) {
 }
 
 // A rename whose table another session holds waits its bound, says what holds
-// the table, and runs once the session lets go. SQLite holds the database for
-// the whole upgrade, so nothing waits there.
+// the table, and runs once the session lets go. What it says names the
+// session and never its statement, which can carry any value a query bound.
+// SQLite holds the database for the whole upgrade, so nothing waits there.
 func TestARenameWaitsForWhatHoldsItsTableAndSaysWhat(t *testing.T) {
 	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -298,7 +273,8 @@ func TestARenameWaitsForWhatHoldsItsTableAndSaysWhat(t *testing.T) {
 		}
 		defer func() { _ = holder.Rollback() }()
 		var n int
-		if err := holder.NewRaw(`SELECT COUNT(*) FROM "claim"`).Scan(ctx, &n); err != nil {
+		const secret = "a-token-the-holder-bound"
+		if err := holder.NewRaw(`SELECT COUNT(*) FROM "claim" WHERE ? <> ''`, secret).Scan(ctx, &n); err != nil {
 			t.Fatal(err)
 		}
 
@@ -328,6 +304,9 @@ func TestARenameWaitsForWhatHoldsItsTableAndSaysWhat(t *testing.T) {
 		if strings.Contains(said, "held_by=\"[nothing this session can see]\"") ||
 			strings.Contains(said, "could not be read") {
 			t.Errorf("the wait was logged without what holds the table:\n%s", said)
+		}
+		if strings.Contains(said, secret) {
+			t.Errorf("the wait was logged with the holder's statement:\n%s", said)
 		}
 		leaveAtLatest(t, ctx, db)
 	})

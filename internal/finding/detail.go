@@ -636,7 +636,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, buildID, vul
 		// from shows the whole of what it would answer: a form that recorded
 		// twelve occurrences having shown six is a form nobody can trust.
 		Apply(inFoldOf(buildID, vulnerabilityID, componentID, visible)).
-		OrderExpr(`"f"."urgency" DESC, "component", consumer`).
+		OrderExpr(`"f"."urgency" DESC, "component", "consumer"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where this sits: %w", err)

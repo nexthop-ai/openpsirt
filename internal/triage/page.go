@@ -82,7 +82,7 @@ func (s *Store) decisionsOn(ctx context.Context, decisions func() *bun.SelectQue
 		Newest     int64 `bun:"newest"`
 		Total      int   `bun:"total"`
 	}
-	if err := decisions().ColumnExpr(`COUNT(*) OVER () AS "total"`).OrderExpr("newest DESC").
+	if err := decisions().ColumnExpr(`COUNT(*) OVER () AS "total"`).OrderExpr(`"newest" DESC`).
 		Limit(int64(limit)).Offset(int64(offset)).Scan(ctx, &page); err != nil {
 		return out, fmt.Errorf("read %s: %w", what, err)
 	}

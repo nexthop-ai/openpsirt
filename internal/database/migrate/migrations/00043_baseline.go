@@ -32,6 +32,10 @@ const Baseline = 43
 // The baseline files beside this one hold each table's declaration, with the
 // reasoning for its shape. v0.9.0's record of the schema it built on each
 // engine is what holds them to it.
+//
+// Its statements are bounded in their wait for a lock as every migration's
+// are, and none waits: it makes its tables in an empty database, where no
+// other session holds one.
 func upBaseline(ctx context.Context, tx *sql.Tx) error {
 	t, err := types(ctx)
 	if err != nil {

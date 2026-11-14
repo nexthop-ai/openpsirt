@@ -40,8 +40,10 @@ back.
 
 | Rule | Reason |
 |---|---|
-| Every transaction runs through one helper that retries it whole on a lost race: deadlock, lock-wait timeout, serialization failure | |
+| Every transaction runs through one helper that retries it whole on a lost race: deadlock, lock-wait timeout, serialization failure, an error during commit, and a busy or locked SQLite database | |
 | A file read a page at a time runs in one read-only snapshot, begun on the database handle and never inside a transaction, the one transaction a request makes outside that helper, ended by rolling back | It writes nothing, so nothing certifies it and it loses no race; a file written as it reads cannot be read again. A transaction already open reads at its own isolation, which on PostgreSQL moves between statements. Every engine takes the same options, and SQLite begins it without the write lock. On PostgreSQL it lifts the server's bounds on an idle transaction and on a transaction's length for itself, and its caller's context bounds it (`design-docs/analytics-exports.md` § Exports) |
+| An error during commit is retried on MySQL and MariaDB | Some cluster certification failures arrive as it rather than as a deadlock |
+| A busy or locked SQLite database is retried | A writer arriving while another holds the file is told so, and goes again once it is free |
 | Any other failure is reported, never retried | A constraint violation retried hammers the database and hangs |
 | Nothing a transaction depends on is read outside it | A retry re-runs the closure against a moved database |
 | A read made before the transaction as an early refusal is repeated inside it, and the inside one decides | |
@@ -63,6 +65,13 @@ back.
 | The product a supplier, an uploaded VEX document or an uploaded advisory names | Which product they are recorded against |
 | The claims a document makes, folded and paired | Which standing claims it repeats and which it sets aside. Copied from the caller's on every attempt |
 | The moment a write is dated | When the act happened. Read from the clock on every attempt, so a retried attempt is not dated before the write it lost to |
+| The product a token is narrowed to or an assignment rule names | Which product the write is recorded against. One renamed or out of reach since the request arrived is refused |
+| The names a collaborator's case is recorded under | The names the trail records, as the case has them when the grant lands |
+| Whether a code finding is fixed | Whether a decision about it is refused |
+| Whether the person judging a report may still be told of the issue it is judged as | Whether the judgment is written |
+| What an advisory covers, on any change to what it says | Whether the writer may write it, whether there is anything to agree to, and whether a release marked is on it |
+| How many filters one person may keep | Whether a new saved filter is kept |
+| A saved filter's row | Built from the request on every attempt, so a retried attempt carries no identifier the rolled-back one was given |
 
 | Inside the act | Reason |
 |---|---|

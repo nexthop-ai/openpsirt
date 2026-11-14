@@ -699,7 +699,7 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 		ColumnExpr(`0 AS "places"`).
 		ColumnExpr(`0 AS "overdue"`).
 		GroupExpr(`"work"."person_id"`).
-		OrderExpr(`open DESC, "person_id"`).
+		OrderExpr(`"open" DESC, "person_id"`).
 		Limit(int64(database.InBulk.Most)).
 		Scan(ctx, &held); err != nil {
 		return nil, fmt.Errorf("read who is holding what: %w", err)

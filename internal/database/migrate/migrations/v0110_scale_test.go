@@ -120,20 +120,7 @@ func timeUpgradeV0110(t *testing.T, db *database.DB, rows int) map[string]time.D
 func seedRowsV0100(t *testing.T, ctx context.Context, db *database.DB, rows int) {
 	t.Helper()
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
-	id := func(query string, args ...any) int64 {
-		t.Helper()
-		var out int64
-		if err := db.DB.NewRaw(query, args...).Scan(ctx, &out); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-		return out
-	}
+	exec, id := seeding(t, ctx, db)
 	exec(`INSERT INTO "party" ("kind") VALUES (?)`, "person")
 	party := id(`SELECT MAX("id") FROM "party"`)
 	exec(`INSERT INTO "person" ("party_id", "identity", "is_admin", "is_bootstrap", "admin_derived", "audits",
