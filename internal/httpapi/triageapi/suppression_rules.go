@@ -130,7 +130,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 		Product string `path:"product"`
 		Body    struct {
 			Rule      string                 `json:"rule,omitempty" maxLength:"191" doc:"An analyzer rule, as <tool>/<rule>"`
-			Prefix    string                 `json:"prefix,omitempty" maxLength:"4096" doc:"A path from the top of the checkout"`
+			Prefix    string                 `json:"prefix,omitempty" maxLength:"4096" doc:"A path from the top of the checkout, at most 4096 bytes"`
 			Reason    core.CodeFindingReason `json:"reason" doc:"Why the code findings it covers are dismissed"`
 			Reasoning string                 `json:"reasoning" minLength:"1" doc:"The reasoning, in markdown"`
 		}

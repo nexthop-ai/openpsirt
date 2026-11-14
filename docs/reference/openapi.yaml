@@ -10964,7 +10964,7 @@ components:
           readOnly: true
           type: string
         prefix:
-          description: A path from the top of the checkout
+          description: A path from the top of the checkout, at most 4096 bytes
           maxLength: 4096
           type: string
         reason:
@@ -12458,7 +12458,7 @@ components:
           description: Whether the snippets of a code finding included in its flaw's disclosure are disclosed with its flaw. Absent takes the nearest prefix that states it, and no prefix stating it strips them at disclosure
           type: boolean
         prefix:
-          description: A path from the top of the checkout. Empty is the whole product
+          description: A path from the top of the checkout, at most 4096 bytes. Empty is the whole product
           maxLength: 4096
           type: string
         remote:

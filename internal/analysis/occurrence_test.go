@@ -191,3 +191,17 @@ func TestALoneResultUnderAKeyHeldTwiceKeepsItsOwnOccurrence(t *testing.T) {
 		}
 	})
 }
+
+func TestAKeyIsHeldTwiceByTwoOccurrencesNeverByOneOnTwoBuilds(t *testing.T) {
+	one := []candidate{{key: "k", occurrence: "o"}, {key: "k", occurrence: "o"}}
+	two := []candidate{{key: "k", occurrence: "o"}, {key: "k", occurrence: "p"}}
+	if candidatesHeldTwice(one, []Keyed{{Key: "k"}})["k"] {
+		t.Error("one occurrence seen on two builds was taken for two")
+	}
+	if !candidatesHeldTwice(two, []Keyed{{Key: "k"}})["k"] {
+		t.Error("two occurrences under one key were taken for one")
+	}
+	if !candidatesHeldTwice(nil, []Keyed{{Key: "k"}, {Key: "k"}})["k"] {
+		t.Error("two results under one key were taken for one")
+	}
+}

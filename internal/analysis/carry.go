@@ -100,7 +100,7 @@ func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fr
 	if err != nil {
 		return err
 	}
-	candidates, err := candidatesOf(ctx, db, open)
+	candidates, err := candidatesOf(ctx, db, open, fresh)
 	if err != nil {
 		return fmt.Errorf("read what the branch this was cut from holds open: %w", err)
 	}
@@ -169,18 +169,25 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 	for _, c := range out {
 		used[c.occurrence] = true
 	}
-	// Where a key is held twice, by two results or by two code findings of the
+	// Where a key is held twice, by two results or by two occurrences of the
 	// series, a hit at the result's column saying what it says is taken first,
 	// so each keeps its occurrence whatever order a run lists them in; the rest
 	// take what is left. Only those keys' messages are read, since a key's
 	// hits span every build of the series.
-	shared := sharedKeys(fresh)
+	holders := map[string]map[string]bool{}
 	for k, hits := range byKey {
-		if len(hits) > 1 {
-			shared[k] = true
+		for _, h := range hits {
+			holding(holders, k, h.Occurrence)
 		}
 	}
-	messages, err := messagesOf(ctx, db, byKey, shared)
+	shared := heldTwice(fresh, holders)
+	var ids []int64
+	for k := range shared {
+		for _, h := range byKey[k] {
+			ids = append(ids, h.ID)
+		}
+	}
+	messages, err := messagesOf(ctx, db, ids)
 	if err != nil {
 		return err
 	}
@@ -228,14 +235,8 @@ type keyHit struct {
 	Column     *int       `bun:"start_column"`
 }
 
-// messagesOf is what each hit under a shared key last said, by finding.
-func messagesOf(ctx context.Context, db bun.IDB, byKey map[string][]keyHit, shared map[string]bool) (map[int64]string, error) {
-	var ids []int64
-	for k := range shared {
-		for _, h := range byKey[k] {
-			ids = append(ids, h.ID)
-		}
-	}
+// messagesOf is what each of these findings last said, by finding.
+func messagesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, error) {
 	out := make(map[int64]string, len(ids))
 	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 		var rows []struct {

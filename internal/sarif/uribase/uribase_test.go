@@ -33,7 +33,7 @@ func TestAnAddressResolvesToWhatItsChainEndsAt(t *testing.T) {
 		{"the root's other name", "a.c", "%SRCROOT%", FromRoot, "a.c", true},
 		{"a chain to the root's undefined name", "bgpd/a.c", "FRR", FromRoot, "src/sonic-frr/bgpd/a.c", true},
 		{"no starting point", "a.c", "", FromWork, "a.c", true},
-		{"a chain to no starting point", "a.c", "WORK", FromWork, "out/a.c", true},
+		{"a starting point relative to nothing", "a.c", "WORK", Absolute, "", false},
 		{"a name defined with no address", "a.c", "EMPTY", Absolute, "", false},
 		{"a chain to another undefined name", "a.c", "ELSEWHR", Absolute, "", false},
 		{"a chain that loops", "a.c", "LOOP", Absolute, "", false},
@@ -52,7 +52,7 @@ func TestAChainLongerThanItsBoundIsRefused(t *testing.T) {
 		case "A":
 			return "a/", "B", true
 		case "B":
-			return "b/", "", true
+			return "file:///b/", "", true
 		}
 		return "", "", false
 	}
@@ -61,5 +61,17 @@ func TestAChainLongerThanItsBoundIsRefused(t *testing.T) {
 	}
 	if _, _, ok := Resolve("x.c", "A", defined, 1); ok {
 		t.Error("a chain past its bound was followed")
+	}
+}
+
+func TestTheRootsNameDefinedRelativeToNothingIsTheUndefinedRoot(t *testing.T) {
+	defined := func(name string) (string, string, bool) {
+		if name == "SRCROOT" {
+			return "sonic/", "", true
+		}
+		return "", "", false
+	}
+	if got, start, ok := Resolve("a.c", "SRCROOT", defined, 1); !ok || start != FromRoot || got != "a.c" {
+		t.Errorf("resolved %q from %d, %v; want a.c from the root", got, start, ok)
 	}
 }

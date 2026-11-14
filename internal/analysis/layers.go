@@ -57,8 +57,9 @@ type spotKey struct {
 	spot
 }
 
-// sharedKeys is the keys more than one result holds.
-func sharedKeys(results []Keyed) map[string]bool {
+// heldTwice is the keys two results hold, or two occurrences: those where a
+// result is told from another by its column and message.
+func heldTwice(results []Keyed, holders map[string]map[string]bool) map[string]bool {
 	seen := make(map[string]bool, len(results))
 	shared := map[string]bool{}
 	for _, k := range results {
@@ -67,7 +68,29 @@ func sharedKeys(results []Keyed) map[string]bool {
 		}
 		seen[k.Key] = true
 	}
+	for k, occurrences := range holders {
+		if len(occurrences) > 1 {
+			shared[k] = true
+		}
+	}
 	return shared
+}
+
+// holding records that an occurrence holds a key.
+func holding(holders map[string]map[string]bool, key, occurrence string) {
+	if holders[key] == nil {
+		holders[key] = map[string]bool{}
+	}
+	holders[key][occurrence] = true
+}
+
+// candidatesHeldTwice is heldTwice over candidates.
+func candidatesHeldTwice(candidates []candidate, results []Keyed) map[string]bool {
+	holders := map[string]map[string]bool{}
+	for _, c := range candidates {
+		holding(holders, c.key, c.occurrence)
+	}
+	return heldTwice(results, holders)
 }
 
 // nearest is how many candidates sharing a result's line key, nearest it
@@ -135,17 +158,12 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 				waiting[k] = append(waiting[k], c)
 			}
 		}
-		// Where a key is held twice, by two results or by two code findings,
+		// Where a key is held twice, by two results or by two occurrences,
 		// they are told apart by column and message first, so each keeps the
 		// code finding it was paired with whatever order a run lists them in.
 		if layer.on == onKey {
-			shared := sharedKeys(results)
+			shared := candidatesHeldTwice(candidates, results)
 			at := map[spotKey][]int{}
-			for k, cs := range waiting {
-				if len(cs) > 1 {
-					shared[k] = true
-				}
-			}
 			for _, c := range order {
 				if k := candidates[c].key; !takenC[c] && shared[k] {
 					at[spotKey{k, candidates[c].spot}] = append(at[spotKey{k, candidates[c].spot}], c)

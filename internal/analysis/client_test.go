@@ -360,52 +360,6 @@ func TestAResultNamingItsExtensionByGUIDKeepsThatExtensionsRule(t *testing.T) {
 	}
 }
 
-func TestANotificationsExtensionFollowsTheMerge(t *testing.T) {
-	pack := `{"name":"pack","rules":[{"id":"Z"}]}`
-	other := `{"name":"other","rules":[{"id":"Y"}]}`
-	first := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql"},"extensions":[` + pack +
-		`]},"results":[]}]}`
-	// The second document lists the pack second, and cites it there from a
-	// notification.
-	second := `{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql"},"extensions":[` + other + "," + pack +
-		`]},"results":[],"invocations":[{"executionSuccessful":true,"toolExecutionNotifications":[` +
-		`{"message":{"text":"n"},"associatedRule":{"id":"Z","toolComponent":{"index":1}}}]}]}]}`
-	doc := forwardedOne(t, []uploadclient.Input{
-		{Name: "a.sarif", Data: []byte(first)}, {Name: "b.sarif", Data: []byte(second)},
-	})
-	var got struct {
-		Runs []struct {
-			Tool struct {
-				Extensions []struct {
-					Name string `json:"name"`
-				} `json:"extensions"`
-			} `json:"tool"`
-			Invocations []struct {
-				Notifications []struct {
-					Rule struct {
-						ToolComponent struct{ Index int } `json:"toolComponent"`
-					} `json:"associatedRule"`
-				} `json:"toolExecutionNotifications"`
-			} `json:"invocations"`
-		} `json:"runs"`
-	}
-	if err := json.Unmarshal(doc, &got); err != nil {
-		t.Fatal(err)
-	}
-	run := got.Runs[0]
-	var cited []string
-	for _, inv := range run.Invocations {
-		for _, n := range inv.Notifications {
-			if i := n.Rule.ToolComponent.Index; i >= 0 && i < len(run.Tool.Extensions) {
-				cited = append(cited, run.Tool.Extensions[i].Name)
-			}
-		}
-	}
-	if len(cited) != 1 || cited[0] != "pack" {
-		t.Errorf("the notification cites %v; want the pack", cited)
-	}
-}
-
 func TestOneExtensionWrittenWithItsGUIDInTwoCasesMergesOnce(t *testing.T) {
 	lower := `{"name":"pack","guid":"abcdef00-1111-1111-1111-111111111111","rules":[{"id":"X"}]}`
 	upper := `{"name":"pack","guid":"ABCDEF00-1111-1111-1111-111111111111","rules":[{"id":"Z"}]}`

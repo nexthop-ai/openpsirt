@@ -142,7 +142,9 @@ func match(candidates []candidate, open []series.Sighting, keyed []Keyed, prints
 
 // candidatesOf is the findings of these sightings as their newest sightings
 // described them, at their occurrences, in the order of their identifiers.
-func candidatesOf(ctx context.Context, db bun.IDB, open []series.Sighting) ([]candidate, error) {
+// Their messages are read only under a key the results or the occurrences
+// hold twice.
+func candidatesOf(ctx context.Context, db bun.IDB, open []series.Sighting, results []Keyed) ([]candidate, error) {
 	absent := make(map[int64]bool, len(open))
 	ids := make([]int64, 0, len(open))
 	for _, s := range open {
@@ -160,20 +162,19 @@ func candidatesOf(ctx context.Context, db bun.IDB, open []series.Sighting) ([]ca
 			LineKey      string `bun:"line_key"`
 			StartLine    *int   `bun:"start_line"`
 			StartColumn  *int   `bun:"start_column"`
-			Message      string `bun:"message_text"`
 		}
 		if err := db.NewSelect().TableExpr(`"analysis_result" AS "ar"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			ColumnExpr(`"ar"."finding_id", "f"."occurrence_identity", "ar"."match_key", "ar"."unprinted_key"`).
 			ColumnExpr(`"ar"."function_key", "ar"."line_key", "ar"."start_line"`).
-			ColumnExpr(`"ar"."start_column", "ar"."message_text"`).
+			ColumnExpr(`"ar"."start_column"`).
 			Where(`"ar"."finding_id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
 			return err
 		}
 		for _, r := range rows {
 			c := candidate{
 				findingID: r.FindingID, occurrence: r.Occurrence, key: r.MatchKey, unprinted: r.UnprintedKey,
-				functionKey: r.FunctionKey, lineKey: r.LineKey, spot: spotOf(r.StartColumn, r.Message),
+				functionKey: r.FunctionKey, lineKey: r.LineKey, spot: spotOf(r.StartColumn, ""),
 				absent: absent[r.FindingID],
 			}
 			if r.StartLine != nil {
@@ -187,6 +188,22 @@ func candidatesOf(ctx context.Context, db bun.IDB, open []series.Sighting) ([]ca
 		return nil, fmt.Errorf("read what the series holds open: %w", err)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].findingID < out[j].findingID })
+	// A message tells apart only the candidates under a key held twice, so
+	// only theirs are read.
+	shared := candidatesHeldTwice(out, results)
+	var told []int64
+	for _, c := range out {
+		if shared[c.key] {
+			told = append(told, c.findingID)
+		}
+	}
+	messages, err := messagesOf(ctx, db, told)
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		out[i].message = messages[out[i].findingID]
+	}
 	return out, nil
 }
 

@@ -111,6 +111,7 @@ and entries are bounded across the upload as memory: placed results take about
 | Paths resolve through named starting points and place against the source root | Paths arrive absolute, as `file://`, relative, or under undefined starting points |
 | A path with no starting point is relative to the first invocation's working directory where that is in the checkout, else the top; one under the source root's own undefined name, directly or through a chain of starting points, is relative to the top | cppcheck run from a subdirectory |
 | The deployment and the upload client resolve a chain of starting points with one resolver | A document uploaded directly places as the client would have placed it |
+| A starting point whose own address is relative to nothing is undefined; the source root's name defined so is the undefined root | The format requires such an address to name a starting point, and the top is where the root's name places otherwise |
 | A path outside the checkout drops its result, counted | |
 | A result repeating another on rule, path, line, column and message is dropped, counted | clang repeats a header per unit |
 | Whole-file contents, fixes and markdown messages are left out of every record, counted | |

@@ -362,7 +362,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	if err != nil {
 		return "", err
 	}
-	candidates, err := candidatesOf(ctx, tx, open)
+	candidates, err := candidatesOf(ctx, tx, open, keyed)
 	if err != nil {
 		return "", err
 	}

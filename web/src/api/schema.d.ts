@@ -14122,7 +14122,7 @@ export interface components {
              * @example https://example.com/schemas/Propose-suppression-ruleRequest.json
              */
             readonly $schema?: string;
-            /** @description A path from the top of the checkout */
+            /** @description A path from the top of the checkout, at most 4096 bytes */
             prefix?: string;
             /**
              * @description Why the code findings it covers are dismissed
@@ -15012,7 +15012,7 @@ export interface components {
             branch?: string;
             /** @description Whether the snippets of a code finding included in its flaw's disclosure are disclosed with its flaw. Absent takes the nearest prefix that states it, and no prefix stating it strips them at disclosure */
             disclosed_snippets?: boolean;
-            /** @description A path from the top of the checkout. Empty is the whole product */
+            /** @description A path from the top of the checkout, at most 4096 bytes. Empty is the whole product */
             prefix: string;
             /** @description The repository the code under the prefix is, where an upload names none. Sent with branch */
             remote?: string;

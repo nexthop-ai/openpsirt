@@ -224,29 +224,47 @@ func plainMessage(m obj) int {
 	return 1
 }
 
-// renumber rewrites the extension positions a run cites to the merged list's:
-// a result's rule, and a notification's rule and descriptor. A relationship's
-// target and a result's taxa may name a taxonomy by position instead, which
-// nothing here reads, so they are left as written.
-func renumber(run obj, moved map[int]int) {
+// moves is where one run's components and rules sit once merged: each
+// extension's position, and each rule's position in the driver or in its
+// extension, by the run's own positions.
+type moves struct {
+	components  map[int]int
+	driverRules map[int]int
+	rules       map[int]map[int]int
+}
+
+// renumber rewrites the positions a result's rule cites to the merged run's:
+// the rule's position and its extension's. A rule the merge keeps no position
+// for loses its position and keeps its identifier. A notification's rule and
+// descriptor are not forwarded, and a relationship's target and a result's
+// taxa may name a taxonomy by position instead, which nothing here reads, so
+// they are left as written.
+func renumber(run obj, m moves) {
 	at := func(ref obj) {
+		if ref == nil {
+			return
+		}
 		component := child(ref, "toolComponent")
-		if i, ok := num(component, "index"); ok {
-			if to, ok := moved[i]; ok {
+		c, named := num(component, "index")
+		byRule := m.driverRules
+		if named {
+			byRule = m.rules[c]
+		}
+		if j, ok := num(ref, "index"); ok {
+			if to, ok := byRule[j]; ok {
+				ref["index"] = to
+			} else {
+				delete(ref, "index")
+			}
+		}
+		if named {
+			if to, ok := m.components[c]; ok {
 				component["index"] = to
 			}
 		}
 	}
 	for _, res := range objects(run, "results") {
 		at(child(res, "rule"))
-	}
-	for _, inv := range objects(run, "invocations") {
-		for _, key := range []string{"toolExecutionNotifications", "toolConfigurationNotifications"} {
-			for _, n := range objects(inv, key) {
-				at(child(n, "associatedRule"))
-				at(child(n, "descriptor"))
-			}
-		}
 	}
 }
 
@@ -263,22 +281,27 @@ func merge(runs []obj) obj {
 	}
 	first := runs[0]
 	driver := ensure(ensure(first, "tool"), "driver")
-	seen := map[string]bool{}
+	seen := map[string]int{}
 	var rules list
 	var results, invocations list
 	var extensions list
 	extensionAt := map[string]int{}
-	extensionRules := []map[string]bool{}
+	extensionRules := []map[string]int{}
 	units, counted := 0, false
 	for _, run := range runs {
 		tool := child(run, "tool")
-		for _, rule := range objects(child(tool, "driver"), "rules") {
-			if id := str(rule, "id"); id != "" && !seen[id] {
-				seen[id] = true
+		m := moves{components: map[int]int{}, driverRules: map[int]int{}, rules: map[int]map[int]int{}}
+		for j, rule := range objects(child(tool, "driver"), "rules") {
+			id := str(rule, "id")
+			if id == "" {
+				continue
+			}
+			if _, ok := seen[id]; !ok {
+				seen[id] = len(rules)
 				rules = append(rules, rule)
 			}
+			m.driverRules[j] = seen[id]
 		}
-		moved := map[int]int{}
 		for i, ext := range objects(tool, "extensions") {
 			key := str(ext, "name") + "\x00" + strings.ToLower(str(ext, "guid")) + "\x00" + str(ext, "version")
 			at, ok := extensionAt[key]
@@ -291,18 +314,24 @@ func merge(runs []obj) obj {
 				}
 				kept["rules"] = list{}
 				extensions = append(extensions, kept)
-				extensionRules = append(extensionRules, map[string]bool{})
+				extensionRules = append(extensionRules, map[string]int{})
 			}
-			moved[i] = at
+			m.components[i] = at
+			m.rules[i] = map[int]int{}
 			merged := extensions[at].(obj)
-			for _, rule := range objects(ext, "rules") {
-				if id := str(rule, "id"); id != "" && !extensionRules[at][id] {
-					extensionRules[at][id] = true
+			for j, rule := range objects(ext, "rules") {
+				id := str(rule, "id")
+				if id == "" {
+					continue
+				}
+				if _, ok := extensionRules[at][id]; !ok {
+					extensionRules[at][id] = len(merged["rules"].(list))
 					merged["rules"] = append(merged["rules"].(list), rule)
 				}
+				m.rules[i][j] = extensionRules[at][id]
 			}
 		}
-		renumber(run, moved)
+		renumber(run, m)
 		if str(driver, "version") == "" {
 			if v := str(child(tool, "driver"), "version"); v != "" {
 				driver["version"] = v
