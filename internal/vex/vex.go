@@ -333,7 +333,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	// product, which says nothing of a flaw recorded in another product or at
 	// security testing visibility.
 	got, err := s.gather(ctx, named, build.ID, gathering{
-		visible: visible, reach: &reader, suppliers: kind == WithSuppliers,
+		visible: visible, reach: reader, suppliers: kind == WithSuppliers,
 	})
 	if err != nil {
 		return nil, err
@@ -417,11 +417,11 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 }
 
 // gathering is what one build's statements are read at: the visibilities,
-// the reader whose reach withholds an issue's other names, nil to withhold
-// none, and which further kinds of statement are read.
+// the reader whose reach withholds an issue's other names, and which further
+// kinds of statement are read.
 type gathering struct {
 	visible   []access.Visibility
-	reach     *access.Subject
+	reach     access.Subject
 	suppliers bool
 	affected  bool
 }
@@ -527,14 +527,12 @@ func (s *Store) gather(ctx context.Context, named *catalog.Named, buildID int64,
 	// No other name of an issue that a flaw of ours recorded out of the
 	// reader's reach wrote onto it is published: one of them is the name
 	// minted for it.
-	if at.reach != nil {
-		withheld, err := finding.RecordedOutOfReach(ctx, s.idb(), *at.reach, issues)
-		if err != nil {
-			return nil, err
-		}
-		for issue := range withheld {
-			delete(got.alsoCalled, issue)
-		}
+	withheld, err := finding.RecordedOutOfReach(ctx, s.idb(), at.reach, issues)
+	if err != nil {
+		return nil, err
+	}
+	for issue := range withheld {
+		delete(got.alsoCalled, issue)
 	}
 	if got.root, err = s.rootOf(ctx, named, buildID); err != nil {
 		return nil, err

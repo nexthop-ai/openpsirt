@@ -107,7 +107,7 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 	// publish the names it reaches.
 	got, err := s.gather(ctx, named, buildID, gathering{
 		visible:  []access.Visibility{access.Public},
-		reach:    new(access.Published([]int64{named.ProductID})),
+		reach:    access.Published([]int64{named.ProductID}),
 		affected: true,
 	})
 	if err != nil {
