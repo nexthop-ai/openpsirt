@@ -13,6 +13,7 @@ import { Wide } from "../ui/Wide";
 import { fileAt as linkedFile } from "../api/links";
 import { own } from "../ui/own";
 import { decisionAt } from "../app/routes";
+import { Downloads } from "../ui/Downloads";
 
 // A promise's state, said in words rather than left to a color.
 const STANDING: Record<Body<"PlannedBody">["state"], string> = {
@@ -83,8 +84,8 @@ export function PlannedUpgrades() {
         <p className="hint">
           {/* A link somebody follows rather than a request this page makes, so
               the browser fetches it with the session it already has. */}
-          Download <a href={fileAt(product, branchOrTag, variant, "csv")}>CSV</a> ·{" "}
-          <a href={fileAt(product, branchOrTag, variant, "json")}>JSON</a>.
+          Download{" "}
+          <Downloads inline href={(format) => fileAt(product, branchOrTag, variant, format)} />.
         </p>
       )}
 

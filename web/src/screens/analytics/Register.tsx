@@ -21,6 +21,7 @@ import { counted, heldLine, holding } from "../../app/families";
 import { HeldLine } from "../../ui/HeldLine";
 import { STATES, type Stands, drawn, said } from "../../ui/states";
 import { Wide } from "../../ui/Wide";
+import { Downloads } from "../../ui/Downloads";
 
 // The share of the register one page holds. The server's own ceiling is five
 // hundred; this is what somebody reads before paging, and the file is what
@@ -208,8 +209,7 @@ export function Register() {
           </h3>
           <p className="hint" style={{ marginTop: 0 }}>
             One row per issue and occurrence, open or closed, <b>no minimum severity</b>.{" "}
-            <a href={fileAt(where, "csv", asked)}>CSV</a> ·{" "}
-            <a href={fileAt(where, "json", asked)}>JSON</a>
+            <Downloads inline href={(format) => fileAt(where, format, asked)} />
           </p>
           <MeasuredWith measured={register.data?.measured} />
           {rows.length === 0 ? (

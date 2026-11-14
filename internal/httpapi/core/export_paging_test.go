@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -29,41 +31,43 @@ import (
 // which is the failure the whole export path is written to avoid. Watched
 // failing against the stepping loop.
 func TestAnExportWritesEveryRowWhateverTheReadersPageIs(t *testing.T) {
-	for _, readerPage := range []int{1, 3, exportPage - 1, exportPage, exportPage + 7} {
-		t.Run(fmt.Sprint(readerPage), func(t *testing.T) {
-			const rows = 250
-			out := Exporting{
-				Header: []string{"n"},
-				Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
-					// A store's own ceiling, applied the way every store here
-					// applies one: silently.
-					if limit > readerPage {
-						limit = readerPage
-					}
-					page := [][]string{}
-					for i := offset; i < offset+limit && i < rows; i++ {
-						page = append(page, []string{fmt.Sprint(i)})
-					}
-					return page, nil
-				},
-			}
-			var written [][]string
-			if err := eachPage(t.Context(), out, func(page [][]string) {
-				written = append(written, page...)
-			}, func() {}); err != nil {
-				t.Fatal(err)
-			}
-			if len(written) != rows {
-				t.Fatalf("a reader paging %d at a time wrote %d of %d rows",
-					readerPage, len(written), rows)
-			}
-			for i, row := range written {
-				if row[0] != fmt.Sprint(i) {
-					t.Fatalf("row %d is %q, so the walk skipped or repeated", i, row[0])
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		for _, readerPage := range []int{1, 3, exportPage - 1, exportPage, exportPage + 7} {
+			t.Run(fmt.Sprint(readerPage), func(t *testing.T) {
+				const rows = 250
+				out := Exporting{
+					Header: []string{"n"},
+					Rows: func(_ context.Context, _ bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
+						// A store's own ceiling, applied the way every store here
+						// applies one: silently.
+						if limit > readerPage {
+							limit = readerPage
+						}
+						page := [][]string{}
+						for i := offset; i < offset+limit && i < rows; i++ {
+							page = append(page, []string{fmt.Sprint(i)})
+						}
+						return page, nil
+					},
 				}
-			}
-		})
-	}
+				var written [][]string
+				if err := eachPage(t.Context(), db, time.Now(), out, func(page [][]string) {
+					written = append(written, page...)
+				}, func() {}); err != nil {
+					t.Fatal(err)
+				}
+				if len(written) != rows {
+					t.Fatalf("a reader paging %d at a time wrote %d of %d rows",
+						readerPage, len(written), rows)
+				}
+				for i, row := range written {
+					if row[0] != fmt.Sprint(i) {
+						t.Fatalf("row %d is %q, so the walk skipped or repeated", i, row[0])
+					}
+				}
+			})
+		}
+	})
 }
 
 // A streamed export writes every row too, and the walk's refusal reaches the
@@ -87,7 +91,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 	}
 	var written [][]string
 	flushes := 0
-	if err := eachPage(t.Context(), out, func(page [][]string) {
+	if err := eachPage(t.Context(), nil, time.Now(), out, func(page [][]string) {
 		written = append(written, page...)
 	}, func() { flushes++ }); err != nil {
 		t.Fatal(err)
@@ -118,7 +122,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 			return fmt.Errorf("the database went away")
 		},
 	}
-	if err := eachPage(t.Context(), broken, func([][]string) {}, func() {}); err == nil {
+	if err := eachPage(t.Context(), nil, time.Now(), broken, func([][]string) {}, func() {}); err == nil {
 		t.Error("a walk that failed was reported as a clean end")
 	}
 }
@@ -126,27 +130,29 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 // And it stops rather than writing a file that trails off, where the reader
 // fails partway.
 func TestAnExportThatFailsPartwayStopsAndSaysSo(t *testing.T) {
-	out := Exporting{
-		Header: []string{"n"},
-		Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
-			if offset > 0 {
-				return nil, fmt.Errorf("the database went away")
-			}
-			page := [][]string{}
-			for i := 0; i < limit; i++ {
-				page = append(page, []string{fmt.Sprint(i)})
-			}
-			return page, nil
-		},
-	}
-	written := 0
-	err := eachPage(t.Context(), out, func(page [][]string) { written += len(page) }, func() {})
-	if err == nil {
-		t.Fatal("a reader that failed was walked to a clean end")
-	}
-	if written != exportPage {
-		t.Errorf("%d rows were written before it failed, want the one page", written)
-	}
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		out := Exporting{
+			Header: []string{"n"},
+			Rows: func(_ context.Context, _ bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
+				if offset > 0 {
+					return nil, fmt.Errorf("the database went away")
+				}
+				page := [][]string{}
+				for i := 0; i < limit; i++ {
+					page = append(page, []string{fmt.Sprint(i)})
+				}
+				return page, nil
+			},
+		}
+		written := 0
+		err := eachPage(t.Context(), db, time.Now(), out, func(page [][]string) { written += len(page) }, func() {})
+		if err == nil {
+			t.Fatal("a reader that failed was walked to a clean end")
+		}
+		if written != exportPage {
+			t.Errorf("%d rows were written before it failed, want the one page", written)
+		}
+	})
 }
 
 // TestAnExportThatStopsEarlySaysSoInTheFile pins the one thing the export path
@@ -157,48 +163,87 @@ func TestAnExportThatFailsPartwayStopsAndSaysSo(t *testing.T) {
 // byte — so saying it in the body is the only honest thing left, and nothing
 // else exercises that half in either format.
 func TestAnExportThatStopsEarlySaysSoInTheFile(t *testing.T) {
-	for _, c := range []struct {
-		format string
-		marker string
-	}{
-		{"csv", "# this export stopped early and is incomplete"},
-		{"json", `],"incomplete":true}`},
-	} {
-		t.Run(c.format, func(t *testing.T) {
-			// A reader that answers one page and then fails, which is what a
-			// connection lost part way through a large export looks like.
-			pages := 0
-			out := Exporting{
-				Header: []string{"n"},
-				Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
-					pages++
-					if pages > 1 {
-						return nil, errors.New("the connection went away")
-					}
-					page := make([][]string, 0, limit)
-					for i := offset; i < offset+limit; i++ {
-						page = append(page, []string{fmt.Sprint(i)})
-					}
-					return page, nil
-				},
-			}
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		for _, c := range []struct {
+			format string
+			marker string
+		}{
+			{"csv", "# this export stopped early and is incomplete"},
+			{"json", `],"incomplete":true}`},
+		} {
+			t.Run(c.format, func(t *testing.T) {
+				// A reader that answers one page and then fails, which is what a
+				// connection lost part way through a large export looks like.
+				pages := 0
+				out := Exporting{
+					Header: []string{"n"},
+					Rows: func(_ context.Context, _ bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
+						pages++
+						if pages > 1 {
+							return nil, errors.New("the connection went away")
+						}
+						page := make([][]string, 0, limit)
+						for i := offset; i < offset+limit; i++ {
+							page = append(page, []string{fmt.Sprint(i)})
+						}
+						return page, nil
+					},
+				}
 
-			rec := httptest.NewRecorder()
-			ctx := humatest.NewContext(nil,
-				httptest.NewRequest(http.MethodGet, "/export", nil).WithContext(t.Context()), rec)
-			WriteExport(ctx, c.format, "mine", out)
+				rec := httptest.NewRecorder()
+				ctx := humatest.NewContext(nil,
+					httptest.NewRequest(http.MethodGet, "/export", nil).WithContext(t.Context()), rec)
+				logged := &tally{}
+				writeExport(ctx, Deps{DB: db, Logger: slog.New(logged)}, c.format, "mine", out)
+				// And the operator hears of it: a 200 has gone out, and
+				// nothing else says the file is short.
+				if logged.n == 0 {
+					t.Error("an export that stopped early was not logged")
+				}
 
-			body := rec.Body.String()
-			if !strings.Contains(body, c.marker) {
-				t.Errorf("an export that stopped early does not say so: %q", tail(body))
+				body := rec.Body.String()
+				if !strings.Contains(body, c.marker) {
+					t.Errorf("an export that stopped early does not say so: %q", tail(body))
+				}
+				// And the rows it did write are still there, because a truncated
+				// file that says it is truncated is worth more than none.
+				if !strings.Contains(body, "\n0") && !strings.Contains(body, `"n":"0"`) {
+					t.Errorf("an export that stopped early threw away what it had: %q", tail(body))
+				}
+			})
+		}
+	})
+}
+
+// TestEveryPageOfAFileReadsAtOneMoment pins one clock to a paged file: every
+// page is handed the same moment. A page reading the clock for itself sorts a
+// row whose deadline passed between two pages into a page already written.
+func TestEveryPageOfAFileReadsAtOneMoment(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		var moments []time.Time
+		out := Exporting{
+			Header: []string{"n"},
+			Rows: func(_ context.Context, _ bun.IDB, at time.Time, limit, offset int) ([][]string, error) {
+				moments = append(moments, at)
+				if offset >= 3*limit {
+					return nil, nil
+				}
+				return [][]string{{fmt.Sprint(offset)}}, nil
+			},
+		}
+		rec := httptest.NewRecorder()
+		ctx := humatest.NewContext(nil,
+			httptest.NewRequest(http.MethodGet, "/export", nil).WithContext(t.Context()), rec)
+		writeExport(ctx, Deps{DB: db, Logger: slog.New(slog.DiscardHandler)}, "csv", "mine", out)
+		if len(moments) < 2 {
+			t.Fatalf("the file read %d pages, want several", len(moments))
+		}
+		for i, at := range moments {
+			if !at.Equal(moments[0]) {
+				t.Errorf("page %d was read at %s, the first at %s", i, at, moments[0])
 			}
-			// And the rows it did write are still there, because a truncated
-			// file that says it is truncated is worth more than none.
-			if !strings.Contains(body, "\n0") && !strings.Contains(body, `"n":"0"`) {
-				t.Errorf("an export that stopped early threw away what it had: %q", tail(body))
-			}
-		})
-	}
+		}
+	})
 }
 
 // tail is the end of a body, for a failure message about how one finishes.
@@ -214,7 +259,8 @@ func tail(body string) string {
 //
 // The write deadline only fires for a reader that stops. One that takes a row
 // every so often keeps it moving, and the cursor holds a connection for as
-// long as that takes. On SQLite that connection is the whole pool. The reader
+// long as that takes. The harness gives SQLite a pool of one, so that
+// connection is the whole pool. The reader
 // here blocks on the second row, as a socket to a slow client does, and the
 // connection has to be free again while it is still blocked.
 func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {
@@ -273,36 +319,101 @@ func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {
 // whatever their sizes are against the export's page: an empty list among
 // them, one ending exactly on a page, and one ending part-way through one.
 func TestListsWrittenInTurnAreEachWrittenWholeInOrder(t *testing.T) {
-	list := func(name string, rows int) Paged {
-		return func(_ context.Context, limit, offset int) ([][]string, error) {
-			page := [][]string{}
-			for i := offset; i < offset+limit && i < rows; i++ {
-				page = append(page, []string{fmt.Sprintf("%s%d", name, i)})
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		list := func(name string, rows int) Paged {
+			return func(_ context.Context, _ bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
+				page := [][]string{}
+				for i := offset; i < offset+limit && i < rows; i++ {
+					page = append(page, []string{fmt.Sprintf("%s%d", name, i)})
+				}
+				return page, nil
 			}
-			return page, nil
 		}
-	}
-	sizes := []int{exportPage, 0, exportPage + 3, 1}
-	parts := make([]Paged, 0, len(sizes))
-	var want []string
-	for i, n := range sizes {
-		name := string(rune('a' + i))
-		parts = append(parts, list(name, n))
-		for j := range n {
-			want = append(want, fmt.Sprintf("%s%d", name, j))
+		sizes := []int{exportPage, 0, exportPage + 3, 1}
+		parts := make([]Paged, 0, len(sizes))
+		var want []string
+		for i, n := range sizes {
+			name := string(rune('a' + i))
+			parts = append(parts, list(name, n))
+			for j := range n {
+				want = append(want, fmt.Sprintf("%s%d", name, j))
+			}
 		}
-	}
-	var written []string
-	if err := eachPage(t.Context(), Exporting{Header: []string{"n"}, Rows: InTurn(parts...)},
-		func(page [][]string) {
+		var written []string
+		if err := eachPage(t.Context(), db, time.Now(), Exporting{Header: []string{"n"}, Rows: InTurn(parts...)},
+			func(page [][]string) {
+				for _, row := range page {
+					written = append(written, row[0])
+				}
+			}, func() {}); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Join(written, ",") != strings.Join(want, ",") {
+			t.Fatalf("wrote %d rows, %v…; want %d, %v…", len(written), written[:min(5, len(written))],
+				len(want), want[:5])
+		}
+	})
+}
+
+// TestAPagedExportReadsOneSnapshotWhateverIsWrittenMeanwhile pins every page of
+// a file to one view of the database: a row written ahead of the cursor
+// between two pages moves no later row, so none is written twice.
+func TestAPagedExportReadsOneSnapshotWhateverIsWrittenMeanwhile(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		// A second connection for the writer; the harness gives SQLite one.
+		db.SetMaxOpenConns(max(db.Pool.MaxOpen, 2))
+		t.Cleanup(func() { db.SetMaxOpenConns(db.Pool.MaxOpen) })
+		if _, err := db.NewRaw(`CREATE TABLE "paged" ("n" INTEGER PRIMARY KEY)`).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _, _ = db.NewRaw(`DROP TABLE "paged"`).Exec(context.Background()) })
+		const rows = exportPage + 50
+		for i := 1; i <= rows; i++ {
+			if _, err := db.NewRaw(`INSERT INTO "paged" ("n") VALUES (?)`, i*10).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		pages := 0
+		out := Exporting{
+			Header: []string{"n"},
+			Rows: func(ctx context.Context, view bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
+				if pages++; pages == 2 {
+					// Ahead of everything already written, the way a newest
+					// row lands on a list ordered newest first.
+					if _, err := db.NewRaw(`INSERT INTO "paged" ("n") VALUES (1)`).Exec(ctx); err != nil {
+						return nil, err
+					}
+				}
+				var ns []int
+				if err := view.NewRaw(`SELECT "n" FROM "paged" ORDER BY "n" LIMIT ? OFFSET ?`,
+					limit, offset).Scan(ctx, &ns); err != nil {
+					return nil, err
+				}
+				page := make([][]string, 0, len(ns))
+				for _, n := range ns {
+					page = append(page, []string{fmt.Sprint(n)})
+				}
+				return page, nil
+			},
+		}
+		var written []string
+		if err := eachPage(ctx, db, time.Now(), out, func(page [][]string) {
 			for _, row := range page {
 				written = append(written, row[0])
 			}
 		}, func() {}); err != nil {
-		t.Fatal(err)
-	}
-	if strings.Join(written, ",") != strings.Join(want, ",") {
-		t.Fatalf("wrote %d rows, %v…; want %d, %v…", len(written), written[:min(5, len(written))],
-			len(want), want[:5])
-	}
+			t.Fatal(err)
+		}
+		seen := map[string]bool{}
+		for _, n := range written {
+			if seen[n] {
+				t.Fatalf("row %s was written twice after a row landed between pages", n)
+			}
+			seen[n] = true
+		}
+		if len(written) != rows {
+			t.Errorf("wrote %d rows of the %d there were when the file began", len(written), rows)
+		}
+	})
 }

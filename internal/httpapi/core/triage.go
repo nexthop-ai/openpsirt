@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
@@ -84,28 +84,24 @@ type DecisionOccurrenceBody struct {
 // FindingRefBody is the subject of a decision occurrence, as the findings list
 // shows it: the build to link to, the issue, the component and where it sits.
 type FindingRefBody struct {
-	Product         string   `json:"product" doc:"The build to link to, by product, branch or tag, and variant. The product by the name that addresses it"`
-	ProductName     string   `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	BranchOrTag     string   `json:"branch_or_tag"`
-	BranchOrTagName string   `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant         string   `json:"variant"`
-	VariantName     string   `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
-	Vulnerability   string   `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
-	Component       string   `json:"component"`
-	Version         string   `json:"version" doc:"The version that ships"`
-	Ecosystem       string   `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace       string   `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Severity        string   `json:"severity,omitempty" doc:"Our rating where one stands, else as published"`
-	Score           float64  `json:"score,omitempty"`
-	ScoreVersion    string   `json:"score_version,omitempty" doc:"The scoring system the number is on"`
-	Exploited       bool     `json:"exploited,omitempty"`
-	FixState        FixState `json:"fix_state,omitempty"`
-	FixedIn         string   `json:"fixed_in,omitempty"`
-	Description     string   `json:"description,omitempty" doc:"The first four hundred characters of what the report says, as plain text"`
-	Owner           string   `json:"owner,omitempty" doc:"The part of the product this belongs to"`
-	Parent          string   `json:"parent,omitempty" doc:"The component that directly pulls it in, which is what the decision is about"`
-	Occurrences     int      `json:"occurrences" doc:"The number of occurrences of the issue in that component in that build"`
-	Decided         int      `json:"decided" doc:"The number of those this decision covers"`
+	Product     string `json:"product" doc:"The build to link to, by product, branch or tag, and variant. The product by the name that addresses it"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	BuildNamesBody
+	Vulnerability string `json:"vulnerability" doc:"The issue, under the name it is most widely known by"`
+	Component     string `json:"component"`
+	Version       string `json:"version" doc:"The version that ships"`
+	PackageKindBody
+	Severity     string   `json:"severity,omitempty" doc:"Our rating where one stands, else as published"`
+	Score        float64  `json:"score,omitempty"`
+	ScoreVersion string   `json:"score_version,omitempty" doc:"The scoring system the number is on"`
+	Exploited    bool     `json:"exploited,omitempty"`
+	FixState     FixState `json:"fix_state,omitempty"`
+	FixedIn      string   `json:"fixed_in,omitempty"`
+	Description  string   `json:"description,omitempty" doc:"The first four hundred characters of what the report says, as plain text"`
+	Owner        string   `json:"owner,omitempty" doc:"The part of the product this belongs to"`
+	Parent       string   `json:"parent,omitempty" doc:"The component that directly pulls it in, which is what the decision is about"`
+	Occurrences  int      `json:"occurrences" doc:"The number of occurrences of the issue in that component in that build"`
+	Decided      int      `json:"decided" doc:"The number of those this decision covers"`
 }
 
 // OccurrenceBody names what a decision occurrence is about.
@@ -193,26 +189,9 @@ func RefusedDecision(logger *slog.Logger, err error) error {
 	case errors.Is(err, finding.ErrCodeFindingPastEndOfLife):
 		return huma.Error409Conflict(finding.ErrCodeFindingPastEndOfLife.Error())
 	}
-	// An authorization refusal is not somebody having asked for the
-	// impossible. Without this arm it falls through to the default below and
-	// answers 422 carrying access.Denied's own sentence — which names the
-	// internal product identifier, so a refusal hands the caller a number
-	// nothing else publishes.
-	if errors.Is(err, access.ErrDenied) {
-		return huma.Error403Forbidden("not authorized")
-	}
-	var faults markdown.Faults
-	if errors.As(err, &faults) {
-		return RefusedText(faults)
-	}
-	// A sentence the store wrote for a person to read: a decision already
-	// standing here, a decision covering nothing, a threshold crossed. Those are
-	// the caller's to fix, and the message is the answer. Anything else is a
-	// fault, and its text is withheld.
-	if database.Publishable(err) {
-		return huma.Error422UnprocessableEntity(err.Error())
-	}
-	return WentWrong(logger, "that could not be recorded", err)
+	// The rest is any store's refusal: authorization, faults in writing, a
+	// sentence for a person to read, and a fault whose text is withheld.
+	return Asked(logger, err)
 }
 
 // RefusedText answers a refused piece of writing with where to look.
@@ -338,7 +317,10 @@ func DecisionArgument(c triage.Decision, reasoning string) DecisionOccurrenceBod
 // A row saying product 4, issue 91 is a row somebody has to make two more
 // requests to understand, and the lists this feeds are exactly where that
 // happens fifty times.
-func DescribeDecisionOccurrences(ctx context.Context, in Deps, store *triage.Store,
+//
+// Every name is read through db, which a file being written reads its pages
+// through, so a page and its names come from one view.
+func DescribeDecisionOccurrences(ctx context.Context, db bun.IDB, store *triage.Store,
 	occurrences []triage.DecisionOccurrence, reasoning map[int64]string) ([]DecisionOccurrenceDetail, error) {
 
 	people := make([]int64, 0, len(occurrences))
@@ -350,19 +332,19 @@ func DescribeDecisionOccurrences(ctx context.Context, in Deps, store *triage.Sto
 		issues = append(issues, occurrence.VulnerabilityID)
 	}
 
-	who, err := WhoSigned(ctx, in.DB.DB, people)
+	who, err := WhoSigned(ctx, db, people)
 	if err != nil {
 		return nil, err
 	}
-	productNames, err := catalog.NewStore(in.DB.DB).ProductsCalled(ctx, products)
+	productNames, err := catalog.NewStore(db).ProductsCalled(ctx, products)
 	if err != nil {
 		return nil, err
 	}
-	productLabels, err := catalog.NewStore(in.DB.DB).ProductNames(ctx, products)
+	productLabels, err := catalog.NewStore(db).ProductNames(ctx, products)
 	if err != nil {
 		return nil, err
 	}
-	issueNames, err := finding.NewVulnerabilities(in.DB.DB).NamesByID(ctx, issues)
+	issueNames, err := finding.NewVulnerabilities(db).NamesByID(ctx, issues)
 	if err != nil {
 		return nil, err
 	}
@@ -405,12 +387,13 @@ func findingRef(described map[int64]triage.Described, occurrenceID int64) *Findi
 	}
 	body := &FindingRefBody{
 		Product: d.Product, ProductName: d.ProductName,
-		BranchOrTag: d.BranchOrTag, Variant: d.Variant,
-		BranchOrTagName: d.BranchOrTagName,
-		VariantName:     d.VariantName,
-		Vulnerability:   d.Issue.Identifier, Component: d.Component, Version: d.Version,
-		Ecosystem: graph.EcosystemOf(d.Purl), Namespace: graph.NamespaceOf(d.Purl),
-		Severity: d.Issue.InForce(), Exploited: d.Issue.Exploited,
+		BuildNamesBody: BuildNamesBody{
+			BranchOrTag: d.BranchOrTag, BranchOrTagName: d.BranchOrTagName,
+			Variant: d.Variant, VariantName: d.VariantName,
+		},
+		Vulnerability: d.Issue.Identifier, Component: d.Component, Version: d.Version,
+		PackageKindBody: PackageKindOf(d.Purl),
+		Severity:        d.Issue.InForce(), Exploited: d.Issue.Exploited,
 		FixState: FixState(d.FixState), FixedIn: d.FixedIn,
 		Description: excerpt(d.Issue.Description, 400),
 		Owner:       d.Owner, Parent: d.Parent,

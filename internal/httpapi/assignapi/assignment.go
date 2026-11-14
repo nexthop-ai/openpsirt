@@ -38,8 +38,8 @@ func unassignedPage(rows []finding.Owned, total int) *UnassignedPage {
 			Vulnerability: row.Vulnerability, Severity: row.Severity,
 			Exploited: row.Exploited, Incident: row.Incident,
 			Component: row.Component, Version: row.Version,
-			Ecosystem: graph.EcosystemOf(row.Purl), Namespace: graph.NamespaceOf(row.Purl),
-			Product: row.Product, ProductName: row.ProductName,
+			PackageKindBody: core.PackageKindOf(row.Purl),
+			Product:         row.Product, ProductName: row.ProductName,
 			BranchOrTag: row.BranchOrTag, Variant: row.Variant,
 			BranchOrTagName: row.BranchOrTagName,
 			VariantName:     row.VariantName,
@@ -58,9 +58,8 @@ type UnassignedBody struct {
 	Incident      bool   `json:"incident,omitempty" doc:"Whether an incident stands in this product through this issue"`
 	Component     string `json:"component"`
 	Version       string `json:"version"`
-	Ecosystem     string `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it"`
-	Namespace     string `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Product       string `json:"product" doc:"The product, by the name that addresses it"`
+	core.PackageKindBody
+	Product string `json:"product" doc:"The product, by the name that addresses it"`
 
 	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	// Branch or tag and Variant name a build holding this, not the only one: a screen

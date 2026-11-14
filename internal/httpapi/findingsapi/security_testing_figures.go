@@ -232,7 +232,7 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 			rows = append(rows, []string{"suppression rule", "", named, "", "", "", "", "", "", "", "",
 				string(r.State), strconv.Itoa(r.Covering)})
 		}
-		return preciseFile.stream(input.Format, input.Product, nil, rows), nil
+		return preciseFile.stream(in, input.Format, input.Product, nil, rows)
 	})
 
 	covered := func(ctx context.Context, input *AnalysisCoverageAsked) ([]analysis.Analyzed, time.Time, time.Time, error) {
@@ -293,7 +293,7 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		return coveredFile.stream(input.Format, input.Product, weeksStated(input.Weeks), coverageRows(got, false)), nil
+		return coveredFile.stream(in, input.Format, input.Product, weeksStated(input.Weeks), coverageRows(got, false))
 	})
 
 	released := func(ctx context.Context, input *CodeFindingsByReleaseAsked) ([]analysis.Release, error) {
@@ -373,8 +373,8 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 					strconv.Itoa(b.ByTier[tier.Name()]), "", "", "", ""})
 			}
 		}
-		return releasedFile.stream(input.Format, input.Product,
-			[]core.Stated{{Label: "releases", Value: strconv.Itoa(input.Releases)}}, rows), nil
+		return releasedFile.stream(in, input.Format, input.Product,
+			[]core.Stated{{Label: "releases", Value: strconv.Itoa(input.Releases)}}, rows)
 	})
 }
 

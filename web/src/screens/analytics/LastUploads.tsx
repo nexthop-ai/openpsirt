@@ -18,6 +18,7 @@ import { Wide } from "../../ui/Wide";
 import { analyticsReportAt, uploadsAt } from "../../app/routes";
 import { holding } from "../../app/families";
 import { useWho } from "../../app/session";
+import { Downloads } from "../../ui/Downloads";
 
 // The builds being scanned, and the ones that have gone silent.
 //
@@ -112,8 +113,7 @@ export function LastUploads() {
                   listed below and not counted.{" "}
                 </>
               )}
-              Download <a href={fileAt("csv", asked)}>CSV</a> ·{" "}
-              <a href={fileAt("json", asked)}>JSON</a>
+              Download <Downloads inline href={(format) => fileAt(format, asked)} />
             </p>
             {analyzes && (
               <p className="hint">

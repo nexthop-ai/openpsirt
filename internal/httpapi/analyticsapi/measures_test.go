@@ -80,12 +80,6 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 			t.Errorf("somebody not on the team is in the team's figures: %v", theirs)
 		}
 
-		// Anybody else is given the team's totals and no row naming a
-		// member.
-		if named := worked(t, "?team=platform"); len(named) != 0 {
-			t.Errorf("somebody who is not an administrator learned the team's members: %v", named)
-		}
-
 		// A product the decisions were made in, and one nobody made any in.
 		if mine := worked(t, "?product=mine"); len(mine) != 2 {
 			t.Errorf("the product the work happened in reports %v", mine)
@@ -96,7 +90,7 @@ func TestMeasuresCanBeAskedAboutOneTeamOrOneProduct(t *testing.T) {
 		// A team nobody declared is a 404 rather than the deployment's
 		// figures: a narrowing that silently widens is the one mistake a
 		// narrowing must not make.
-		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
+		if got := httpapitest.AsPerson(t, r, "admin-reader", http.MethodGet,
 			"/v1/measures?team=nobodys", ""); got.Code != http.StatusNotFound {
 			t.Errorf("an unknown team answered %d", got.Code)
 		}
@@ -118,7 +112,7 @@ func TestATeamWithNobodyOnItMeasuresNothing(t *testing.T) {
 			} `json:"throughput"`
 			Until string `json:"until"`
 		}
-		httpapitest.Read(t, r, "private-triage", "/v1/measures?team=empty", &body)
+		httpapitest.Read(t, r, "admin-reader", "/v1/measures?team=empty", &body)
 		if len(body.Worked) != 0 {
 			t.Errorf("a team with nobody on it measured %d people", len(body.Worked))
 		}
@@ -126,6 +120,31 @@ func TestATeamWithNobodyOnItMeasuresNothing(t *testing.T) {
 		// readable as an empty answer rather than as a failed one.
 		if _, err := time.Parse(time.DateOnly, body.Until); err != nil {
 			t.Errorf("the report does not say what period it covered: %q", body.Until)
+		}
+	})
+}
+
+// TestATeamNarrowingIsAnAdministrators pins who may narrow a report to a team.
+//
+// Who is on a team is an administrator's to know, and a report narrowed to a
+// team's people, differenced against the audit log's proposers, says it. A
+// declared team and an undeclared one are refused alike, because the refusal
+// comes before the name is looked up.
+func TestATeamNarrowingIsAnAdministrators(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if _, _, err := access.NewStore(r.DB.DB).DeclareTeam(t.Context(),
+			"platform", "Platform"); err != nil {
+			t.Fatal(err)
+		}
+		for _, path := range []string{"/v1/measures", "/v1/effort"} {
+			for _, team := range []string{"platform", "nobodys"} {
+				httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage",
+					http.MethodGet, path+"?team="+team, ""), http.StatusForbidden)
+			}
+			if got := httpapitest.AsPerson(t, r, "admin-reader", http.MethodGet,
+				path+"?team=platform", ""); got.Code != http.StatusOK {
+				t.Errorf("an administrator narrowing %s to a team answered %d", path, got.Code)
+			}
 		}
 	})
 }

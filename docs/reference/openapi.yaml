@@ -1806,13 +1806,13 @@ components:
           description: The variant as it was spelled, or its name where no spelling was recorded
           type: string
       required:
-        - branch_or_tag
-        - variant
         - critical
         - high
         - medium
         - low
         - total
+        - branch_or_tag
+        - variant
       type: object
     BuildName:
       additionalProperties: false
@@ -5921,13 +5921,13 @@ components:
           type: string
       required:
         - product
-        - branch_or_tag
-        - variant
         - vulnerability
         - component
         - version
         - occurrences
         - decided
+        - branch_or_tag
+        - variant
       type: object
     FindingsOutputBody:
       additionalProperties: false
@@ -7398,11 +7398,11 @@ components:
         - vulnerability
         - component
         - product
-        - branch_or_tag
-        - variant
         - occurrences
         - due
         - days_left
+        - branch_or_tag
+        - variant
       type: object
     LinkBody:
       additionalProperties: false
@@ -8694,9 +8694,9 @@ components:
           description: The version that build ships under this name — pass it as ?version= when applying a decision there
           type: string
       required:
+        - occurrences
         - branch_or_tag
         - variant
-        - occurrences
       type: object
     MeasuredBody:
       additionalProperties: false
@@ -15775,6 +15775,8 @@ paths:
 
         Takes the kind and the period the list takes. Asked for no period it writes everything this deployment holds.
 
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+
         Requires: administrator, or the audit permission over this deployment's own records
       operationId: export-administrative-changes
       parameters:
@@ -17145,6 +17147,8 @@ paths:
 
         Takes every filter the audit list takes, including the period.
 
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-audit
       parameters:
@@ -17535,12 +17539,12 @@ paths:
           schema:
             description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"
             type: string
-        - description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
             type: string
         - description: The version, where the build holds that name at several
           explode: false
@@ -17665,12 +17669,12 @@ paths:
           schema:
             description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"
             type: string
-        - description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
             type: string
         - description: The version, where the build holds that name at several
           explode: false
@@ -18180,6 +18184,8 @@ paths:
         The code finding list across products as a file: every row the same filters would list, not one page of them, in the same order, each naming its product.
 
         Read with your own visibility, as it is written. No row carries source text. Takes every filter the list across products takes.
+
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
 
         Requires: any signed-in person, and not a pipeline key. Exports only the products where you read security testing work.
       operationId: export-code-findings-across-products
@@ -19526,12 +19532,12 @@ paths:
           schema:
             description: Limit to decisions made in one product, by name
             type: string
-        - description: Limit to decisions this team's members proposed, by team name
+        - description: Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists
           explode: false
           in: query
           name: team
           schema:
-            description: Limit to decisions this team's members proposed, by team name
+            description: Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists
             type: string
         - description: The most rows to return
           explode: false
@@ -20175,6 +20181,8 @@ paths:
         Below the findings come the open static analysis code findings of every product, by product name, as the product export writes them. The columns and the rule about filters are the product export's.
 
         Takes every filter the cross-product list takes. `beneath` and `differs` are not offered here, for the reason that list gives.
+
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
 
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-findings-anywhere
@@ -21237,7 +21245,7 @@ paths:
 
         Send-backs are counted for the deployment rather than per person: the record holds that a decision was sent back and not by whom, and the reason travels as a comment.
 
-        Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error.
+        Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error. A narrowing to a team is the exception: from anybody but an administrator it is refused with 403.
 
         Asked for neither a period nor a window, this is the last 90 days.
 
@@ -21275,12 +21283,12 @@ paths:
           schema:
             description: Limit to decisions made in one product, by name
             type: string
-        - description: Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows
+        - description: Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists
           explode: false
           in: query
           name: team
           schema:
-            description: Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows
+            description: Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists
             type: string
       responses:
         "200":
@@ -21354,6 +21362,8 @@ paths:
         What `GET /v1/my-decisions` lists, as a file: every decision you proposed, newest first, with what became of each and who did it, rather than one page.
 
         Narrowed to what you may still read.
+
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
 
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-my-decisions
@@ -25780,6 +25790,8 @@ paths:
       description: |-
         The register as a file. Read with your own visibility as it streams, like every other export here.
 
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-disposition-register
       parameters:
@@ -28064,6 +28076,8 @@ paths:
 
         With no `state` it is the queue, and the file says so. Takes every filter the code finding list takes.
 
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-code-findings
       parameters:
@@ -28898,12 +28912,12 @@ paths:
           schema:
             description: Limit to one variant. Left out, every one under the product, and independent of the branch
             type: string
-        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
             type: string
         - description: The version, where the build holds that name at several
           explode: false
@@ -29532,6 +29546,8 @@ paths:
 
         Takes every filter the findings list takes.
 
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-findings
       parameters:
@@ -29558,12 +29574,12 @@ paths:
           name: variant
           schema:
             type: string
-        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
             type: string
         - description: The version, where the build holds that name at several
           explode: false
@@ -30136,12 +30152,12 @@ paths:
           schema:
             description: Limit to one variant. Left out, every one under the product
             type: string
-        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
             type: string
         - description: The version, where the build holds that name at several
           explode: false
@@ -30728,12 +30744,12 @@ paths:
           schema:
             description: Limit to one variant. Left out, every one under the product, and independent of the branch
             type: string
-        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
             type: string
         - description: The version, where the build holds that name at several
           explode: false
@@ -31304,6 +31320,8 @@ paths:
 
         Takes the same filters as the by-component list, and the line this deployment triages at is stated in the file.
 
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-finding-components
       parameters:
@@ -31330,12 +31348,12 @@ paths:
           name: variant
           schema:
             type: string
-        - description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
             type: string
         - description: The version, where the build holds that name at several
           explode: false
@@ -33410,6 +33428,8 @@ paths:
         The same list as a file: one row per upstream upgrade, with what it closes and the builds that hold it.
 
         Takes the same selection and the same filters as the screen, from the same struct. The builds an upgrade is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
+
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
 
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-planned-upgrades
@@ -36082,6 +36102,8 @@ paths:
 
         Takes the same `reason`, `mine`, `product` and filters as `GET /v1/review-queue`, and holds the same decisions.
 
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-review-queue
       parameters:
@@ -36340,6 +36362,8 @@ paths:
         The same list the screen reads, under the same rule — a deadline that has been answered is not on it, because a dismissal takes a finding off the clock and a deferral replaces the deadline with its own date. What is left is time passing with nothing said.
 
         `days_left` is negative once something is overdue.
+
+        Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
 
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-running-out
@@ -37350,12 +37374,12 @@ paths:
           schema:
             description: Keep only what is open against components of this name, whatever version
             type: string
-        - description: Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
             type: string
         - description: The version, where the build holds that name at several
           explode: false
@@ -37471,12 +37495,12 @@ paths:
           schema:
             description: Keep only what is open against components of this name, whatever version
             type: string
-        - description: Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
           explode: false
           in: query
           name: beneath
           schema:
-            description: Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
             type: string
         - description: The version, where the build holds that name at several
           explode: false

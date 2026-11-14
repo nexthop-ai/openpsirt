@@ -30,10 +30,41 @@ describe("a printed sheet's header", () => {
   });
 
   it("names the team an effort sheet is narrowed to", async () => {
-    serve(() => ({ data: { items: [], total: 0 } }));
+    serve((path) =>
+      path === "/v1/session/me"
+        ? { data: { identity: "root", name: "Root", admin: true, kind: "person", reach: [] } }
+        : { data: { items: [], total: 0 } },
+    );
     mount.render(screen(<Effort />, "/analytics/effort-by-component?team=platform"));
     await settle();
     expect(printed()).toContain("team platform");
+  });
+
+  it("narrows an effort sheet to a team for an administrator alone", async () => {
+    const got = serve((path) =>
+      path === "/v1/session/me"
+        ? {
+            data: {
+              identity: "ana",
+              name: "Ana",
+              admin: false,
+              kind: "person",
+              reach: [readingDependencies("sonic")],
+            },
+          }
+        : path === "/v1/teams"
+          ? { data: { items: [{ name: "platform", display_name: "Platform" }], total: 1 } }
+          : { data: { items: [], total: 0 } },
+    );
+    mount.render(screen(<Effort />, "/analytics/effort-by-component?team=platform"));
+    await settle();
+    expect(printed()).not.toContain("team platform");
+    expect(mount.host().querySelector("select")).toBeNull();
+    const sent = (got.mock.calls as unknown as [string, unknown][]).map(
+      ([path, init]): [string, string] => [path, JSON.stringify(init ?? {}) ?? ""],
+    );
+    expect(sent.some(([path]) => path === "/v1/teams")).toBe(false);
+    expect(sent.some(([, init]) => init.includes('"team"'))).toBe(false);
   });
 
   it("says an effort sheet's list was cut", async () => {

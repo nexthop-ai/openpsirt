@@ -70,8 +70,9 @@ then the grain is one row per product per day, the grain access is granted at.
 ## The period a report covers
 
 Deadline compliance, remediation, triage latency, approval coverage, effort,
-advisories issued and administrative changes each take one period, in one
-shape, so a link between reports carries the same two parameters.
+advisories issued, administrative changes and the audit log each take one
+period, in one shape, so a link between reports carries the same two
+parameters.
 
 | Rule | Reason |
 |---|---|

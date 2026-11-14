@@ -218,6 +218,28 @@ func registerLastUploadsExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
+		written := make([][]string, 0, len(rows))
+		for _, row := range rows {
+			last := ""
+			if row.LastReceivedAt != nil {
+				last = core.Stamp(*row.LastReceivedAt)
+			}
+			refused, why := "", ""
+			if row.LastRefusedAt != nil {
+				refused = core.Stamp(*row.LastRefusedAt)
+			}
+			if row.RefusedBecause != nil {
+				why = *row.RefusedBecause
+			}
+			written = append(written, []string{
+				row.Product, row.BranchOrTag, row.BranchOrTagKind, row.Variant, last,
+				refused, why,
+				strconv.Itoa(int(row.Since.Hours() / 24)),
+				strconv.FormatBool(row.Quiet),
+				strconv.FormatBool(row.OutOfSupport),
+				strconv.FormatBool(row.RetiredFromUse),
+			})
+		}
 		out := core.Exporting{
 			What:  "last upload per build",
 			About: []core.Stated{{Label: "quiet after days", Value: strconv.Itoa(int(quietAfter.Hours() / 24))}},
@@ -226,38 +248,8 @@ func registerLastUploadsExport(api huma.API, in core.Deps) {
 				"last_received_at", "last_refused_at", "refused_because",
 				"quiet_days", "quiet", "out_of_support", "retired",
 			},
-			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
-				page := core.Window(rows, limit, offset)
-				if len(page) == 0 {
-					return nil, nil
-				}
-				written := make([][]string, 0, len(page))
-				for _, row := range page {
-					last := ""
-					if row.LastReceivedAt != nil {
-						last = core.Stamp(*row.LastReceivedAt)
-					}
-					refused, why := "", ""
-					if row.LastRefusedAt != nil {
-						refused = core.Stamp(*row.LastRefusedAt)
-					}
-					if row.RefusedBecause != nil {
-						why = *row.RefusedBecause
-					}
-					written = append(written, []string{
-						row.Product, row.BranchOrTag, row.BranchOrTagKind, row.Variant, last,
-						refused, why,
-						strconv.Itoa(int(row.Since.Hours() / 24)),
-						strconv.FormatBool(row.Quiet),
-						strconv.FormatBool(row.OutOfSupport),
-						strconv.FormatBool(row.RetiredFromUse),
-					})
-				}
-				return written, nil
-			},
+			Held: written,
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "last-uploads", out)
-		}}, nil
+		return core.Export(in, input.Format, "last-uploads", out)
 	})
 }

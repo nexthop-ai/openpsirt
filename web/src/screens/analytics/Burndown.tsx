@@ -19,6 +19,7 @@ import { BANDS, FLOORS } from "../../ui/severities";
 import { AddedDone, Burn, BurnLegend, paceWords } from "../../ui/Burn";
 import { Sheet } from "./Sheet";
 import { scopeWords } from "./catalog";
+import { Downloads } from "../../ui/Downloads";
 
 // What is left from a day 0, and whether the pace reaches zero.
 //
@@ -173,12 +174,7 @@ export function Burndown() {
         )}
         {figures && !needsBuild && (
           <span style={{ marginLeft: "auto" }} className="noprint">
-            <a className="btn quiet" href={file("csv")}>
-              CSV
-            </a>{" "}
-            <a className="btn quiet" href={file("json")}>
-              JSON
-            </a>
+            <Downloads href={file} />
           </span>
         )}
       </div>

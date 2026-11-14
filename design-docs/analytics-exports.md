@@ -19,21 +19,32 @@ audit log, the review queue, what became of the reader's own decisions, the
 by-component view, what is running out of time, the last upload per build, what
 is out of support, a comparison of two builds, a comparison of two builds'
 inventories, the planned upgrades of a product and of one build, the code
-finding queue, what keeps being put off, the backlog over time, the findings
+finding queue, the code finding trend and figures, what keeps being put off, the backlog over time, the findings
 burndown, administrative changes, what a build holds that the scanner cannot
 match, and the disposition register.
 
-A file is the list's own query with the same subject, written and paged as it
-streams at the screen's page size; no complete list exists to filter afterwards.
+A file is the list's own query with the same subject, written as it is read; no
+complete list exists to filter afterwards. A file is read one of three ways.
+
+| Way | Files |
+|---|---|
+| Paged at the screen's page size, every page inside one read-only snapshot of the database | The findings list and its code findings, the cross-product findings list, the audit log, the review queue, the reader's own decisions, the by-component view, what is running out of time, the planned upgrades of a product, the code finding queue, administrative changes |
+| One cursor over the whole answer | The disposition register |
+| Read whole before the first byte | A comparison of two builds or their inventories, the backlog over time, the findings burndown, the code finding trend and figures, what keeps being put off, the last upload per build, what is out of support, one build's planned upgrades, what a build holds that the scanner cannot match |
 
 | Rule | Reason |
 |---|---|
 | A list and its file are built from one function | |
 | A file takes its screen's filters, declared once; an undeclared filter is refused | An export dropping a filter showed eight rows on screen and seven thousand in the file |
 | Paging is kept apart from the filters | A file pages internally and offers no page size |
-| A failure part-way writes a line saying the file is incomplete | |
-| A stream holds its cursor ten minutes at most, then is cut with the incomplete marker | A slow reader otherwise holds a connection about 41 hours for 249,288 occurrences read in 1.9 s; on SQLite, the whole pool |
-| Streams at once are a fifth of the pool, at least one; one more is refused with 503 and a time to ask again | |
+| A file over a period says each bound back as the day asked for; an open end as the moment the file was asked, and a rolling window's start as its moment | A bound inside a day said as that day names a period the file does not cover: the end is not itself in the period, and a window starts partway through its first day |
+| A screen's file link carries its filters with each value of a list as its own repetition of the name, and never its page | The server reads `a,b` as one value named `a,b` |
+| Every page of a paged file, and every name a page carries, is read through one snapshot | Each page is its own statement, and a row written between two of them moves every later row, so the file repeats or skips a row and says it is complete |
+| Every page of a paged file reads at the moment the file states it was taken: a deadline, a date run out and an end of life | A deadline passing between two pages sorts a row into a page already written, which repeats or skips a row as a write between them does |
+| A list grouped in the application from everything it reads is read whole, once | Paged, every page repeats the whole read: what keeps being put off is grouped from every deferral |
+| A failure part-way writes a line saying the file is incomplete, and is logged | The 200 has gone out, so nothing else tells an operator; a reader that went away, or one too slow for the stall bound or the ceiling, is a warning |
+| A stream's cursor and a paged file's snapshot are held ten minutes at most, then cut with the incomplete marker | A slow reader otherwise holds a connection about 41 hours for 249,288 occurrences read in 1.9 s; on a pool of one connection, the whole pool. A snapshot also holds back the engine's clean-up of old row versions, and on SQLite a checkpoint of the write-ahead log past it. On PostgreSQL, MySQL and MariaDB it holds a shared lock on every table it has read until it ends, so a migration altering one of them, such as a replica's at start during a rolling upgrade, waits for the file, and every later request on that table waits behind the migration. Ten minutes beside 100 write transactions a second grew MySQL 8's history list to 139,646 and MariaDB's to 154,061. A findings file of 12,000 groups reads in 42 s on MySQL, the slowest engine (`design-docs/analytics-measurements.md` § Export snapshots) |
+| Files reading the database as they are written are a fifth of the pool at once, at least one; one more is refused with 503 and a time to ask again | A file read whole holds no connection and takes no place |
 | A refusal is answered before the first byte | After it, a refusal sits inside a 200 |
 | The deadline report pages by offset, with the build in the ordering | An arbitrary order repeats one row and skips another |
 | A comparison is one file, a column naming which of the three parts a row is in, read whole | |

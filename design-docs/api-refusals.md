@@ -70,7 +70,7 @@ SQLite refuse such a string as a fault; MySQL and MariaDB drop the character.
 |---|---|
 | A query parameter, by name | Once for every operation, after unknown parameters are refused |
 | A path value, by name | The same check |
-| A form field, by name | Where every multipart form is read, before the operation parses it |
+| A form field, by name | Where every multipart form is read, before the operation parses it; a form is known by its media type regardless of capitals, as the form parser knows it |
 | A string or a key in a JSON body, by its place | The one reader of JSON bodies, reported as an unreadable body |
 
 Names are taken in order, so a request holding two is refused naming the same

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { fileAt, linkTo } from "./links";
+import { exportQuery, fileAt, linkTo } from "./links";
 
 describe("an address a browser fetches directly", () => {
   it("escapes each placeholder as a path segment", () => {
@@ -45,5 +45,21 @@ describe("a report file's address", () => {
       fileAt("/v1/products/{product}/comparison.{format}", "json", { path: { product: "son ic" } }),
     ).toBe("/v1/products/son%20ic/comparison.json");
     expect(fileAt("/v1/deferrals/repeated.{format}", "json")).toBe("/v1/deferrals/repeated.json");
+  });
+});
+
+describe("the question a file asks", () => {
+  it("repeats the key for each value of a list, and leaves off the paging and anything unset", () => {
+    expect(
+      exportQuery({
+        component: ["a", "b,c"],
+        severity: "high",
+        days: 30,
+        q: "",
+        state: undefined,
+        limit: 50,
+        offset: 100,
+      }).toString(),
+    ).toBe("component=a&component=b%2Cc&severity=high&days=30");
   });
 });

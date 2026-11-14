@@ -35,16 +35,20 @@ func reachBody(r finding.Reach) ReachBody {
 	}
 	for _, m := range r.Automatic {
 		body.Automatic = append(body.Automatic, MatchBody{
-			BranchOrTag: m.BranchOrTag, Variant: m.Variant, Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
-			BranchOrTagName: m.BranchOrTagName,
-			VariantName:     m.VariantName,
+			BuildNamesBody: core.BuildNamesBody{
+				BranchOrTag: m.BranchOrTag, BranchOrTagName: m.BranchOrTagName,
+				Variant: m.Variant, VariantName: m.VariantName,
+			},
+			Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
 		})
 	}
 	for _, m := range r.Differing {
 		body.Differing = append(body.Differing, MatchBody{
-			BranchOrTag: m.BranchOrTag, Variant: m.Variant, Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
-			BranchOrTagName: m.BranchOrTagName,
-			VariantName:     m.VariantName,
+			BuildNamesBody: core.BuildNamesBody{
+				BranchOrTag: m.BranchOrTag, BranchOrTagName: m.BranchOrTagName,
+				Variant: m.Variant, VariantName: m.VariantName,
+			},
+			Version: m.Version, Occurrences: m.Occurrences, Here: m.Here,
 		})
 	}
 	return body
@@ -52,10 +56,7 @@ func reachBody(r finding.Reach) ReachBody {
 
 // MatchBody is the same issue at the same occurrence in another build.
 type MatchBody struct {
-	BranchOrTag     string `json:"branch_or_tag"`
-	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant         string `json:"variant"`
-	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	core.BuildNamesBody
 	// Version is what that build ships, and the reason this is a separate
 	// question. With a match, the decision already reaches there and nobody is
 	// asked. It is the version the decision route resolves a name by, so a

@@ -74,7 +74,7 @@ func TestWhereTheEffortWentIsAReport(t *testing.T) {
 		// And it takes the same scope the other reports do.
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
 			"/v1/effort?product=theirs", ""), http.StatusNotFound)
-		if unknown := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
+		if unknown := httpapitest.AsPerson(t, r, "admin-reader", http.MethodGet,
 			"/v1/effort?team=nobodys", ""); unknown.Code != http.StatusNotFound {
 			t.Errorf("a team nobody declared answered %d", unknown.Code)
 		}

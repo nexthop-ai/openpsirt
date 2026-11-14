@@ -195,6 +195,15 @@ func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
+// At makes every moment the store reads the one given, for a file read a page
+// at a time, where each page read at its own moment can sort a row into a
+// page already written.
+func (s *Store) At(moment time.Time) *Store {
+	moment = moment.UTC()
+	s.now = func() time.Time { return moment }
+	return s
+}
+
 // ErrAlreadyInTransaction is returned when a write entry point is called on a
 // store that is already inside a transaction.
 //

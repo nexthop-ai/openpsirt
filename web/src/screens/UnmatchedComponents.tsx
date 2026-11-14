@@ -15,6 +15,7 @@ import { Wide } from "../ui/Wide";
 import { own } from "../ui/own";
 import { fileAt as linkedFile } from "../api/links";
 import { componentAt } from "../app/routes";
+import { Downloads } from "../ui/Downloads";
 
 const PAGE = 200;
 
@@ -128,13 +129,12 @@ export function UnmatchedComponents() {
 
           <p className="hint">
             Download{" "}
-            <a href={fileAt({ product, branch_or_tag: branchOrTag, variant }, "csv", reason)}>
-              CSV
-            </a>{" "}
-            ·{" "}
-            <a href={fileAt({ product, branch_or_tag: branchOrTag, variant }, "json", reason)}>
-              JSON
-            </a>
+            <Downloads
+              inline
+              href={(format) =>
+                fileAt({ product, branch_or_tag: branchOrTag, variant }, format, reason)
+              }
+            />
             .
           </p>
 

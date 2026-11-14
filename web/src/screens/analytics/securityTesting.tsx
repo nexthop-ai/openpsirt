@@ -18,6 +18,7 @@ import { Wide } from "../../ui/Wide";
 import { CODE_FINDING_METHODS } from "../codeFindings";
 import { TIERS } from "../codeTrend";
 import { scopeWords } from "./catalog";
+import { Downloads } from "../../ui/Downloads";
 
 // What the security testing figures share: the narrowing they read from the
 // address and the picker, the frame they draw in place of figures a reader
@@ -102,12 +103,7 @@ export function Files({
   const file = (format: "csv" | "json") => fileAt(path, format, { path: { product }, query });
   return (
     <span style={{ marginLeft: "auto" }} className="noprint">
-      <a className="btn quiet" href={file("csv")}>
-        CSV
-      </a>{" "}
-      <a className="btn quiet" href={file("json")}>
-        JSON
-      </a>
+      <Downloads href={file} />
     </span>
   );
 }

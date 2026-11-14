@@ -101,3 +101,20 @@ export function fileAt<P extends FileRoute>(
     query: given?.query,
   });
 }
+
+// The question a screen asked, as a file asks it: every filter, each value of
+// a list as its own repetition of the key, and never the paging, since a file
+// is the whole of a narrowing rather than the page in front of somebody. A
+// filter left unset or empty is left off.
+export function exportQuery(query: Record<string, unknown>): URLSearchParams {
+  const asked = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (key === "limit" || key === "offset" || value === undefined || value === "") continue;
+    if (Array.isArray(value)) {
+      for (const each of value) asked.append(key, String(each));
+    } else {
+      asked.append(key, String(value));
+    }
+  }
+  return asked;
+}

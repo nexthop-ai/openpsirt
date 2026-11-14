@@ -30,6 +30,7 @@ import {
 import { scopeWords } from "./catalog";
 import { Sheet } from "./Sheet";
 import { Segments, StepSegments, boundedAsked } from "./Window";
+import { Downloads } from "../../ui/Downloads";
 
 // Whether the code findings backlog is shrinking: what is not fixed week by
 // week, split by tier, series or method, what opened against what was fixed,
@@ -195,12 +196,7 @@ export function CodeFindingTrend() {
         </div>
         {product && reads && !needsBuild && (
           <span style={{ marginLeft: "auto" }} className="noprint">
-            <a className="btn quiet" href={file("csv")}>
-              CSV
-            </a>{" "}
-            <a className="btn quiet" href={file("json")}>
-              JSON
-            </a>
+            <Downloads href={file} />
           </span>
         )}
       </div>

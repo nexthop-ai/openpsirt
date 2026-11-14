@@ -128,41 +128,31 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
+		written := make([][]string, 0, len(rows))
+		for _, row := range rows {
+			// Said in a word as well as in the sign of a number: a
+			// spreadsheet sorted on the days column puts the two
+			// populations either side of zero, and a reader scanning
+			// rows has to notice the minus to tell them apart.
+			state := "ending"
+			if row.Ended {
+				state = "ended"
+			}
+			written = append(written, []string{
+				row.Product, row.BranchOrTag, string(row.Kind), state, row.EndedOn,
+				strconv.FormatBool(row.Inherited),
+				strconv.Itoa(row.EndedDays), strconv.Itoa(row.Open),
+			})
+		}
 		out := core.Exporting{
 			What: "releases out of support",
 			Header: []string{
 				"product", "branch_or_tag", "kind", "state", "ended_on", "inherited",
 				"ended_days", "open",
 			},
-			// Read whole above, so a page is a slice of what is already in
-			// hand rather than the same query run again per two hundred.
-			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
-				page := core.Window(rows, limit, offset)
-				if len(page) == 0 {
-					return nil, nil
-				}
-				written := make([][]string, 0, len(page))
-				for _, row := range page {
-					// Said in a word as well as in the sign of a number: a
-					// spreadsheet sorted on the days column puts the two
-					// populations either side of zero, and a reader scanning
-					// rows has to notice the minus to tell them apart.
-					state := "ending"
-					if row.Ended {
-						state = "ended"
-					}
-					written = append(written, []string{
-						row.Product, row.BranchOrTag, string(row.Kind), state, row.EndedOn,
-						strconv.FormatBool(row.Inherited),
-						strconv.Itoa(row.EndedDays), strconv.Itoa(row.Open),
-					})
-				}
-				return written, nil
-			},
+			Held: written,
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "out-of-support", out)
-		}}, nil
+		return core.Export(in, input.Format, "out-of-support", out)
 	})
 }
 

@@ -47,6 +47,8 @@ export interface paths {
          *
          *     Takes the kind and the period the list takes. Asked for no period it writes everything this deployment holds.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: administrator, or the audit permission over this deployment's own records
          */
         get: operations["export-administrative-changes"];
@@ -663,6 +665,8 @@ export interface paths {
          *
          *     Takes every filter the audit list takes, including the period.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-audit"];
@@ -928,6 +932,8 @@ export interface paths {
          * @description The code finding list across products as a file: every row the same filters would list, not one page of them, in the same order, each naming its product.
          *
          *     Read with your own visibility, as it is written. No row carries source text. Takes every filter the list across products takes.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only the products where you read security testing work.
          */
@@ -1667,6 +1673,8 @@ export interface paths {
          *
          *     Takes every filter the cross-product list takes. `beneath` and `differs` are not offered here, for the reason that list gives.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-findings-anywhere"];
@@ -2015,7 +2023,7 @@ export interface paths {
          *
          *     Send-backs are counted for the deployment rather than per person: the record holds that a decision was sent back and not by whom, and the reason travels as a comment.
          *
-         *     Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error.
+         *     Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error. A narrowing to a team is the exception: from anybody but an administrator it is refused with 403.
          *
          *     Asked for neither a period nor a window, this is the last 90 days.
          *
@@ -2068,6 +2076,8 @@ export interface paths {
          * @description What `GET /v1/my-decisions` lists, as a file: every decision you proposed, newest first, with what became of each and who did it, rather than one page.
          *
          *     Narrowed to what you may still read.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -3907,6 +3917,8 @@ export interface paths {
          * Export the disposition register
          * @description The register as a file. Read with your own visibility as it streams, like every other export here.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-disposition-register"];
@@ -4501,6 +4513,8 @@ export interface paths {
          *
          *     With no `state` it is the queue, and the file says so. Takes every filter the code finding list takes.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-code-findings"];
@@ -4863,6 +4877,8 @@ export interface paths {
          *
          *     Takes every filter the findings list takes.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-findings"];
@@ -4948,6 +4964,8 @@ export interface paths {
          *     This is the shape a release meeting argues over: where the weight is rather than what is wrong. On a switch operating-system image the kernel carried 4,943 of 6,822 findings rows and the next largest contributor carried 58, which is a one-line answer here and invisible in a list of issues.
          *
          *     Takes the same filters as the by-component list, and the line this deployment triages at is stated in the file.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -5680,6 +5698,8 @@ export interface paths {
          * @description The same list as a file: one row per upstream upgrade, with what it closes and the builds that hold it.
          *
          *     Takes the same selection and the same filters as the screen, from the same struct. The builds an upgrade is held in are one cell, separated by spaces, because a spreadsheet has no second dimension.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -6831,6 +6851,8 @@ export interface paths {
          *
          *     Takes the same `reason`, `mine`, `product` and filters as `GET /v1/review-queue`, and holds the same decisions.
          *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
+         *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
         get: operations["export-review-queue"];
@@ -6932,6 +6954,8 @@ export interface paths {
          *     The same list the screen reads, under the same rule — a deadline that has been answered is not on it, because a dismissal takes a finding off the clock and a deferral replaces the deadline with its own date. What is left is time passing with nothing said.
          *
          *     `days_left` is negative once something is overdue.
+         *
+         *     Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
          *
          *     Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
          */
@@ -17881,7 +17905,7 @@ export interface operations {
                 component?: string;
                 /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused */
                 purl?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -17935,7 +17959,7 @@ export interface operations {
                 component?: string;
                 /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused */
                 purl?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -19113,7 +19137,7 @@ export interface operations {
                 days?: number;
                 /** @description Limit to decisions made in one product, by name */
                 product?: string;
-                /** @description Limit to decisions this team's members proposed, by team name */
+                /** @description Limit to decisions this team's members proposed, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists */
                 team?: string;
                 /** @description The most rows to return */
                 limit?: number;
@@ -19874,7 +19898,7 @@ export interface operations {
                 days?: number;
                 /** @description Limit to decisions made in one product, by name */
                 product?: string;
-                /** @description Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator is given the per-person rows */
+                /** @description Limit to decisions this team's members proposed, and to what they themselves agreed to and withdrew, by team name. Only an administrator may narrow to a team; from anybody else it is refused with 403, whether or not the team exists */
                 team?: string;
             };
             header?: never;
@@ -24330,7 +24354,7 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -24503,7 +24527,7 @@ export interface operations {
             query?: {
                 branch_or_tag?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -24638,7 +24662,7 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -24778,7 +24802,7 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Left out, every one under the product, and independent of the branch */
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -24916,7 +24940,7 @@ export interface operations {
             query?: {
                 branch_or_tag?: string;
                 variant?: string;
-                /** @description Keep only what sits at this component or anywhere under it — what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. The name must be in the build; a name it does not hold answers 404, and one the build holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -28931,7 +28955,7 @@ export interface operations {
                 days?: number;
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;
@@ -28983,7 +29007,7 @@ export interface operations {
                 days?: number;
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
-                /** @description Keep only what sits at this component or anywhere under it. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
                 beneath?: string;
                 /** @description The version, where the build holds that name at several */
                 beneath_version?: string;

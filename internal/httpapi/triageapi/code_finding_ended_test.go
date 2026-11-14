@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
@@ -221,6 +223,48 @@ func TestAReaffirmationRemakesADecisionOnlyAtCodeFindingsStillInSupport(t *testi
 		}
 		if got := decisionsAt(t, r, kin[0]); got != 1 {
 			t.Errorf("the kin past its end of life holds %d rows; want the lapsed one alone", got)
+		}
+	})
+}
+
+// TestACodeFindingFileReadsEndOfLifeAtItsMoment pins the moment a code finding
+// file's pages read at: a release is past its end of life or not as of the
+// moment given, whatever the clock says, in the queue's file and in the code
+// findings below a findings file.
+func TestACodeFindingFileReadsEndOfLifeAtItsMoment(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		httpapitest.SeededCodeFinding(t, r)
+		endMaster(t, r)
+		mine, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader := access.NewPerson(1_000_000, "a reader", false,
+			map[int64][]access.Role{mine.ID: {access.SecurityTestingRead}}, 0)
+		scope := analysis.Scope{ProductID: mine.ID}
+		for _, c := range []struct {
+			name string
+			at   time.Time
+			want int
+		}{
+			{"before its end of life", time.Now().Add(-7 * 24 * time.Hour), 1},
+			{"after its end of life", time.Now(), 0},
+		} {
+			queued, err := analysis.CodeFindingPageOf(ctx, r.DB.DB, reader, scope, "", c.at, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(queued) != c.want {
+				t.Errorf("%s, the queue's file holds %d code findings, want %d", c.name, len(queued), c.want)
+			}
+			open, err := analysis.OpenCodeFindingsOf(ctx, r.DB.DB, reader, scope, c.at, 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(open) != c.want {
+				t.Errorf("%s, the findings file holds %d code findings, want %d", c.name, len(open), c.want)
+			}
 		}
 	})
 }

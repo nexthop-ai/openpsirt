@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
@@ -183,15 +184,15 @@ func (a CodeFindingsAsked) scoped(ctx context.Context, in core.Deps) (access.Sub
 }
 
 // codeFindingRows is a page of code findings as the list and its file both state them, with
-// who holds each one named.
-func codeFindingRows(ctx context.Context, in core.Deps, rows []analysis.QueueRow) ([]CodeFindingRowBody, error) {
+// who holds each one named through db.
+func codeFindingRows(ctx context.Context, db bun.IDB, rows []analysis.QueueRow) ([]CodeFindingRowBody, error) {
 	parties := make([]int64, 0, len(rows))
 	for _, r := range rows {
 		if r.Holder != nil {
 			parties = append(parties, *r.Holder)
 		}
 	}
-	who, err := access.NewStore(in.DB.DB).WhoHolds(ctx, parties)
+	who, err := access.NewStore(db).WhoHolds(ctx, parties)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +293,7 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			"page of them, in the same order.\n\n" +
 			"Read with your own visibility, as it is written. No row carries source text.\n\n" +
 			"With no `state` it is the queue, and the file says so. Takes every filter the code finding " +
-			"list takes.",
+			"list takes.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		CodeFindingsAsked
@@ -309,13 +310,13 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			What:   "code findings",
 			About:  []core.Stated{{Label: "lists", Value: listedAs(input.State, input.Assigned == finding.HeldByNobody, scope, input.Beneath)}},
 			Header: codeFindingColumns(),
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				page, err := analysis.CodeFindingPageOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
-					limit, offset)
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+				page, err := analysis.CodeFindingPageOf(ctx, db, subject, scope, analysis.State(input.State),
+					moment, limit, offset)
 				if err != nil {
 					return nil, err
 				}
-				listed, err := codeFindingRows(ctx, in, page)
+				listed, err := codeFindingRows(ctx, db, page)
 				if err != nil {
 					return nil, err
 				}
@@ -327,9 +328,7 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			},
 		}
 		name := "code findings-" + strings.ToLower(input.Product)
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, name, out)
-		}}, nil
+		return core.Export(in, input.Format, name, out)
 	})
 
 	registerCodeFindingQueueAcross(api, in)
@@ -345,7 +344,7 @@ func queueOutput(ctx context.Context, in core.Deps, queue *analysis.Queue) (*Cod
 		out.Body.States[string(state)] = n
 	}
 	var err error
-	if out.Body.Items, err = codeFindingRows(ctx, in, queue.Rows); err != nil {
+	if out.Body.Items, err = codeFindingRows(ctx, in.DB.DB, queue.Rows); err != nil {
 		return nil, core.WentWrong(in.Logger, "who holds the code findings could not be read", err)
 	}
 	return out, nil
@@ -411,7 +410,7 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 		Description: "The code finding list across products as a file: every row the same filters would list, " +
 			"not one page of them, in the same order, each naming its product.\n\n" +
 			"Read with your own visibility, as it is written. No row carries source text. Takes every filter " +
-			"the list across products takes.",
+			"the list across products takes.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only the products where you read security testing work."), func(ctx context.Context, input *struct {
 		CodeFindingsAcrossAsked
@@ -429,13 +428,13 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 				{Label: "products", Value: "every product you read security testing work in"},
 			},
 			Header: codeFindingColumns(),
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				page, err := analysis.CodeFindingPageOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
-					limit, offset)
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+				page, err := analysis.CodeFindingPageOf(ctx, db, subject, scope, analysis.State(input.State),
+					moment, limit, offset)
 				if err != nil {
 					return nil, err
 				}
-				listed, err := codeFindingRows(ctx, in, page)
+				listed, err := codeFindingRows(ctx, db, page)
 				if err != nil {
 					return nil, err
 				}
@@ -446,8 +445,6 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 				return rows, nil
 			},
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "code findings", out)
-		}}, nil
+		return core.Export(in, input.Format, "code findings", out)
 	})
 }

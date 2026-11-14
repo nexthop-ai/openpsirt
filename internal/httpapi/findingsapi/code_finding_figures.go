@@ -189,7 +189,7 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		return judgedFile.stream(input.Format, input.Product, weeksStated(input.Weeks), judgingRows(got)), nil
+		return judgedFile.stream(in, input.Format, input.Product, weeksStated(input.Weeks), judgingRows(got))
 	})
 
 	fixed := func(ctx context.Context, input *CodeFindingWindowAsked) (*analysis.Fixing, time.Time, time.Time, error) {
@@ -253,7 +253,7 @@ func registerCodeFindingTiming(api huma.API, in core.Deps) {
 		}
 		rows := append(waitRows("fixed", got.Fixed), waitRows("no longer detected", got.NoLongerDetected)...)
 		rows = append(rows, []string{"dismissed, left out", "all", strconv.Itoa(got.Dismissed), "", "", ""})
-		return fixedFile.stream(input.Format, input.Product, weeksStated(input.Weeks), rows), nil
+		return fixedFile.stream(in, input.Format, input.Product, weeksStated(input.Weeks), rows)
 	})
 }
 
@@ -306,26 +306,18 @@ func (f figureFile) operation() huma.Operation {
 // default the query leaves out decides it, such as the weeks of a window. The
 // figure is worked out before this is called, so a refusal is a status rather
 // than a line in a file that answered 200.
-func (f figureFile) stream(format, product string, about []core.Stated, rows [][]string) *huma.StreamResponse {
-	out := core.Exporting{
-		What:   f.what,
-		About:  about,
-		Header: f.header,
-		// Every row in one answer: a figure is worked out whole, so the
-		// second page is empty and the walk stops.
-		Rows: func(_ context.Context, _, offset int) ([][]string, error) {
-			if offset > 0 {
-				return nil, nil
-			}
-			return rows, nil
-		},
-	}
+func (f figureFile) stream(in core.Deps, format, product string, about []core.Stated,
+	rows [][]string) (*huma.StreamResponse, error) {
+
 	// A figure across products is named for no product.
 	name := f.what
 	if product != "" {
 		name += "-" + strings.ToLower(product)
 	}
-	return &huma.StreamResponse{Body: func(writer huma.Context) {
-		core.WriteExport(writer, format, name, out)
-	}}
+	return core.Export(in, format, name, core.Exporting{
+		What:   f.what,
+		About:  about,
+		Header: f.header,
+		Held:   rows,
+	})
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
@@ -149,7 +150,7 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 			"and the builds that hold it.\n\n" +
 			"Takes the same selection and the same filters as the screen, from the same " +
 			"struct. The builds an upgrade is held in are one cell, separated by spaces, because " +
-			"a spreadsheet has no second dimension.",
+			"a spreadsheet has no second dimension.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -163,16 +164,11 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		store := finding.NewStore(in.DB.DB)
 		narrowed := input.narrow(floor)
 		oneBuild := scope.BranchOrTagID != nil && scope.VariantID != nil
-		line := "everything"
-		if floor.Hides() {
-			line = floor.Word
-		}
 		out := core.Exporting{
 			What:  "findings by upgrade",
-			About: []core.Stated{{Label: "triaged at or above", Value: line}},
+			About: []core.Stated{core.TriagedAtOrAbove(floor)},
 			Header: []string{
 				"upstream", "from", "to", "components", "issues", "occurrences",
 				"builds", "severity", "exploited", "incident", "in",
@@ -180,8 +176,8 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 			// Paged through the store the screen reads, so the file is the
 			// list rather than a second query that will come to disagree
 			// with it.
-			Rows: func(ctx context.Context, limit, offset int) ([][]string, error) {
-				upgrades, _, err := store.PlannedUpgrades(ctx, subject, scope, limit, offset, narrowed)
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+				upgrades, _, err := finding.NewStore(db).At(moment).PlannedUpgrades(ctx, subject, scope, limit, offset, narrowed)
 				if err != nil {
 					return nil, err
 				}
@@ -210,9 +206,7 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 				return rows, nil
 			},
 		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "planned-upgrades-"+core.DownloadName(input.Product), out)
-		}}, nil
+		return core.Export(in, input.Format, "planned-upgrades-"+core.DownloadName(input.Product), out)
 	})
 }
 
@@ -347,6 +341,19 @@ func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 			return nil, core.RefusedFinding(in, err)
 		}
 		rows := plannedBodies(planned)
+		written := make([][]string, 0, len(rows))
+		for _, row := range rows {
+			decision := ""
+			if row.DecisionID != 0 {
+				decision = strconv.FormatInt(row.DecisionID, 10)
+			}
+			written = append(written, []string{
+				row.Upstream, row.From, row.To,
+				strings.Join(row.Components, " "),
+				strconv.Itoa(row.Issues), strconv.Itoa(row.Occurrences),
+				row.DeclaredAt, row.By, row.HeldBy, row.HeldByName, string(row.State), decision,
+			})
+		}
 		out := core.Exporting{
 			What: "upgrades this build is waiting on",
 			About: []core.Stated{
@@ -356,31 +363,10 @@ func registerBuildPlannedUpgrades(api huma.API, in core.Deps) {
 				"upstream", "from", "to", "components", "issues", "occurrences",
 				"declared_at", "by", "held_by", "held_by_name", "state", "decision",
 			},
-			Rows: func(_ context.Context, limit, offset int) ([][]string, error) {
-				page := core.Window(rows, limit, offset)
-				if len(page) == 0 {
-					return nil, nil
-				}
-				written := make([][]string, 0, len(page))
-				for _, row := range page {
-					decision := ""
-					if row.DecisionID != 0 {
-						decision = strconv.FormatInt(row.DecisionID, 10)
-					}
-					written = append(written, []string{
-						row.Upstream, row.From, row.To,
-						strings.Join(row.Components, " "),
-						strconv.Itoa(row.Issues), strconv.Itoa(row.Occurrences),
-						row.DeclaredAt, row.By, row.HeldBy, row.HeldByName, string(row.State), decision,
-					})
-				}
-				return written, nil
-			},
+			Held: written,
 		}
 		name := "planned-upgrades-" + core.DownloadName(input.Product+"-"+input.BranchOrTag+"-"+input.Variant)
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, name, out)
-		}}, nil
+		return core.Export(in, input.Format, name, out)
 	})
 }
 

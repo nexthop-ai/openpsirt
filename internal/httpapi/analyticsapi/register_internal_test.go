@@ -44,3 +44,21 @@ func (c *tally) Handle(context.Context, slog.Record) error {
 }
 func (c *tally) WithAttrs([]slog.Attr) slog.Handler { return c }
 func (c *tally) WithGroup(string) slog.Handler      { return c }
+
+// A release note whose builds could not be named fails, rather than heading a
+// document going to a customer with the names this deployment files them by.
+func TestAReleaseNoteWhoseBuildsCouldNotBeNamedIsAFault(t *testing.T) {
+	gone := dbtest.Closed(t)
+	logged := &tally{}
+	in := core.Deps{DB: gone, Logger: slog.New(logged)}
+	named, err := describing(t.Context(), in, 1, "master", "broadcom")
+	if err == nil {
+		t.Fatalf("a database nobody can reach named the build %q", named)
+	}
+	if core.Answered(err) != http.StatusInternalServerError {
+		t.Errorf("a build lookup that failed answered %d", core.Answered(err))
+	}
+	if logged.n == 0 {
+		t.Error("a build lookup that failed was not logged")
+	}
+}

@@ -44,10 +44,7 @@ type EmbargoedBody struct {
 
 // EmbargoedBuildBody is one build an embargoed issue sits in.
 type EmbargoedBuildBody struct {
-	BranchOrTag     string `json:"branch_or_tag"`
-	BranchOrTagName string `json:"branch_or_tag_name,omitempty" doc:"The branch or tag as it was spelled, or its name where no spelling was recorded"`
-	Variant         string `json:"variant"`
-	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
+	core.BuildNamesBody
 }
 
 // EnteredBody is the record of a flaw entered.
@@ -383,10 +380,10 @@ func registerDisclosure(api huma.API, in core.Deps) {
 		for _, row := range rows {
 			builds := make([]EmbargoedBuildBody, 0, len(row.Builds))
 			for _, b := range row.Builds {
-				builds = append(builds, EmbargoedBuildBody{
+				builds = append(builds, EmbargoedBuildBody{BuildNamesBody: core.BuildNamesBody{
 					BranchOrTag: b.BranchOrTag, BranchOrTagName: b.BranchOrTagName,
 					Variant: b.Variant, VariantName: b.VariantName,
-				})
+				}})
 			}
 			components := row.Components
 			if components == nil {

@@ -40,6 +40,7 @@ import {
   placedOn,
   stateSaid,
 } from "./codeFindings";
+import { Downloads } from "../ui/Downloads";
 
 // A product's static analysis code findings. With no state it is the queue: open
 // code findings nothing waits on. A state lists that state's code findings instead.
@@ -245,12 +246,7 @@ export function CodeFindings() {
               </Link>{" "}
             </>
           )}
-          <a className="btn quiet" href={file("csv")}>
-            CSV
-          </a>{" "}
-          <a className="btn quiet" href={file("json")}>
-            JSON
-          </a>
+          <Downloads href={file} />
         </span>
       </div>
       <div className="tabs2">

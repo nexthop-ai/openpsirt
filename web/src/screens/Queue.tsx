@@ -24,6 +24,7 @@ import { fileAt } from "../api/links";
 import { Card, Dated } from "./QueueCard";
 import { PAGE, useQueueReads } from "./useQueueReads";
 import { useQueueApproval } from "./useQueueApproval";
+import { Downloads } from "../ui/Downloads";
 
 // The review queue at the grain of a decision: one card per proposer's action,
 // however many records it wrote. Three lists, one per reason a decision waits:
@@ -188,12 +189,7 @@ export function Queue() {
             offers none rather than another list under its heading. */}
         {!reaffirm && (
           <span style={{ marginLeft: "auto" }}>
-            <a className="btn quiet" href={file("csv")}>
-              CSV
-            </a>{" "}
-            <a className="btn quiet" href={file("json")}>
-              JSON
-            </a>
+            <Downloads href={file} />
           </span>
         )}
       </div>

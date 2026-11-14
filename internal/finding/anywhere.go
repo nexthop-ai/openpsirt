@@ -77,6 +77,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 	filter.ProductID = 0
 	filter.HeldBy = subject.Mine()
 	filter.reader = subject
+	// The store's clock, as a list within a product reads it.
+	filter.now = s.now
 	// All three are statements about a selection of builds, which this is not.
 	filter.Builds = 0
 	filter.DiffersBetweenBuilds = false

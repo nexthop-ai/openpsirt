@@ -289,15 +289,11 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 			byBuild[row.BuildID] = append(byBuild[row.BuildID], row.ComponentID)
 		}
 	}
-	// The graph store reads through the pool. Describing is a read on the
-	// way out of a handler, never part of a transaction.
-	pool, err := s.pool()
-	if err != nil {
-		return nil, fmt.Errorf("describing decision occurrences reads the graph through the pool: %w", err)
-	}
+	// Through this store's own handle, so a description read inside a
+	// snapshot reads the graph from the same view as the rows it describes.
 	chains := map[int64]map[int64][]graph.Step{}
 	for build, components := range byBuild {
-		down, err := graph.NewStore(pool).Chains(ctx, subject, build, components)
+		down, err := graph.NewStore(s.db).Chains(ctx, subject, build, components)
 		if err != nil {
 			return nil, err
 		}

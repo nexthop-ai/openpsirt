@@ -33,6 +33,7 @@ import { counted, decidesAt, decidesLine, holding } from "../../app/families";
 import { HeldLine } from "../../ui/HeldLine";
 import { Wide } from "../../ui/Wide";
 import { decisionOccurrenceAt } from "../../app/routes";
+import { Downloads } from "../../ui/Downloads";
 
 // The window the figures cover. Thirty days is the window the remediation
 // metrics names and the one people quote; the others are here because a month
@@ -520,8 +521,7 @@ export function Overview() {
             {byProduct(at.product)}, all time.{" "}
             {/* The one list on this sheet rather than a figure, so it is the one
               thing here that exports. A review argues over the rows. */}
-            <a href={repeatsFile(at.product ?? "", "csv")}>CSV</a> ·{" "}
-            <a href={repeatsFile(at.product ?? "", "json")}>JSON</a>
+            <Downloads inline href={(format) => repeatsFile(at.product ?? "", format)} />
           </p>
           {repeated.isPending ? (
             <Loading />

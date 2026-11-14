@@ -9,73 +9,18 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
-
-// streamSlots bounds how many streamed exports hold a connection at once.
-//
-// A fifth of the pool, and at least one: the rest of the pool is left for
-// every other request. A pool of one connection has one slot, and it is the
-// whole of the pool for as long as the stream runs, which exportCeiling
-// bounds.
-type streamSlots chan struct{}
-
-// exportStreams is the number of slots where the pool states no size.
-const exportStreams = 5
-
-// streams holds each database's slots for the life of the process. The slots
-// are a share of one pool, so they belong to the pool rather than to a server
-// built over it.
-var streams = struct {
-	sync.Mutex
-	of map[*database.DB]streamSlots
-}{of: map[*database.DB]streamSlots{}}
-
-// streamSlotsFor is the slots of db's pool.
-func streamSlotsFor(db *database.DB) streamSlots {
-	streams.Lock()
-	defer streams.Unlock()
-	slots, ok := streams.of[db]
-	if !ok {
-		slots = newStreamSlots(db)
-		streams.of[db] = slots
-	}
-	return slots
-}
-
-func newStreamSlots(db *database.DB) streamSlots {
-	n := exportStreams
-	if db != nil {
-		if open := db.DB.DB.Stats().MaxOpenConnections; open > 0 {
-			n = max(1, open/5)
-		}
-	}
-	return make(streamSlots, n)
-}
-
-// take claims a slot, or refuses with a time to ask again. The release is
-// called once the stream has finished writing.
-func (s streamSlots) take() (func(), error) {
-	select {
-	case s <- struct{}{}:
-		return func() { <-s }, nil
-	default:
-		return nil, huma.ErrorWithHeaders(
-			huma.Error503ServiceUnavailable("too many exports are being written at once; ask again shortly"),
-			http.Header{"Retry-After": []string{"30"}})
-	}
-}
 
 // scoreCell is a severity score as a file states it, and nothing where there
 // is none.
@@ -112,7 +57,7 @@ func registerExport(api huma.API, in core.Deps) {
 			"order holds no code finding, and says so. Three filters narrow no code finding and keep them: `below_minimum_severity`, `planned=unplanned`, " +
 			"and `on=branch` with `support=in-support`, which is what the list reads when " +
 			"neither is asked.\n\n" +
-			"Takes every filter the findings list takes.",
+			"Takes every filter the findings list takes.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product     string `path:"product"`
@@ -129,14 +74,10 @@ func registerExport(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		subject, scope, floor, narrowed, store := at.Subject, at.Scope, at.MinimumSeverity, at.Filter, at.Store
+		subject, scope, floor, narrowed := at.Subject, at.Scope, at.MinimumSeverity, at.Filter
 
-		line := "everything"
-		if floor.Hides() {
-			line = floor.Word
-		}
-		findings := func(ctx context.Context, limit, offset int) ([][]string, error) {
-			groups, _, err := store.Groups(ctx, subject, scope, limit, offset, narrowed)
+		findings := func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+			groups, _, err := finding.NewStore(db).At(moment).Groups(ctx, subject, scope, limit, offset, narrowed)
 			if err != nil {
 				return nil, err
 			}
@@ -148,20 +89,16 @@ func registerExport(api huma.API, in core.Deps) {
 		}
 		parts, codeFindings := []core.Paged{findings}, withCodeFindings(input.Narrowing, input.AtOneBuild)
 		if codeFindings.Value == codeFindingsListed {
-			parts = append(parts, codeFindingRows(in, subject, analysis.Scope{
+			parts = append(parts, codeFindingRows(subject, analysis.Scope{
 				ProductID: *scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
 			}, ""))
 		}
-		out := core.Exporting{
+		return core.Export(in, input.Format, "findings-"+strings.ToLower(input.Product), core.Exporting{
 			What:   "findings",
-			About:  []core.Stated{{Label: "triaged at or above", Value: line}, codeFindings},
+			About:  []core.Stated{core.TriagedAtOrAbove(floor), codeFindings},
 			Header: findingColumns(),
 			Rows:   core.InTurn(parts...),
-		}
-		name := "findings-" + strings.ToLower(input.Product)
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, name, out)
-		}}, nil
+		})
 	})
 }
 
@@ -191,7 +128,7 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			"product name, as the product export writes them. The columns and the rule about " +
 			"filters are the product export's.\n\n" +
 			"Takes every filter the cross-product list takes. `beneath` and `differs` are " +
-			"not offered here, for the reason that list gives.",
+			"not offered here, for the reason that list gives.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Format string `path:"format" enum:"csv,json"`
@@ -210,9 +147,8 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		narrowed.MinSeverity = ""
-		store := finding.NewStore(in.DB.DB)
-		findings := func(ctx context.Context, limit, offset int) ([][]string, error) {
-			groups, _, err := store.Anywhere(ctx, subject, limit, offset, narrowed)
+		findings := func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+			groups, _, err := finding.NewStore(db).At(moment).Anywhere(ctx, subject, limit, offset, narrowed)
 			if err != nil {
 				return nil, err
 			}
@@ -224,27 +160,42 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 		}
 		parts, codeFindings := []core.Paged{findings}, withCodeFindings(input.Narrowing, core.AtOneBuild{})
 		if codeFindings.Value == codeFindingsListed {
-			products, err := catalog.NewStore(in.DB.DB).Products(ctx, subject)
-			if err != nil {
-				return nil, core.WentWrong(in.Logger, "the products could not be read", err)
-			}
-			for _, p := range products {
-				if _, err := access.Readable(subject, p.ID); err != nil {
-					continue
-				}
-				parts = append(parts, codeFindingRows(in, subject, analysis.Scope{ProductID: p.ID}, p.Name))
-			}
+			parts = append(parts, everyProductsCodeFindings(subject))
 		}
-		out := core.Exporting{
+		return core.Export(in, input.Format, "findings", core.Exporting{
 			What:   "findings, every product",
-			About:  []core.Stated{{Label: "triaged at or above", Value: "each product's own minimum severity"}, codeFindings},
+			About:  []core.Stated{core.TriagedEachAtItsOwn(), codeFindings},
 			Header: append([]string{"product"}, findingColumns()...),
 			Rows:   core.InTurn(parts...),
-		}
-		return &huma.StreamResponse{Body: func(writer huma.Context) {
-			core.WriteExport(writer, input.Format, "findings", out)
-		}}, nil
+		})
 	})
+}
+
+// everyProductsCodeFindings is the open code findings of every product the
+// subject reads, one product after another by name.
+//
+// The products are read on the first page asked, through the handle that page
+// is read through, so a product's name on its code findings is the name its
+// findings carry: read before the file's snapshot, a rename in between names
+// one product two ways in one file.
+func everyProductsCodeFindings(subject access.Subject) core.Paged {
+	var each core.Paged
+	return func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+		if each == nil {
+			products, err := catalog.NewStore(db).Products(ctx, subject)
+			if err != nil {
+				return nil, err
+			}
+			parts := make([]core.Paged, 0, len(products))
+			for _, p := range products {
+				if _, err := access.Readable(subject, p.ID); err == nil {
+					parts = append(parts, codeFindingRows(subject, analysis.Scope{ProductID: p.ID}, p.Name))
+				}
+			}
+			each = core.InTurn(parts...)
+		}
+		return each(ctx, db, moment, limit, offset)
+	}
 }
 
 // findingColumns names the columns of a findings export, in the order
@@ -314,10 +265,9 @@ func withCodeFindings(by core.Narrowing, at core.AtOneBuild) core.Stated {
 // The code finding queue's read, under its visibility, with the code findings a decision
 // waits on kept in. No row carries source text. A product whose code findings the reader may not read is a part holding
 // no row.
-func codeFindingRows(in core.Deps, subject access.Subject, scope analysis.Scope, product string) core.Paged {
-	return func(ctx context.Context, limit, offset int) ([][]string, error) {
-		in := core.Of(ctx, in)
-		open, err := analysis.OpenCodeFindingsOf(ctx, in.DB.DB, subject, scope, limit, offset)
+func codeFindingRows(subject access.Subject, scope analysis.Scope, product string) core.Paged {
+	return func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+		open, err := analysis.OpenCodeFindingsOf(ctx, db, subject, scope, moment, limit, offset)
 		if errors.Is(err, access.ErrDenied) {
 			return nil, nil
 		}
