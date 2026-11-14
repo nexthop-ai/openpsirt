@@ -14,7 +14,7 @@ export type Happened = Body<"DecisionDetail">["happened"];
 // | pending | waiting on a second person, or still argued: sent back, an agreement undone, rows that ended several ways |
 // | approved | in force: agreed to, or proposed where nothing waits on a second person |
 // | lapsed | stopped applying under it |
-// | none | withdrawn by its proposer, which ends it without standing either way |
+// | none | withdrawn by somebody who may argue it, which ends it without standing either way |
 type Stripe = "pending" | "approved" | "lapsed" | "";
 
 export function stripeOf(happened: Happened | undefined, needsApproval: boolean): Stripe {
