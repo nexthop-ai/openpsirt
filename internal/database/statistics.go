@@ -66,7 +66,7 @@ type Analyzed struct {
 // lock, so it waits only behind a schema change holding or queued for an
 // exclusive one, and without a bound it waits for the server's default of a
 // year.
-const lockWait = "1"
+const lockWait = 1
 
 // AnalyzeEveryTable asks the engine to refresh the planner's statistics of
 // every table in the database now. On SQLite it is RefreshStatistics, which
@@ -125,14 +125,13 @@ func AnalyzeEveryTable(ctx context.Context, db *DB) (Analyzed, error) {
 		return done, nil
 	}
 
-	if _, err := conn.ExecContext(ctx, "SET SESSION lock_wait_timeout = "+lockWait); err != nil {
-		return done, fmt.Errorf("bound the wait to analyze: %w", err)
+	if err := BoundLockWait(ctx, conn, db.Server.Engine, lockWait); err != nil {
+		return done, err
 	}
 	defer func() {
-		// A connection that cannot be put back is closed rather than pooled
-		// with the bound still on it.
-		if _, err := conn.ExecContext(context.WithoutCancel(ctx),
-			"SET SESSION lock_wait_timeout = DEFAULT"); err != nil {
+		// A connection whose bound cannot be lifted is closed, so the pool
+		// holds none carrying it.
+		if err := LiftLockWait(context.WithoutCancel(ctx), conn, db.Server.Engine); err != nil {
 			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
 		}
 	}()

@@ -14,6 +14,7 @@ Satisfies REQ-72, REQ-76.
 - [Migrations that stop half way](#migrations-that-stop-half-way)
 - [Release records](#release-records)
 - [Upgrade rehearsal](#upgrade-rehearsal)
+- [Statement lock waits](#statement-lock-waits)
 - [Migration locks](#migration-locks)
 - [Limits](#limits)
 
@@ -33,7 +34,7 @@ upgrade is deploying it.
 | The version a binary carries is the highest among its embedded migrations, read from their file names | The migration library applies the same rule |
 | Migrations are written in Go | They branch on the engine. A timestamp has no portable spelling: PostgreSQL has no `DATETIME`, and MySQL's `TIMESTAMP` is 32-bit and can acquire an implicit default and on-update clause from server configuration |
 | Only the migrations registered in the binary are applied, and no directory is read | The library otherwise globs the working directory: a stray `.sql` refuses every start, a numbered one runs under the migration credential, and a numbered `.go` file narrows what is applied |
-| What every migration does around its statements is one place: asking the engine, refusing one with no spellings, running each statement, naming the one that failed by its first line | |
+| What every migration does around its statements is one place: asking the engine, refusing one with no spellings, running each statement with its wait for a lock bounded (§ Statement lock waits), naming the one that failed by its first line | |
 | Dropping an index is one place | Two engines name an index's table and two refuse to |
 
 | Applied version | At start |
@@ -214,6 +215,46 @@ the demo's inventories, so it runs locally, outside the gate.
 | An engine `make engines-up` made joins the rehearsal's network | It publishes on loopback, which no container reaches. The container publishing the URL's port joins and is addressed by name, on Docker Desktop, rootless Docker and Podman. A failing docker command, or two containers publishing the port, refuses with docker's words. Another host, or a port no container publishes, is reached through `host.docker.internal`. A port no container publishes is refused while a container runs on the host network, where `ENGINE_NETWORK=host` starts the engines on loopback, out of a container's reach |
 | Everything it made is removed on pass, fail or interrupt | Its containers, network and database. The worktree, both images, the run's logs and the scanner's database are kept. `-keep` keeps everything. A second interrupt stops the removal |
 
+## Statement lock waits
+
+A data-definition statement waits for every session holding its table, and on
+PostgreSQL, MySQL and MariaDB every later statement from another session on that table
+queues behind the waiting one. A paged export's snapshot holds every table it has read
+for up to ten minutes (`design-docs/analytics-exports.md` § Exports).
+
+| Setting | Value | Reason |
+|---|---|---|
+| One attempt's wait | 3 s, for each lock the statement waits for | A statement queued behind a waiting lock is released within this long; a statement taking two tables can hold the first while it waits for the second. A short transaction holds a lock for milliseconds and ends inside one attempt. MySQL and MariaDB count whole seconds |
+| Pause after the first attempt that waits out its bound | 1 s, doubling after each | Queued statements go through during the pause, so a holder that stays leaves the table queued three seconds in four after the first attempt, and three in thirty-three from the sixth |
+| Longest pause | 30 s | The longest a migration starts late once its holder lets go |
+| Total wait | None | A cap is a guess at the longest holder. A stop ends the wait, and every attempt names the sessions to look at |
+
+| Engine | Bound | An attempt that waits out its bound |
+|---|---|---|
+| PostgreSQL | `lock_timeout`, set for the transaction before each statement | The upgrade's transaction rolls back, letting go of every table it took, and runs again after the pause |
+| MySQL, MariaDB | `lock_wait_timeout`, set for the session before each statement and put back to the session's own once it ends | The statement runs again where it stands. Each data-definition statement commits, so nothing earlier is held |
+| SQLite | The busy timeout of a minute every connection opens with (`design-docs/database.md` § SQLite settings) | The upgrade's transaction rolls back and runs again after the pause. In write-ahead-log mode a reader goes through beside a writer. A table locked on the migration's own connection fails it, since no wait frees one |
+
+| Rule | Reason |
+|---|---|
+| Every statement of a migration's schema change and every index dropped is bounded, the baseline's included | They run through the one place that runs a migration's statements (§ Migrations) |
+| The bound is set for each statement | The v0.11.0 renames put PostgreSQL's back to the server's default part way through their migration |
+| On PostgreSQL the bound lasts until the transaction ends or something resets it, so a data step after a bounded statement is bounded too, and a wait it ends runs the upgrade again | `SET LOCAL` belongs to the transaction |
+| On MySQL and MariaDB the bound is lifted when the statement ends, so a data step beside it waits as the server says | The bound belongs to the session |
+| A deadlock that ends the migration's statement is an attempt that waited out its bound | A holder reading a table the migration already took closes a cycle, and an ended attempt changed nothing |
+| On PostgreSQL a deadlock ends whichever side checks first, once its wait passes the server's deadlock timeout | Each side checks on its own clock |
+| On MySQL and MariaDB a deadlock ends the holder | A schema change outweighs a read |
+| On MySQL and MariaDB a bound the session already carried, such as one the URL set, is put back after each statement | The bound belongs to the session, and the connection goes back to the pool |
+| An upgrade gives up only when stopped or on a failure other than a lock wait | A holder that ends, an export's ten-minute snapshot among them, is waited out, and the migration takes the table at the first attempt that finds it free |
+| Each attempt that waits out its bound is logged with its number, the time waited, the statement, and every other session on the database with a transaction open, oldest first, twenty at most | A holder that never lets go holds the start, and the log names the session to end |
+| On PostgreSQL a session whose state is hidden is named after the open transactions, whether it holds one or sits idle | Another role's state and times show only to a role that reads every session's statistics |
+| On MySQL and MariaDB an account that cannot see every process is shown its own other sessions on the database | Open transactions list only for an account that sees every process, and no other account's sessions show |
+| Where MySQL and MariaDB list no open transaction, every session on the database the account can see is named, idle ones included, the migrating instance's own among them | The session holding the migration lock is one of them, and ending it gives the lock up mid-migration (§ Migration locks) |
+| On PostgreSQL a retried upgrade runs its earlier statements again, holding each table it takes until the attempt ends | A statement queued on such a table waits at most one attempt and the statements before it |
+| The v0.11.0 renames wait in their own attempts of three seconds with a pause of a second, inside the upgrade's transaction on PostgreSQL | Their migration is the release's record, and is amended only for a fix the owner approves |
+| On MySQL and MariaDB the v0.11.0 renames end by setting the session's bound to the server's default, so a connection that ran them leaves without a bound its URL set | Their migration is the release's record |
+| The baseline never waits | It makes its tables in an empty database, where no session holds one |
+
 ## Migration locks
 
 One instance migrates at a time (REQ-72).
@@ -257,3 +298,4 @@ done.
 |---|---|
 | The concurrency test does not cover the advisory lock | Every caller takes the in-process mutex first, so goroutines driven through the normal path pass with the advisory lock deleted. The suite drives the advisory lock from two pools directly (`design-docs/database.md` § Test harness) |
 | Any account can hold the migration lock | Any account on a MySQL or MariaDB server, or any role with CONNECT on the PostgreSQL database, can take the migration lock and hold every start behind it; the waiter's log line names the connection to end |
+| On MySQL and MariaDB a data step waits for a row as the server's own bound says, and a writer holding the row past it fails the migration. | Retrying the step where it stands loses the work before it under `innodb_rollback_on_timeout`, and retrying from the start runs again each data-definition statement already committed |

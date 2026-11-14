@@ -74,6 +74,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped and PostgreSQL refuses it in a timestamp column. PostgreSQL casts to a zoned timestamp, MySQL and MariaDB to a six-digit datetime, SQLite to nothing |
 | The test harness | It names each engine to choose a connection and report which ran, never to write a query |
 | Seeing a seam's rival wait on a lock | No portable statement reports another session's lock wait. PostgreSQL's activity view names the wait; InnoDB lists a transaction waiting, joined to its session for the database, since other binaries hold databases on the same server |
+| Bounding a lock wait, reading that the bound passed, and naming the sessions with a transaction open | Each engine names the bound and reports its passing differently, and lists open transactions in a catalog of its own. MySQL and MariaDB's bound belongs to the session, so it is put back |
 | Leasing the harness's slots | A named lock on MySQL and MariaDB, a numbered advisory lock on PostgreSQL, each held for the connection |
 | Numbering the rows of one insert on MySQL | MySQL reports only the first identifier; the rest are counted in the server's step, read from the inserting session. The branch asks which statements the dialect can write |
 | Writing a batch whose identifiers nobody reads | PostgreSQL takes one array a column; the others take a list of rows (`design-docs/database-queries.md` § Bulk inserts) |
