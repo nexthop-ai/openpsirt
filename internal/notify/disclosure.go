@@ -46,8 +46,9 @@ func (w *sweep) pastDisclosure(ctx context.Context, admins []int64) (map[int64][
 // Before the date, not on it. The date arriving is the last moment to act
 // rather than the first useful warning, and an approver who touches disclosure
 // a few times a year has no reason to open the screen that would have told
-// them. In the application rather than by mail, because mail may not name an
-// undisclosed issue.
+// them. Mailed as it happens, since an extension needs a second person and
+// arranging one takes time; a message about an undisclosed issue says only
+// that there is something.
 func (w *sweep) approachingDisclosure(ctx context.Context, admins []int64) (map[int64][]Holds, error) {
 	lead, err := setting.NewStore(w.db).Duration(ctx, setting.DisclosureLead,
 		setting.DefaultDisclosureLead)

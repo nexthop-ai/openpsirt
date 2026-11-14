@@ -71,6 +71,42 @@ func TestOnlyWhatAPersonMustActOnIsMailedAtOnce(t *testing.T) {
 	})
 }
 
+// An embargo coming due and a suppression rule waiting on a second person are
+// mailed as they happen: each asks for a second person's time before it is too
+// late. A response window opening asks nothing yet, and is left to the digest.
+func TestAComingEmbargoAndAWaitingRuleAreMailedAtOnce(t *testing.T) {
+	for _, tc := range []struct {
+		kind   notify.Kind
+		mailed bool
+	}{
+		{notify.DisclosureNear, true},
+		{notify.SuppressionRuleWaiting, true},
+		{notify.ResponseWindowOpen, false},
+	} {
+		t.Run(string(tc.kind), func(t *testing.T) {
+			eachWithDB(t, func(t *testing.T, db *database.DB, s *notify.Store, me, _ access.Subject) {
+				ctx := t.Context()
+				if err := access.NewStore(db.DB).SetEmail(ctx, me.ID, "ana@example", access.Recorded); err != nil {
+					t.Fatal(err)
+				}
+				if _, _, err := s.Reconcile(ctx, me.ID, tc.kind, []notify.Holds{{
+					About: string(tc.kind) + " one", Body: "Something to act on.", Link: "/",
+				}}); err != nil {
+					t.Fatal(err)
+				}
+				sender := &recorder{}
+				sent, _, err := notify.NewPost(db.DB, sender, "https://psirt.example", discard(), "test").Once(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if (sent == 1) != tc.mailed {
+					t.Errorf("%s: %d mailed at once, want mailed %v", tc.kind, sent, tc.mailed)
+				}
+			})
+		})
+	}
+}
+
 // The digest carries every notice mail left to it: disclosed ones by their
 // words, undisclosed ones as a count, and nothing mail already carried or the
 // last digest already said.

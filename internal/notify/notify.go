@@ -83,8 +83,8 @@ func Kinds() []Kind {
 // Kept against Kinds by a test, because this is a hand-maintained list over a
 // closed vocabulary.
 var immediate = []Kind{
-	Assigned, Mentioned, SentBack, DecisionWaiting, SentBackWaiting,
-	DisclosureDue, ResponseWindowNear, ResponseWindowPassed, DeferralEnding,
+	Assigned, Mentioned, SentBack, DecisionWaiting, SentBackWaiting, SuppressionRuleWaiting,
+	DisclosureDue, DisclosureNear, ResponseWindowNear, ResponseWindowPassed, DeferralEnding,
 	ApprovalWithdrawn, ApprovalUndone, DecisionLapsed, CriticalOnRelease,
 	Unanswered, ReportMessage,
 }

@@ -59,12 +59,14 @@ kind reaches mail in the digest alone (`design-docs/notifications-work.md`
 | `sent-back` | More on a decision |
 | `decision-waiting` | A second person's agreement |
 | `sent-back-waiting` | The revision an approver asked for |
+| `suppression-rule-waiting` | A second person's agreement to a rule |
 | `deferral-ending` | A deferral re-made or let go |
 | `approval-withdrawn` | Agreement to the changed words |
 | `approval-undone` | A decision taken up again |
 | `decision-lapsed` | The finding handed back |
 | `critical-on-release` | A decision on a shipped critical |
 | `disclosure-due` | An embargo answered |
+| `disclosure-near` | An extension arranged before the date, which needs a second person |
 | `response-window-near` | A notice before the window ends |
 | `response-window-passed` | A notice the window was owed |
 | `unanswered-report` | An answer to a reporter |
