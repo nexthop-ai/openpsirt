@@ -180,7 +180,13 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 			holding(holders, k, h.Occurrence)
 		}
 	}
-	shared := heldTwice(keysOf(fresh), holders)
+	var waiting []string
+	for i, k := range fresh {
+		if _, done := out[i]; !done {
+			waiting = append(waiting, k.Key)
+		}
+	}
+	shared := heldTwice(waiting, holders)
 	newest := map[string]keyHit{}
 	for k := range shared {
 		for _, h := range byKey[k] {

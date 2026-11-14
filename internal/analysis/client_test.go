@@ -360,6 +360,37 @@ func TestAResultNamingItsExtensionByGUIDKeepsThatExtensionsRule(t *testing.T) {
 	}
 }
 
+func TestOneRunListingAnExtensionTwiceLeavesLaterRunsOnTheFirst(t *testing.T) {
+	pack := func(rule string) string {
+		return `{"name":"pack","guid":"11111111-1111-1111-1111-111111111111","rules":[{"id":"` + rule + `"}]}`
+	}
+	doc := forwardedOne(t, []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(pack("X")+","+pack("Y"), "")},
+		{Name: "b.sarif", Data: forwarded(pack("X"),
+			forwardedAt("1", `"rule":{"id":"X","index":0,"toolComponent":{"index":0}}`))},
+	})
+	var got struct {
+		Runs []struct {
+			Results []struct {
+				Rule struct {
+					ToolComponent struct {
+						Index int `json:"index"`
+					} `json:"toolComponent"`
+				} `json:"rule"`
+			} `json:"results"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(doc, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Runs[0].Results) != 1 {
+		t.Fatalf("%d results; want one", len(got.Runs[0].Results))
+	}
+	if at := got.Runs[0].Results[0].Rule.ToolComponent.Index; at != 0 {
+		t.Errorf("the later run's pack merged into extension %d; want 0, the first listed", at)
+	}
+}
+
 func TestOneExtensionWrittenWithItsGUIDInTwoCasesMergesOnce(t *testing.T) {
 	lower := `{"name":"pack","guid":"abcdef00-1111-1111-1111-111111111111","rules":[{"id":"X"}]}`
 	upper := `{"name":"pack","guid":"ABCDEF00-1111-1111-1111-111111111111","rules":[{"id":"Z"}]}`

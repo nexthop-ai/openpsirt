@@ -259,7 +259,9 @@ func renumber(run obj, m moves) {
 				delete(ref, "index")
 			}
 		}
-		if _, byIndex := num(component, "index"); named && byIndex {
+		// A component named by GUID or name is written by position too, since
+		// the merged list may hold two of one name.
+		if named {
 			if to, ok := m.components[c]; ok {
 				component["index"] = to
 			}
@@ -312,7 +314,9 @@ func merge(runs []obj) obj {
 			// run's extensions are never one another.
 			if !ok || str(ext, "name") == "" && str(ext, "guid") == "" || inRun[at] {
 				at = len(extensions)
-				extensionAt[key] = at
+				if _, kept := extensionAt[key]; !kept {
+					extensionAt[key] = at
+				}
 				kept := obj{}
 				for k, v := range ext {
 					kept[k] = v

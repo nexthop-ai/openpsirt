@@ -40,7 +40,11 @@ func TestATrendWindowTheEdgeAcceptsIsOneTheStoreWorksOut(t *testing.T) {
 			t.Errorf("%s at its maximum, %d, reaches short of the store's %d days", c.field, most, finding.MostTrendSteps)
 		}
 	}
-	if err := finding.TrendWindow(24*time.Hour, core.TrendWeeks); err != nil {
+	_, step, n, err := core.Steps{}.Window(time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := finding.TrendWindow(step, n); err != nil {
 		t.Errorf("the default window is refused by the store: %v", err)
 	}
 }
