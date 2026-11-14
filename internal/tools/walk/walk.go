@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -102,14 +103,14 @@ func Paths(extra []string, visit func(path string) (bool, error)) (int, error) {
 // less those under a skipped directory, for a gate whose set of files is the
 // committed tree. Each file's content is read from the working tree.
 func Tracked() ([]string, error) {
-	return listed("tracked files", "ls-files", "-z")
+	return listed("tracked files", "ls-files", "-z", "--stage")
 }
 
 // Unignored is Tracked with the files git would add beside them: every file
 // on disk that no ignore rule covers, for a gate reading the change about to
 // be committed. Build output is ignored, so it is not read.
 func Unignored() ([]string, error) {
-	return listed("files git does not ignore", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	return listed("files git does not ignore", "ls-files", "-z", "--stage", "--cached", "--others", "--exclude-standard")
 }
 
 func listed(what string, args ...string) ([]string, error) {
@@ -121,14 +122,29 @@ func listed(what string, args ...string) ([]string, error) {
 	return files, sawSomething(len(files), what)
 }
 
-// trackedIn reads git's NUL-separated listing, once per path, dropping an
-// empty entry, a listed directory and a path with a directory named in skip.
+// staged is a tracked entry of a listing taken with --stage: its mode, object
+// and stage before a tab, then its path. A file not yet added is its path
+// alone.
+var staged = regexp.MustCompile(`^([0-7]{6}) [0-9a-f]+ [0-3]\t`)
+
+// submodule is the mode git records a nested repository's commit under.
+const submodule = "160000"
+
+// trackedIn reads git's NUL-separated listing, taken with --stage, once per
+// path, dropping an empty entry, a nested repository and a path with a
+// directory named in skip. A nested repository holds no file to read: a
+// tracked one is listed under the submodule mode, an untracked one with a
+// trailing slash. An unmerged path is listed once per stage.
 func trackedIn(listed []byte, skip []string) []string {
 	var tracked []string
 	for _, each := range bytes.Split(listed, []byte{0}) {
 		path := string(each)
-		// A directory git lists as a whole is a nested repository, which holds
-		// no file to read; an unmerged path is listed once per stage.
+		if m := staged.FindStringSubmatch(path); m != nil {
+			if m[1] == submodule {
+				continue
+			}
+			path = path[len(m[0]):]
+		}
 		if path == "" || strings.HasSuffix(path, "/") || slices.Contains(tracked, path) {
 			continue
 		}

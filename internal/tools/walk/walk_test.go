@@ -190,10 +190,11 @@ func TestAPathCarriesNoLeadingDotSlash(t *testing.T) {
 }
 
 func TestATrackedListingKeepsEachFileOnceOutsideSkippedDirectories(t *testing.T) {
-	listed := []byte("go.mod\x00internal/webui/dist/.gitkeep\x00web/node_modules/x/a.js\x00internal/dist.go\x00\x00" +
-		"nested/\x00internal/dist.go\x00")
+	listed := []byte("100644 0a1b 0\tgo.mod\x00100644 0a1b 0\tinternal/webui/dist/.gitkeep\x00" +
+		"100644 0a1b 0\tweb/node_modules/x/a.js\x00100644 0a1b 2\tinternal/dist.go\x00\x00" +
+		"nested/\x00100644 0a1b 3\tinternal/dist.go\x00160000 0a1b 0\tsubmodule\x00new.go\x00")
 	got := trackedIn(listed, Skipped())
-	if want := []string{"go.mod", "internal/dist.go"}; !slices.Equal(got, want) {
+	if want := []string{"go.mod", "internal/dist.go", "new.go"}; !slices.Equal(got, want) {
 		t.Errorf("tracked %v, want %v", got, want)
 	}
 }
