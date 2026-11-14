@@ -415,7 +415,7 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// in two builds at two versions moves both.
 		Where(FoldedOn+` IN (?)`, bun.List(folds)).
 		OrderExpr(`"f"."vulnerability_id", "f"."component_id", "f"."build_id", "occurrence_identity", ` +
-			`"component_upstream", "consumer_upstream"`)
+			`"component_upstream", "consumer_upstream", "f"."id"`)
 	err = query.Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where that bump would reach: %w", err)

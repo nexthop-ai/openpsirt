@@ -568,6 +568,74 @@ func TestAFlawIsNotWidenedToABuildHoldingItsNameAsSeveralOtherComponents(t *test
 	})
 }
 
+func TestAFlawWidensToItsOwnEcosystemAtAnotherVersion(t *testing.T) {
+	// The added build ships the package at another version, and a Python
+	// package of the same name beside it: the row's ecosystem decides.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		python := graph.Described{Purl: "pkg:pypi/" + libnl.Name + "@3.9.0", Name: libnl.Name, Version: "3.9.0"}
+		f.shippedTo(t, other, graph.Snapshot{
+			Root: root, Components: []graph.Described{swss, teamd, libnlNew, python},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: root, Child: teamd},
+				{Parent: swss, Child: libnlNew}, {Parent: teamd, Child: python}},
+		})
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID,
+			[]int64{f.build, other}, ""); err != nil {
+			t.Fatalf("widening to a build shipping the package at another version: %v", err)
+		}
+		var opened []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&opened).
+			Where(`"vulnerability_id" = ?`, rows[0].VulnerabilityID).
+			Where(`"build_id" = ?`, other).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var want int64
+		if err := f.db.DB.NewSelect().TableExpr(`"component"`).Column("id").
+			Where(`"purl" = ?`, libnlNew.Purl).Scan(ctx, &want); err != nil {
+			t.Fatal(err)
+		}
+		if len(opened) != 1 || opened[0].ComponentID != want {
+			t.Errorf("the added build holds %+v, want one finding on the Debian package, component %d", opened, want)
+		}
+	})
+}
+
+func TestAFlawIsNotWidenedToAnotherEcosystemsPackageOfItsName(t *testing.T) {
+	// An npm package and a Python one of one name are different software, so
+	// a build shipping only the other ecosystem's holds no such component.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		python := graph.Described{Purl: "pkg:pypi/" + libnl.Name + "@" + libnl.Version, Name: libnl.Name,
+			Version: libnl.Version}
+		f.shippedTo(t, other, through(python))
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID, []int64{f.build, other}, "")
+		if !errors.Is(err, finding.ErrNoSuchComponent) {
+			t.Errorf("widening to a build shipping the name only as a Python package answered %v, "+
+				"want ErrNoSuchComponent", err)
+		}
+	})
+}
+
 func TestABuildAnotherEditTookOutFirstIsNotCountedAsClosedAgain(t *testing.T) {
 	// Two people taking one build out at once: the second's answer counts
 	// the builds it closed, and the first closed this one.

@@ -125,6 +125,14 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 // A list asks it of every occurrence in SQL, so the two read one set.
 var noVersionToTake = []FixState{NoFix, WontFix}
 
+// unclocked is the condition, over a finding's own columns, under which it
+// carries no deadline: Clocked as the statements that set and clear deadlines
+// ask it, from the one set of states.
+func unclocked() (string, []any) {
+	return `("fix_state" IN (?) AND NOT ("fix_state" = ? AND ("urgency_exploited" = ? OR "urgency_incident" = ?)))`,
+		[]any{bun.List(noVersionToTake), WontFix, true, true}
+}
+
 // Closable reports whether anything upstream would close a finding in this
 // state, which is what makes a deadline on it meetable.
 //
@@ -579,6 +587,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	unclockedWhere, unclockedArgs := unclocked()
 
 	// Written in slices of the identifier range rather than as one statement
 	// per band. SQLite has one writer, so a statement rewriting four hundred
@@ -703,9 +712,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 							// carries no deadline.
 							Where(`"stated_by" IS NULL`).
 							Where(onClock, onClockArgs...).
-							Where(`"fix_state" <> ?`, NoFix).
-							Where(`NOT ("fix_state" = ? AND "urgency_exploited" = ? AND `+
-								`"urgency_incident" = ?)`, WontFix, false, false)
+							Where(`NOT `+unclockedWhere, unclockedArgs...)
 						result, err := each.where(query).Exec(ctx)
 						if err != nil {
 							return changed, fmt.Errorf("rewrite deadlines: %w", err)
@@ -809,20 +816,14 @@ func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
 // because on an exploited issue it leaves work only this deployment can do.
 func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
 	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
+	unclockedWhere, unclockedArgs := unclocked()
 	result, err := s.db.NewUpdate().
 		Model((*Finding)(nil)).
 		Set(`"due_at" = NULL`).
 		Where(kinds, kindArgs...).
 		Where(`"closed_at" IS NULL`).
 		Where(`"due_at" IS NOT NULL`).
-		WhereGroup(" AND ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
-			return q.Where(`"fix_state" = ?`, NoFix).
-				WhereGroup(" OR ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
-					return q.Where(`"fix_state" = ?`, WontFix).
-						Where(`"urgency_exploited" = ?`, false).
-						Where(`"urgency_incident" = ?`, false)
-				})
-		}).
+		Where(unclockedWhere, unclockedArgs...).
 		Exec(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("take the deadline off what has nothing to take: %w", err)

@@ -259,12 +259,14 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 // likeIn resolves what in an added build holds the flaw a row records, and the
 // name its occurrence is keyed on.
 //
-// Resolved from the row's component, not its name alone: a flaw recorded
-// against a build's root is recorded against the added build's root, whose
-// name is the variant's own, and a component the added build ships at several
-// versions is the one at the row's version, ecosystem and namespace. Where the
-// build ships it at none of those, the name alone decides, with the ecosystem
-// and namespace first.
+// Resolved from the row's component: root, version, ecosystem and namespace,
+// then name. A flaw recorded against a build's root is recorded against the
+// added build's root, whose name is the variant's own, and a component the
+// added build ships at several versions is the one at the row's version,
+// ecosystem and namespace. Where the build ships it at none of those, its
+// ecosystem and namespace decide, and the name alone only for a component
+// whose identifier names no ecosystem: an npm package and a Python one of one
+// name are different software.
 func likeIn(ctx context.Context, db bun.IDB, buildID int64, like *Finding) (int64, string, error) {
 	root, err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
@@ -297,12 +299,15 @@ func likeIn(ctx context.Context, db bun.IDB, buildID int64, like *Finding) (int6
 	parts := graph.PartsOfPurl(c.Purl)
 	ecosystem := graph.EcosystemOf(c.Purl)
 	// Narrowest first: the row's version, ecosystem and namespace, then its
-	// ecosystem and namespace where it states either, then the name alone.
+	// ecosystem and namespace where it states either, then the name alone
+	// where it states no ecosystem.
 	tries := []Entering{{Component: c.Name, Version: c.Version, Ecosystem: ecosystem, Namespace: parts.Namespace}}
 	if ecosystem != "" || parts.Namespace != "" {
 		tries = append(tries, Entering{Component: c.Name, Ecosystem: ecosystem, Namespace: parts.Namespace})
 	}
-	tries = append(tries, Entering{Component: c.Name})
+	if ecosystem == "" {
+		tries = append(tries, Entering{Component: c.Name})
+	}
 	var id int64
 	var name string
 	for _, try := range tries {

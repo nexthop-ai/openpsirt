@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -303,4 +304,65 @@ func TestAPlannedUpgradeReachesEveryVersionPairAtAnOccurrenceByItsEarliestDeadli
 			t.Errorf("the earliest deadline it reached is %v, want %v", earliest, soon)
 		}
 	})
+}
+
+func TestAPromisesReachMergesTheRowsOfOneOccurrenceAndVersionPair(t *testing.T) {
+	// Two rows at one occurrence and version pair are one thing to decide
+	// about: counted as both, private where either is, and due when the
+	// earlier is. The rows are read in the order they were written, and each
+	// arrangement puts one of the two on the second row, so one needs the
+	// visibility merged and the other the deadline.
+	for _, privateIsSecond := range []bool{true, false} {
+		t.Run(fmt.Sprintf("private row is second %v", privateIsSecond), func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				ctx := t.Context()
+				f.shipped(t, through(libnl))
+				if _, err := f.store.Apply(ctx, f.build, f.run(t),
+					[]finding.Reported{found("CVE-2026-71", libnl)}); err != nil {
+					t.Fatal(err)
+				}
+				open := f.open(t)
+				if len(open) != 1 {
+					t.Fatalf("the scan opened %d findings, want 1", len(open))
+				}
+				earlier := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+				later := earlier.AddDate(0, 1, 0)
+				firstDue, secondDue := later, earlier
+				firstSeen, secondSeen := access.Private, access.Public
+				if privateIsSecond {
+					firstDue, secondDue = earlier, later
+					firstSeen, secondSeen = access.Public, access.Private
+				}
+				if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+					Set(`"due_at" = ?`, firstDue).Set(`"visibility" = ?`, firstSeen).
+					Where(`"id" = ?`, open[0].ID).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				second := open[0]
+				second.ID, second.DueAt, second.Visibility = 0, &secondDue, secondSeen
+				if _, err := f.db.DB.NewInsert().Model(&second).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				reached, err := f.store.OccurrencesOnComponentWithin(ctx, f.db.DB,
+					f.holding(t, access.PublicTriage, access.PrivateTriage), f.productID, []int64{f.build},
+					libnl.Name, "")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(reached) != 1 || len(reached[0].Occurrences) != 1 {
+					t.Fatalf("the promise reaches %+v, want one occurrence", reached)
+				}
+				got := reached[0].Occurrences[0]
+				if got.Occurrences != 2 {
+					t.Errorf("the occurrence counts %d rows, want 2", got.Occurrences)
+				}
+				if got.Visibility != access.Private {
+					t.Errorf("the occurrence reads as %q, want private: one of its rows is", got.Visibility)
+				}
+				if got.DueAt == nil || !got.DueAt.Equal(earlier) {
+					t.Errorf("the occurrence is due %v, want the earlier %v", got.DueAt, earlier)
+				}
+			})
+		})
+	}
 }

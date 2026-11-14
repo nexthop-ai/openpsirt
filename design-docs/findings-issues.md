@@ -29,6 +29,7 @@ resolves to one row, and a decision holds across all of them (REQ-18).
 | A name given twice is one name, under a unique index on its normalized form | A report may list its own identifier among its aliases |
 | The filed name, folded, is what makes one issue one row | |
 | Two writers recording one new issue, name or reference at once both succeed: the one whose write collides goes again and reads the other's row | Two replicas apply two scans naming one new issue together, and a collision failing the whole scan charges the job an attempt |
+| A new issue whose name a record of another kind holds, such as an analyzer's rule, is refused as that collision and never retried | A name is held once over every kind, so no attempt changes the answer |
 | What a finding screen reports (holder, placing rule) is asked of the whole fold: one name for the group, empty where its occurrences disagree | Asked per component, one rule reads as none and as all |
 | Recording a name by hand asks for triage in every product the issue is open in, at each occurrence's visibility, refused whole | From then every product's scans resolve the name here and inherit its decisions |
 | Recording a name the issue already goes by succeeds, writes nothing and adds no entry to the record of changes | A client retrying the request leaves one addition, the real one |
@@ -81,7 +82,7 @@ references are patches.
 
 | Field | Treatment |
 |---|---|
-| Severity | Stored as a word, which ranks and sets a deadline. A number is the first rating stating both score and vector, worst winning; the vector travels with it |
+| Severity | Stored as a word, which ranks and sets a deadline. A number is the worst rating stating both score and vector in the newest generation of the scheme a report states, so the order a report lists ratings in decides nothing; the vector travels with it |
 | What counts as a fix | One list, named once. A closure not on it is churn or a correction |
 | Fix state | Three: no fix, upstream declined, a fixed version exists. Declined changes the outcome somebody should reach |
 | A group whose occurrences disagree on fix state | Says so, read from both ends of the group; the fix version is empty |
