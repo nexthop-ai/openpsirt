@@ -130,7 +130,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 
 	held, err := pendingFrom(r.Context(), in, r)
 	if errors.Is(err, errSignInFault) {
-		wentWrongHere(w, r, in, "a sign-in could not be completed", err)
+		failedToComplete(w, r, in, "a sign-in could not be completed", err)
 		return
 	}
 	if err != nil {
@@ -153,7 +153,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 
 	callback, err := in.RedirectURI(r, provider.Name())
 	if err != nil {
-		wentWrongHere(w, r, in, "a sign-in could not be completed", err)
+		failedToComplete(w, r, in, "a sign-in could not be completed", err)
 		return
 	}
 	identity, err := provider.Complete(r.Context(), code, pending, callback)
@@ -195,7 +195,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	// outage turns every browser away as though nothing granted them anything.
 	person, err := admit(r, in, rights, identity)
 	if err != nil && !errors.Is(err, access.ErrDenied) {
-		wentWrongHere(w, r, in, "who signed in could not be looked up", err)
+		failedToComplete(w, r, in, "who signed in could not be looked up", err)
 		return
 	}
 	if err != nil {
@@ -209,12 +209,12 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 
 	lifetime, err := sessionWindow(r.Context(), in)
 	if err != nil {
-		wentWrongHere(w, r, in, "how long a sign-in lasts could not be read", err)
+		failedToComplete(w, r, in, "how long a sign-in lasts could not be read", err)
 		return
 	}
 	issued, err := rights.StartSession(r.Context(), person.ID, lifetime)
 	if err != nil {
-		wentWrongHere(w, r, in, "a session could not be started", err)
+		failedToComplete(w, r, in, "a session could not be started", err)
 		return
 	}
 
@@ -519,11 +519,16 @@ func wentWrongHere(w http.ResponseWriter, r *http.Request, in core.Deps, what st
 	if in.Logger != nil {
 		in.Log().Error(what, "error", err)
 	}
-	if _, held := r.Cookie(access.CookieName(pendingCookie, in.PlainHTTP)); held == nil {
-		cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
-		http.SetCookie(w, &cleared)
-	}
 	http.Redirect(w, r, faultedHere, http.StatusSeeOther)
+}
+
+// failedToComplete is wentWrongHere for a returning sign-in, whose pending
+// cookie is spent either way. A sign-in that fails to begin leaves the cookie
+// alone, since it may belong to a sign-in another tab has under way.
+func failedToComplete(w http.ResponseWriter, r *http.Request, in core.Deps, what string, err error) {
+	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
+	http.SetCookie(w, &cleared)
+	wentWrongHere(w, r, in, what, err)
 }
 
 // sessionWindow is how long a sign-in lasts here.

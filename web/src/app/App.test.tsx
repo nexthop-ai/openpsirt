@@ -4,6 +4,7 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { SignIn } from "../screens/SignIn";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 
 const mount = mounted();
@@ -136,6 +137,20 @@ describe("the application for a browser the proxy named and this deployment refu
     expect(text()).toContain("No access here");
     expect(text()).toContain("Ask an administrator for access.");
     expect(text()).not.toContain("Sign in to continue");
+    expect(text()).not.toContain("Continue with");
+  });
+
+  it("says there is no access here when a session ends under it", async () => {
+    serve((path) =>
+      path === "/v1/sign-in"
+        ? { data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }], named_by_proxy: true } }
+        : { data: { items: [] } },
+    );
+    mount.render(screen(<SignIn resuming />, "/"));
+    await settle();
+    expect(text()).toContain("No access here");
+    expect(text()).not.toContain("Your session ended");
+    expect(text()).not.toContain("Anything you typed is kept.");
     expect(text()).not.toContain("Continue with");
   });
 

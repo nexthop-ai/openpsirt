@@ -141,6 +141,12 @@ func (t Trust) groupsFrom(req *http.Request) []string {
 	return names
 }
 
+// named is the identity the trusted header carries, wherever it came from;
+// empty where it carries none.
+func (t Trust) named(req *http.Request) string {
+	return strings.TrimSpace(req.Header.Get(t.Header))
+}
+
 // trusts reports whether a request came from somewhere the header is honored.
 func (t Trust) trusts(remote string) bool {
 	host, _, err := net.SplitHostPort(remote)
@@ -191,8 +197,7 @@ func NewResolver(store *Store, trust Trust) *Resolver {
 // source it is honored from: the proxy in front of this deployment named
 // somebody. It says nothing about whether they are let in.
 func (r *Resolver) NamedByProxy(req *http.Request) bool {
-	return r.trust.Enabled() && strings.TrimSpace(req.Header.Get(r.trust.Header)) != "" &&
-		r.trust.trusts(req.RemoteAddr)
+	return r.trust.Enabled() && r.trust.named(req) != "" && r.trust.trusts(req.RemoteAddr)
 }
 
 // WithMode tells the resolver where roles come from.
@@ -296,7 +301,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *http.Request) (Subject, *Se
 	// so honoring the cookie first would let a stale one outrank a live
 	// assertion about the same browser.
 	if r.trust.Enabled() {
-		identity := strings.TrimSpace(req.Header.Get(r.trust.Header))
+		identity := r.trust.named(req)
 		if identity == "" {
 			return r.fromCookie(ctx, req)
 		}

@@ -228,10 +228,11 @@ to begin, so a refusal or a fault there answers with a page.
 | The screen there reads "No access here" and "Ask an administrator for access.", and offers the configured ways in | It states no reason, since an expired or mismatched sign-in lands there too |
 | The screen there never forwards to the provider | The provider still holds the refused account, so a forward refuses it again in a loop |
 | A sign-in begun from that screen, or from the one sign-out lands on, carries no return address | Landing back on either draws the home page under an address that says otherwise |
-| A fault on this side in beginning or completing a sign-in redirects to `/?sign-in-failed`, whose screen reads "Sign-in didn't finish" and "Try again shortly.", offers the ways in, and never forwards | Trying again can help with a fault and never with a refusal; a forward repeats the fault in a loop |
+| A fault on this side in beginning or completing a sign-in redirects to `/?sign-in-failed`, whose screen says the sign-in did not finish and to try again shortly, offers the ways in, and never forwards | Trying again can help with a fault and never with a refusal; a forward repeats the fault in a loop |
+| A fault completing a sign-in clears its pending cookie; a fault beginning one leaves the cookie alone | The cookie may hold a sign-in another tab has under way |
 | The sign-in key failing to be read while a returning sign-in is checked is a fault | A refusal sends somebody granted access to ask for it |
 | The list of ways in says whether the trusted proxy named the browser asking, from a source it is honored from, whatever the person holds | It is the one sign a browser the proxy named and this deployment refused has, and it says nothing of why |
-| A browser the proxy named that this deployment refuses is shown the "No access here" screen, with no way in offered | The proxy names it again on every request, outranking any session |
+| A browser the proxy named that this deployment refuses is shown the "No access here" screen, with no way in offered, including where its session ended mid-use | The proxy names it again on every request, outranking any session |
 | A key, a token, a trusted header or a session is refused with the problem document of `design-docs/api-refusals.md` § Refusal shape | Those are requests a client reads |
 | A callback naming an unknown provider answers 404 with the problem document | A name nobody configured is no sign-in to land |
 
