@@ -17,7 +17,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
@@ -453,15 +452,15 @@ func heldByReaders(level catalogLevel) error {
 
 // declineRename turns a refused rename into the answer that describes it.
 //
-// A rename that loses a race with another rename on a unique index is answered
-// as a name already taken, rather than with the engine's constraint message —
-// the name of an index nobody outside this repository has.
+// A name another row holds is a conflict, whether the check saw it or the
+// unique index caught a rename at the same moment: the store reports both as
+// the name taken, never with the engine's constraint message.
 func declineRename(logger *slog.Logger, err error) error {
-	if errors.Is(err, catalog.ErrExists) || errors.Is(err, catalog.ErrNotFound) {
-		return core.DeclineDeclaration(logger, err)
+	if errors.Is(err, catalog.ErrExists) {
+		return huma.NewError(http.StatusConflict, err.Error())
 	}
-	if database.IsDuplicate(err) {
-		return huma.NewError(http.StatusConflict, "that name is already taken")
+	if errors.Is(err, catalog.ErrNotFound) {
+		return core.DeclineDeclaration(logger, err)
 	}
 	return core.WentWrong(logger, "that name could not be recorded", err)
 }
