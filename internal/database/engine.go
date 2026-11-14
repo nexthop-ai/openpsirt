@@ -248,9 +248,10 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 		default:
 			return "", fmt.Errorf("database URL names no file")
 		}
-		// Every connection is opened with these, in this order; a URL may
-		// add its own _pragma entries after them, and SQLite takes the last
-		// setting of a name, so a URL can override any of them.
+		// Every connection is opened with these, and a URL's own _pragma
+		// entry for a name replaces the one here. The driver runs the list
+		// sorted, busy_timeout first and the rest by their text, so two
+		// entries for one name run in an order neither one chose.
 		//
 		// busy_timeout: wait for a held lock rather than failing at once.
 		// Without this, anything concurrent gets an immediate "database is
@@ -277,7 +278,7 @@ func driverDSN(engine Engine, u *url.URL, raw string) (string, error) {
 			"journal_mode(WAL)",
 			"synchronous(NORMAL)",
 		}
-		pragmas = append(pragmas, u.Query()["_pragma"]...)
+		pragmas = withPragmas(pragmas, u.Query()["_pragma"])
 		// Every transaction begins by taking the write lock. A transaction
 		// that begins deferred, reads, and then writes cannot wait for a
 		// writer that committed after its read: its snapshot is stale, so it
@@ -508,4 +509,34 @@ func scrub(err error, target Target) error {
 		text = strings.ReplaceAll(text, secret, "xxxxx")
 	}
 	return scrubbed{text: text, err: err}
+}
+
+// withPragmas is defaults followed by own, leaving out each default that own
+// sets again. A pragma is named by what precedes its value, in either of the
+// driver's spellings: busy_timeout(60000) or busy_timeout = 60000, with any
+// schema before it left off. A pragma with no value only reads the setting,
+// so it replaces nothing.
+func withPragmas(defaults, own []string) []string {
+	name := func(pragma string) string {
+		if i := strings.IndexAny(pragma, "(="); i >= 0 {
+			pragma = pragma[:i]
+		}
+		if i := strings.LastIndex(pragma, "."); i >= 0 {
+			pragma = pragma[i+1:]
+		}
+		return strings.ToLower(strings.TrimSpace(pragma))
+	}
+	named := map[string]bool{}
+	for _, p := range own {
+		if strings.ContainsAny(p, "(=") {
+			named[name(p)] = true
+		}
+	}
+	var out []string
+	for _, p := range defaults {
+		if !named[name(p)] {
+			out = append(out, p)
+		}
+	}
+	return append(out, own...)
 }

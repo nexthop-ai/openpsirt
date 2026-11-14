@@ -72,13 +72,9 @@ func TestSQLitesBusyTimeoutPassingIsALockWaitEnded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// The waiter's timeout is a tenth of a second, set on its one
-	// connection.
-	waiter := open(url)
-	waiter.SetMaxOpenConns(1)
-	if _, err := waiter.ExecContext(ctx, `PRAGMA busy_timeout = 100`); err != nil {
-		t.Fatal(err)
-	}
+	// The waiter's timeout is a tenth of a second, on every connection it
+	// opens.
+	waiter := open(url + "?_pragma=busy_timeout(100)")
 	_, err = waiter.ExecContext(ctx, `INSERT INTO "t" ("n") VALUES (2)`)
 	if err == nil {
 		t.Fatal("a write went through while another connection held the write lock")

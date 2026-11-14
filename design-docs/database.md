@@ -207,8 +207,10 @@ model's reflected table.
 | Planner statistics refreshed at start, after an upgrade and after every scan | SQLite gathers none unless asked. On 361,429 findings the review queue took 4.1 s and the list of what is running out 2.5 s without them, 0.08 s and 0.13 s with them, and a whole analysis 0.66 s. After every scan, because a scan changes how rows divide: analyzed only on growth, the findings list took 2.1 s instead of 0.57 s. Sampling the first rows of each index took 71 ms and misjudged which findings were assigned |
 | A connection lives a minute, and a refresh closes the idle ones | A connection reads statistics when it opens and never again. Across a refresh the review queue took 4.1 s on every connection but the one that analyzed |
 
-The pragmas are set on the connection string, and a URL may add its own after
-them. The test harness adds `synchronous(OFF)`.
+The pragmas are set on the connection string, and a URL's own pragma replaces
+the one of its name. The driver runs the list sorted, `busy_timeout` first and
+the rest by their text, so two entries for one name run in an order neither
+chose. The test harness sets `synchronous(OFF)`.
 
 ## Test harness
 
