@@ -65,7 +65,8 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		Path:    "/v1/releases/out-of-support",
 		Summary: "List releases that are out of support",
 		Description: "Every release you can see whose end-of-life date has passed, with how " +
-			"long ago that was and how many issues are still open against it.\n\n" +
+			"long ago that was and how many issues are still open against it. A retired " +
+			"release, or any release of a retired product, is left out.\n\n" +
 			"Past end-of-life the deadline is removed from every open finding on a release, so " +
 			"nothing here is overdue or due soon and none of it reaches a figure built on " +
 			"either. Nothing is deleted or hidden: the findings and the history stay, and stay " +
@@ -113,7 +114,8 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		Summary: "Export releases that are out of support",
 		Description: "The same answer as a file: every release you can see whose end-of-life " +
 			"date has passed, how long ago that was, and how many issues are still open " +
-			"against it.\n\n" +
+			"against it. A retired release, or any release of a retired product, is left " +
+			"out.\n\n" +
 			"`open` counts issues at components rather than one per occurrence, the same unit " +
 			"every release-level count here uses. `inherited` means the date came from the " +
 			"product rather than from the release itself.\n\n" +
