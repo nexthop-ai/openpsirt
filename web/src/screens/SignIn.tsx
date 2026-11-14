@@ -125,7 +125,8 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
   const offered = providers.data?.items ?? [];
   const only = offered.length === 1 ? offered[0] : undefined;
   const forwarding = Boolean(only) && forwardable(offered.length, resuming);
-  const turnedAway = !resuming && marked(refused);
+  // Where no way in is configured, that is the one thing worth saying.
+  const turnedAway = !resuming && marked(refused) && providers.data?.items?.length !== 0;
 
   useEffect(() => {
     if (!forwarding || !only) return;
