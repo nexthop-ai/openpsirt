@@ -179,6 +179,13 @@ func (s Subject) narrowedToRoles(holds string) Subject {
 		}
 	}
 	s.grants = narrowed
+	var everywhere []Role
+	for _, role := range s.everywhere {
+		if wanted[role] {
+			everywhere = append(everywhere, role)
+		}
+	}
+	s.everywhere = everywhere
 	// Administration and auditing are not roles in this vocabulary and cannot
 	// be named, so a token asked to carry some roles carries neither.
 	s.Admin = false
@@ -281,8 +288,9 @@ func (s Subject) narrowedTo(productID int64) Subject {
 	s.unnarrowed = false
 	// A role held across every product is held on this one, and nowhere else
 	// through this token. The estate grants were spread across products when
-	// the subject was built, so what is left above is already the intersection.
-	//
+	// the subject was built, so what is left above is already the intersection,
+	// and the roles held across every product go.
+	s.everywhere = nil
 	// The cases stay: being brought into one is a grant on a pair of a product
 	// and an issue, and a token pinned to that product does not take it away.
 	// Cases in other products go, for the same reason the other grants do.
