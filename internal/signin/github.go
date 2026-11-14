@@ -224,10 +224,14 @@ func (g *GitHub) get(ctx context.Context, token *oauth2.Token, url string, into 
 
 	resp, err := g.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("ask github: %w", err)
+		return unanswered(fmt.Errorf("ask github: %w", err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// A server error or a rate limit says nothing about who this is.
+	if unansweredStatus(resp) {
+		return unanswered(fmt.Errorf("github answered %s", resp.Status))
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("github answered %s", resp.Status)
 	}
@@ -239,7 +243,7 @@ func (g *GitHub) get(ctx context.Context, token *oauth2.Token, url string, into 
 	// in.
 	if err := json.NewDecoder(io.LimitReader(resp.Body, mostFromGitHub)).
 		Decode(into); err != nil {
-		return fmt.Errorf("read what github answered: %w", err)
+		return unanswered(fmt.Errorf("read what github answered: %w", err))
 	}
 	return nil
 }

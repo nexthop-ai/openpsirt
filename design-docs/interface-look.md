@@ -168,7 +168,7 @@ Each screen was compared with the restyled mockup control for control.
 | The users table lists user, identity, last sign-in, roles and assigned | User, identity, roles and a grant control; sign-in and assigned work are on the person's own screen |
 | Administration in the grant grid | A control of its own beside the grid: it is global |
 | A pipeline key created elsewhere; a token's reach chosen after it is made; a withdrawn credential leaving the list | `design-docs/interface-administration.md` § The administration screens |
-| The sign-in screen drawn where there is one way in | Forwarded straight to the provider, except: over live work after a session ended, straight after sign-out (the provider's session would sign somebody back in), and a second arrival in a tab that already forwarded |
+| The sign-in screen drawn where there is one way in | Forwarded straight to the provider, except: over live work after a session ended, straight after sign-out (the provider's session would sign somebody back in), after a refused or failed sign-in and for a browser the proxy named and this deployment refused (`design-docs/access-signin.md` § Refused sign-in), and a second arrival in a tab that already forwarded |
 | Uploads' SBOM table carries product, branch and variant columns | The scope bar; it adds when the producer says the build was made |
 | Settings write "3 days" in the field | The field holds the server's duration syntax, with the reading beside it |
 | A gray canvas with raised white cards | One white plane with hairlines (§ The work surface) |

@@ -199,11 +199,15 @@ export function Products({ who }: { who: Who }) {
 
       {items.length === 0 ? (
         <Empty
-          title="You can reach no product yet."
+          title={
+            !who.admin && who.everywhere ? "No product is open." : "You can reach no product yet."
+          }
           detail={
             who.admin
               ? "Declare one before a build can file a scan against it."
-              : "An administrator grants a role before anything appears here."
+              : who.everywhere
+                ? "Your role reaches each product while it's open."
+                : "An administrator grants a role before anything appears here."
           }
         />
       ) : (

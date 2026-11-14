@@ -249,7 +249,11 @@ func (o *OIDC) Complete(ctx context.Context, code string, pending Pending, redir
 	}
 	verified, err := o.verifier.Verify(ctx, raw)
 	if err != nil {
-		return nil, fmt.Errorf("verify the identity token from %q: %w", o.name, err)
+		err = fmt.Errorf("verify the identity token from %q: %w", o.name, err)
+		if keysUnfetched(err) {
+			return nil, unanswered(err)
+		}
+		return nil, err
 	}
 	// The nonce ties this token to the sign-in that started here. Without the
 	// comparison a token issued for some other sign-in would verify perfectly
@@ -289,6 +293,14 @@ func (o *OIDC) Complete(ctx context.Context, code string, pending Pending, redir
 		EmailVerified: verifiedEmail(claims),
 		Groups:        groups(claims[o.groupsClaim]),
 	}, nil
+}
+
+// keysUnfetched reports whether verifying an identity token failed because the
+// provider's keys could not be fetched. The library flattens that cause into
+// its message, so the message is what is read; a test holds it against the
+// library at the version this module requires.
+func keysUnfetched(err error) bool {
+	return strings.Contains(err.Error(), "fetching keys")
 }
 
 // text reads a claim that should be a string, treating anything else as

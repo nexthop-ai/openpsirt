@@ -41,6 +41,13 @@ type provider struct {
 	document map[string]any
 	// mux is what the stand-in serves, for a test that serves more.
 	mux *http.ServeMux
+	// tokenAnswer and keysAnswer, where set, are the status the token and
+	// key endpoints answer instead, for the tests about a provider that does
+	// not answer; a tokenAnswer of -1 is a 200 that does not parse.
+	tokenAnswer, keysAnswer int
+	// forged, where set, signs the identity token in place of the key the
+	// provider publishes.
+	forged *rsa.PrivateKey
 	// asked records what was fetched, because what these adapters get wrong is
 	// the request they build and only the server sees that.
 	asked []string
@@ -74,6 +81,10 @@ func standing(t *testing.T) *provider {
 		writeJSON(w, published)
 	})
 	mux.HandleFunc("/keys", func(w http.ResponseWriter, _ *http.Request) {
+		if p.keysAnswer != 0 {
+			w.WriteHeader(p.keysAnswer)
+			return
+		}
 		writeJSON(w, map[string]any{"keys": []any{map[string]any{
 			"kty": "RSA", "alg": "RS256", "use": "sig", "kid": "one",
 			"n": base64.RawURLEncoding.EncodeToString(p.key.N.Bytes()),
@@ -84,6 +95,17 @@ func standing(t *testing.T) *provider {
 	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if p.tokenAnswer == -1 {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("not json"))
+			return
+		}
+		if p.tokenAnswer != 0 {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(p.tokenAnswer)
+			_, _ = w.Write([]byte(`{"error":"invalid_grant"}`))
 			return
 		}
 		// Kept, because the proof key is the control: what goes out in the
@@ -113,8 +135,12 @@ func (p *provider) token() string {
 	if err != nil {
 		panic(err)
 	}
+	signing := p.key
+	if p.forged != nil {
+		signing = p.forged
+	}
 	signer, err := jose.NewSigner(
-		jose.SigningKey{Algorithm: jose.RS256, Key: p.key},
+		jose.SigningKey{Algorithm: jose.RS256, Key: signing},
 		(&jose.SignerOptions{}).WithHeader("kid", "one"))
 	if err != nil {
 		panic(err)
@@ -712,5 +738,95 @@ func TestBothAdaptersStartASignInTheSameWay(t *testing.T) {
 		if query.Get("state") != pending.State || pending.State == "" {
 			t.Errorf("%s does not carry the state this sign-in will be matched on", adapter.Name())
 		}
+	}
+}
+
+// A provider that cannot be reached, answers with a server error, or cannot
+// have its keys fetched has not answered; one turning the code down, or
+// handing over a token its keys do not verify, has.
+func TestAProviderThatDoesNotAnswerIsToldApartFromOneThatSaysNo(t *testing.T) {
+	for _, c := range []struct {
+		what       string
+		set        func(*provider, *OIDC)
+		unanswered bool
+	}{
+		{"a token endpoint answering 503", func(p *provider, _ *OIDC) { p.tokenAnswer = http.StatusServiceUnavailable }, true},
+		{"a token endpoint nobody listens on", func(_ *provider, o *OIDC) {
+			o.config.Endpoint.TokenURL = "https://127.0.0.1:1/token"
+		}, true},
+		{"keys answering 503", func(p *provider, _ *OIDC) { p.keysAnswer = http.StatusServiceUnavailable }, true},
+		{"a token endpoint answering 429", func(p *provider, _ *OIDC) { p.tokenAnswer = http.StatusTooManyRequests }, true},
+		{"a token endpoint answering what does not parse", func(p *provider, _ *OIDC) { p.tokenAnswer = -1 }, true},
+		{"a token endpoint turning the code down", func(p *provider, _ *OIDC) { p.tokenAnswer = http.StatusBadRequest }, false},
+		{"a token signed with another key", func(p *provider, _ *OIDC) {
+			other, err := rsa.GenerateKey(rand.Reader, 2048)
+			if err != nil {
+				panic(err)
+			}
+			p.forged = other
+		}, false},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			p := standing(t)
+			adapter, pending := p.begun(t, OIDCConfig{})
+			p.claims["nonce"] = pending.Nonce
+			p.claims["preferred_username"] = "ana"
+			c.set(p, adapter)
+			_, err := adapter.Complete(t.Context(), "a-code", pending, "https://here.example/back")
+			if err == nil {
+				t.Fatal("the sign-in completed")
+			}
+			if got := errors.Is(err, ErrUnanswered); got != c.unanswered {
+				t.Errorf("unanswered is %v, want %v: %v", got, c.unanswered, err)
+			}
+		})
+	}
+}
+
+func TestAGitHubThatDoesNotAnswerIsToldApartFromOneThatSaysNo(t *testing.T) {
+	for _, c := range []struct {
+		what       string
+		answer     func(http.ResponseWriter)
+		unreached  bool
+		unanswered bool
+	}{
+		{"a profile answering 502", func(w http.ResponseWriter) { w.WriteHeader(http.StatusBadGateway) }, false, true},
+		{"a profile answering 429", func(w http.ResponseWriter) { w.WriteHeader(http.StatusTooManyRequests) }, false, true},
+		{"a profile answering 403 with no requests left", func(w http.ResponseWriter) {
+			w.Header().Set("X-RateLimit-Remaining", "0")
+			w.WriteHeader(http.StatusForbidden)
+		}, false, true},
+		{"a profile answering 403 with a time to ask again", func(w http.ResponseWriter) {
+			w.Header().Set("Retry-After", "60")
+			w.Header().Set("X-RateLimit-Remaining", "4000")
+			w.WriteHeader(http.StatusForbidden)
+		}, false, true},
+		{"a profile that does not parse", func(w http.ResponseWriter) { _, _ = w.Write([]byte("{")) }, false, true},
+		{"a profile nobody serves", nil, true, true},
+		{"a profile answering 401", func(w http.ResponseWriter) { w.WriteHeader(http.StatusUnauthorized) }, false, false},
+		{"a profile answering 403 with requests left", func(w http.ResponseWriter) {
+			w.Header().Set("X-RateLimit-Remaining", "10")
+			w.WriteHeader(http.StatusForbidden)
+		}, false, false},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			adapter := forge(t, "", func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasPrefix(r.URL.Path, "/token") {
+					writeJSON(w, map[string]any{"access_token": "a-token", "token_type": "Bearer"})
+					return
+				}
+				c.answer(w)
+			})
+			if c.unreached {
+				adapter.api = "http://127.0.0.1:1"
+			}
+			_, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"}, "https://here.example/back")
+			if err == nil {
+				t.Fatal("the sign-in completed")
+			}
+			if got := errors.Is(err, ErrUnanswered); got != c.unanswered {
+				t.Errorf("unanswered is %v, want %v: %v", got, c.unanswered, err)
+			}
+		})
 	}
 }

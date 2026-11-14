@@ -280,6 +280,11 @@ type Subject struct {
 	// as occurrences per product. It reads those code findings' evidence and nothing else
 	// of the product. Carried on the subject for the reason cases are.
 	codeFindings map[int64][]string
+	// everywhere is the roles held across every product. Already spread over
+	// the catalog into grants, which is what every product-scoped question
+	// reads. Kept apart for the questions that must answer yes over a catalog
+	// with nothing in it, such as whether a role is held anywhere.
+	everywhere []Role
 	// casesReadOnly takes the write half of a case grant away, for a
 	// credential narrowed to roles that do not include triage. Inverted so
 	// that the zero value acts, which is what every subject not narrowed this
@@ -872,7 +877,8 @@ func (s Subject) ReachesCodeFinding(productID int64) bool {
 }
 
 // HoldsAnywhere reports whether this subject holds one of these roles on any
-// product at all.
+// product at all, or across every product. A role across every product is
+// held here before any product exists, though it reaches no row until one does.
 //
 // A coarse check made before a name in a request is resolved, never the
 // whole of an authorization. Where the thing being acted on is named by an
@@ -891,13 +897,33 @@ func (s Subject) HoldsAnywhere(roles ...Role) bool {
 	if s.Kind != Person {
 		return false
 	}
-	for _, held := range s.grants {
-		for _, role := range held {
-			for _, wanted := range roles {
-				if role == wanted {
-					return true
-				}
+	for _, wanted := range roles {
+		// A role across every product is held anywhere a product could be,
+		// including a catalog with none in it yet.
+		if holds(s.everywhere, wanted) {
+			return true
+		}
+		for _, held := range s.grants {
+			if holds(held, wanted) {
+				return true
 			}
+		}
+	}
+	return false
+}
+
+// ReadsEverywhere reports whether this subject reads findings of some
+// visibility across every product, which covers each product as it is
+// declared. A role across every product that reads nothing, such as approving
+// alone, reaches no product a screen lists.
+func (s Subject) ReadsEverywhere() bool {
+	if s.Kind != Person {
+		return false
+	}
+	for _, v := range Visibilities() {
+		read, triage := reading(v)
+		if holds(s.everywhere, read) || holds(s.everywhere, triage) {
+			return true
 		}
 	}
 	return false

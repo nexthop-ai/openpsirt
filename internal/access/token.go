@@ -168,17 +168,12 @@ func (s Subject) narrowedToRoles(holds string) Subject {
 	}
 	narrowed := map[int64][]Role{}
 	for product, held := range s.grants {
-		var kept []Role
-		for _, role := range held {
-			if wanted[role] {
-				kept = append(kept, role)
-			}
-		}
-		if len(kept) > 0 {
+		if kept := keptRoles(held, wanted); len(kept) > 0 {
 			narrowed[product] = kept
 		}
 	}
 	s.grants = narrowed
+	s.everywhere = keptRoles(s.everywhere, wanted)
 	// Administration and auditing are not roles in this vocabulary and cannot
 	// be named, so a token asked to carry some roles carries neither.
 	s.Admin = false
@@ -191,6 +186,17 @@ func (s Subject) narrowedToRoles(holds string) Subject {
 	// material is no part of one.
 	s.casesReadOnly = !wanted[PublicTriage] && !wanted[PrivateTriage]
 	return s
+}
+
+// keptRoles is the roles in a list a token was asked to carry.
+func keptRoles(roles []Role, wanted map[Role]bool) []Role {
+	var kept []Role
+	for _, role := range roles {
+		if wanted[role] {
+			kept = append(kept, role)
+		}
+	}
+	return kept
 }
 
 // ResolveToken turns somebody's own credential into the subject it stands for.
@@ -281,8 +287,10 @@ func (s Subject) narrowedTo(productID int64) Subject {
 	s.unnarrowed = false
 	// A role held across every product is held on this one, and nowhere else
 	// through this token. The estate grants were spread across products when
-	// the subject was built, so what is left above is already the intersection.
-	//
+	// the subject was built, so what is left above is already the intersection,
+	// and "holds this role anywhere" answers from it.
+	s.everywhere = nil
+
 	// The cases stay: being brought into one is a grant on a pair of a product
 	// and an issue, and a token pinned to that product does not take it away.
 	// Cases in other products go, for the same reason the other grants do.

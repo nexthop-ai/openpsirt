@@ -52,8 +52,8 @@ answer without a credential, written out so a new route adds no exception.
 | Surface | Answers |
 |---|---|
 | `/healthz`, `/readyz` | Whether the process is up, and whether it reaches its database |
-| `/v1/sign-in` | The providers an operator configured, for a button per provider |
-| `/v1/sign-in/…` | Redirects to a provider, or refuses. It reads and writes only the sign-in key, the session, and the account a first arrival needs, and a route added here is checked against that |
+| `/v1/sign-in` | The providers an operator configured, for a button per provider, and whether the trusted proxy named the browser asking |
+| `/v1/sign-in/…` | Redirects to a provider, or to the interface's sign-in screen marked refused or failed (`design-docs/access-signin.md` § Refused sign-in). It reads and writes only the sign-in key, the session, and the account a first arrival needs, and a route added here is checked against that |
 | The interface | The built assets, which hold no data. A path naming a directory of them answers with the page, never a listing |
 | `/.well-known/csaf/…`, `/openvex/…` | The security documents of the products an administrator chose, once an operator turns publishing on, read as anybody at all. No credential is looked at, GET and HEAD are the only methods, and a deployment publishing nothing answers every path as unpublished (`design-docs/publishing.md`) |
 
