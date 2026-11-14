@@ -441,15 +441,6 @@ func (s Subject) OnCodeFindings(codeFindings map[int64][]string) Subject {
 	return s
 }
 
-// Everywhere returns this subject holding roles across every product.
-//
-// The roles reach a product only through the grants they were spread into, so
-// this widens no product-scoped question. Chained for the reason OnCases is.
-func (s Subject) Everywhere(roles []Role) Subject {
-	s.everywhere = roles
-	return s
-}
-
 // Auditing returns this subject holding the deployment's own records.
 //
 // Chained rather than another argument to NewPerson, for the reason OnCases is:
@@ -886,7 +877,8 @@ func (s Subject) ReachesCodeFinding(productID int64) bool {
 }
 
 // HoldsAnywhere reports whether this subject holds one of these roles on any
-// product at all.
+// product at all, or across every product. A role across every product is
+// held here before any product exists, though it reaches no row until one does.
 //
 // A coarse check made before a name in a request is resolved, never the
 // whole of an authorization. Where the thing being acted on is named by an

@@ -224,8 +224,8 @@ page.
 
 | Rule | Reason |
 |---|---|
-| Every refused callback redirects to the interface's sign-in screen at `/?no-access`, with one address and body for every reason: a failed exchange, an echoed value that does not match, somebody unknown, granted nothing or gone, a lapsed authorization (REQ-41) | Told apart, the reasons say whether a name is real |
-| The screen there says the account has no access and to ask an administrator, and offers the configured ways in | |
+| Every refused callback to a configured provider redirects to the interface's sign-in screen at `/?no-access`, with one address and body for every reason: a failed exchange, an echoed value that does not match, somebody unknown, granted nothing or gone, a lapsed authorization (REQ-41) | Told apart, the reasons say whether a name is real |
+| The screen there says the sign-in gave no access, to ask an administrator for it, and offers the configured ways in | It states no reason, since an expired or mismatched sign-in lands there too |
 | The screen there never forwards to the provider | The provider still holds the refused account, so a forward refuses it again in a loop |
 | A sign-in begun from that screen carries no return address | Landing back on it says somebody signed in was refused |
 | A key, a token, a trusted header or a session is refused with the problem document of `design-docs/api-refusals.md` § Refusal shape | Those are requests a client reads |

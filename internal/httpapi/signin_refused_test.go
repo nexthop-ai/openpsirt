@@ -61,6 +61,8 @@ func TestEveryRefusedSignInLandsOnTheOneNoAccessScreen(t *testing.T) {
 				state = "the-state"
 			}
 			rec := callback(t, r, state, "a-code", true)
+			// The literal the sign-in screen reads as its marker
+			// (web/src/screens/SignIn.tsx), pinned there to the same text.
 			if rec.Code != http.StatusSeeOther || rec.Header().Get("Location") != "/?no-access" {
 				t.Errorf("%s answered %d to %q, want 303 to /?no-access: %s",
 					c.what, rec.Code, rec.Header().Get("Location"), rec.Body.String())
@@ -79,8 +81,6 @@ func TestEveryRefusedSignInLandsOnTheOneNoAccessScreen(t *testing.T) {
 
 // A role across every product admits its holder before any product is
 // declared, at sign-in and on every request after, and reaches nothing there.
-// Refused, the holder met a raw "not authorized" until somebody made them an
-// administrator.
 func TestARoleAcrossEveryProductSignsSomebodyInBeforeAnyProductExists(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()

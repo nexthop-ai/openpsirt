@@ -40,6 +40,9 @@ describe("where a sign-in comes back to", () => {
     // home page under an address that says they were refused.
     at("/", "?no-access");
     expect(returningHere()).toBe("");
+    // However the marker is spelled, as the screen reads it.
+    at("/", "?no-access=&x=1");
+    expect(returningHere()).toBe("");
   });
 
   it("carries nothing from the home page, which is where a sign-in lands anyway", () => {

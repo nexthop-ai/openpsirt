@@ -571,7 +571,10 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 		on = append(on, team.PartyID)
 	}
 	subject := NewPerson(person.ID, person.Identity, administers, grants,
-		person.PartyID, on...).OnCases(cases).OnCodeFindings(codeFindings).Everywhere(everywhere)
+		person.PartyID, on...).OnCases(cases).OnCodeFindings(codeFindings)
+	// Set here and nowhere else: only a grant read above may answer "holds
+	// this role anywhere".
+	subject.everywhere = everywhere
 	if audits {
 		subject = subject.Auditing()
 	}
