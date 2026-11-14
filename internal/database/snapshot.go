@@ -21,6 +21,10 @@ import (
 // a file written a page at a time, where a row written between two pages would
 // otherwise be skipped or written twice.
 //
+// Begun on a database handle, never inside a transaction: a transaction
+// reads at its own isolation, which on PostgreSQL is READ COMMITTED, where
+// every statement sees a moving database.
+//
 // Read only, and the one transaction a request makes outside InTransaction;
 // migrations run their own. It writes nothing, so nothing certifies it at
 // COMMIT and it has no race to lose; and what fn does with each statement's
@@ -38,21 +42,17 @@ import (
 // Both are lifted for the snapshot alone, and fn's context bounds it instead.
 // MySQL and MariaDB end any session idle past wait_timeout, inside a
 // transaction or not; its default of eight hours is far past any export's
-// ceiling, and it is left as the server sets it.
-func Snapshot(ctx context.Context, db bun.IDB, fn func(context.Context, bun.IDB) error) error {
-	if tx, inside := db.(bun.Tx); inside {
-		// Already inside a transaction, which is a view of its own.
-		return fn(ctx, tx)
-	}
-	handle, ok := Handle(db)
-	if !ok {
-		return fmt.Errorf("a snapshot: %T is neither a database handle nor a transaction", db)
-	}
-	tx, err := handle.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+// ceiling, and it is left as the server sets it. MariaDB also ends a
+// transaction idle past idle_transaction_timeout or
+// idle_readonly_transaction_timeout, both off by default and left as the
+// server sets them: it has no setting scoped to one transaction, so a lift
+// would outlive the snapshot on its pooled connection.
+func Snapshot(ctx context.Context, db *DB, fn func(context.Context, bun.IDB) error) error {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
 	if err != nil {
 		return fmt.Errorf("begin a snapshot: %w", err)
 	}
-	if handle.Dialect().Name() == dialect.PG {
+	if db.Dialect().Name() == dialect.PG {
 		// Both bounds the server holds, read from its settings: PostgreSQL 17
 		// added the second, and a name an older server does not know is
 		// refused rather than ignored.

@@ -67,32 +67,45 @@ func TestASnapshotReadsWhatWasCommittedWhenItFirstRead(t *testing.T) {
 // against a server that ends a session idle inside a transaction, or a
 // transaction past a length: a file written slowly between two pages still
 // reads its second page. The pool is narrowed to one connection, so the
-// snapshot runs on the session given the bounds.
+// snapshot runs on the session given the bound.
 func TestASnapshotOutlastsPostgreSQLsBoundsOnATransaction(t *testing.T) {
 	dbtest.Only(t, database.Postgres, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		db.SetMaxOpenConns(1)
-		t.Cleanup(func() { db.SetMaxOpenConns(db.Pool.MaxOpen) })
-		// The bound on a transaction's length is PostgreSQL 17's, and is set
-		// where the server has it.
-		if _, err := db.ExecContext(ctx, `SELECT set_config("name", '100ms', false) FROM "pg_settings"
-			WHERE "name" IN ('idle_in_transaction_session_timeout', 'transaction_timeout')`); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() {
-			_, _ = db.ExecContext(context.WithoutCancel(ctx), `SELECT set_config("name", '0', false) FROM "pg_settings"
-				WHERE "name" IN ('idle_in_transaction_session_timeout', 'transaction_timeout')`)
-		})
-		err := database.Snapshot(ctx, db, func(ctx context.Context, view bun.IDB) error {
-			var n int
-			if err := view.NewRaw(`SELECT 1`).Scan(ctx, &n); err != nil {
-				return err
-			}
-			time.Sleep(400 * time.Millisecond)
-			return view.NewRaw(`SELECT 2`).Scan(ctx, &n)
-		})
-		if err != nil {
-			t.Fatalf("a snapshot held past the server's bounds failed: %v", err)
+		for _, bound := range []struct {
+			name, setting string
+			since         int // server_version_num
+		}{
+			{"idle inside a transaction", "idle_in_transaction_session_timeout", 0},
+			{"a transaction's length", "transaction_timeout", 170000},
+		} {
+			t.Run(bound.name, func(t *testing.T) {
+				ctx := t.Context()
+				var version int
+				if err := db.NewRaw(`SELECT current_setting('server_version_num')::int`).Scan(ctx, &version); err != nil {
+					t.Fatal(err)
+				}
+				if version < bound.since {
+					t.Skipf("%s is a setting from server version %d; this server is %d", bound.setting, bound.since, version)
+				}
+				db.SetMaxOpenConns(1)
+				t.Cleanup(func() { db.SetMaxOpenConns(db.Pool.MaxOpen) })
+				if _, err := db.ExecContext(ctx, `SELECT set_config(?, '100ms', false)`, bound.setting); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					_, _ = db.ExecContext(context.WithoutCancel(ctx), `SELECT set_config(?, '0', false)`, bound.setting)
+				})
+				err := database.Snapshot(ctx, db, func(ctx context.Context, view bun.IDB) error {
+					var n int
+					if err := view.NewRaw(`SELECT 1`).Scan(ctx, &n); err != nil {
+						return err
+					}
+					time.Sleep(400 * time.Millisecond)
+					return view.NewRaw(`SELECT 2`).Scan(ctx, &n)
+				})
+				if err != nil {
+					t.Fatalf("a snapshot held past the server's bound on %s failed: %v", bound.name, err)
+				}
+			})
 		}
 	})
 }
