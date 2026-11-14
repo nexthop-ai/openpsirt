@@ -22,7 +22,7 @@ type Provider = { name: string; path: string };
 // carries nothing and the server's own default applies.
 export function returningHere(): string {
   const here = window.location.pathname + window.location.search;
-  if (here === "/" || here === "" || marked(refused)) return "";
+  if (here === "/" || here === "" || marked(signedOut) || marked(refused)) return "";
   return "?return=" + encodeURIComponent(here);
 }
 
@@ -48,12 +48,10 @@ const triedKey = "signin-forwarded";
 const signedOut = "signed-out";
 export const signedOutHere = "/?" + signedOut;
 
-// The address a refused sign-in lands on, and the marker the sign-in screen
-// reads there. The server redirects every refused sign-in to exactly this
-// address, whatever the reason, so the screen says no more than that this
-// account has no access here.
+// The marker on the address a refused sign-in lands on. The server redirects
+// every refused sign-in to "/?no-access", whatever the reason, so the screen
+// says no more than that the sign-in gave no access.
 const refused = "no-access";
-export const refusedHere = "/?" + refused;
 
 // Whether the address carries one of the markers above.
 function marked(marker: string): boolean {
@@ -174,10 +172,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
           {turnedAway ? (
             <div className="text-center">
               <p className="text-sm font-medium">No access here</p>
-              <p className="mt-1 text-sm text-[var(--muted)]">
-                Your sign-in didn't get you in. If you need access, ask an administrator, then try
-                again.
-              </p>
+              <p className="mt-1 text-sm text-[var(--muted)]">Ask an administrator for access.</p>
             </div>
           ) : (
             <p className="text-sm text-[var(--muted)]">

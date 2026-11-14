@@ -102,7 +102,7 @@ describe("the application after a refused sign-in", () => {
     mount.render(screen(<App />, "/"));
     await settle();
     expect(text()).toContain("No access here");
-    expect(text()).toContain("ask an administrator");
+    expect(text()).toContain("Ask an administrator for access.");
     expect(text()).not.toContain("Sign in to continue");
     const way = mount.host().querySelector<HTMLAnchorElement>('a[href^="/v1/sign-in/oidc"]');
     expect(way?.getAttribute("href")).toBe("/v1/sign-in/oidc");
