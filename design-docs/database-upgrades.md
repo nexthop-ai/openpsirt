@@ -268,3 +268,4 @@ newest, by upload order, which a stopped upgrade run again finds done.
 |---|---|
 | A database a release before v0.9.0 built is not upgraded | The baseline makes v0.9.0's schema and no migration here reads an earlier one. v0.10.2 upgrades it first (`design-docs/database-migrations.md` § The baseline) |
 | An upgraded database keeps only the last stretch v0.12.0 recorded for an issue on an advisory | v0.12.0 revived the row on putting an issue back and overwrote when it was first added, and nothing else recorded it. An issue taken off, put back and taken off again before the upgrade reads as not named by an issuance from an earlier stretch |
+| An upgraded database keeps only the last stretch v0.12.0 recorded for a release marked affected | v0.12.0 revived the row on marking a release again and overwrote who marked and cleared it before |
