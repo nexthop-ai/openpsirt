@@ -213,7 +213,12 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 
 	// The row is marked before the bytes go. The other order leaves a file
 	// removed with nothing saying so, which reads as a store that lost it.
-	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+	// On a context of its own, as removeBytes is: a caller going away during
+	// the commit can answer it failed after it landed, which leaves a row
+	// read as redacted over bytes nothing removes.
+	marking, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
+	defer cancel()
+	err = database.InTransaction(marking, s.db, func(ctx context.Context, tx bun.Tx) error {
 		now := s.now().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*Attachment)(nil)).
 			Set(`"redacted_at" = ?`, now).

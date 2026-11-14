@@ -207,8 +207,8 @@ not.
 | A row the reaper could not finish does not end the pass | One undeletable object would stall collection |
 | What the reaper destroyed and failed to destroy is named by key, never counted | |
 | A reaper pass stopped part way claims no further row, logs what it could not finish, and its stop is not logged as a failure | A claim runs on a context of its own, so the check before each row is what ends the pass |
-| A redaction's removal, the reaper's claim and removal, and the removal of an upload's bytes whose row failed each run on a context of their own, bounded at 30 seconds | One still running when the shutdown grace ends fails the exit |
-| A redaction removes the bytes past its caller going away | Cut short after the row is marked, the bytes stay until somebody redacts again |
+| A redaction's mark and removal, the reaper's claim and removal, and the removal of an upload's bytes whose row failed each run on a context of their own, bounded at 30 seconds | One still running when the shutdown grace ends fails the exit |
+| A redaction marks its row and removes the bytes past its caller going away | A mark answered failed after it committed, or cut short before the bytes, leaves a row read as redacted over bytes nobody removes until somebody redacts again |
 | The reaper claims a row and removes its bytes past a stop | A stop answering the claim failed after it committed, or landing between the row and its bytes, would leave bytes nothing names |
 | An upload's bytes whose row failed are removed past its caller going away | A caller that went away is the commonest reason the row failed |
 | Those bytes are kept where the row is found, or cannot be looked for | A commit answered as failed may have landed, and the bytes stay with their row |

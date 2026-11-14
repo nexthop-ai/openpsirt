@@ -1081,3 +1081,141 @@ func TestALongNameIsShortenedBetweenCharacters(t *testing.T) {
 		}
 	}
 }
+
+// stopping ends a caller's context at the first statement of one verb naming
+// one table: before it runs, or once it has.
+type stopping struct {
+	verb, table string
+	after       bool
+	stop        func()
+	mu          sync.Mutex
+	fired       bool
+}
+
+func (s *stopping) fire(e *bun.QueryEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.fired || !strings.HasPrefix(e.Query, s.verb) || !strings.Contains(e.Query, s.table) {
+		return
+	}
+	s.fired = true
+	s.stop()
+}
+
+func (s *stopping) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if !s.after {
+		s.fire(e)
+	}
+	return ctx
+}
+
+func (s *stopping) AfterQuery(_ context.Context, e *bun.QueryEvent) {
+	if s.after {
+		s.fire(e)
+	}
+}
+
+// A redaction whose caller goes away once the row is marked still commits the
+// mark and removes the bytes: both run on a context of their own.
+func TestARedactionWhoseCallerWentAwayStillRemovesTheBytes(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		admin := f.admin(t)
+		stored := f.upload(t, who, "oops.txt", []byte("AKIAIOSFODNN7EXAMPLE"))
+
+		hook := &stopping{verb: "UPDATE", table: "attachment", after: true, stop: stop}
+		store := attach.NewStore(dbtest.Hooked(f.db, hook).DB, cancelHonoring{f.files})
+		if err := store.Redact(ctx, admin, stored.Token, "a credential"); err != nil {
+			t.Fatalf("a redaction whose caller went away answered %v", err)
+		}
+		if !hook.fired {
+			t.Fatal("the caller never went away")
+		}
+		row, err := f.store.Find(t.Context(), who, stored.Token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !row.Redacted() {
+			t.Error("the mark did not land")
+		}
+		if _, err := f.files.Open(t.Context(), row.ObjectKey); err == nil {
+			t.Error("the bytes of a redacted file are still in the store")
+		}
+	})
+}
+
+// A collection pass stopped as it claims a row finishes that row, claim and
+// bytes both, and claims no other.
+func TestACollectionPassStoppedDuringAClaimFinishesThatRow(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		for _, name := range []string{"one.log", "two.log", "three.log"} {
+			f.upload(t, who, name, []byte("nothing will ever point here"))
+		}
+		f.age(t, past)
+
+		var said bytes.Buffer
+		hook := &stopping{verb: "DELETE", table: "attachment", stop: stop}
+		store := attach.NewStore(dbtest.Hooked(f.db, hook).DB, cancelHonoring{f.files}).
+			Reporting(slog.New(slog.NewTextHandler(&said, nil)))
+		gone, err := store.Sweep(ctx, 24*time.Hour)
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("a stopped pass answered %v", err)
+		}
+		if gone != 1 {
+			t.Errorf("a pass stopped during its first claim collected %d rows, want 1", gone)
+		}
+		if strings.Contains(said.String(), "level=ERROR") {
+			t.Errorf("a pass stopped during a claim logged errors: %s", said.String())
+		}
+		if held := filesUnder(t, f.root); held != 2 {
+			t.Errorf("a pass stopped during its first claim left %d of 3 files, want 2", held)
+		}
+	})
+}
+
+// syncBuffer is a buffer written from more than one goroutine.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// A store given no logger names bytes it could not remove on the process's
+// default logger, since the key is the only thing that can find them. It
+// replaces the default, so it runs alone.
+func TestAStoreWithNoLoggerNamesUnremovedBytesOnTheDefault(t *testing.T) {
+	said := &syncBuffer{}
+	was := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(said, nil)))
+	defer slog.SetDefault(was)
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		store := attach.NewStore(f.db.DB, undeletable{f.files})
+		attach.BeforeRecord(store, stop)
+		if _, err := store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue},
+			"evidence.log", strings.NewReader("abc"), 3, roomy, plenty, plenty, false); err == nil {
+			t.Fatal("an upload whose caller went away was recorded")
+		}
+	})
+	if !strings.Contains(said.String(), "left bytes behind") || !strings.Contains(said.String(), "key=") {
+		t.Errorf("bytes nothing records were not named on the default logger: %s", said.String())
+	}
+}
