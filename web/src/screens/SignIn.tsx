@@ -22,7 +22,7 @@ type Provider = { name: string; path: string };
 // carries nothing and the server's own default applies.
 export function returningHere(): string {
   const here = window.location.pathname + window.location.search;
-  if (here === "/" || here === "" || here === refusedHere) return "";
+  if (here === "/" || here === "" || marked(refused)) return "";
   return "?return=" + encodeURIComponent(here);
 }
 
@@ -55,9 +55,9 @@ export const signedOutHere = "/?" + signedOut;
 const refused = "no-access";
 export const refusedHere = "/?" + refused;
 
-// Whether the browser is on the address a refused sign-in lands on.
-function refusedSignIn(): boolean {
-  return new URLSearchParams(window.location.search).has(refused);
+// Whether the address carries one of the markers above.
+function marked(marker: string): boolean {
+  return new URLSearchParams(window.location.search).has(marker);
 }
 
 function alreadyTried(): boolean {
@@ -98,10 +98,10 @@ export function forwardable(count: number, resuming: boolean | undefined): boole
   // Signing out lands here, and the provider still holds its own session — so
   // forwarding would sign them straight back in and make signing out
   // impossible.
-  if (new URLSearchParams(window.location.search).has(signedOut)) return false;
+  if (marked(signedOut)) return false;
   // A refused sign-in lands here, and the provider still holds the account it
   // refused, so forwarding would refuse it again in a loop.
-  if (refusedSignIn()) return false;
+  if (marked(refused)) return false;
   return !alreadyTried();
 }
 
@@ -127,7 +127,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
   const offered = providers.data?.items ?? [];
   const only = offered.length === 1 ? offered[0] : undefined;
   const forwarding = Boolean(only) && forwardable(offered.length, resuming);
-  const turnedAway = !resuming && refusedSignIn();
+  const turnedAway = !resuming && marked(refused);
 
   useEffect(() => {
     if (!forwarding || !only) return;
@@ -175,8 +175,8 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
             <div className="text-center">
               <p className="text-sm font-medium">No access here</p>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Signed in, but this account has no access here. Ask an administrator, or use another
-                account.
+                Your sign-in didn't get you in. If you need access, ask an administrator, then try
+                again.
               </p>
             </div>
           ) : (

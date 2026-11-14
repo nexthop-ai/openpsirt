@@ -23,9 +23,8 @@ var everyEstateRole = []access.Role{
 }
 
 // A role across every product is access whatever the catalog holds. Spread over
-// a catalog with nothing in it, it adds no per-product grant, and counting only
-// those refused the holder at every request until somebody ticked
-// administration. Admitted, they still read nothing until a product exists.
+// a catalog with nothing in it, it adds no per-product grant, so its holder is
+// admitted on the role itself and reads nothing until a product exists.
 func TestARoleAcrossEveryProductAdmitsSomebodyBeforeAnyProductExists(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
