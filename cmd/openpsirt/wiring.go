@@ -209,12 +209,11 @@ func signInProviders(ctx context.Context, cfg config.Config, logger *slog.Logger
 // safe direction.
 func roleMode(settings *setting.Store) func(context.Context) access.Mode {
 	return func(ctx context.Context) access.Mode {
-		mode, err := settings.Word(ctx, setting.RoleMode,
-			access.ModeWords(), string(access.Direct))
+		stored, _, err := settings.Get(ctx, setting.RoleMode)
 		if err != nil {
 			return access.Direct
 		}
-		return access.Mode(mode)
+		return access.AsMode(stored)
 	}
 }
 

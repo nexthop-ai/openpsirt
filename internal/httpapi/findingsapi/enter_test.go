@@ -903,16 +903,20 @@ func TestAnUndeclaredBuildInABodyIsNamedByEveryRouteTakingBuilds(t *testing.T) {
 			`{"builds":`+typo+`,"summary":"Another.","severity":"critical"}`)
 		affecting := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
 			"/v1/products/mine/issues/"+recorded.Identifier+"/builds", `{"builds":`+typo+`}`)
+		planning := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/components/libcurl4t64/upgrade",
+			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`","reasoning":"Taking the bump.","builds":`+typo+`}`)
 		for what, answer := range map[string]*httptest.ResponseRecorder{
 			"recording a flaw": entering, "setting the builds it affects": affecting,
+			"planning an upgrade": planning,
 		} {
 			if answer.Code != http.StatusNotFound || !strings.Contains(answer.Body.String(), "broadcm") {
 				t.Errorf("%s against an undeclared variant answered %d: %s", what, answer.Code, answer.Body.String())
 			}
-		}
-		if entering.Body.String() != affecting.Body.String() {
-			t.Errorf("the two routes refuse one undeclared build differently\n recording: %s\n affecting: %s",
-				entering.Body.String(), affecting.Body.String())
+			if answer.Body.String() != entering.Body.String() {
+				t.Errorf("%s refuses an undeclared build otherwise than recording a flaw\n %s\n %s",
+					what, answer.Body.String(), entering.Body.String())
+			}
 		}
 	})
 }

@@ -38,23 +38,17 @@ const (
 // Modes is both ways roles can be assigned.
 func Modes() []Mode { return []Mode{Direct, GroupBound} }
 
-// ModeWords is Modes as the setting holding one stores them.
-func ModeWords() []string {
-	words := make([]string, 0, len(Modes()))
-	for _, m := range Modes() {
-		words = append(words, string(m))
-	}
-	return words
-}
-
-// AsMode reads a stored value, treating anything unrecognized as direct.
+// AsMode reads a stored value as one of Modes, treating anything
+// unrecognized as direct. Every reader of the stored mode reads it here.
 //
 // Direct is the safe reading: it is the mode in which nothing is derived from
 // what a provider says, so a value nobody can parse cannot turn group
 // membership into roles.
 func AsMode(s string) Mode {
-	if Mode(s) == GroupBound {
-		return GroupBound
+	for _, m := range Modes() {
+		if Mode(s) == m {
+			return m
+		}
 	}
 	return Direct
 }

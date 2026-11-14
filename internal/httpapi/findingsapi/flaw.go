@@ -22,13 +22,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
 
-// CodeFindingBuild is one build a request names by its branch or tag and
-// variant.
-type CodeFindingBuild struct {
-	BranchOrTag string `json:"branch_or_tag" minLength:"1" doc:"A branch or a tag"`
-	Variant     string `json:"variant" minLength:"1" doc:"The way that line is built"`
-}
-
 // FlawOfferSource is where a suggested component came from.
 type FlawOfferSource string
 
@@ -43,12 +36,12 @@ func (FlawOfferSource) Schema(huma.Registry) *huma.Schema {
 
 // SuggestionBody is one component offered at flaw record.
 type SuggestionBody struct {
-	Component  string             `json:"component,omitempty" doc:"The component, as the builds name it. Absent for the build itself"`
-	Ecosystem  string             `json:"ecosystem,omitempty" doc:"Its ecosystem, where its package identifier states one"`
-	Namespace  string             `json:"namespace,omitempty" doc:"Its namespace, where its package identifier states one"`
-	From       FlawOfferSource    `json:"from" doc:"Where the suggestion came from: a prefix confirmed at an earlier flaw record, the component the code finding was placed on, a component whose name resembles the code finding's directory, or the build itself"`
-	Lacking    []CodeFindingBuild `json:"lacking" doc:"The builds the code finding was seen in that hold no such component. Recording the flaw against them is refused"`
-	Unanalyzed []CodeFindingBuild `json:"unanalyzed" doc:"The builds holding the component that the code finding's series never analyzed"`
+	Component  string            `json:"component,omitempty" doc:"The component, as the builds name it. Absent for the build itself"`
+	Ecosystem  string            `json:"ecosystem,omitempty" doc:"Its ecosystem, where its package identifier states one"`
+	Namespace  string            `json:"namespace,omitempty" doc:"Its namespace, where its package identifier states one"`
+	From       FlawOfferSource   `json:"from" doc:"Where the suggestion came from: a prefix confirmed at an earlier flaw record, the component the code finding was placed on, a component whose name resembles the code finding's directory, or the build itself"`
+	Lacking    []core.BuildNamed `json:"lacking" doc:"The builds the code finding was seen in that hold no such component. Recording the flaw against them is refused"`
+	Unanalyzed []core.BuildNamed `json:"unanalyzed" doc:"The builds holding the component that the code finding's series never analyzed"`
 }
 
 // NoteBody is one piece of writing on a decision about a code finding.
@@ -84,13 +77,13 @@ type DisclosesBody struct {
 
 // FlawOfferBody is what a flaw record of one code finding is offered.
 type FlawOfferBody struct {
-	Rule        string             `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
-	Seen        []CodeFindingBuild `json:"seen" doc:"Every build the code finding was seen in, which the flaw is proposed against"`
-	Suggestions []SuggestionBody   `json:"suggestions" doc:"The components offered, most likely first. The build itself is always last"`
-	Prefix      string             `json:"prefix,omitempty" doc:"The path a confirmed component is remembered for: the repository or declared third-party path the code finding is in, or its directory"`
-	ThirdParty  bool               `json:"third_party,omitempty" doc:"Whether the code finding is in code its newest run declared third-party. The flaw is reported to the upstream the code came from; recording it here is still accepted"`
-	Together    int                `json:"together" doc:"The number of other code findings linked to the flaw with this one: the code findings its confirming decision covers. They are included in disclosure or taken out with it"`
-	Discloses   DisclosesBody      `json:"discloses" doc:"What including the code finding, and the code findings linked with it, in the flaw's disclosure discloses when the flaw is disclosed"`
+	Rule        string            `json:"rule" doc:"The analyzer's rule, as <tool>/<rule>"`
+	Seen        []core.BuildNamed `json:"seen" doc:"Every build the code finding was seen in, which the flaw is proposed against"`
+	Suggestions []SuggestionBody  `json:"suggestions" doc:"The components offered, most likely first. The build itself is always last"`
+	Prefix      string            `json:"prefix,omitempty" doc:"The path a confirmed component is remembered for: the repository or declared third-party path the code finding is in, or its directory"`
+	ThirdParty  bool              `json:"third_party,omitempty" doc:"Whether the code finding is in code its newest run declared third-party. The flaw is reported to the upstream the code came from; recording it here is still accepted"`
+	Together    int               `json:"together" doc:"The number of other code findings linked to the flaw with this one: the code findings its confirming decision covers. They are included in disclosure or taken out with it"`
+	Discloses   DisclosesBody     `json:"discloses" doc:"What including the code finding, and the code findings linked with it, in the flaw's disclosure discloses when the flaw is disclosed"`
 }
 
 // RecordedAsFlawBody is the record of a code finding recorded as a flaw.
@@ -211,10 +204,10 @@ func registerFlaw(api huma.API, in core.Deps) {
 	}), func(ctx context.Context, input *struct {
 		core.CodeFindingRoute
 		Body struct {
-			Builds    []CodeFindingBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build the flaw is recorded against"`
-			Component string             `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
-			Ecosystem string             `json:"ecosystem,omitempty" doc:"The ecosystem, where two components share the name"`
-			Namespace string             `json:"namespace,omitempty" doc:"The namespace, where two share a name and an ecosystem"`
+			Builds    []core.BuildNamed `json:"builds" minItems:"1" maxItems:"200" doc:"Every build the flaw is recorded against"`
+			Component string            `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
+			Ecosystem string            `json:"ecosystem,omitempty" doc:"The ecosystem, where two components share the name"`
+			Namespace string            `json:"namespace,omitempty" doc:"The namespace, where two share a name and an ecosystem"`
 			FlawFields
 			IncludeInDisclosure bool `json:"include_in_disclosure,omitempty" doc:"Whether the code finding is included in its flaw's disclosure. Security testing only by default"`
 		}
@@ -233,7 +226,7 @@ func registerFlaw(api huma.API, in core.Deps) {
 		if err := analysis.MayRecordAsFlaw(subject, at.named.ProductID); err != nil {
 			return nil, refusedFlawRecord(in, err)
 		}
-		buildIDs, err := bodyBuilds(ctx, in, subject, input.Product, input.Body.Builds)
+		buildIDs, err := core.BodyBuilds(ctx, in, subject, input.Product, input.Body.Builds)
 		if err != nil {
 			return nil, err
 		}
@@ -308,33 +301,11 @@ func registerFlaw(api huma.API, in core.Deps) {
 	}), including(false))
 }
 
-// bodyBuilds resolves the builds a request body names in a product, refusing
-// an undeclared one by naming it. Asked only after the caller is authorized on
-// the product.
-func bodyBuilds(ctx context.Context, in core.Deps, subject access.Subject, product string,
-	builds []CodeFindingBuild) ([]int64, error) {
-
-	names := catalog.NewStore(in.DB.DB)
-	out := make([]int64, 0, len(builds))
-	for _, b := range builds {
-		at, err := names.LocateVisible(ctx, subject, product, b.BranchOrTag, b.Variant)
-		if err != nil {
-			return nil, core.Undeclared(in.Logger, err, "that build could not be looked up")
-		}
-		build, err := core.BuildRow(ctx, in, at.BranchOrTagID, at.VariantID)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, build.ID)
-	}
-	return out, nil
-}
-
 // codeFindingBuilds is builds as an answer states them.
-func codeFindingBuilds(builds []analysis.BuildName) []CodeFindingBuild {
-	out := make([]CodeFindingBuild, 0, len(builds))
+func codeFindingBuilds(builds []analysis.BuildName) []core.BuildNamed {
+	out := make([]core.BuildNamed, 0, len(builds))
 	for _, b := range builds {
-		out = append(out, CodeFindingBuild{BranchOrTag: b.BranchOrTag, Variant: b.Variant})
+		out = append(out, core.BuildNamed{BranchOrTag: b.BranchOrTag, Variant: b.Variant})
 	}
 	return out
 }

@@ -113,12 +113,11 @@ func productLabels(ctx context.Context, a core.Administering) (map[string]string
 // is given — which is the transaction deciding, rather than this.
 func roleModeIn(settings func(bun.IDB) *setting.Store) func(context.Context, bun.IDB) (access.Mode, error) {
 	return func(ctx context.Context, db bun.IDB) (access.Mode, error) {
-		mode, err := settings(db).Word(ctx, setting.RoleMode,
-			access.ModeWords(), string(access.Direct))
+		stored, _, err := settings(db).Get(ctx, setting.RoleMode)
 		if err != nil {
 			return "", fmt.Errorf("read where roles come from: %w", err)
 		}
-		return access.Mode(mode), nil
+		return access.AsMode(stored), nil
 	}
 }
 

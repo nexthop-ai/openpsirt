@@ -8884,8 +8884,10 @@ export interface components {
             /** @description The variant as it was spelled, or its name where no spelling was recorded */
             variant_name?: string;
         };
-        BuildName: {
+        BuildNamed: {
+            /** @description A branch or a tag */
             branch_or_tag: string;
+            /** @description The way that line is built */
             variant: string;
         };
         BuildStandingBody: {
@@ -9325,12 +9327,6 @@ export interface components {
              * @description Code findings nothing answers yet, a decision waiting for a second person included
              */
             unjudged: number;
-        };
-        CodeFindingBuild: {
-            /** @description A branch or a tag */
-            branch_or_tag: string;
-            /** @description The way that line is built */
-            variant: string;
         };
         CodeFindingCountsBody: {
             /**
@@ -11503,7 +11499,7 @@ export interface components {
             /** @description The analyzer's rule, as <tool>/<rule> */
             rule: string;
             /** @description Every build the code finding was seen in, which the flaw is proposed against */
-            seen: components["schemas"]["CodeFindingBuild"][] | null;
+            seen: components["schemas"]["BuildNamed"][] | null;
             /** @description The components offered, most likely first. The build itself is always last */
             suggestions: components["schemas"]["SuggestionBody"][] | null;
             /** @description Whether the code finding is in code its newest run declared third-party. The flaw is reported to the upstream the code came from; recording it here is still accepted */
@@ -13803,7 +13799,7 @@ export interface components {
              */
             readonly $schema?: string;
             /** @description The releases this is promised for. A branch or tag staying on a maintained older line takes its own promise with its own version */
-            builds: components["schemas"]["BuildName"][] | null;
+            builds: components["schemas"]["BuildNamed"][] | null;
             /** @description The date the work lands, as 2026-03-31. A missed target is measured against it */
             by: string;
             /** @description The party carrying it, by sign-in identity. Leave both out and it is held by nobody */
@@ -13911,7 +13907,7 @@ export interface components {
             /** @description The version in hand */
             from: string;
             /** @description The builds that hold this upgrade */
-            in: components["schemas"]["BuildName"][] | null;
+            in: components["schemas"]["BuildNamed"][] | null;
             /** @description Whether an incident stands in this product through some of what it closes */
             incident?: boolean;
             /**
@@ -14501,7 +14497,7 @@ export interface components {
              */
             readonly $schema?: string;
             /** @description Every build the flaw is recorded against */
-            builds: components["schemas"]["CodeFindingBuild"][] | null;
+            builds: components["schemas"]["BuildNamed"][] | null;
             /** @description The component that carries it. Omit for the build itself */
             component?: string;
             /** @description The ecosystem, where two components share the name */
@@ -14530,7 +14526,7 @@ export interface components {
              */
             readonly $schema?: string;
             /** @description Every build that ships it. One issue, and one finding for each occurrence of the component in each build — which is the shape a scanner's findings already take */
-            builds: components["schemas"]["CodeFindingBuild"][] | null;
+            builds: components["schemas"]["BuildNamed"][] | null;
             /** @description The component that carries it. Omit for the build itself */
             component?: string;
             /** @description The address to reach them at. A researcher has no account here, which is the shape of the thing */
@@ -15489,7 +15485,7 @@ export interface components {
              */
             readonly $schema?: string;
             /** @description Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding */
-            builds: components["schemas"]["CodeFindingBuild"][] | null;
+            builds: components["schemas"]["BuildNamed"][] | null;
             /** @description The reason any build is being taken out. Required whenever one is */
             reason?: string;
         };
@@ -15985,11 +15981,11 @@ export interface components {
              */
             from: "confirmed" | "placed" | "resembles" | "build";
             /** @description The builds the code finding was seen in that hold no such component. Recording the flaw against them is refused */
-            lacking: components["schemas"]["CodeFindingBuild"][] | null;
+            lacking: components["schemas"]["BuildNamed"][] | null;
             /** @description Its namespace, where its package identifier states one */
             namespace?: string;
             /** @description The builds holding the component that the code finding's series never analyzed */
-            unanalyzed: components["schemas"]["CodeFindingBuild"][] | null;
+            unanalyzed: components["schemas"]["BuildNamed"][] | null;
         };
         SupplierAdvisoryFeedBody: {
             /**

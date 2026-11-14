@@ -113,7 +113,7 @@ func registerEntry(api huma.API, in core.Deps) {
 			// is minted per product — so the product is the level
 			// this is recorded at and the builds are what it
 			// names.
-			Builds []CodeFindingBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each occurrence of the component in each build — which is the shape a scanner's findings already take"`
+			Builds []core.BuildNamed `json:"builds" minItems:"1" maxItems:"200" doc:"Every build that ships it. One issue, and one finding for each occurrence of the component in each build — which is the shape a scanner's findings already take"`
 			FlawFields
 			Component string `json:"component,omitempty" doc:"The component that carries it. Omit for the build itself"`
 			Version   string `json:"version,omitempty" doc:"The version, where the build holds that name at several"`
@@ -140,7 +140,7 @@ func registerEntry(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		buildIDs, err := bodyBuilds(ctx, in, subject, input.Product, input.Body.Builds)
+		buildIDs, err := core.BodyBuilds(ctx, in, subject, input.Product, input.Body.Builds)
 		if err != nil {
 			return nil, err
 		}
@@ -864,8 +864,8 @@ func registerAffects(api huma.API, in core.Deps) {
 		Product       string `path:"product"`
 		Vulnerability string `path:"issue" doc:"The identifier it was filed under"`
 		Body          struct {
-			Builds []CodeFindingBuild `json:"builds" minItems:"1" maxItems:"200" doc:"Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding"`
-			Reason string             `json:"reason,omitempty" doc:"The reason any build is being taken out. Required whenever one is"`
+			Builds []core.BuildNamed `json:"builds" minItems:"1" maxItems:"200" doc:"Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding"`
+			Reason string            `json:"reason,omitempty" doc:"The reason any build is being taken out. Required whenever one is"`
 		}
 	}) (*struct{ Body AffectsBody }, error) {
 		in := core.Of(ctx, in)
@@ -889,7 +889,7 @@ func registerAffects(api huma.API, in core.Deps) {
 			return nil, err
 		}
 
-		buildIDs, err := bodyBuilds(ctx, in, subject, input.Product, input.Body.Builds)
+		buildIDs, err := core.BodyBuilds(ctx, in, subject, input.Product, input.Body.Builds)
 		if err != nil {
 			return nil, err
 		}

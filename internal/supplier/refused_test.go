@@ -371,5 +371,32 @@ func TestADocumentTheStoreRefusesIsSteppedOver(t *testing.T) {
 		if took.Refused != 1 || took.Documents != 1 {
 			t.Errorf("read %+v, want the document the store refuses stepped over", took)
 		}
+		// Refused before anything further is asked of the publisher about it,
+		// while the document beside it has its digest asked for.
+		asked := strings.Join(p.asked, " ")
+		if strings.Contains(asked, "/2026/EL-45.json.") {
+			t.Errorf("the publisher was asked %s, want nothing beside a document already refused", asked)
+		}
+		if !strings.Contains(asked, "/2026/EL-46.json.sha") {
+			t.Errorf("the publisher was asked %s, want the recorded document's digest", asked)
+		}
+	})
+}
+
+// The store refuses what it will not record, and a refusal is about the
+// document: read as a failure of this deployment, it would hold the mark
+// before the document for ever.
+func TestARefusalFromTheStoreIsAboutTheDocument(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		p := serving(t)
+		long := strings.Repeat("x", finding.MostPublisher+1)
+		err := supplier.RecordForTest(t.Context(), fetching(t, f, p), f.by, from(t, f, p),
+			p.server.URL+"/2026/EL-47.json", long, "EL-2026-0047")
+		if err == nil {
+			t.Fatal("the store recorded a publisher past its bound")
+		}
+		if !supplier.SteppedOver(err) {
+			t.Errorf("the refusal %v reads as a failure of this deployment", err)
+		}
 	})
 }

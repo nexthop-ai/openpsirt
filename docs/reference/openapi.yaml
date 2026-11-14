@@ -1858,12 +1858,16 @@ components:
         - branch_or_tag
         - variant
       type: object
-    BuildName:
+    BuildNamed:
       additionalProperties: false
       properties:
         branch_or_tag:
+          description: A branch or a tag
+          minLength: 1
           type: string
         variant:
+          description: The way that line is built
+          minLength: 1
           type: string
       required:
         - branch_or_tag
@@ -2571,21 +2575,6 @@ components:
         - confirmed
         - fixed
         - unjudged
-      type: object
-    CodeFindingBuild:
-      additionalProperties: false
-      properties:
-        branch_or_tag:
-          description: A branch or a tag
-          minLength: 1
-          type: string
-        variant:
-          description: The way that line is built
-          minLength: 1
-          type: string
-      required:
-        - branch_or_tag
-        - variant
       type: object
     CodeFindingCountsBody:
       additionalProperties: false
@@ -6231,7 +6220,7 @@ components:
         seen:
           description: Every build the code finding was seen in, which the flaw is proposed against
           items:
-            $ref: "#/components/schemas/CodeFindingBuild"
+            $ref: "#/components/schemas/BuildNamed"
           type:
             - array
             - "null"
@@ -10481,7 +10470,7 @@ components:
         builds:
           description: The releases this is promised for. A branch or tag staying on a maintained older line takes its own promise with its own version
           items:
-            $ref: "#/components/schemas/BuildName"
+            $ref: "#/components/schemas/BuildNamed"
           maxItems: 2000
           minItems: 1
           type:
@@ -10646,7 +10635,7 @@ components:
         in:
           description: The builds that hold this upgrade
           items:
-            $ref: "#/components/schemas/BuildName"
+            $ref: "#/components/schemas/BuildNamed"
           type:
             - array
             - "null"
@@ -11540,7 +11529,7 @@ components:
         builds:
           description: Every build the flaw is recorded against
           items:
-            $ref: "#/components/schemas/CodeFindingBuild"
+            $ref: "#/components/schemas/BuildNamed"
           maxItems: 200
           minItems: 1
           type:
@@ -11601,7 +11590,7 @@ components:
         builds:
           description: Every build that ships it. One issue, and one finding for each occurrence of the component in each build — which is the shape a scanner's findings already take
           items:
-            $ref: "#/components/schemas/CodeFindingBuild"
+            $ref: "#/components/schemas/BuildNamed"
           maxItems: 200
           minItems: 1
           type:
@@ -13248,7 +13237,7 @@ components:
         builds:
           description: Every build it affects, as the whole answer rather than a change to it. Bounded, because this is a complete list and every build absent from it is closed as never affected — so a caller that sent what it happened to have in hand would close the rest. Where an issue is open at more builds than this, the builds are answered one at a time from each build's own finding
           items:
-            $ref: "#/components/schemas/CodeFindingBuild"
+            $ref: "#/components/schemas/BuildNamed"
           maxItems: 200
           minItems: 1
           type:
@@ -14152,7 +14141,7 @@ components:
         lacking:
           description: The builds the code finding was seen in that hold no such component. Recording the flaw against them is refused
           items:
-            $ref: "#/components/schemas/CodeFindingBuild"
+            $ref: "#/components/schemas/BuildNamed"
           type:
             - array
             - "null"
@@ -14162,7 +14151,7 @@ components:
         unanalyzed:
           description: The builds holding the component that the code finding's series never analyzed
           items:
-            $ref: "#/components/schemas/CodeFindingBuild"
+            $ref: "#/components/schemas/BuildNamed"
           type:
             - array
             - "null"
