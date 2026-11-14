@@ -245,11 +245,29 @@ func RivalAfterSelect(t *testing.T, db *database.DB, read string, wait time.Dura
 	return hook.hooked(t, db, hook, "the rival never ran, so nothing landed after the read")
 }
 
+// RivalAfterSelectInside is RivalAfterSelect counting only a read made after a
+// transaction began on the handle. A store asking a question before its
+// transaction as an early refusal, and again inside it, reads the same table
+// twice, and the rival belongs after the read that decides.
+func RivalAfterSelectInside(t *testing.T, db *database.DB, read string, wait time.Duration,
+	rival func() error) (*bun.DB, func() error) {
+
+	t.Helper()
+	if db.Stats().MaxOpenConnections == 1 {
+		t.Skip("one connection: nothing lands between two reads")
+	}
+	hook := &afterSelect{read: read, inside: true, rivalSeam: newSeam(db, wait, rival)}
+	return hook.hooked(t, db, hook, "the rival never ran, so nothing landed after the read")
+}
+
 // afterSelect arms once a read of one table has run, and fires before the
-// statement after it.
+// statement after it. With inside set, a read arms it only once a transaction
+// has begun on the handle.
 type afterSelect struct {
-	read  string
-	armed bool
+	read   string
+	inside bool
+	begun  bool
+	armed  bool
 	rivalSeam
 }
 
@@ -261,7 +279,11 @@ func (h *afterSelect) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) contex
 func (h *afterSelect) AfterQuery(_ context.Context, e *bun.QueryEvent) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if verbOf(e.Query) == "SELECT" && names(e.Query, h.read) {
+	verb := verbOf(e.Query)
+	if verb == "BEGIN" {
+		h.begun = true
+	}
+	if verb == "SELECT" && names(e.Query, h.read) && (h.begun || !h.inside) {
 		h.armed = true
 	}
 }

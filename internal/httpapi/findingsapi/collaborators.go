@@ -111,7 +111,16 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			var added bool
 			var named, issued string
 			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
-				var err error
+				// Asked again where the grant is written, and this answer
+				// decides: an issue that left the product since the early
+				// refusal is refused as absent.
+				told, err := finding.MayBeToldOfWithin(ctx, tx, subject, product, issue)
+				if err != nil {
+					return core.WentWrong(in.Logger, "that could not be looked up", err)
+				}
+				if !told {
+					return core.NoSuchFinding()
+				}
 				// Named where the record is written, so it carries the names
 				// the case has when the grant lands.
 				if named, issued, err = namedCase(ctx, in, tx, product, issue); err != nil {

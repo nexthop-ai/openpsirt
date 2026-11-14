@@ -237,7 +237,8 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 		// Asked again here, because what the advisory covers decides both
 		// who may write it and whether the issue is on it, and it moves
 		// under an edit.
-		if err := s.mayWrite(ctx, tx, subject, row, "mark a release affected"); err != nil {
+		highest, err := s.mayEdit(ctx, tx, subject, row, "mark a release affected")
+		if err != nil {
 			return err
 		}
 		covered, err := coveredBy(ctx, tx, subject, row.ID)
@@ -303,7 +304,7 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 				return err
 			}
 		}
-		return reopen(ctx, tx, row, subject.ID, now)
+		return reopen(ctx, tx, row, highest, subject.ID, now)
 	})
 	switch {
 	case errors.Is(err, ErrNoSuchRelease), errors.Is(err, ErrNoSuchIssue),

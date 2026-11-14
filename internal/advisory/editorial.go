@@ -114,11 +114,12 @@ func (s *Store) Retitle(ctx context.Context, subject access.Subject,
 	}
 
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := s.mayWrite(ctx, tx, subject, row, "retitle an advisory"); err != nil {
+		highest, err := s.mayEdit(ctx, tx, subject, row, "retitle an advisory")
+		if err != nil {
 			return err
 		}
 		now := s.now().UTC().Truncate(time.Microsecond)
-		_, err := openEdition(ctx, tx, row.ID, subject.ID, title, now)
+		_, err = openEdition(ctx, tx, row.ID, highest, subject.ID, title, now)
 		return err
 	})
 	if errors.Is(err, access.ErrDenied) {
@@ -135,25 +136,43 @@ func (s *Store) Retitle(ctx context.Context, subject access.Subject,
 	return row, held, nil
 }
 
-// openEdition writes the next edition and takes back every agreement standing
-// on the one it replaces.
+// mayEdit asks whether this subject may change what an advisory says, inside a
+// transaction that goes on to open an edition, and answers the highest edition
+// the advisory has, zero before its first.
 //
-// One place, because every act that changes what the document says runs it:
-// retitling, naming a flaw, and taking one off. A rule enforced at one of
-// three sites is a rule that holds until somebody does their job.
-//
-// The ordinal is read and used in the same transaction, so two people editing
-// at the same moment cannot be handed the same number.
-func openEdition(ctx context.Context, tx bun.Tx, advisoryID, who int64,
-	title string, now time.Time) (*Edition, error) {
+// The edition is read before the question. Every change to what the advisory
+// covers opens an edition, so one committing after the read takes the number
+// this transaction is about to take, the unique ordinal refuses the second,
+// and the retry asks again who may write what the advisory now covers. Read
+// after the question, on an engine that reads what is committed at each
+// statement, the number follows the rival's edition and the write lands under
+// an answer about coverage that has since moved.
+func (s *Store) mayEdit(ctx context.Context, tx bun.Tx, subject access.Subject, row *Advisory,
+	what string) (int, error) {
 
 	var highest int
 	if err := tx.NewSelect().Model((*Edition)(nil)).
 		ColumnExpr(`COALESCE(MAX("ordinal"), 0)`).
-		Where(`"advisory_id" = ?`, advisoryID).
+		Where(`"advisory_id" = ?`, row.ID).
 		Scan(ctx, &highest); err != nil {
-		return nil, err
+		return 0, err
 	}
+	if err := s.mayWrite(ctx, tx, subject, row, what); err != nil {
+		return 0, err
+	}
+	return highest, nil
+}
+
+// openEdition writes the edition after highest, which mayEdit read in the same
+// transaction, and takes back every agreement standing on the one it
+// replaces.
+//
+// One place, because every act that changes what the document says runs it:
+// retitling, naming a flaw, and taking one off. A rule enforced at one of
+// three sites is a rule that holds until somebody does their job.
+func openEdition(ctx context.Context, tx bun.Tx, advisoryID int64, highest int, who int64,
+	title string, now time.Time) (*Edition, error) {
+
 	// Built inside the transaction, because the insert writes the generated
 	// identifier back into the model. A retry would otherwise re-insert a
 	// model carrying the rolled-back attempt's answer.
