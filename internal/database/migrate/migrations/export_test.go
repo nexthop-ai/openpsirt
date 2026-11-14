@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"slices"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -385,3 +386,10 @@ func StopV0130AfterPurlPhase(ctx context.Context, db *database.DB, phases int) e
 // PublishedBatchV0130 is how many published documents one read of the
 // v0.13.0 upgrade takes.
 const PublishedBatchV0130 = publishedBatchV0130
+
+// ShortLockWaits is ctx with a migration's attempts at a lock one second
+// long, and the pauses between them a tenth of a second, doubling to a fifth.
+func ShortLockWaits(ctx context.Context) context.Context {
+	return context.WithValue(ctx, waitsKey{}, lockWaits{attemptSeconds: 1,
+		pause: 100 * time.Millisecond, most: 200 * time.Millisecond})
+}
