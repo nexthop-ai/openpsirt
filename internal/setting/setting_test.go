@@ -94,30 +94,18 @@ func TestAValueNobodyCanParseReadsAsTheDefault(t *testing.T) {
 		}
 		// A switch the same way: a word other than on and off is the default,
 		// whichever way the default points.
-		for _, fallback := range []bool{true, false} {
-			if _, _, err := s.Change(ctx, setting.IssueDates, "yes"); err != nil {
-				t.Fatal(err)
-			}
-			got, err := s.Switch(ctx, setting.IssueDates, fallback)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != fallback {
-				t.Errorf("%q read as %v, want the default %v", "yes", got, fallback)
-			}
-		}
-		// A switch the same way: a word that is neither on nor off is the
-		// default, which for date lookups is on.
-		for _, bad := range []string{"maybe", "ON", "", "true"} {
+		for _, bad := range []string{"yes", "maybe", "ON", "", "true"} {
 			if _, _, err := s.Change(ctx, setting.IssueDates, bad); err != nil {
 				t.Fatal(err)
 			}
-			got, err := s.Switch(ctx, setting.IssueDates, true)
-			if err != nil {
-				t.Fatalf("%q: %v", bad, err)
-			}
-			if !got {
-				t.Errorf("%q read as off, want the default", bad)
+			for _, fallback := range []bool{true, false} {
+				got, err := s.Switch(ctx, setting.IssueDates, fallback)
+				if err != nil {
+					t.Fatalf("%q: %v", bad, err)
+				}
+				if got != fallback {
+					t.Errorf("%q read as %v, want the default %v", bad, got, fallback)
+				}
 			}
 		}
 	})
