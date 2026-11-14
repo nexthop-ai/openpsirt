@@ -959,7 +959,7 @@ says which part is missing rather than making you guess:</p>
 words the screen shows, so the person reading the failed step and the person
 opening the interface are reading the same sentence.</p>
 <pre><code class="language-json">{&quot;scan_id&quot;: 1, &quot;state&quot;: &quot;failed&quot;,
- &quot;failure&quot;: &quot;run grype: exec: \&quot;grype\&quot;: executable file not found in $PATH&quot;,
+ &quot;failure&quot;: &quot;the scanner failed (exit status 1): failed to load vulnerability db&quot;,
  &quot;components&quot;: 106, &quot;placed&quot;: 106}
 </code></pre>
 <p><code>components</code> against <code>placed</code> is worth watching: it is the difference between a

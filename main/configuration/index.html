@@ -1155,6 +1155,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="From v0.12.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vex-statements-from-v0120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VEX statements from v0.12.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
       </ul>
@@ -1979,6 +1996,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="From v0.12.0">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#vex-statements-from-v0120" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VEX statements from v0.12.0
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -5451,8 +5485,47 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <td>The Helm chart salts the checksum that rolls the pods when a chart-held secret changes, and keeps the salt in the Secret <code>&lt;fullname&gt;-rollout-salt</code>, where <code>&lt;fullname&gt;</code> is the name the chart's resources share: <code>fullnameOverride</code> where set, otherwise the release name followed by <code>-</code> and the chart name (<code>nameOverride</code> where set) unless the release name holds it, cut to 63 characters. The first upgrade rolls the pods once</td>
 <td>Where the chart is rendered with no cluster, <code>helm template</code> or Argo CD, set <code>rolloutSalt</code> to a long random value, or the pods roll on every render</td>
 </tr>
+<tr>
+<td>A VEX document uploaded without <code>publisher</code> is filed under the publisher it names: an OpenVEX author or a CSAF publisher name. One naming neither is refused with 422. v0.12.0 filed it under its file name</td>
+<td>Clear what v0.12.0 filed under a file name, as <a href="#vex-statements-from-v0120">VEX statements from v0.12.0</a> says. Left alone, those statements stay in force beside the ones later uploads file under the document's own publisher</td>
+</tr>
+<tr>
+<td>A VEX document replaces only an earlier revision of itself: the same publisher and the same OpenVEX <code>@id</code> or CSAF tracking identifier. v0.12.0 replaced every earlier document from that publisher</td>
+<td>Clear what v0.12.0 recorded under each publisher, as <a href="#vex-statements-from-v0120">VEX statements from v0.12.0</a> says. Left alone, a revision stating an identifier replaces none of it, and what v0.12.0 recorded stays in force beside the revision</td>
+</tr>
+<tr>
+<td>A build's components are shown, searched and given to the scanner by the name and version that build stated. v0.12.0 used those of whichever build described the package first, in any product</td>
+<td>Nothing. A build shows its own once its inventory is sent again; until then it keeps the names and versions v0.12.0 showed</td>
+</tr>
 </tbody>
 </table>
+<h4 id="vex-statements-from-v0120">VEX statements from v0.12.0<a class="headerlink" href="#vex-statements-from-v0120" title="Permanent link">&para;</a></h4>
+<p>Every VEX statement v0.12.0 recorded carries no document identifier, so a
+later document stating an OpenVEX <code>@id</code> or a CSAF tracking identifier replaces
+none of them. Those filed under a file name also carry no real publisher. The
+document they came from is not kept, so neither can be filled in. For each
+publisher name v0.12.0's statements show, a file name or a real publisher, and
+before uploading anything new under that name:</p>
+<ol>
+<li>Upload an empty document stating no identifier, with <code>publisher</code> set to that
+   name. It sets aside every statement v0.12.0 recorded under it:</li>
+</ol>
+<p><code>bash
+   echo '{"@context":"https://openvex.dev/ns/v0.2.0","author":"cleared",
+     "timestamp":"2026-11-12T00:00:00Z","version":1,"statements":[]}' &gt; empty.json
+   curl -X POST \
+     "$OPENPSIRT/v1/products/sonic/vex-documents?publisher=debian-vex.json" \
+     -H "Origin: $OPENPSIRT" -F "statements=@empty.json"</code></p>
+<ol>
+<li>Upload the publisher's current documents again, without <code>publisher</code> or with
+   the name of the real publisher.</li>
+</ol>
+<p>The answer to the first step says how many statements it set aside. A set-aside
+statement stays readable beside any approval granted on it, and each approved
+decision that cites one raises a "cited statement changed" alert. Where the
+second step records the same words, reasoning included, under the same
+publisher name, the alert clears; where v0.12.0 filed them under a file name, it
+stands until the decision is made again against what the second step recorded.</p>
 
 
 
