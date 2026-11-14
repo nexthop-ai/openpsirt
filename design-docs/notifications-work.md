@@ -143,7 +143,7 @@ It carries only what nothing else told the reader:
 | Work that became yours without a message | Assigned to yourself, when nothing could send, or before you had an address |
 | Findings nobody owns | For whoever asks |
 | Vulnerability reports in your teams' queues | A count, never a name; a rule placing a report in a queue tells nobody |
-| Notices mail does not carry as they happen | Every kind but those `design-docs/notifications-delivery.md` § Mail lists, unread and still true, created since the last digest or all of them for a first one |
+| Notices mail does not carry as they happen | Every kind but those `design-docs/notifications-delivery.md` § Mail lists, unread, unsent and still true, created since the last digest or all of them for a first one |
 
 Both switches are off by default and derive from no role.
 

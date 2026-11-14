@@ -101,6 +101,7 @@ func TestADigestCarriesTheNoticesMailLeftToIt(t *testing.T) {
 			{Kind: notify.InventoryMoved, Body: "SONIC-2026-77 moved", Private: true, ProductID: &product.ID},
 			{Kind: notify.Assigned, Body: "CVE-2026-1 in libfoo"},
 			{Kind: notify.Disclosed, Body: "CVE-2026-5 was said before the last digest"},
+			{Kind: notify.BuildQuiet, Body: "CVE-2026-7 went by mail as it happened"},
 		} {
 			each.PersonID = reader.ID
 			if err := store.Tell(ctx, each); err != nil {
@@ -110,6 +111,12 @@ func TestADigestCarriesTheNoticesMailLeftToIt(t *testing.T) {
 		if _, err := db.DB.NewUpdate().Model((*notify.Notification)(nil)).
 			Set(`"created_at" = ?`, lastDigest.Add(-time.Hour)).
 			Where(`"kind" = ?`, notify.Disclosed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// Mailed as it happened by a release that mailed every kind.
+		if _, err := db.DB.NewUpdate().Model((*notify.Notification)(nil)).
+			Set(`"sent_at" = ?`, lastDigest.Add(time.Hour)).
+			Where(`"kind" = ?`, notify.BuildQuiet).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 
@@ -131,7 +138,7 @@ func TestADigestCarriesTheNoticesMailLeftToIt(t *testing.T) {
 				t.Errorf("the digest does not say %q:\n%s", want, text)
 			}
 		}
-		for _, absent := range []string{"SONIC-2026-77", "CVE-2026-1", "CVE-2026-5"} {
+		for _, absent := range []string{"SONIC-2026-77", "CVE-2026-1", "CVE-2026-5", "CVE-2026-7"} {
 			if strings.Contains(text, absent) {
 				t.Errorf("the digest carries %q:\n%s", absent, text)
 			}
@@ -164,6 +171,57 @@ func TestMailRefusedForItsServerWaitsForTheConfiguration(t *testing.T) {
 		if sent, _, err := notify.NewPost(db.DB, sender, "https://psirt.example", discard(), "test").
 			Once(ctx); err != nil || sent != 1 {
 			t.Errorf("once the server is accepted, %d sent: %v; want the waiting message", sent, err)
+		}
+	})
+}
+
+// A digest refused for its server's missing STARTTLS is not a digest sent: the
+// stamp stays, and the digest goes once the configuration changes.
+func TestADigestRefusedForItsServerWaitsForTheConfiguration(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		rights := access.NewStore(db.DB)
+		reader, err := rights.Ensure(ctx, "reader@example.com", "Rhea Reader", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rights.GrantRole(ctx, reader.ID, w.Product.ID, access.PrivateTriage); err != nil {
+			t.Fatal(err)
+		}
+		lastDigest := time.Now().UTC().Add(-48 * time.Hour).Truncate(time.Microsecond)
+		if _, err := db.DB.NewUpdate().Model((*access.Account)(nil)).
+			Set(`"email" = ?`, "reader@example.com").
+			Set(`"digest" = ?`, true).
+			Set(`"digest_sent_at" = ?`, lastDigest).
+			Where(`"id" = ?`, reader.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := notify.NewStore(db.DB).Tell(ctx, notify.Telling{
+			PersonID: reader.ID, Kind: notify.MergeSuperseded, Body: "Two decisions on CVE-2026-9 met",
+		}); err != nil {
+			t.Fatal(err)
+		}
+		refused := &recorder{fail: fmt.Errorf("%w, and plain mail is not accepted", notify.ErrUnsecured)}
+		if _, err := notify.NewPost(db.DB, refused, "https://psirt.example", discard(), "test").
+			Digests(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(refused.sent) != 1 {
+			t.Fatalf("%d digests were offered to the refusing server, want 1", len(refused.sent))
+		}
+		var stamped time.Time
+		if err := db.DB.NewSelect().Model((*access.Account)(nil)).Column("digest_sent_at").
+			Where(`"id" = ?`, reader.ID).Scan(ctx, &stamped); err != nil {
+			t.Fatal(err)
+		}
+		if !stamped.Equal(lastDigest) {
+			t.Errorf("a refused digest moved the stamp to %v", stamped)
+		}
+		sender := &recorder{}
+		if sent, err := notify.NewPost(db.DB, sender, "https://psirt.example", discard(), "test").
+			Digests(ctx); err != nil || sent != 1 {
+			t.Errorf("once the server is accepted, %d digests sent: %v; want the waiting one", sent, err)
 		}
 	})
 }

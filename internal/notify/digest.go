@@ -350,6 +350,10 @@ func (s *Store) inDigest(ctx context.Context, subject access.Subject, since *tim
 	theirs := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where(`"person_id" = ?`, subject.ID).
 			Where(`"kind" NOT IN (?)`, bun.List(immediate)).
+			// A notice of one of these kinds already mailed is not mailed
+			// again; a database upgraded from a release mailing every kind
+			// holds them.
+			Where(`"sent_at" IS NULL`).
 			Where(`"read_at" IS NULL`).
 			Where(`"cleared_at" IS NULL`)
 		if since != nil {
