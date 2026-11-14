@@ -109,6 +109,13 @@ One standing grant, covering products declared afterwards (REQ-42).
 | Rule | Reason |
 |---|---|
 | One grant, never a copy per product, its reach worked out as the subject is resolved | A copy records the catalog of its moment |
+| Holding one in force is access whatever the catalog holds: before any product is declared its holder signs in and reaches no product | Spread over an empty catalog it adds no per-product grant, and counting only those refuses its holder at every request |
+| A grant set aside or naming no role admits nobody, and through a token neither does one derived longer ago than the token window | Each reaches no product |
+| Asked whether somebody holds a role on any product, it answers yes before any product exists | A token's mint refuses roles its owner holds nowhere |
+| A triage role across every product opens starting an advisory, and editing one covering no product, before any product exists | Both ask whether the role is held on any product |
+| A token narrowed to roles keeps only those of the roles held across every product | It carries only what it was minted for |
+| The answer about yourself says a role across every product that reads findings is held; a token pinned to one product holds none | A screen tells a catalog with nothing in it from nothing granted; a role reading nothing, such as approving alone, reaches no product a screen lists |
+| A token pinned to one product drops the roles across every product | They were already spread over its product |
 | It narrows by visibility exactly as a per-product grant does, never through the queries' "every product" flag | That flag means no narrowing at all and belongs to the background passes (REQ-43) |
 | Withdrawn whole, leaving nothing behind, and handing back work product by product (`design-docs/access-assignment.md` § Lost reading) | |
 | Every question about what somebody holds asks this table too: whether they may be handed a finding, may be mentioned, still read their work, or still hold the approving right | Those predicates read the grant tables directly |

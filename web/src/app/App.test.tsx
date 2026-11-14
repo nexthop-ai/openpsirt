@@ -4,6 +4,8 @@
 import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { SignIn } from "../screens/SignIn";
+import { api } from "../api/client";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 
 const mount = mounted();
@@ -39,10 +41,14 @@ const ONE: Record<string, unknown> = {
 
 // Draws the application at an address, with the identity read answered as
 // given and every other read answered empty.
-async function drawn(who: () => Answer, at = "/nowhere/at/all") {
+async function drawn(
+  who: () => Answer,
+  at = "/nowhere/at/all",
+  ways: Answer = { data: { items: [] } },
+) {
   const asked = serve((path) => {
     if (path === "/v1/session/me") return who();
-    if (path === "/v1/sign-in") return { data: { items: [] } };
+    if (path === "/v1/sign-in") return ways;
     if (path in ONE) return { data: ONE[path] };
     return { data: { items: [], total: 0 } };
   });
@@ -83,6 +89,114 @@ describe("the application before anybody is known", () => {
     expect(text()).toContain("Sign in to continue");
     expect(text()).not.toContain("The signed-in person could not be read.");
     expect(mount.host().querySelector(".topsearch")).toBeNull();
+  });
+});
+
+describe("the application after a refused sign-in", () => {
+  afterEach(() => window.history.replaceState({}, "", "/"));
+
+  it("says this account has no access here, and offers the way in without forwarding", async () => {
+    // One provider forwards straight to it anywhere else. Here that would
+    // refuse the same account again, in a loop.
+    window.history.replaceState({}, "", "/?no-access");
+    await drawn(() => ({ status: 401 }), "/", {
+      data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }] },
+    });
+    expect(text()).toContain("No access here");
+    expect(text()).toContain("Ask an administrator for access.");
+    expect(text()).not.toContain("Sign in to continue");
+    const way = mount.host().querySelector<HTMLAnchorElement>('a[href^="/v1/sign-in/oidc"]');
+    expect(way?.getAttribute("href")).toBe("/v1/sign-in/oidc");
+  });
+});
+
+describe("the application after a refused sign-in with no way in", () => {
+  afterEach(() => window.history.replaceState({}, "", "/"));
+
+  it("says no way in is configured, and not to ask for access", async () => {
+    window.history.replaceState({}, "", "/?no-access");
+    await drawn(() => ({ status: 401 }), "/");
+    expect(text()).toContain("No way in is configured.");
+    expect(text()).not.toContain("Ask an administrator for access.");
+    expect(text()).not.toContain("Sign in to continue");
+  });
+
+  it("says the ways in could not be read, and not to ask for access", async () => {
+    window.history.replaceState({}, "", "/?no-access");
+    await drawn(() => ({ status: 401 }), "/", { status: 503 });
+    expect(text()).toContain("The ways in could not be read.");
+    expect(text()).not.toContain("Ask an administrator for access.");
+    expect(text()).not.toContain("Sign in to continue");
+  });
+});
+
+describe("the application for a browser the proxy named and this deployment refused", () => {
+  it("says there is no access here, and offers no way in the proxy would override", async () => {
+    await drawn(() => ({ status: 401 }), "/", {
+      data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }], named_by_proxy: true },
+    });
+    expect(text()).toContain("No access here");
+    expect(text()).toContain("Ask an administrator for access.");
+    expect(text()).not.toContain("Sign in to continue");
+    expect(text()).not.toContain("Continue with");
+  });
+
+  it("says there is no access here when a session ends under it", async () => {
+    serve((path) =>
+      path === "/v1/sign-in"
+        ? { data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }], named_by_proxy: true } }
+        : { data: { items: [] } },
+    );
+    mount.render(screen(<SignIn resuming />, "/"));
+    await settle();
+    expect(text()).toContain("No access here");
+    // What the overlay is named by, so a screen reader hears what is drawn.
+    expect(mount.host().querySelector("#sign-in-state")?.textContent).toBe("No access here");
+    expect(text()).not.toContain("Your session ended");
+    expect(text()).not.toContain("Anything you typed is kept.");
+    expect(text()).not.toContain("Continue with");
+  });
+
+  it("says nothing of a session ending while the ways in load", async () => {
+    vi.spyOn(api, "GET").mockImplementation(() => new Promise(() => {}));
+    mount.render(screen(<SignIn resuming />, "/"));
+    await settle();
+    expect(text()).not.toContain("Your session ended");
+    expect(text()).not.toContain("Anything you typed is kept.");
+    expect(mount.host().querySelector("#sign-in-state")?.textContent).toBe("Sign in");
+  });
+
+  it("says there is no access here where no provider is configured", async () => {
+    await drawn(() => ({ status: 401 }), "/", { data: { items: [], named_by_proxy: true } });
+    expect(text()).toContain("No access here");
+    expect(text()).not.toContain("No way in is configured.");
+  });
+});
+
+describe("the application after a sign-in that failed on this side", () => {
+  afterEach(() => window.history.replaceState({}, "", "/"));
+
+  it("says one thing at an address carrying both markers, the refusal", async () => {
+    window.history.replaceState({}, "", "/?no-access&sign-in-failed");
+    await drawn(() => ({ status: 401 }), "/", {
+      data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }] },
+    });
+    expect(text()).toContain("No access here");
+    expect(text()).not.toContain("Try again shortly.");
+    expect(mount.host().querySelectorAll("#sign-in-state")).toHaveLength(1);
+  });
+
+  it("says to try again, and offers the way in without forwarding", async () => {
+    window.history.replaceState({}, "", "/?sign-in-failed");
+    await drawn(() => ({ status: 401 }), "/", {
+      data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }] },
+    });
+    expect(text()).toContain("Sign-in didn\u2019t finish");
+    expect(text()).toContain("Try again shortly.");
+    expect(text()).not.toContain("No access here");
+    expect(text()).not.toContain("Sign in to continue");
+    const way = mount.host().querySelector<HTMLAnchorElement>('a[href^="/v1/sign-in/oidc"]');
+    expect(way?.getAttribute("href")).toBe("/v1/sign-in/oidc");
   });
 });
 

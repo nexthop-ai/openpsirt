@@ -141,6 +141,12 @@ func (t Trust) groupsFrom(req *http.Request) []string {
 	return names
 }
 
+// named is the identity the trusted header carries, wherever it came from;
+// empty where it carries none.
+func (t Trust) named(req *http.Request) string {
+	return strings.TrimSpace(req.Header.Get(t.Header))
+}
+
 // trusts reports whether a request came from somewhere the header is honored.
 func (t Trust) trusts(remote string) bool {
 	host, _, err := net.SplitHostPort(remote)
@@ -185,6 +191,13 @@ func NewResolver(store *Store, trust Trust) *Resolver {
 		// from what a provider says.
 		mode: func(context.Context) Mode { return Direct },
 	}
+}
+
+// NamedByProxy reports whether a request carries the trusted header from a
+// source it is honored from: the proxy in front of this deployment named
+// somebody. It says nothing about whether they are let in.
+func (r *Resolver) NamedByProxy(req *http.Request) bool {
+	return r.trust.Enabled() && r.trust.named(req) != "" && r.trust.trusts(req.RemoteAddr)
 }
 
 // WithMode tells the resolver where roles come from.
@@ -288,7 +301,7 @@ func (r *Resolver) Resolve(ctx context.Context, req *http.Request) (Subject, *Se
 	// so honoring the cookie first would let a stale one outrank a live
 	// assertion about the same browser.
 	if r.trust.Enabled() {
-		identity := strings.TrimSpace(req.Header.Get(r.trust.Header))
+		identity := r.trust.named(req)
 		if identity == "" {
 			return r.fromCookie(ctx, req)
 		}
@@ -483,8 +496,9 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 		Where(`"person_id" = ?`, person.ID).Where(`"active" = ?`, true).Scan(ctx); err != nil {
 		return Subject{}, fmt.Errorf("read what %q may do everywhere: %w", identity, err)
 	}
+	var everywhere []Role
 	if len(estate) > 0 {
-		everywhere := make([]Role, 0, len(estate))
+		everywhere = make([]Role, 0, len(estate))
 		for _, grant := range estate {
 			if boundDerived && s.stale(ctx, grant.Source, grant.CreatedAt) {
 				continue
@@ -493,6 +507,8 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 				everywhere = append(everywhere, grant.Role)
 			}
 		}
+	}
+	if len(everywhere) > 0 {
 		products, err := s.everyProduct(ctx)
 		if err != nil {
 			return Subject{}, err
@@ -544,7 +560,12 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	// Somebody holding the audit permission alone holds access: they reach no
 	// product and read the deployment's own records, which is the whole of
 	// what it is for.
-	if !administers && !audits && len(grants) == 0 && len(cases) == 0 && len(codeFindings) == 0 {
+	//
+	// A role across every product is access whatever the catalog holds. Spread
+	// over a catalog with nothing in it, it adds no per-product grant, so it is
+	// counted as held here and reaches no product until one is declared.
+	if !administers && !audits && len(grants) == 0 && len(everywhere) == 0 &&
+		len(cases) == 0 && len(codeFindings) == 0 {
 		return Subject{}, ErrDenied
 	}
 
@@ -566,6 +587,9 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	}
 	subject := NewPerson(person.ID, person.Identity, administers, grants,
 		person.PartyID, on...).OnCases(cases).OnCodeFindings(codeFindings)
+	// Filled only from the grants read above; narrowing a token only drops
+	// from it, so nothing else may answer "holds this role anywhere".
+	subject.everywhere = everywhere
 	if audits {
 		subject = subject.Auditing()
 	}

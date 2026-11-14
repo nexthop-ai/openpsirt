@@ -108,8 +108,8 @@ they reach.
 |---|---|
 | Capabilities, never roles | A second copy of the role mapping drifts into offering refused buttons |
 | A product somebody cannot reach is absent, and a screen treats it as not there (REQ-42) | The server's answer |
-| `GET /v1/sign-in` is answered without a credential, listing the providers an operator configured (REQ-41); a test asserts it says nothing about whether any account exists | It is what somebody sees before they have a credential |
-| A 401 from `session/me` is an answer: nobody is signed in | A fresh browser |
+| `GET /v1/sign-in` is answered without a credential, listing the providers an operator configured and whether the trusted proxy named the browser asking (REQ-41); a test asserts it says nothing about whether any account exists | It is what somebody sees before they have a credential |
+| A 401 from `session/me` is an answer: nobody is signed in, or, where the proxy named the browser, it was refused, by `design-docs/access-signin.md` § Refused sign-in | A fresh browser |
 | Markdown is rendered and sanitized in the browser; the server returns markdown only | Preview and published text are one renderer, with no round trip per keystroke |
 
 ## Families a reader holds

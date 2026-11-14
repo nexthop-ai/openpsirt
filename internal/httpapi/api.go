@@ -234,6 +234,11 @@ func Build(ready Ready, in core.Deps) *Built {
 			// sign in and they report nothing beyond whether this process can
 			// serve.
 			if open[r.URL.Path] || strings.HasPrefix(r.URL.Path, openPrefix) {
+				// Whether the proxy named somebody, for the list of ways in
+				// to say. Resolving them would decide nothing here.
+				if in.Access != nil && in.Access.NamedByProxy(r) {
+					r = r.WithContext(context.WithValue(r.Context(), namedByProxy{}, true))
+				}
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -447,10 +452,11 @@ func Build(ready Ready, in core.Deps) *Built {
 var open = map[string]bool{
 	"/healthz": true,
 	"/readyz":  true,
-	// The view before anybody has a credential. It lists the
-	// providers an operator configured and nothing else — the sign-in page
-	// has to draw a button per provider, and it cannot ask for that list
-	// while holding nothing. Everything under openPrefix already answers
+	// The view before anybody has a credential. It lists the providers an
+	// operator configured, and whether the trusted proxy named the browser
+	// asking, the same whether that person is let in or refused. The sign-in
+	// page draws a button per provider and cannot ask for that list while
+	// holding nothing. Everything under openPrefix already answers
 	// without a credential for the same reason; this is the list of what is
 	// down there.
 	"/v1/sign-in": true,
@@ -522,11 +528,11 @@ func unavailable(w http.ResponseWriter) {
 //
 // The API answers `application/problem+json` for everything it refuses. The
 // handlers in front of the router — the credential check, and the sign-in
-// callbacks, which are ordinary handlers because a redirect from a provider is
-// not an API call — write their refusals through this rather than as
-// `text/plain`: a client that parses one shape and gets the other reads a
-// failure as a transport fault, and the shape of a refusal is part of the
-// answer.
+// handlers for an unknown provider — write through this rather than as
+// `text/plain`; a refused or failed sign-in redirects to the sign-in screen
+// instead, since a browser was sent there. A client
+// that parses one shape and gets the other reads a failure as a transport
+// fault, and the shape of a refusal is part of the answer.
 //
 // One field it still cannot carry: the schema link, which the API's response
 // transformer adds and which nothing in front of the router reaches.

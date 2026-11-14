@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -49,13 +50,10 @@ const pendingCookie = "openpsirt_pending"
 // this window: what the cookie holds is the makings of a sign-in, not one.
 const pendingLife = 10 * time.Minute
 
-// registerSignIn mounts the sign-in paths on the router directly rather than
-// through the API description.
-//
-// They are browser redirects rather than API operations: nothing calls them
-// with a client, the response is a 302 with cookies, and describing them as
-// operations would put two routes in the document that no generated client
-// could ever usefully call.
+// registerSignIn mounts the sign-in paths on the router directly, outside the
+// API description. They are browser redirects: a 302 into the provider or the
+// application, or a 303 to the no-access or try-again screen. No generated
+// client could usefully call them.
 func registerSignIn(router chi.Router, in core.Deps) {
 	if len(in.Providers) == 0 {
 		return
@@ -82,12 +80,12 @@ func begin(w http.ResponseWriter, r *http.Request, in core.Deps) {
 
 	callback, err := in.RedirectURI(r, provider.Name())
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be started", err)
+		wentWrongHere(w, r, in, "a sign-in could not be started", err)
 		return
 	}
 	where, pending, err := provider.Begin(r.Context(), callback)
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be started", err)
+		wentWrongHere(w, r, in, "a sign-in could not be started", err)
 		return
 	}
 
@@ -100,12 +98,12 @@ func begin(w http.ResponseWriter, r *http.Request, in core.Deps) {
 		Minted: time.Now().UTC(),
 	})
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be started", err)
+		wentWrongHere(w, r, in, "a sign-in could not be started", err)
 		return
 	}
 	sealed, err := sealPending(r.Context(), in, encoded)
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be started", err)
+		wentWrongHere(w, r, in, "a sign-in could not be started", err)
 		return
 	}
 	cookie := browserCookie(pendingCookie, sealed, false, in.PlainHTTP,
@@ -128,8 +126,12 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	}
 
 	held, err := pendingFrom(r.Context(), in, r)
+	if errors.Is(err, errSignInFault) {
+		failedToComplete(w, r, in, "a sign-in could not be completed", err)
+		return
+	}
 	if err != nil {
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 	pending := held.Pending
@@ -137,21 +139,35 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	// handing a signed-in person a callback of their own making and having the
 	// session come back as theirs.
 	if state := r.URL.Query().Get("state"); state == "" || state != pending.State {
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 	code := r.URL.Query().Get("code")
+	// A provider that sends the browser back saying it could not answer
+	// (RFC 6749 § 4.1.2.1) has said nothing about who this is. Every other
+	// error it sends back, a denial included, is a refusal.
+	if said := r.URL.Query().Get("error"); code == "" &&
+		(said == "temporarily_unavailable" || said == "server_error") {
+		failedToComplete(w, r, in, "a sign-in could not be completed",
+			fmt.Errorf("%s answered %s", provider.Name(), said))
+		return
+	}
 	if code == "" {
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 
 	callback, err := in.RedirectURI(r, provider.Name())
 	if err != nil {
-		wentWrongHere(w, in, "a sign-in could not be completed", err)
+		failedToComplete(w, r, in, "a sign-in could not be completed", err)
 		return
 	}
 	identity, err := provider.Complete(r.Context(), code, pending, callback)
+	if errors.Is(err, signin.ErrUnanswered) {
+		failedToComplete(w, r, in, "a sign-in could not be completed",
+			fmt.Errorf("%s: %w", provider.Name(), err))
+		return
+	}
 	if err != nil {
 		// Logged rather than described. What went wrong between us and a
 		// provider is an operator's problem, and telling whoever is at the
@@ -160,7 +176,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 			in.Log().Warn("a sign-in could not be completed",
 				"provider", provider.Name(), "error", err)
 		}
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 	if part, carried := identity.NUL(); carried {
@@ -168,7 +184,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 			in.Log().Warn("a sign-in was refused because the provider's identity carries a NUL character",
 				"provider", provider.Name(), "part", part)
 		}
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 
@@ -190,7 +206,7 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 	// outage turns every browser away as though nothing granted them anything.
 	person, err := admit(r, in, rights, identity)
 	if err != nil && !errors.Is(err, access.ErrDenied) {
-		wentWrongHere(w, in, "who signed in could not be looked up", err)
+		failedToComplete(w, r, in, "who signed in could not be looked up", err)
 		return
 	}
 	if err != nil {
@@ -198,27 +214,26 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 			in.Log().Info("refused somebody who authenticated but reaches nothing",
 				"provider", provider.Name(), "identity", identity.Username)
 		}
-		refuseSignIn(w, in)
+		refuseSignIn(w, r, in)
 		return
 	}
 
 	lifetime, err := sessionWindow(r.Context(), in)
 	if err != nil {
-		wentWrongHere(w, in, "how long a sign-in lasts could not be read", err)
+		failedToComplete(w, r, in, "how long a sign-in lasts could not be read", err)
 		return
 	}
 	issued, err := rights.StartSession(r.Context(), person.ID, lifetime)
 	if err != nil {
-		wentWrongHere(w, in, "a session could not be started", err)
+		failedToComplete(w, r, in, "a session could not be started", err)
 		return
 	}
 
 	session := SessionCookie(issued.Token, in.PlainHTTP)
 	csrf := CSRFCookie(issued.CSRF, in.PlainHTTP)
-	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
 	http.SetCookie(w, &session)
 	http.SetCookie(w, &csrf)
-	http.SetCookie(w, &cleared)
+	clearPending(w, in)
 	// Back to what they were doing, where they were doing something. A
 	// sign-in that always lands on the home page loses somebody's place
 	// every time a session ends, which for a long justification is the
@@ -372,7 +387,7 @@ func openPending(ctx context.Context, in core.Deps, value string) ([]byte, error
 	}
 	key, err := signingKey(ctx, in)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", errSignInFault, err)
 	}
 	mac := hmac.New(sha256.New, key)
 	mac.Write(payload)
@@ -474,25 +489,60 @@ func aLocalPath(where string) string {
 	return parsed.RequestURI()
 }
 
+// refusedHere is where a browser whose sign-in was refused lands: the
+// interface's sign-in screen, marked so that it says this account has no
+// access here and does not forward to the provider again, which would sign the
+// same account straight back in and loop.
+const refusedHere = "/?no-access"
+
 // refuseSignIn answers a sign-in that will not be completed.
 //
 // One answer for every reason: a provider that failed, a state that did not
-// match, somebody unknown, and somebody known but granted nothing. Telling
-// them apart says whether a name is real, which is free reconnaissance for
-// somebody who has just proved nothing.
-func refuseSignIn(w http.ResponseWriter, in core.Deps) {
-	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
-	http.SetCookie(w, &cleared)
-	Problem(w, http.StatusUnauthorized, "not authorized")
+// match, somebody unknown, somebody known but granted nothing, and somebody who
+// has left. Telling them apart says whether a name is real, which is free
+// reconnaissance for somebody who has just proved nothing.
+//
+// The callback is a page the provider sends a browser to, so the answer is a
+// page too. A problem document there is drawn as raw text.
+func refuseSignIn(w http.ResponseWriter, r *http.Request, in core.Deps) {
+	clearPending(w, in)
+	http.Redirect(w, r, refusedHere, http.StatusSeeOther)
 }
+
+// faultedHere is where a browser whose sign-in failed on this side lands: the
+// interface's sign-in screen, marked so that it says to try again shortly and
+// does not forward to the provider, which would repeat the fault in a loop.
+const faultedHere = "/?sign-in-failed"
+
+// errSignInFault marks a failure of this deployment's own while reading what a
+// sign-in left in the browser; the sign-in lands on the try-again screen.
+var errSignInFault = errors.New("the sign-in key could not be read")
 
 // wentWrongHere records a fault where an operator can read it and says nothing
 // about it to whoever asked.
-func wentWrongHere(w http.ResponseWriter, in core.Deps, what string, err error) {
+//
+// Beginning and completing a sign-in are pages a browser is sent to, so the
+// answer is a page too. A fault is said apart from a refusal because a fault
+// can clear on a retry.
+func wentWrongHere(w http.ResponseWriter, r *http.Request, in core.Deps, what string, err error) {
 	if in.Logger != nil {
 		in.Log().Error(what, "error", err)
 	}
-	Problem(w, http.StatusInternalServerError, "something went wrong")
+	http.Redirect(w, r, faultedHere, http.StatusSeeOther)
+}
+
+// clearPending tells the browser to drop a sign-in in flight.
+func clearPending(w http.ResponseWriter, in core.Deps) {
+	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
+	http.SetCookie(w, &cleared)
+}
+
+// failedToComplete is wentWrongHere for a returning sign-in, whose pending
+// cookie is spent either way. A sign-in that fails to begin leaves the cookie
+// alone, since it may belong to a sign-in another tab has under way.
+func failedToComplete(w http.ResponseWriter, r *http.Request, in core.Deps, what string, err error) {
+	clearPending(w, in)
+	wentWrongHere(w, r, in, what, err)
 }
 
 // sessionWindow is how long a sign-in lasts here.

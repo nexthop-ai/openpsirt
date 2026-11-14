@@ -34,6 +34,25 @@ describe("where a sign-in comes back to", () => {
     expect(returningHere()).toContain("%3Fstate%3Dundecided%26severity%3Dhigh");
   });
 
+  it("carries nothing from the address a refused sign-in lands on", () => {
+    // Coming back there after signing in with another account would draw the
+    // home page under an address that says they were refused.
+    at("/", "?no-access");
+    expect(returningHere()).toBe("");
+    // However the marker is spelled, as the screen reads it.
+    at("/", "?no-access=&x=1");
+    expect(returningHere()).toBe("");
+    // A screen's own query carrying the word keeps its place.
+    at("/findings", "?no-access");
+    expect(returningHere()).toBe("?return=%2Ffindings%3Fno-access");
+  });
+
+  it("carries nothing from the address a sign-out lands on", () => {
+    const [path, query] = signedOutHere.split("?");
+    at(path ?? "/", query ? "?" + query : "");
+    expect(returningHere()).toBe("");
+  });
+
   it("carries nothing from the home page, which is where a sign-in lands anyway", () => {
     at("/");
     expect(returningHere()).toBe("");
@@ -81,6 +100,27 @@ describe("sending somebody straight on to the only provider", () => {
     expect(forwardable(1, false)).toBe(false);
   });
 
+  it("does not forward at the address a refused sign-in lands on", () => {
+    // The provider still holds the account it refused, so forwarding would
+    // refuse it again in a loop. The server redirects every refused sign-in
+    // to this literal address (internal/httpapi/signin.go), so it is written
+    // out here rather than read back from the screen.
+    at("/", "?no-access");
+    expect(forwardable(1, false)).toBe(false);
+    // Only there: a screen's own query carrying the word forwards as usual.
+    at("/findings", "?no-access");
+    expect(forwardable(1, false)).toBe(true);
+  });
+
+  it("does not forward at the address a failed sign-in lands on", () => {
+    // Forwarding would repeat the fault in a loop. The server redirects every
+    // sign-in that failed on its side to this literal address
+    // (internal/httpapi/signin.go).
+    at("/", "?sign-in-failed");
+    expect(forwardable(1, false)).toBe(false);
+    expect(returningHere()).toBe("");
+  });
+
   it("does not forward after a sign-out once the address is gone", () => {
     // Pressing Back leaves the marker behind but not the address. The tab is
     // marked as well, because the session at the provider outlives both.
@@ -90,9 +130,7 @@ describe("sending somebody straight on to the only provider", () => {
   });
 
   it("does not forward twice in one tab", () => {
-    // Somebody who authenticates and was granted nothing is refused, and the
-    // refusal is an API answer rather than a screen. Coming back has to offer
-    // the way in rather than send them round again.
+    // A forward that comes back without a session offers the way in.
     expect(forwardable(1, false)).toBe(true);
     rememberForward();
     expect(forwardable(1, false)).toBe(false);

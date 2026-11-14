@@ -52,7 +52,11 @@ export function Me() {
       <div className="card">
         <h3>Your access</h3>
         {(me.reach ?? []).length === 0 ? (
-          <p className="reading">Nothing yet. An administrator grants access.</p>
+          <p className="reading">
+            {me.everywhere
+              ? "Every product, as each is declared."
+              : "Nothing yet. An administrator grants access."}
+          </p>
         ) : (
           <Wide>
             <table>

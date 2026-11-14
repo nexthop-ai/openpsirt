@@ -15,6 +15,7 @@ Satisfies REQ-08, REQ-41, REQ-68, REQ-69.
 - [Session state](#session-state)
 - [Sessions and request forgery](#sessions-and-request-forgery)
 - [Sign-in return addresses](#sign-in-return-addresses)
+- [Refused sign-in](#refused-sign-in)
 - [Values a deployment mints](#values-a-deployment-mints)
 - [Browser headers](#browser-headers)
 - [Limits](#limits)
@@ -216,6 +217,29 @@ A sign-in may carry the address it began at.
 | Checked on the way in and again on the way out | The browser may edit its cookie |
 | A bad address is discarded, never refused | |
 
+## Refused sign-in
+
+A provider sends a browser to the callback, and the sign-in screen sends one
+to begin, so a refusal or a fault there answers with a page.
+
+| Rule | Reason |
+|---|---|
+| Every refused callback to a configured provider redirects to the interface's sign-in screen at `/?no-access`, with one address and body for every reason: the provider turning the code down or handing over a token that does not verify, an echoed value that does not match, somebody unknown, granted nothing or gone, a lapsed authorization (REQ-41) | Told apart, the reasons say whether a name is real |
+| The screen there reads "No access here" and "Ask an administrator for access.", and offers the configured ways in | It states no reason, since an expired or mismatched sign-in lands there too |
+| The screen there never forwards to the provider | The provider still holds the refused account, so a forward refuses it again in a loop |
+| A sign-in begun from that screen, or from the one sign-out lands on, carries no return address | Landing back on either draws the home page under an address that says otherwise |
+| A fault on this side inside the handlers beginning or completing a sign-in redirects to `/?sign-in-failed`, whose screen says the sign-in did not finish and to try again shortly, offers the ways in, and never forwards | A fault can clear on a retry; a forward repeats the fault in a loop |
+| A fault completing a sign-in clears its pending cookie; a fault beginning one leaves the cookie alone | The cookie may hold a sign-in another tab has under way |
+| The sign-in key failing to be read while a returning sign-in is checked is a fault | A refusal sends somebody granted access to ask for it |
+| A provider that does not answer is a fault: it cannot be reached, it answers the token exchange or a profile read with a server error or a rate limit, it sends back something unreadable, its keys cannot be fetched, or it sends the browser back with `temporarily_unavailable` or `server_error` | An outage must not tell everybody granted access to ask for it |
+| The token endpoint answering with a client error, or a token its keys do not verify, is the provider turning the sign-in down, and a refusal | That is the provider's answer about this sign-in |
+| The list of ways in says whether the trusted proxy named the browser asking, from a source it is honored from, whatever the person holds | It is the one sign a browser the proxy named and this deployment refused has, and it says nothing of why |
+| The list of ways in is answered `no-store` | It turns on who asks and is read without a credential, so a shared cache would hand one browser's answer to another |
+| A browser the proxy named that this deployment refuses is shown the "No access here" screen, with no way in offered, including where its session ended mid-use | The proxy names it again on every request, outranking any session |
+| A key, a token, a trusted header or a session is refused with the problem document of `design-docs/api-refusals.md` § Refusal shape | Those are requests a client reads |
+| A callback naming an unknown provider answers 404 with the problem document | A name nobody configured is no sign-in to land |
+| A request the router turns away before those handlers run, during an upgrade or on an unconfigured deployment, answers with the problem document, and a panic with plain text | Those answers come from in front of every route |
+
 ## Values a deployment mints
 
 The key sealing sign-ins in flight is written by the deployment itself. A
@@ -249,4 +273,5 @@ them.
 |---|---|
 | Trusted-header sign-in has no stable identifier | The proxy is the authority |
 | Proxies delivering identity in a signed token are not supported by the header path | A header read cannot verify a signature; such deployments configure a provider |
+| The no-access screen offers no sign-out at the provider | Trying another account depends on the provider's own sign-out |
 | Naming every address as a trusted source is refused | It reaches what naming none does. An IPv4-mapped range is held as its IPv4 range, so `::ffff:0:0/96` is refused with `0.0.0.0/0` |

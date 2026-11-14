@@ -20,15 +20,24 @@ const me = {
   digest: false,
 };
 
-function deployment(tokens: Answer, digest = { on: false }) {
+function deployment(tokens: Answer, digest = { on: false }, everywhere = false) {
   serve((path) => {
-    if (path === "/v1/session/me") return { data: { ...me, digest: digest.on } };
+    if (path === "/v1/session/me") return { data: { ...me, digest: digest.on, everywhere } };
     if (path === "/v1/tokens") return tokens;
     return { data: { items: [], total: 0 } };
   });
 }
 
 describe("a person's own page", () => {
+  it("says a role across every product covers each product once declared", async () => {
+    deployment({ data: { items: [], total: 0 } }, { on: false }, true);
+    mount.render(screen(<Me />));
+    await settle();
+    const text = mount.host().textContent ?? "";
+    expect(text).toContain("Every product, as each is declared.");
+    expect(text).not.toContain("An administrator grants access.");
+  });
+
   it("says the tokens could not be read rather than that none are held", async () => {
     deployment({ status: 503 });
     mount.render(screen(<Me />));

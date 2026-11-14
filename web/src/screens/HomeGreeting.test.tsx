@@ -37,4 +37,28 @@ describe("the front page's greeting", () => {
     expect(text).toContain("You hold triage on sonic");
     expect(text).not.toContain("You can read");
   });
+
+  it("says a role across every product is held while no product is open", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    mount.render(
+      screen(
+        <Home
+          who={{
+            identity: "ana",
+            name: "Ana",
+            admin: false,
+            kind: "person",
+            reach: [],
+            everywhere: true,
+            outcomes: [],
+          }}
+        />,
+      ),
+    );
+    await settle();
+    const text = mount.host().textContent ?? "";
+    expect(text).toContain("You hold a role on every product");
+    expect(text).not.toContain("read findings in any product");
+    expect(text).not.toContain("You hold no role on a product");
+  });
 });
