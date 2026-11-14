@@ -201,8 +201,38 @@ func TestATokenPinnedToAProductHoldsNothingAcrossEveryProduct(t *testing.T) {
 		if !subject.HoldsAnywhere(access.PublicRead) {
 			t.Error("a token pinned to a product lost the role it holds there")
 		}
-		if subject.HoldsEverywhere() {
+		if subject.ReadsEverywhere() {
 			t.Error("a token pinned to one product says it covers every product as each is declared")
+		}
+	})
+}
+
+func TestARoleAcrossEveryProductThatReadsNothingReadsNowhere(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		store := access.NewStore(db.DB)
+		person, err := store.Ensure(ctx, "approving", "Approving", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.GrantEstateRole(ctx, person.ID, access.Approver); err != nil {
+			t.Fatal(err)
+		}
+		subject, err := store.Resolve(ctx, "approving")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if subject.ReadsEverywhere() {
+			t.Error("approving across every product is said to read every product")
+		}
+		if err := store.GrantEstateRole(ctx, person.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+		if subject, err = store.Resolve(ctx, "approving"); err != nil {
+			t.Fatal(err)
+		}
+		if !subject.ReadsEverywhere() {
+			t.Error("triage across every product is not said to read every product")
 		}
 	})
 }

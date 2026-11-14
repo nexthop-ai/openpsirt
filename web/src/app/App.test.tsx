@@ -163,6 +163,7 @@ describe("the application for a browser the proxy named and this deployment refu
     await settle();
     expect(text()).not.toContain("Your session ended");
     expect(text()).not.toContain("Anything you typed is kept.");
+    expect(mount.host().querySelector("#sign-in-state")?.textContent).toBe("Sign in");
   });
 
   it("says there is no access here where no provider is configured", async () => {
