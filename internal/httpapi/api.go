@@ -522,11 +522,11 @@ func unavailable(w http.ResponseWriter) {
 //
 // The API answers `application/problem+json` for everything it refuses. The
 // handlers in front of the router — the credential check, and the sign-in
-// callbacks, which are ordinary handlers because a redirect from a provider is
-// not an API call — write their refusals through this rather than as
-// `text/plain`: a client that parses one shape and gets the other reads a
-// failure as a transport fault, and the shape of a refusal is part of the
-// answer.
+// handlers for an unknown provider and an internal fault — write through this
+// rather than as `text/plain`; a refused sign-in callback redirects to the
+// sign-in screen instead, since a provider sent a browser there. A client
+// that parses one shape and gets the other reads a failure as a transport
+// fault, and the shape of a refusal is part of the answer.
 //
 // One field it still cannot carry: the schema link, which the API's response
 // transformer adds and which nothing in front of the router reaches.
