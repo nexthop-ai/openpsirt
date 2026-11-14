@@ -50,13 +50,10 @@ const pendingCookie = "openpsirt_pending"
 // this window: what the cookie holds is the makings of a sign-in, not one.
 const pendingLife = 10 * time.Minute
 
-// registerSignIn mounts the sign-in paths on the router directly rather than
-// through the API description.
-//
-// They are browser redirects rather than API operations: nothing calls them
-// with a client, the response is a 302 with cookies, and describing them as
-// operations would put two routes in the document that no generated client
-// could ever usefully call.
+// registerSignIn mounts the sign-in paths on the router directly, outside the
+// API description. They are browser redirects: a 302 into the provider or the
+// application, or a 303 to the no-access or try-again screen. No generated
+// client could usefully call them.
 func registerSignIn(router chi.Router, in core.Deps) {
 	if len(in.Providers) == 0 {
 		return
@@ -220,10 +217,9 @@ func complete(w http.ResponseWriter, r *http.Request, in core.Deps) {
 
 	session := SessionCookie(issued.Token, in.PlainHTTP)
 	csrf := CSRFCookie(issued.CSRF, in.PlainHTTP)
-	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
 	http.SetCookie(w, &session)
 	http.SetCookie(w, &csrf)
-	http.SetCookie(w, &cleared)
+	clearPending(w, in)
 	// Back to what they were doing, where they were doing something. A
 	// sign-in that always lands on the home page loses somebody's place
 	// every time a session ends, which for a long justification is the
@@ -495,8 +491,7 @@ const refusedHere = "/?no-access"
 // The callback is a page the provider sends a browser to, so the answer is a
 // page too. A problem document there is drawn as raw text.
 func refuseSignIn(w http.ResponseWriter, r *http.Request, in core.Deps) {
-	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
-	http.SetCookie(w, &cleared)
+	clearPending(w, in)
 	http.Redirect(w, r, refusedHere, http.StatusSeeOther)
 }
 
@@ -522,12 +517,17 @@ func wentWrongHere(w http.ResponseWriter, r *http.Request, in core.Deps, what st
 	http.Redirect(w, r, faultedHere, http.StatusSeeOther)
 }
 
+// clearPending tells the browser to drop a sign-in in flight.
+func clearPending(w http.ResponseWriter, in core.Deps) {
+	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
+	http.SetCookie(w, &cleared)
+}
+
 // failedToComplete is wentWrongHere for a returning sign-in, whose pending
 // cookie is spent either way. A sign-in that fails to begin leaves the cookie
 // alone, since it may belong to a sign-in another tab has under way.
 func failedToComplete(w http.ResponseWriter, r *http.Request, in core.Deps, what string, err error) {
-	cleared := browserCookie(pendingCookie, "", false, in.PlainHTTP, -1)
-	http.SetCookie(w, &cleared)
+	clearPending(w, in)
 	wentWrongHere(w, r, in, what, err)
 }
 
