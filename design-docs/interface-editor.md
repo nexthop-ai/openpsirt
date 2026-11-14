@@ -44,6 +44,8 @@ submission, an expired session and a closed tab leave the words.
 | A draft is restored into the form it was typed in, and is no default; an explicit "start from this" beats it | It is this person's answer to this finding |
 | Where a draft lives and under whose name is decided in one place | |
 | A draft is kept under the identity that wrote it, encoded into the key; text typed before anybody is recognized is not kept | A session can expire silently; the separator is a colon, which an identity may hold |
+| A draft lasts a day from its last edit; every page load removes older drafts, whether or not anybody is signed in, and restoring refuses one | A lapsed session never signs out, and nobody may sign in on that browser again |
+| A draft is cleared when its form is accepted, including a form that closes in the same render | An accepted text restored into the next form for the same subject invites a duplicate |
 | Signing out clears every draft the browser holds, every writer's, before the request ending the session | Drafts hold private triage text; a sign-out that cannot reach the server is when clearing matters most |
 | A sign-out the server did not complete stays on the page and offers it again; drafts are cleared either way; a refusal for want of any session reads as signed out | The server clears the cookie only on ending the session |
 | A browser the proxy signed in is offered no sign-out: the menu names who the proxy signed in, says to sign out at the proxy, and offers clearing the drafts and tab state a sign-out clears, followed by a full load. A sign-out the server refuses on that ground stays on the page and says the same | No session here is there to end, the proxy signs the next request back in, and the proxy knows nothing of drafts here |
@@ -60,6 +62,7 @@ as a link, by the type the server decided.
 | Rule | Reason |
 |---|---|
 | A refusal is shown beside the control: a file over the deployment's size, a deployment with no room | |
+| The file's name is the link text with brackets, angle brackets, emphasis marks and backslashes escaped | A stored name keeps them, and unescaped they end the link or read as refused markup |
 | A reference becomes a path on this origin before anything renders it | Its scheme is unknown to browsers, so the sanitizer would drop it |
 | An image pointing anywhere else loses the whole element | Such text is refused at submission; an older one would draw a broken icon |
 | The finding lists what is attached beside rendering it, a removed file listed saying so and why | A file in an unread revision is still record |

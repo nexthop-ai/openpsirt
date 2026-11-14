@@ -10,8 +10,9 @@ import { Words } from "../ui/Words";
 import { Unread } from "../ui/Reading";
 import type { Readable } from "../ui/Count";
 import { called, identifiersIn, useWeaknessNames, useWeaknessSearch, type Named } from "../ui/cwe";
-import { useState } from "react";
-import { BENEATH_PARTS } from "./list";
+import { useMemo, useState } from "react";
+import { SUBTREE, sentFor, validFilter, withoutInvalid, type ListScope } from "./list";
+import { BUMP_FILTERS } from "./FindingsViews";
 // The findings list's filters, apart from the list itself.
 //
 // Everything the server can narrow by is here, named for what it asks, each
@@ -258,9 +259,17 @@ export function activeFilters(
   // The names of the weaknesses the address asks for, where they have been
   // read.
   weaknesses?: Map<string, Named>,
+  // Where the list is asked. Given, a chip is drawn only where removing it
+  // changes the request the list sends there.
+  scope?: ListScope,
 ): Active[] {
   const out: Active[] = [];
-  const at = (key: string) => params.get(key) ?? "";
+  // A value the list does not send draws no chip: it narrows nothing.
+  const at = (key: string) => {
+    const value = params.get(key) ?? "";
+    return validFilter(key, value) ? value : "";
+  };
+  const all = (key: string) => params.getAll(key).filter((value) => validFilter(key, value));
   const add = (key: string, label: string, value: string, clears?: [string, string][]) => {
     if (value) out.push({ key, label, value, clears: clears ?? [[key, ""]] });
   };
@@ -287,7 +296,7 @@ export function activeFilters(
   // than as "3 chosen", because a summary somebody cannot act on sends them
   // back into the panel to find out what it means.
   const each = (key: string, label: string, pairs: Pairs) => {
-    for (const value of params.getAll(key).filter(Boolean)) {
+    for (const value of all(key)) {
       out.push({ key, label, value: said(pairs, value), clears: [[key, value]] });
     }
   };
@@ -310,7 +319,7 @@ export function activeFilters(
   // chip widens to both rather than deleting the parameter, because deleting
   // it is how the address asks for the default back.
   const oneOf = (key: string, label: string, pairs: Pairs, both: string[]) => {
-    const chosen = params.getAll(key).filter(Boolean);
+    const chosen = all(key);
     if (chosen.length !== 1) return;
     out.push({
       key,
@@ -334,7 +343,7 @@ export function activeFilters(
   each("vex_status", "VEX status", VEX_STATUS);
   each("build_says", "Build says", BUILD_SAYS);
   each("component", "Component", []);
-  for (const kind of params.getAll("ecosystem").filter(Boolean)) {
+  for (const kind of all("ecosystem")) {
     out.push({
       key: "ecosystem",
       label: "Package type",
@@ -345,14 +354,15 @@ export function activeFilters(
   add("purl", "Package", at("purl"));
   each("declared_as", "Producer said", DECLARED_AS);
   add("under", "Inside container", at("under"));
-  // With what qualifies it, which goes when the chip does.
+  // With what qualifies it, and any other root, which go when the chip does.
   add(
     "beneath",
     "At or under",
     at("beneath") && [at("beneath"), at("beneath_version")].filter(Boolean).join(" "),
-    [["beneath", ""], ...BENEATH_PARTS.map((part): [string, string] => [part, ""])],
+    SUBTREE.map((part): [string, string] => [part, ""]),
   );
-  add("beneath_purl", "At or under", at("beneath_purl"));
+  // One root is sent, and a component names the narrower.
+  if (!at("beneath")) add("beneath_purl", "At or under", at("beneath_purl"));
   if (at("under_build") === "yes") add("under_build", "Held directly by the build", "only");
   // One chip per component hidden, and the page has no second list of them:
   // hiding drew its own row saying the same names the summary already said,
@@ -372,7 +382,7 @@ export function activeFilters(
   // The same for a decision: the decision page links to where its rows sat. One
   // chip for the decision and the states together, because the states mean
   // nothing without it.
-  const decisionStates = params.getAll("decision_state").filter(Boolean);
+  const decisionStates = all("decision_state");
   add(
     "decision",
     "Where decision",
@@ -385,7 +395,7 @@ export function activeFilters(
   );
   add("proposed_after", "Decided after", at("proposed_after"));
   add("closed_after", "Closed after", at("closed_after"));
-  for (const id of params.getAll("weakness").filter(Boolean)) {
+  for (const id of all("weakness")) {
     const named = weaknesses?.get(id);
     out.push({
       key: "weakness",
@@ -402,7 +412,9 @@ export function activeFilters(
     "Across variants",
     SPREADS.find(([word]) => word !== "" && word === at("variants"))?.[1].toLowerCase() ?? "",
   );
-  return out;
+  if (!scope) return out;
+  const sent = JSON.stringify(sentFor(params, scope));
+  return out.filter((chip) => JSON.stringify(sentFor(without(params, chip), scope)) !== sent);
 }
 
 // The address with one chip's filter removed. A pair naming a word removes
@@ -430,7 +442,7 @@ export function without(params: URLSearchParams, chip: Active): URLSearchParams 
 // applied in turn — so a filter the summary does not name is not silently
 // cleared by "clear all" either.
 export function withoutAny(params: URLSearchParams): URLSearchParams {
-  let next = params;
+  let next = withoutInvalid(params);
   for (const each of activeFilters(params)) next = without(next, each);
   return next;
 }
@@ -861,7 +873,13 @@ export function Narrowed({
   clear: (chip: Active) => void;
   clearAll: () => void;
 }) {
-  const active = activeFilters(params, weaknesses);
+  const { product, branch_or_tag: branchOrTag, variant } = scope;
+  // Each chip asks whether removing it changes the request, so they are worked
+  // out once per question.
+  const active = useMemo(
+    () => activeFilters(params, weaknesses, { product, branch_or_tag: branchOrTag, variant }),
+    [params, weaknesses, product, branchOrTag, variant],
+  );
   const where: { label: string; value: string; to: typeof scope }[] = [];
   if (scope.product) {
     where.push({
@@ -927,4 +945,24 @@ export function Narrowed({
       )}
     </div>
   );
+}
+
+// The filters the by-bump view can apply, by the key their chip carries.
+const BUMPABLE = new Set<string>(Object.keys(BUMP_FILTERS));
+
+// The filters in force that the by-bump view cannot apply, as their chips name
+// them. A bump has no occurrence, no deadline and no assignee, so a filter
+// asking about one has no row there to narrow. The filters it does take take
+// one value each, the first the list sends, so every later value is named with
+// its filter. A filter the selection drops is in force nowhere and is not
+// named.
+export function unbumped(asked: URLSearchParams, scope: ListScope): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const each of activeFilters(asked, undefined, scope)) {
+    if (!BUMPABLE.has(each.key)) out.push(each.label);
+    else if (seen.has(each.key)) out.push(`${each.label}: ${each.value}`);
+    seen.add(each.key);
+  }
+  return out;
 }

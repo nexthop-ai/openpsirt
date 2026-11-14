@@ -84,6 +84,8 @@ sits at, with how far it is decided in each.
 |---|---|
 | One row per build and component, never per occurrence | |
 | How far it is decided uses the findings list's expression | |
+| A product narrows the rows, the total and the count of products to it; one the reader cannot see is refused as one that does not exist | |
+| The rows are ordered by product, branch or tag, variant and component, and paged by offset | The affected-builds editor reads every row of one product |
 | The narrowing is in the query | A count leaks with no row shown |
 | The search box lands on an issue's page where the term names one, and on the component chooser otherwise (`design-docs/interface-shell.md` § The search box) | |
 | `/v1/findings` spans products: one row per product, issue and component, with the same filters, sort keys and paging | |

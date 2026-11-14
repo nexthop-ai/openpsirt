@@ -3,6 +3,7 @@
 
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { api } from "../api/client";
 import { Shell } from "./Shell";
 import { answer, location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import type { Who } from "./session";
@@ -560,5 +561,35 @@ describe("the phone tab bar", () => {
   it("draws no findings tab for a reader of neither family", async () => {
     await railAt("/start", [{ product: "sonic" }]);
     expect(tabs().map(([label]) => label)).toEqual(["Home", "Queue"]);
+  });
+});
+
+describe("who is signed in", () => {
+  it("draws initials from the name the label shows, without its provider", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    mount.render(screen(<Shell who={{ ...who, name: "github:alice" }}>{null}</Shell>, "/start"));
+    await settle();
+    expect(mount.host().querySelector(".me b")?.textContent).toBe("alice");
+    expect(mount.host().querySelector('button[aria-label="You"]')?.textContent).toBe("AL");
+  });
+});
+
+describe("the review queue entry", () => {
+  it("draws no count until the report rulings it adds are in", async () => {
+    window.sessionStorage.clear();
+    vi.spyOn(api, "GET").mockImplementation(((path: string) =>
+      path === "/v1/report-rulings"
+        ? new Promise(() => undefined)
+        : Promise.resolve({
+            data: { items: [], total: path === "/v1/review-queue" ? 3 : 0 },
+            response: new Response(null, { status: 200 }),
+          })) as never);
+    mount.render(screen(<Shell who={who}>{null}</Shell>, "/start"));
+    await settle();
+    const link = [...mount.host().querySelectorAll<HTMLElement>("a")].find((each) =>
+      each.textContent?.startsWith("Review queue"),
+    );
+    expect(link).toBeDefined();
+    expect(link?.querySelector(".count")).toBeNull();
   });
 });

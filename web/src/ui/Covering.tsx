@@ -47,6 +47,17 @@ function groupsOf(occurrences: Sitting[]): Group[] {
   return [...byConsumer.values()].sort((a, b) => b.items.length - a.items.length);
 }
 
+// The occurrences a decision names, or nothing where it covers every one
+// listed. An excluded occurrence no longer listed narrows nothing, so it does
+// not turn a decision over the whole fold into one over today's rows.
+export function namedOccurrences(
+  listed: { occurrence?: string }[],
+  excluded: Set<string>,
+): string[] | undefined {
+  const kept = listed.filter((each) => !excluded.has(each.occurrence ?? ""));
+  return kept.length < listed.length ? kept.map((each) => each.occurrence ?? "") : undefined;
+}
+
 export function Covering({
   occurrences,
   excluded,
@@ -69,7 +80,11 @@ export function Covering({
   const [filter, setFilter] = useState("");
   const groups = groupsOf(occurrences);
   const total = occurrences.length;
-  const covered = total - excluded.size;
+  // Excluded occurrences still open here. One decided elsewhere since it was
+  // excluded leaves the list and stays in the set, and the decision covers
+  // only what is listed.
+  const leftOpen = occurrences.filter((each) => excluded.has(each.occurrence ?? "")).length;
+  const covered = total - leftOpen;
   // Counted in the units somebody acts in. A decision covers the whole fold,
   // so what it reaches is packages and the things that pull them in — an occurrence
   // count is a figure a reader cannot reconcile with anything else on the
@@ -101,7 +116,7 @@ export function Covering({
           {covered} of {total}
         </span>
       </header>
-      {excluded.size === 0 ? (
+      {leftOpen === 0 ? (
         <p className="said">
           <b>
             {packages > 1 && <>All {packages} packages · </>}
@@ -119,7 +134,7 @@ export function Covering({
           <b>
             {covered} of {total}
           </b>{" "}
-          covered · {excluded.size} left open under{" "}
+          covered · {leftOpen} left open under{" "}
           {leftUnder.map((c, i) => (
             <span key={c}>
               {i > 0 && ", "}

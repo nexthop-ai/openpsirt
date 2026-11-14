@@ -6,7 +6,9 @@
 // A decision is one argument however many occurrences it covers, so this is the page
 // the acts live on: revise, withdraw, comment, agree, send back, hold rows
 // back, and say where the work is happening. Nothing here offers an act on one
-// row, and nothing here counts occurrences — an occurrence is a unit nobody acted in.
+// row. Present reach is said in issues and folds, with the occurrences written
+// at on hover; an occurrence count is drawn only where an act or a record is
+// keyed on rows: re-affirming, and the reach a decision had when it ended.
 
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";

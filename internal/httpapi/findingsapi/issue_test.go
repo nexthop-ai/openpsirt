@@ -207,6 +207,20 @@ func TestOneIssueIsAnsweredAcrossEveryProductYouMaySee(t *testing.T) {
 			t.Errorf("a finding nobody has decided reads as %q", one.State)
 		}
 
+		// One product named narrows the answer to it; a product the reader
+		// cannot see is refused, the way one that does not exist is.
+		httpapitest.Read(t, r, "triager", "/v1/issues/CVE-2026-9999?product=mine", &out)
+		if len(out.Items) == 0 || out.Products != 1 || out.Items[0].Product != "mine" {
+			t.Fatalf("the issue in one product reads as %+v", out)
+		}
+		for _, product := range []string{"theirs", "nowhere"} {
+			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet,
+				"/v1/issues/CVE-2026-9999?product="+product, "")
+			if got.Code != http.StatusNotFound {
+				t.Errorf("asking in %s answered %d, want 404", product, got.Code)
+			}
+		}
+
 		// A decision moves the state on this page too: it is the same
 		// definition the findings list uses rather than a second one.
 		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)

@@ -16,12 +16,12 @@ import {
 } from "../api/codeFindings";
 import { decisionAt, codeFindingAt, codeFindingsAt, componentAt, type Build } from "../app/routes";
 import { ChoiceCards } from "../ui/ChoiceCards";
-import { Editor } from "../ui/Editor";
+import { Editor, forget } from "../ui/Editor";
 import { Failed } from "../ui/Failed";
 import { Holder } from "../ui/Holder";
 import { Loading } from "../ui/Loading";
 import { labeled } from "../ui/Outcome";
-import { linkable } from "../ui/addressable";
+import { Outward } from "../ui/Outward";
 import { on } from "../ui/when";
 import {
   CODE_FINDING_OUTCOMES,
@@ -121,18 +121,9 @@ export function CodeFinding() {
             <Commit sha={evidence.not_seen_commit} />
           )}
           {evidence.unchanged && " · the code did not change between those builds"}
-          {linkable(evidence.compare) && (
-            <>
-              {" · "}
-              <a
-                href={linkable(evidence.compare) ?? undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Compare builds
-              </a>
-            </>
-          )}
+          <Outward href={evidence.compare} className="" unlinked={null} lead=" · ">
+            Compare builds
+          </Outward>
         </p>
       </div>
 
@@ -230,26 +221,22 @@ function Commit({ sha }: { sha: string }) {
 
 // One location the analyzer named: where, what it said there, and the code.
 function Location({ location }: { location: CodeFindingOccurrence }) {
-  const href = linkable(location.link);
   const where = located(location.path, location.start_line);
   return (
     <div>
       <div>
-        {href ? (
-          <a
-            className="mono"
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={location.revision}
-          >
-            {where}
-          </a>
-        ) : (
-          <span className="mono" title={location.unlinked}>
-            {where}
-          </span>
-        )}
+        <Outward
+          href={location.link}
+          className="mono"
+          title={location.revision}
+          unlinked={
+            <span className="mono" title={location.unlinked}>
+              {where}
+            </span>
+          }
+        >
+          {where}
+        </Outward>
         {location.function && <span className="hint"> in {location.function}</span>}
         {location.approximate && (
           <span className="hint" title="The line is where the code was, not where it is.">
@@ -324,6 +311,7 @@ function DecideForm({ build, occurrence }: { build: Build; occurrence: string })
   const [reason, setReason] = useState<CodeFindingReason | "">("");
   const [reasoning, setReasoning] = useState("");
   const decide = useDecideCodeFinding(build, occurrence);
+  const draftKey = `code finding:${build.product}:${occurrence}`;
   const needsReason = outcome === "dismissed";
   const ready = outcome !== "" && (!needsReason || reason !== "") && reasoning.trim() !== "";
 
@@ -364,7 +352,7 @@ function DecideForm({ build, occurrence }: { build: Build; occurrence: string })
             value={reasoning}
             onChange={setReasoning}
             rows={4}
-            draftKey={`code finding:${build.product}:${occurrence}`}
+            draftKey={draftKey}
           />
         </div>
       )}
@@ -382,7 +370,10 @@ function DecideForm({ build, occurrence }: { build: Build; occurrence: string })
                 ...(needsReason && reason ? { reason } : {}),
               },
               {
+                // Forgotten here, since clearing the outcome unmounts the
+                // editor before it can see the reasoning emptied.
                 onSuccess: () => {
+                  forget(draftKey);
                   setOutcome("");
                   setReason("");
                   setReasoning("");
@@ -458,23 +449,26 @@ function FixForm({
 }) {
   const [because, setBecause] = useState("");
   const fix = useFixCodeFinding(build, occurrence);
+  const draftKey = `code-finding-fixed:${build.product}:${occurrence}`;
   return (
     <div style={{ marginTop: 10 }}>
       <p className="hint">Fixed in the build of the first run that did not see it.</p>
-      <Editor
-        label="Fixed by"
-        value={because}
-        onChange={setBecause}
-        rows={3}
-        draftKey={`code-finding-fixed:${build.product}:${occurrence}`}
-      />
+      <Editor label="Fixed by" value={because} onChange={setBecause} rows={3} draftKey={draftKey} />
       <button
         type="button"
         className="btn"
         style={{ marginTop: 8 }}
         disabled={because.trim() === "" || fix.isPending}
         onClick={() =>
-          fix.mutate({ because: because.trim(), fixedIn }, { onSuccess: () => setBecause("") })
+          fix.mutate(
+            { because: because.trim(), fixedIn },
+            {
+              onSuccess: () => {
+                forget(draftKey);
+                setBecause("");
+              },
+            },
+          )
         }
       >
         Close as fixed

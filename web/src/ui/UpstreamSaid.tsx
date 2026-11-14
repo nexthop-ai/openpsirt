@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { useDecline } from "../api/upstream";
-import { linkable } from "./addressable";
+import { Outward } from "./Outward";
 import { Failed } from "./Failed";
 
 // What an upstream's statement is here, beside the statement: whether it
@@ -26,7 +26,6 @@ export function UpstreamSaid({
   mayTriage: boolean;
 }) {
   const decline = useDecline();
-  const href = linkable(document);
   return (
     <span>
       {declined ? (
@@ -48,13 +47,7 @@ export function UpstreamSaid({
           upstream · for review
         </span>
       )}{" "}
-      {href ? (
-        <a href={href} target="_blank" rel="noreferrer noopener" className="linkish">
-          source
-        </a>
-      ) : (
-        <span className="id">{document}</span>
-      )}
+      <Outward href={document}>source</Outward>
       {mayTriage && (
         <>
           {" "}

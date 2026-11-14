@@ -41,7 +41,8 @@ names them.
 | Severity is a dot and a word colored by the band, with no fill | Fifty tinted pills compete with the column read first |
 | A count beside a tab is a number, quieter than its word, the same selected or not | |
 | A warning and an all-clear each have three tokens: a panel on the surface, a wash over anything, the line around either. A different strength is a raw mix that says why beside it | Two screens' warnings are one shade |
-| A shape many rules share is one rule listing every selector: the sentence-case label, the small uppercase group heading, a chip's tint arms, the editor column's reserved height | A change lands everywhere it is drawn |
+| A shape many rules share is one rule listing every selector: the sentence-case label, the small uppercase group heading, a chip's tint arms, the editor column's reserved height, the block a person's reasoning or comment is read in, the dependency tree's two count badges | A change lands everywhere it is drawn |
+| A mark drawn on a filled control, such as the key cap on a primary button, is drawn in the control's own text color | A fixed white vanishes on the dark look's light button |
 
 ### Choosing a look
 
@@ -188,6 +189,8 @@ split and the ring use the library.
 | Every trend panel offers Daily and Weekly, daily first | |
 | The chart starts at the first step holding anything, so the open line's scale starts where scanning began | Before the first scan nothing is open, and drawn, the line spans zero to the whole inventory |
 | The open axis is labeled in whole numbers where brief labels would read the same | A fitted scale over a backlog moving by tens puts 8,271 and 8,290 both at 8.3k |
+| The trend and the burndown are drawn from one set of parts: the flow bars, the marks, the grid's round values and the dates under the axis | A second copy drifts from the first |
+| A date is written under every few steps and under the last; the one before the last is left out within a step of it | Thirty daily steps put the last two 17 pixels apart |
 
 ## Limits
 

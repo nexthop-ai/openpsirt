@@ -22,7 +22,7 @@ import {
 } from "../api/codeFindings";
 import { issueAt, type Build } from "../app/routes";
 import { ChoiceCards } from "../ui/ChoiceCards";
-import { Editor } from "../ui/Editor";
+import { Editor, forget } from "../ui/Editor";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { on } from "../ui/when";
@@ -183,6 +183,7 @@ function UndoRecordAsFlaw({ build, occurrence }: { build: Build; occurrence: str
   const [open, setOpen] = useState(false);
   const [because, setBecause] = useState("");
   const undo = useUndoRecordAsFlaw(build, occurrence);
+  const draftKey = `code-finding-undo:${build.product}:${occurrence}`;
   if (!open) {
     return (
       <button
@@ -198,19 +199,20 @@ function UndoRecordAsFlaw({ build, occurrence }: { build: Build; occurrence: str
   }
   return (
     <div style={{ marginTop: 10 }}>
-      <Editor
-        label="Reason"
-        value={because}
-        onChange={setBecause}
-        rows={3}
-        draftKey={`code-finding-undo:${build.product}:${occurrence}`}
-      />
+      <Editor label="Reason" value={because} onChange={setBecause} rows={3} draftKey={draftKey} />
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
         <button
           type="button"
           className="btn"
           disabled={because.trim() === "" || undo.isPending}
-          onClick={() => undo.mutate(because.trim(), { onSuccess: () => setBecause("") })}
+          onClick={() =>
+            undo.mutate(because.trim(), {
+              onSuccess: () => {
+                forget(draftKey);
+                setBecause("");
+              },
+            })
+          }
         >
           Withdraw flaw
         </button>
@@ -231,6 +233,7 @@ function RecordAsFlawForm({ build, occurrence }: { build: Build; occurrence: str
   const [added, setAdded] = useState<Set<string>>(new Set());
   const [summary, setSummary] = useState("");
   const [included, setIncluded] = useState(false);
+  const draftKey = `code-finding-flaw:${build.product}:${occurrence}`;
 
   if (offer.isPending) return <Loading />;
   if (offer.isError) {
@@ -351,7 +354,7 @@ function RecordAsFlawForm({ build, occurrence }: { build: Build; occurrence: str
           value={summary}
           onChange={setSummary}
           rows={4}
-          draftKey={`code-finding-flaw:${build.product}:${occurrence}`}
+          draftKey={draftKey}
         />
       </div>
       {data.together > 0 && (
@@ -373,14 +376,17 @@ function RecordAsFlawForm({ build, occurrence }: { build: Build; occurrence: str
         disabled={!ready || recordAsFlaw.isPending}
         onClick={() =>
           chosen &&
-          recordAsFlaw.mutate({
-            builds: builds.map((b) => ({ branch_or_tag: b.branch_or_tag, variant: b.variant })),
-            summary: summary.trim(),
-            ...(chosen.component ? { component: chosen.component } : {}),
-            ...(chosen.ecosystem ? { ecosystem: chosen.ecosystem } : {}),
-            ...(chosen.namespace ? { namespace: chosen.namespace } : {}),
-            ...(included ? { include_in_disclosure: true } : {}),
-          })
+          recordAsFlaw.mutate(
+            {
+              builds: builds.map((b) => ({ branch_or_tag: b.branch_or_tag, variant: b.variant })),
+              summary: summary.trim(),
+              ...(chosen.component ? { component: chosen.component } : {}),
+              ...(chosen.ecosystem ? { ecosystem: chosen.ecosystem } : {}),
+              ...(chosen.namespace ? { namespace: chosen.namespace } : {}),
+              ...(included ? { include_in_disclosure: true } : {}),
+            },
+            { onSuccess: () => forget(draftKey) },
+          )
         }
       >
         Record as a flaw

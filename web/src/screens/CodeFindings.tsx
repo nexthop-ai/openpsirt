@@ -7,8 +7,8 @@ import { useWho } from "../app/session";
 import { counted, heldLine, holding } from "../app/families";
 import { fileAt } from "../api/links";
 import { codeTrendAt } from "./codeTrend";
+import { PAGE } from "../api/queries";
 import {
-  PAGE,
   codeFindingsQuery,
   useCodeFindings,
   type CodeFindingMethod,
@@ -23,7 +23,6 @@ import {
   codeFindingsAcrossAt,
   productAt,
 } from "../app/routes";
-import { askForScope } from "../app/scope";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
@@ -41,6 +40,7 @@ import {
   stateSaid,
 } from "./codeFindings";
 import { Downloads } from "../ui/Downloads";
+import { NeedsOneBuild } from "../ui/NeedsOneBuild";
 
 // A product's static analysis code findings. With no state it is the queue: open
 // code findings nothing waits on. A state lists that state's code findings instead.
@@ -173,14 +173,7 @@ export function CodeFindings() {
             <span className="id">{placed.beneath}</span>
           </p>
         </div>
-        <Empty
-          title="This needs one build."
-          detail="At or under a component is read on one build. Pick a product, a branch and a variant."
-        >
-          <button type="button" className="btn" onClick={askForScope}>
-            Pick a build
-          </button>
-        </Empty>
+        <NeedsOneBuild andProduct />
       </div>
     );
   }
@@ -211,7 +204,7 @@ export function CodeFindings() {
             </>
           )}
         </p>
-        <span style={{ marginLeft: "auto" }}>
+        <span style={{ marginLeft: "auto" }} className="noprint">
           {/* A suppression rule and a trend belong to one product. */}
           {!across && (
             <>

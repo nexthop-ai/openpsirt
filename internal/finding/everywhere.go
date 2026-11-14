@@ -6,7 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
-	"sort"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -66,8 +66,13 @@ type Sighting struct {
 // builds is a real answer and an unbounded one is a page nobody can read. The
 // number of products is counted with the total rather than off the page, so a
 // page cut short still says how many products carry the issue.
+//
+// A product, where one is given, narrows the rows, the total and the count of
+// products to it; zero is every product the subject may see. Offset skips that
+// many rows of the order the rows are read in, so a caller needing every row
+// reads them a page at a time.
 func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
-	vulnerabilityID int64, limit int) ([]Sighting, int, int, error) {
+	vulnerabilityID, productID int64, limit, offset int) ([]Sighting, int, int, error) {
 
 	limit = database.AWholeBuild.Of(limit)
 	// Not merely empty: "here is nothing" and "you cannot ask" are
@@ -93,6 +98,9 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 			Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 			Where(`"f"."closed_at" IS NULL`)
+		if productID != 0 {
+			q = q.Where(`"st"."product_id" = ?`, productID)
+		}
 		return onlyReadable(q, subject, readable, all)
 	}
 
@@ -161,8 +169,18 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		// value each for a component in a build.
 		GroupExpr(`"p"."name", "p"."display_name", "st"."name", "va"."name", "c"."name", "c"."version", "c"."id", `+
 			`"sn"."name", "sn"."version"`).
-		OrderExpr(`"p"."name", "st"."name", "va"."name", "component", "c"."id"`).
+		// Names are ordered by code point, so every engine answers in one
+		// order whatever its collation, and the rows an offset skips are the
+		// rows an earlier page returned.
+		OrderExpr(strings.Join([]string{
+			database.Bytewise(s.db, `"p"."name"`),
+			database.Bytewise(s.db, `"st"."name"`),
+			database.Bytewise(s.db, `"va"."name"`),
+			database.Bytewise(s.db, database.Expr(graph.NodeName("sn", "c"))),
+			`"c"."id"`,
+		}, ", ")).
 		Limit(int64(limit)).
+		Offset(int64(max(offset, 0))).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("read where this issue sits: %w", err)
@@ -182,20 +200,5 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 			FixedIn:     row.FixedIn,
 		})
 	}
-	// Ordered here as well as in the statement, so two engines that disagree
-	// about how names sort still answer in the same order.
-	sort.SliceStable(out, func(i, j int) bool {
-		a, b := out[i], out[j]
-		if a.Product != b.Product {
-			return a.Product < b.Product
-		}
-		if a.BranchOrTag != b.BranchOrTag {
-			return a.BranchOrTag < b.BranchOrTag
-		}
-		if a.Variant != b.Variant {
-			return a.Variant < b.Variant
-		}
-		return a.Component < b.Component
-	})
 	return out, int(total), int(products), nil
 }

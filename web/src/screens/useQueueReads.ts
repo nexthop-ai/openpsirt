@@ -4,14 +4,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { unwrap } from "../api/queries";
-import { PENDING_PAGE } from "./QueuePending";
+import { PAGE, unwrap } from "../api/queries";
 import { queueNarrowing } from "./QueueFilters";
 import { queueReason, type Reason } from "./queueReasons";
-
-// A page of decisions. The queue is read at the grain of a decision, and a decision
-// is a card with its whole argument, so a page is what fits a sitting.
-export const PAGE = 50;
 
 // Everything the review queue reads, and what the address asks of it.
 //
@@ -120,7 +115,7 @@ export function useQueueReads(params: URLSearchParams, offset: number) {
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/disclosure-movements", {
-          params: { query: { limit: PENDING_PAGE, offset: embargoAt } },
+          params: { query: { limit: PAGE, offset: embargoAt } },
         }),
       ),
     // Somebody who may read nothing undisclosed gets an empty list rather than
@@ -132,7 +127,7 @@ export function useQueueReads(params: URLSearchParams, offset: number) {
     queryFn: async () =>
       unwrap(
         await api.GET("/v1/assessments", {
-          params: { query: { state: "proposed", limit: PENDING_PAGE, offset: ratingAt } },
+          params: { query: { state: "proposed", limit: PAGE, offset: ratingAt } },
         }),
       ),
   });

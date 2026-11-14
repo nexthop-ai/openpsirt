@@ -92,6 +92,9 @@ committed. The interface uses no private endpoint.
 | A table of words over a server word is keyed on the generated union | A word the server adds is a compile error until it has words |
 | A lint refuses a literal table in the screens keyed on any string, whole or partial; a table typed by an index signature is not caught. A table over an open set (a package kind, a keyboard key, this interface's own names) says why beside it | |
 | A read is declared once and asked through its hook | Two declarations miss each other's invalidations |
+| What an act moves is one named list of keys per subject (a decision, a report, an advisory, an incident, a change of holder), applied by one helper; an act moving two subjects applies both lists | A list restated at each act loses a key at one of them |
+| A change of holder moves the holdings and the held-work lists, whatever is handed: a finding, a code finding, a decision's work | Assignments is served from cache otherwise |
+| Withdrawing trust in an upstream moves the statements a component screen draws from it | They stop standing |
 | The catalog's products, branches and variants, one release's variants, where an issue sits, a decision's approvals and revisions, what sits around a component, and the outbound destinations each have one definition, keyed so a change reaches every screen showing them | |
 | A download or document link is built by one link builder over the generated paths: the path is a key of the document, each placeholder required, named as the path names it and escaped as a segment; a placeholder with no value is refused | The browser fetches these, not the client |
 
@@ -110,6 +113,8 @@ they reach.
 | A product somebody cannot reach is absent, and a screen treats it as not there (REQ-42) | The server's answer |
 | `GET /v1/sign-in` is answered without a credential, listing the providers an operator configured (REQ-41); a test asserts it says nothing about whether any account exists | It is what somebody sees before they have a credential |
 | A 401 from `session/me` is an answer: nobody is signed in | A fresh browser |
+| A bound the server refuses past and a screen stops at is read from `session/me`, as the weaknesses one flaw states are; a request size the interface sends, as the rows one assignment names, is held to the published API document by a test | A copy in the interface keeps the old bound after the server's moves |
+| A table of the server's words, such as outcomes, decision states, queue reasons and ruling dispositions, is keyed by the generated type, so a word the server adds fails to compile until the table names it | A word missing from a table is a tab never offered or a card in the wrong words |
 | Markdown is rendered and sanitized in the browser; the server returns markdown only | Preview and published text are one renderer, with no round trip per keystroke |
 
 ## Families a reader holds
@@ -158,8 +163,10 @@ one it is a wrong answer.
 | A page is asked on a timer only while something on it moves: Uploads' receipts every 15 s while an upload is being read or scanned | A settled answer costs the server the same each time, per open screen |
 | A refusal is an answer; a fault is not. 403 and 404 draw a quiet not-yours card; anything else is said | |
 | A count from a page is not a count: the server's total is the figure; where it only caps, the list says the cap was reached | |
-| A set read under a cap is never written back whole; the affected-build editor refuses to edit rather than editing part | The server closes everything absent from the list sent |
+| A page at or past the end of its list says it holds nothing and of how many; Previous goes to the last page holding rows | A bulk act shrinks the list under the page somebody is on |
+| A set written back whole is read whole first; the affected-build editor reads every page, and refuses to edit rather than editing part | The server closes everything absent from the list sent |
 | A printed sheet prints only once every figure has arrived | It stamps the moment it was taken |
+| A printed screen keeps its head's title, breadcrumb and counts; what is pressed there is marked to stay off paper, and a web test fails a button or link under a head that is not, drawn always, on a condition or by a component | A known vulnerability scan is named only in its breadcrumb |
 | A failed identity read is not "signed out" | With one provider the sign-in screen forwards straight to it |
 | What the server said is shown; where it said nothing, the status is | HTTP/2 carries no reason phrase |
 | One component draws a read's three arms: waiting, the loading line; failed, what the server said; answered, the screen, its empty state included | A screen drawn through it cannot show "none" for an unanswered read |
@@ -215,7 +222,7 @@ Every count says what it is a count of (REQ-60).
 | Absolute | The UTC day, never localized: the server writes a day from the moment in UTC, and a moment sent with an offset is shown as the UTC day it falls on. Every stored instant on a screen goes through one formatter, a key's or token's last use included |
 | To the minute | The UTC day and minute, saying UTC, for a moment correlated with another: a comment, a grant, a scan arriving |
 | Typed to the minute | In UTC, labeled so, defaulting to now in UTC; the minute typed is the minute shown |
-| Relative | For staleness, one scale in both directions, with the absolute form on the title |
+| Relative | For staleness, one scale in both directions, with the absolute form on the title. Its year is 365 days, so a year reads as one on the day it ends |
 
 A value that is not a stored moment is drawn as nothing in both forms: the shape
 is checked, because a bare number parses as a year, and so is the calendar day,

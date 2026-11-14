@@ -37,6 +37,7 @@ figure says otherwise.
 | A window is the newest 1 to 104 weeks, thirteen unless named, ending at the coming midnight UTC | The trend's weeks |
 | Waits are worked out in the application from stored times | Subtraction of times is spelled four ways across the engines |
 | The tier is the rule's as rated now | No rating history is stored |
+| A split by tier draws every tier the figure counts: the named ones highest first, then any the interface has no name for, under the server's word | A split counts what the whole counts, a tier added on the server included |
 | No presence spans and no stored figure; each is worked out from opening, closing, decision and run times when asked (REQ-74) | Absence closes nothing, and a stored answer drifts |
 | A figure counting no fixed code finding reads the queue's rows of open findings alone, kept by the conditions of its states | A state other than fixed has no closed finding to test for opening anew (`design-docs/analysis-queue.md` § Code finding queue) |
 | Nothing names a testing method that is not built | AI review is not supported |

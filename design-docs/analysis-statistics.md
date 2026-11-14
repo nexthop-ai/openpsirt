@@ -145,7 +145,7 @@ component, `design-docs/interface-shell.md` § Security testing figures).
 | Pace chart | Not fixed, new and fixed per step, with a dashed mark at each step holding a marker, said on hover |
 | Split chart | Not fixed, stacked by the split picked |
 | Today's count | No longer detected, opening the queue in that state with the same narrowing |
-| Step by step | Each step's three numbers, its split, and its markers in words |
+| Step by step | Headed Day by day or Week by week, as the step drawn; each step's three numbers, its split, and its markers in words |
 
 | Rule | Reason |
 |---|---|

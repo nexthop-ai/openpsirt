@@ -212,10 +212,12 @@ export function Shell({ who, children }: { who: Who; children: ReactNode }) {
               to="/review-queue"
               icon="inbox"
               label="Review queue"
+              // Drawn once both counts it adds are in, so it never shows the
+              // decisions alone as the whole.
               count={
-                queue.data?.total === undefined
+                queue.data?.total === undefined || approvable.data === undefined
                   ? undefined
-                  : queue.data.total + (approvable.data ?? 0)
+                  : queue.data.total + approvable.data
               }
               unread={queue.isError || approvable.isError}
               unit="waiting for your approval"
@@ -849,11 +851,14 @@ function Me({ who }: { who: Who }) {
   }
 
   useClickAway(box, open, () => setOpen(false));
+  // The name without the sign-in provider's prefix, for the label and the
+  // initials alike.
+  const shown = who.name.replace(/^[a-z]+:/, "");
 
   return (
     <div className="me" ref={box}>
       <span className="hint">
-        <b>{who.name.replace(/^[a-z]+:/, "")}</b>
+        <b>{shown}</b>
       </span>
       <button
         type="button"
@@ -863,7 +868,7 @@ function Me({ who }: { who: Who }) {
         title={who.identity}
         onClick={() => setOpen(!open)}
       >
-        {initials(who.name)}
+        {initials(shown)}
       </button>
       {open && (
         <div className="lookmenu" role="menu">

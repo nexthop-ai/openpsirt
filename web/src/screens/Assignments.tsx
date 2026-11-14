@@ -8,7 +8,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api, type Body } from "../api/client";
 import { scopeQuery, useScope } from "../app/scope";
 import { useWho } from "../app/session";
-import { unwrap } from "../api/queries";
+import { PAGE, unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Severity, Exploited, Incident } from "../ui/Severity";
@@ -22,10 +22,6 @@ import { counted, holding } from "../app/families";
 import { useOwnWork, type WorkFamily } from "../app/ownWork";
 import { HeldLine } from "../ui/HeldLine";
 import { on } from "../ui/when";
-
-// One page of what somebody holds. The answer carries a total, so this is a
-// page rather than a cap and the footer pages through the rest.
-const PAGE = 50;
 
 // Assignments: what is running out of time undecided, and what each person
 // holds. What nobody holds has its own entry in the rail, which opens each

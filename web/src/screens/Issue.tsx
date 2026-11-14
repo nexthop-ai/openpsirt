@@ -84,8 +84,8 @@ export function Issue() {
         <p>
           {(it?.products ?? 0).toLocaleString()}{" "}
           {(it?.products ?? 0) === 1 ? "product" : "products"} · {(it?.total ?? 0).toLocaleString()}{" "}
-          {(it?.total ?? 0) === 1 ? "build" : "builds"} carry it — one row per build and component,
-          however many occurrences each sits at
+          {(it?.total ?? 0) === 1 ? "build and component" : "builds and components"} carry it — one
+          row per build and component, however many occurrences each sits at
         </p>
       </div>
 

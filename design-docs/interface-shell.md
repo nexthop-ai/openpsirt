@@ -40,6 +40,7 @@ waiting on the reader, and who they are.
 | A screen's breadcrumb opens the product page from the product's name, and the branch or tag's own page from its name | The product page names every build with what is open in it |
 | The bar's search finds an issue or a component (§ The search box); "/" focuses it unless somebody is typing | |
 | Upload is in the bar on every screen (REQ-05), and on Uploads | The form picks its own build; Uploads is where the result appears |
+| The bar names who is signed in, without the sign-in provider's prefix, and their initials open the look menu; both are read from that one name | |
 | On a narrow screen the rail gives way to a tab bar: home, the reader's findings, the review queue, and a fourth tab and a bar control opening the whole rail as a panel | What somebody reviews and responds from on a phone |
 | The phone's findings tab is Findings, opening Dependency findings, for a reader of them in some product; Code findings, opening the Security testing queue, for a reader of code findings alone; absent for a reader of neither | The tab follows the entries the rail draws for the reader |
 
@@ -58,6 +59,7 @@ right its screen asks for.
 | Dependency findings with a product picked | Declines where the reader holds them in another product, saying so on hover; its count is asked only where they are read here |
 | The Dependency findings and Unassigned badges | A reader of one half alone has the unit say which half the count is of (REQ-60) |
 | The Unassigned badge | One count of the items of work nobody holds, in every family the reader counts, as the totals by holder count work of both (`design-docs/kinds.md` § Consumers); on hover, each family's count apart. It is never a vulnerability count (REQ-87), and `/unassigned` counts each family apart. Where one family's count fails, the badge says it could not be read |
+| The Review queue badge | The decisions waiting for the reader's approval and the report rulings they may agree to, drawn once both counts are in; where either fails, the badge says it could not be read |
 | Security testing | A reader of security testing work in some product; declines in a product where it is not read, with the code family's line on hover |
 | Code findings over time | The same readers, below Security testing; declines until a product is picked, and in a product where the work is not read, saying why on hover |
 | Vulnerability reports, Disclosure deadlines | A reader of undisclosed work in some product |
@@ -135,13 +137,13 @@ are asked occasionally and are the slowest read.
 | The tab rides in the address, `figures=security-testing`; the address naming none is Dependencies, and a reader holding one family is shown it whatever the address names | A link opens the same tab |
 | The strip governs the figures and trends alone; the work stays above it, unchanged by the tab | Tabs inside the page keep it one page leading with the work |
 | A tab whose family the reader holds in another product and not the picked one draws the family's line in place of its figures | A zero for work the reader cannot see reads as nothing open |
-| Lapsed decisions are drawn for a reader of either family at the picked scope; its line counting findings with a lapsed decision is asked only where dependency findings are counted there | A decision lapses on either family; the findings line counts dependency findings |
+| Lapsed decisions are drawn for a reader of either family at the picked scope; its line counting findings with a lapsed decision is asked only where dependency findings are counted there, and "Nothing has lapsed" waits only on the reads asked | A decision lapses on either family; the findings line counts dependency findings |
 | The work figures (sent back, pending approval) and in progress stay for every reader of either family | They hold both families' work |
 | What is assigned to the reader is one figure per family, under the rule for the reader's own lists in `design-docs/interface-review.md` § Assignments and assignment rules; held in another product and holding none, the figure is a dash with the family's line | One figure over both families counts two units as one |
 | A reader of no finding in any product who administers, audits or collaborates on nothing has a Records panel among the work, opening the audit log, access and settings where they may read them; the work figures and panels stay; the line under the greeting says they audit or hold no role | An auditor's work is the deployment's records, and a capability held without a read role still brings assigned work (`design-docs/access.md` § Breadth of view) |
 | A reader the session says collaborates has a Your cases panel, whatever else they read: each case by its issue and product, opening the product's findings list searched for the issue, and each code finding granted by its rule, file, flaw and product, opening it on the build it was last seen in (`design-docs/access-disclosure.md` § Own cases). The list is asked only for them, and the panel is absent where every grant has ended | A grant reaches one thing, and the notice that brought them in scrolls away |
 | The line under the greeting counts the products the reader reads | |
-| What became of decisions is counted from a page read, and the tile says where the page was cut | It is derived, with no count to ask for |
+| What became of decisions is counted from a page read, and the tile marks the figure a floor wherever the page was cut, zero included | It is derived, with no count to ask for; a sent-back decision older than the page counts nowhere |
 | Every figure opens the list it counts, narrowed as counted, the aging buckets included (`design-docs/interface-administration.md` § Analytics) | |
 | A figure counting anything closed opens nothing | The findings list holds what is open (`design-docs/analytics-catalog.md`) |
 

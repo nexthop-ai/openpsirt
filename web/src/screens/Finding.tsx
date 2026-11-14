@@ -44,6 +44,7 @@ import { useFindingNeighbors } from "./findingNeighbors";
 import { useDecisionPrefill } from "./findingPrefill";
 import { FindingWhich } from "./FindingWhich";
 import {
+  allFindingsAt,
   buildFindingsAt,
   decisionAt,
   componentAt,
@@ -51,6 +52,7 @@ import {
   productFindingsAt,
 } from "../app/routes";
 import { useReseed } from "../ui/reseed";
+import { ACROSS, withoutAcross } from "./list";
 import { UpstreamSaid } from "../ui/UpstreamSaid";
 
 // One finding: what the issue is, how bad, what upstream has done, where it
@@ -359,7 +361,9 @@ export function Finding() {
   // them, because the build travels in the address like every other filter and
   // the list may have been across several.
   const back = walking
-    ? productFindingsAt(product, from)
+    ? new URLSearchParams(from).get(ACROSS) === "1"
+      ? allFindingsAt(withoutAcross(from))
+      : productFindingsAt(product, from)
     : buildFindingsAt({ product, branch_or_tag: branchOrTag, variant });
   const mine = (proposedBy: string) => !!who.data && proposedBy === who.data.identity;
 

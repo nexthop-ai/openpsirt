@@ -18,7 +18,7 @@ import {
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
-import { unwrap } from "../api/queries";
+import { beneathOf, unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { sharedVersion } from "../ui/versions";
@@ -612,11 +612,7 @@ function beneathComponent(
   at: At,
   row: { component?: string; version?: string; ecosystem?: string; namespace?: string },
 ): string {
-  const query = new URLSearchParams({ beneath: row.component ?? "" });
-  if (row.version) query.set("beneath_version", row.version);
-  if (row.ecosystem) query.set("beneath_ecosystem", row.ecosystem);
-  if (row.namespace) query.set("beneath_namespace", row.namespace);
-  return buildFindingsAt(at, query);
+  return buildFindingsAt(at, beneathOf(row.component ?? "", row));
 }
 
 // The burndown of a node and everything under it, on this build.
@@ -624,10 +620,7 @@ function burndownBeneath(at: At, node: Node): string {
   return analyticsReportAt("findings-burndown", {
     branch_or_tag: at.branch_or_tag,
     variant: at.variant,
-    beneath: node.component,
-    beneath_version: node.version || undefined,
-    beneath_ecosystem: node.ecosystem || undefined,
-    beneath_namespace: node.namespace || undefined,
+    ...beneathOf(node.component, node),
   });
 }
 
@@ -646,10 +639,7 @@ function CodeCount({ at, node, first }: { at: At; node: Node; first: boolean }) 
       to={codeFindingsAt(at.product, {
         branch_or_tag: at.branch_or_tag,
         variant: at.variant,
-        beneath: node.component,
-        beneath_version: node.version || undefined,
-        beneath_ecosystem: node.ecosystem || undefined,
-        beneath_namespace: node.namespace || undefined,
+        ...beneathOf(node.component, node),
         state: "open",
       })}
       onClick={(event) => event.stopPropagation()}

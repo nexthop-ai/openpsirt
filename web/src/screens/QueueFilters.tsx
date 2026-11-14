@@ -23,6 +23,21 @@ type Narrowing = Pick<
   (typeof QUEUE_FILTERS)[number]
 >;
 
+// The severity floors offered, least first. Keyed by every floor the queue
+// takes, so one the server adds is a compile error here. Low is not offered:
+// it excludes nothing.
+const FLOORS = {
+  low: null,
+  medium: "Medium or worse",
+  high: "High or worse",
+  critical: "Critical",
+} satisfies Record<NonNullable<Narrowing["severity"]>, string | null>;
+
+// The floors offered, with the words each is offered in.
+const OFFERED = Object.entries(FLOORS).filter(
+  (floor): floor is [Exclude<keyof typeof FLOORS, "low">, string] => floor[1] !== null,
+);
+
 // The ages offered, in days. The server takes any number; these are the ones
 // a person reaching for "old" means.
 const AGES = [7, 30, 90];
@@ -37,9 +52,8 @@ export function queueNarrowing(params: URLSearchParams): Narrowing {
   const days = Number(params.get("older_than") ?? "");
   if (Number.isInteger(days) && days > 0) out.older_than = days;
   const severity = params.get("severity");
-  if (severity === "medium" || severity === "high" || severity === "critical") {
-    out.severity = severity;
-  }
+  const floor = OFFERED.find(([each]) => each === severity);
+  if (floor) out.severity = floor[0];
   const outcomes = params.getAll("outcome").filter((word) => outcomeWords().includes(word));
   if (outcomes.length > 0) out.outcome = outcomes as NonNullable<Narrowing["outcome"]>;
   const branchOrTag = params.get("branch_or_tag")?.trim();
@@ -116,9 +130,11 @@ export function QueueFilters({
         aria-label="Severity"
       >
         <option value="">Any severity</option>
-        <option value="medium">Medium or worse</option>
-        <option value="high">High or worse</option>
-        <option value="critical">Critical</option>
+        {OFFERED.map(([floor, label]) => (
+          <option key={floor} value={floor}>
+            {label}
+          </option>
+        ))}
       </select>
       <select
         value={params.get("outcome") ?? ""}

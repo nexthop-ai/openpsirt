@@ -70,31 +70,38 @@ type IssueOutput struct {
 func registerIssue(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "get-issue", Method: http.MethodGet, Path: "/v1/issues/{issue}",
-		Summary: "List findings for one issue across every product",
-		Description: "Every build that carries this issue, across every product you may see, " +
-			"with how far it has been decided in each.\n\n" +
-			"One row per build and component, not per occurrence: the same component in two " +
-			"builds is two things somebody ships, and sixty occurrences of it in one build is one " +
-			"piece of work with a count.\n\n" +
-			"Narrowed the way every other read is, per product and per visibility. A page " +
-			"that spans products is exactly where filtering afterwards gets forgotten, and " +
-			"the count is the leak even when no row is shown.\n\n" +
-			"Nothing affected is an answer, not a 404: `total` is zero and `items` is " +
-			"empty, which is what a customer inquiry is asking for. An identifier nobody " +
-			"here has seen answers the same way as one that sits only in products you " +
-			"cannot read — told apart, the pair would say which issues this deployment " +
-			"holds, one guess at a time.\n\n" +
+		Summary: "List findings for one issue",
+		Description: "Every build that carries this issue, across every product you may see " +
+			"or in the one product `product` names, with how far it has been decided in each.\n\n" +
+			"One row per build and component, with a count of its occurrences, ordered by " +
+			"product, branch or tag, variant and component; `offset` reads the rows past a " +
+			"page.\n\n" +
+			"The rows, `total` and the count of products cover only products you may read.\n\n" +
+			"An issue that affects nothing you may read answers `total` zero with empty " +
+			"`items`, whether nobody here has seen it or it sits only in products you cannot " +
+			"read. A `product` you cannot see is refused with 404, as one that does not " +
+			"exist is.\n\n" +
 			"Answers by any name the issue goes by, with when it was published and last " +
 			"modified as OSV states them.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
+		Product       string `query:"product" doc:"Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused as not found"`
 		Limit         int    `query:"limit" default:"200" minimum:"1" maximum:"500"`
+		Offset        int    `query:"offset" minimum:"0" doc:"The number of rows skipped, in the order the rows are listed"`
 	}) (*IssueOutput, error) {
 		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
+		}
+		var productID int64
+		if input.Product != "" {
+			product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
+			}
+			productID = product.ID
 		}
 		out := &IssueOutput{}
 		out.Body.Vulnerability = input.Vulnerability
@@ -123,7 +130,7 @@ func registerIssue(api huma.API, in core.Deps) {
 			return out, nil
 		}
 		store := finding.NewStore(in.DB.DB)
-		rows, total, products, err := store.Everywhere(ctx, subject, id, input.Limit)
+		rows, total, products, err := store.Everywhere(ctx, subject, id, productID, input.Limit, input.Offset)
 		if err != nil {
 			return nil, core.WentWrong(in.Logger, "where this issue sits could not be read", err)
 		}

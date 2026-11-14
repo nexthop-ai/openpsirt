@@ -269,6 +269,14 @@ export function read(vector: string): Record<string, string> {
   return chosen;
 }
 
+// seeded is the answers a vector states that its scheme offers. A value the
+// scheme does not offer would count as answered while its control shows
+// nothing, and compose into a vector the scoring refuses, so it is dropped as
+// a change of scheme drops it.
+export function seeded(vector: string): Record<string, string> {
+  return carriedTo(versionOf(vector), read(vector));
+}
+
 export function Scoring({
   vector,
   onChange,
@@ -276,7 +284,7 @@ export function Scoring({
   vector: string;
   onChange: (vector: string) => void;
 }) {
-  const [chosen, setChosen] = useState<Record<string, string>>(() => read(vector));
+  const [chosen, setChosen] = useState<Record<string, string>>(() => seeded(vector));
   const [open, setOpen] = useState(false);
   // The scheme being composed under, which an empty form does not get from a
   // vector. Held here so that picking one opens the right metrics before any
@@ -300,7 +308,7 @@ export function Scoring({
   useReseed(vector, () => {
     if (vector === emitted) return;
     setEmitted(vector);
-    setChosen(read(vector));
+    setChosen(seeded(vector));
     if (vector !== "") setVersion(versionOf(vector));
   });
 

@@ -44,7 +44,10 @@ export function fixedFromCodeFinding(
     (b) => b.branch_or_tag === branchOrTag && b.variant === variant,
   );
   if (!here) return "";
-  const run = here.fixed ?? here.not_seen;
+  // The first run that did not see it, which is what the card names too. A
+  // build a person stated fixed it is what closing it records, never where
+  // detection stopped.
+  const run = here.not_seen;
   const commit = run.commit ? ` at ${run.commit.slice(0, 12)}` : "";
   return `No longer detected by the analyzer since the build made ${on(run.built)}${commit}.`;
 }

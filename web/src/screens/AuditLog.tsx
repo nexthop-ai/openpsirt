@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type Body } from "../api/client";
 import { useProducts } from "../api/catalog";
 import { usePaging } from "./list";
-import { notYours, unwrap } from "../api/queries";
+import { notYours, PAGE as RULINGS_PAGE, unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { Unread } from "../ui/Reading";
@@ -20,7 +20,7 @@ import { Paged } from "../ui/Paged";
 import { Choices } from "../ui/Choices";
 import { Wide } from "../ui/Wide";
 import { calendarDay, coveringPeriod, endExclusive, stated } from "./analytics/Window";
-import { PAGE as RULINGS_PAGE, useRulingsAcross } from "../api/intake";
+import { useRulingsAcross } from "../api/intake";
 import { RulingCard, useBackOff } from "./ReportRuling";
 import { allFindingsAt, decisionAt } from "../app/routes";
 import { fileAt as linkedFile } from "../api/links";
@@ -65,12 +65,16 @@ export function outcomesSaid(dismisses: (outcome?: string) => boolean): [Outcome
   ]);
 }
 
-const STATES = [
-  ["approved", "agreed"],
-  ["proposed", "waiting"],
-  ["lapsed", "lapsed"],
-  ["withdrawn", "withdrawn"],
-] as const;
+// The states a decision is in, as the filter offers them. Keyed by every state
+// the server counts, so one it adds is a compile error here.
+type DecisionState = keyof Audited["states"];
+const STATE_SAID: Record<DecisionState, string> = {
+  approved: "agreed",
+  proposed: "waiting",
+  lapsed: "lapsed",
+  withdrawn: "withdrawn",
+};
+const STATES = Object.entries(STATE_SAID) as [DecisionState, string][];
 
 // The audit log: what was decided, for somebody auditing it.
 //
@@ -166,9 +170,7 @@ export function AuditLog() {
                 : {}),
               ...(alone ? { alone: true } : {}),
               ...(inForce ? { in_force: true } : {}),
-              ...(states.length > 0
-                ? { state: states as ("proposed" | "approved" | "withdrawn" | "lapsed")[] }
-                : {}),
+              ...(states.length > 0 ? { state: states as DecisionState[] } : {}),
               ...(sent.from ? { from: sent.from } : {}),
               ...(sent.to ? { to: sent.to } : {}),
             },
@@ -459,7 +461,12 @@ function Administered() {
   // Past what the route answers in one request, the file is how the rest is
   // read; asking for more would be refused and take the section with it.
   const longest = CHANGES_MOST;
+  // An administrator's or an auditor's record; asked of nobody else, so the
+  // section never draws for a reader it is refused to.
+  const who = useWho().data;
+  const reads = Boolean(who?.admin || who?.audits);
   const changes = useQuery({
+    enabled: reads,
     queryKey: ["administered", sent.from, sent.to, kind, showing],
     queryFn: async () =>
       unwrap(
@@ -474,15 +481,20 @@ function Administered() {
           },
         }),
       ),
-    // An administrator's or an auditor's screen; anybody else is refused and
-    // the section is simply absent for them.
     retry: false,
+    // Show more keeps the rows in hand while the longer page is read; any
+    // other change of question draws the loading line instead.
+    placeholderData: (previous, query) =>
+      query?.queryKey.slice(0, 4).join("|") === ["administered", sent.from, sent.to, kind].join("|")
+        ? previous
+        : undefined,
   });
   const rows = changes.data?.items ?? [];
-  // Absent for somebody who is not an administrator, which is the refusal this
-  // section expects. A read that failed for any other reason is said, because
-  // an audit screen silently missing half of what it is for is the one place
-  // a quiet absence costs the most.
+  // A refusal draws nothing: the section is asked only of an administrator or
+  // an auditor, and one whose role was withdrawn since is refused. A read that
+  // failed for any other reason is said, because an audit screen silently
+  // missing half of what it is for is the one place a quiet absence costs the
+  // most.
   if (changes.isError) {
     return notYours(changes.error) ? null : (
       <div style={{ marginTop: 24 }}>
@@ -491,9 +503,7 @@ function Administered() {
       </div>
     );
   }
-  // Empty under a kind somebody picked is an answer, and the picker stays so
-  // it can be put back.
-  if (rows.length === 0 && showing === CHANGES_FIRST && !kind) return null;
+  if (!reads) return null;
 
   return (
     <div style={{ marginTop: 24 }} id="changes">
@@ -535,7 +545,14 @@ function Administered() {
           ))}
         </select>
       </div>
-      {rows.length === 0 && (
+      {/* The head and picker stay drawn while a new narrowing is read, so a
+          pick keeps its focus. Empty is an answer, said once the read is in;
+          under a kind, the picker stays so it can be put back. */}
+      {changes.isPending && <Loading />}
+      {!changes.isPending && rows.length === 0 && !kind && (
+        <Empty title="No changes over this period" />
+      )}
+      {!changes.isPending && rows.length === 0 && kind && (
         <Empty title="No changes of that kind">
           <button
             type="button"
@@ -550,54 +567,56 @@ function Administered() {
           </button>
         </Empty>
       )}
-      <Wide>
-        <table>
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Who</th>
-              <th>What</th>
-              <th>Was</th>
-              <th>Became</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, i) => (
-              <tr key={`${row.at} ${row.about} ${i}`}>
-                <td className="id">{at(row.at)}</td>
-                <td>
-                  {row.actor === "configuration" ? (
-                    <span className="hint" title="The deployment's startup configuration">
-                      configuration
-                    </span>
-                  ) : row.actor === "merge" ? (
-                    <span
-                      className="hint"
-                      title="A scan merging two issues its report named together"
-                    >
-                      merge
-                    </span>
-                  ) : row.actor === "upgrade" ? (
-                    <span
-                      className="hint"
-                      title="The upgrade, withdrawing a key or token whose name another holds"
-                    >
-                      upgrade
-                    </span>
-                  ) : (
-                    row.by_name || row.by
-                  )}
-                </td>
-                <td>
-                  <span className="hint">{row.kind}</span> {row.about}
-                </td>
-                <td>{row.unset ? <span className="hint">unset</span> : row.was}</td>
-                <td>{row.cleared ? <span className="hint">cleared</span> : row.became}</td>
+      {rows.length > 0 && (
+        <Wide>
+          <table>
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Who</th>
+                <th>What</th>
+                <th>Was</th>
+                <th>Became</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Wide>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={`${row.at} ${row.about} ${i}`}>
+                  <td className="id">{at(row.at)}</td>
+                  <td>
+                    {row.actor === "configuration" ? (
+                      <span className="hint" title="The deployment's startup configuration">
+                        configuration
+                      </span>
+                    ) : row.actor === "merge" ? (
+                      <span
+                        className="hint"
+                        title="A scan merging two issues its report named together"
+                      >
+                        merge
+                      </span>
+                    ) : row.actor === "upgrade" ? (
+                      <span
+                        className="hint"
+                        title="The upgrade, withdrawing a key or token whose name another holds"
+                      >
+                        upgrade
+                      </span>
+                    ) : (
+                      row.by_name || row.by
+                    )}
+                  </td>
+                  <td>
+                    <span className="hint">{row.kind}</span> {row.about}
+                  </td>
+                  <td>{row.unset ? <span className="hint">unset</span> : row.was}</td>
+                  <td>{row.cleared ? <span className="hint">cleared</span> : row.became}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Wide>
+      )}
       {(changes.data?.total ?? 0) > rows.length && (
         <p className="hint noprint">
           Showing the newest {rows.length.toLocaleString()} of{" "}

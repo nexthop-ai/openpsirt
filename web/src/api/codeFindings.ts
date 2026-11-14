@@ -1,17 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  queryOptions,
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type UseQueryResult,
-} from "@tanstack/react-query";
+import { useAfterHandBack } from "./intake";
+import { queryOptions, useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
 import type { paths } from "./schema";
-import { unwrap } from "./queries";
+import { PAGE, unwrap } from "./queries";
 import { useAfterDecision } from "./decisions";
+import { useInvalidating } from "./invalidate";
 import type { Build } from "../app/routes";
 
 // Static analysis code findings: the queue, one code finding's evidence, and the product's
@@ -34,17 +30,14 @@ export type CodeFindingMethod = NonNullable<
   NonNullable<paths["/v1/products/{product}/code-findings"]["get"]["parameters"]["query"]>["method"]
 >;
 
-// The rows one request carries, named so the pager and the request agree.
-export const PAGE = 50;
-
 // Everything an act on a code finding or a rule can move.
 function useAfterCodeFinding() {
-  const queries = useQueryClient();
+  const rules = useInvalidating(["suppression-rules"]);
   const decided = useAfterDecision();
   // The decision's own set carries the code findings and the code finding; a suppression rule's
   // coverage moves with either.
   return () => {
-    void queries.invalidateQueries({ queryKey: ["suppression-rules"] });
+    rules();
     decided();
   };
 }
@@ -52,7 +45,7 @@ function useAfterCodeFinding() {
 // What narrows a product's code findings, on the list and in its file alike.
 // `assigned` reads as the findings list's does: "nobody" keeps the code findings
 // nobody holds.
-type CodeFindingsAsked = {
+export type CodeFindingsAsked = {
   branch_or_tag?: string;
   variant?: string;
   series?: string;
@@ -97,37 +90,25 @@ export function useCodeFindings(
               query: {
                 limit: PAGE,
                 offset: asked.offset ?? 0,
-                ...(asked.series ? { series: asked.series } : {}),
-                ...(asked.method ? { method: asked.method } : {}),
-                ...(asked.state ? { state: asked.state } : {}),
-                ...(asked.assigned ? { assigned: asked.assigned } : {}),
-                ...(asked.component ? { component: asked.component } : {}),
-                ...(asked.component_version ? { component_version: asked.component_version } : {}),
+                ...codeFindingsQuery({
+                  series: asked.series,
+                  method: asked.method,
+                  state: asked.state,
+                  assigned: asked.assigned,
+                  component: asked.component,
+                  component_version: asked.component_version,
+                }),
               },
             },
           }),
         );
       }
+      const { offset, ...narrowing } = asked;
       return unwrap(
         await api.GET("/v1/products/{product}/code-findings", {
           params: {
             path: { product },
-            query: {
-              limit: PAGE,
-              offset: asked.offset ?? 0,
-              ...(asked.branch_or_tag ? { branch_or_tag: asked.branch_or_tag } : {}),
-              ...(asked.variant ? { variant: asked.variant } : {}),
-              ...(asked.series ? { series: asked.series } : {}),
-              ...(asked.method ? { method: asked.method } : {}),
-              ...(asked.state ? { state: asked.state } : {}),
-              ...(asked.assigned ? { assigned: asked.assigned } : {}),
-              ...(asked.component ? { component: asked.component } : {}),
-              ...(asked.component_version ? { component_version: asked.component_version } : {}),
-              ...(asked.beneath ? { beneath: asked.beneath } : {}),
-              ...(asked.beneath_version ? { beneath_version: asked.beneath_version } : {}),
-              ...(asked.beneath_ecosystem ? { beneath_ecosystem: asked.beneath_ecosystem } : {}),
-              ...(asked.beneath_namespace ? { beneath_namespace: asked.beneath_namespace } : {}),
-            },
+            query: { limit: PAGE, offset: offset ?? 0, ...codeFindingsQuery(narrowing) },
           },
         }),
       );
@@ -208,19 +189,7 @@ export function codeFindingTrendRead(product: string, asked: CodeFindingTrendAsk
         await api.GET("/v1/products/{product}/code-finding-trend", {
           params: {
             path: { product },
-            query: {
-              ...(asked.days ? { days: asked.days } : { weeks: asked.weeks }),
-              ...(asked.branch_or_tag ? { branch_or_tag: asked.branch_or_tag } : {}),
-              ...(asked.variant ? { variant: asked.variant } : {}),
-              ...(asked.series ? { series: asked.series } : {}),
-              ...(asked.method ? { method: asked.method } : {}),
-              ...(asked.component ? { component: asked.component } : {}),
-              ...(asked.component_version ? { component_version: asked.component_version } : {}),
-              ...(asked.beneath ? { beneath: asked.beneath } : {}),
-              ...(asked.beneath_version ? { beneath_version: asked.beneath_version } : {}),
-              ...(asked.beneath_ecosystem ? { beneath_ecosystem: asked.beneath_ecosystem } : {}),
-              ...(asked.beneath_namespace ? { beneath_namespace: asked.beneath_namespace } : {}),
-            },
+            query: codeFindingsQuery(asked),
           },
         }),
       ),
@@ -278,7 +247,13 @@ export function useFixCodeFinding(build: Build, occurrence: string) {
 // A party, not a person: a team holds a code finding exactly as somebody does. Nobody
 // hands it back.
 export function useAssignCodeFinding(build: Build, occurrence: string) {
-  const after = useAfterCodeFinding();
+  const decided = useAfterCodeFinding();
+  // A change of holder moves the holdings and the lists of who holds what.
+  const handedOver = useAfterHandBack();
+  const after = () => {
+    decided();
+    handedOver();
+  };
   return useMutation({
     mutationFn: async (held: { kind: "person" | "team"; identity: string } | null) =>
       unwrap(
@@ -376,11 +351,10 @@ export function useFlawOffer(build: Build, occurrence: string, wanted: boolean) 
 // code finding, the queue, the decisions and a flaw that is now on the findings
 // lists.
 function useAfterRecordAsFlaw() {
-  const queries = useQueryClient();
+  const recorded = useInvalidating(["code-finding-flaw", "findings"]);
   const after = useAfterCodeFinding();
   return () => {
-    void queries.invalidateQueries({ queryKey: ["code-finding-flaw"] });
-    void queries.invalidateQueries({ queryKey: ["findings"] });
+    recorded();
     after();
   };
 }

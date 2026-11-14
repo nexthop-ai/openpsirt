@@ -125,6 +125,19 @@ describe("the backlog's pace", () => {
     );
   });
 
+  it("leaves out the date before the last where the two would overprint", () => {
+    const days = Array.from({ length: 30 }, (_, i) => {
+      const at = new Date(Date.UTC(2026, 9, 12 + i)).toISOString().slice(0, 10);
+      return point(at, 100, 1, 1);
+    });
+    mount.render(<Pace points={days} />);
+    const dates = Array.from(mount.host().querySelectorAll("text.axis"))
+      .map((each) => each.textContent ?? "")
+      .filter((text) => /^\d{2}-\d{2}$/.test(text));
+    expect(dates.at(-1)).toBe("11-10");
+    expect(dates).not.toContain("11-09");
+  });
+
   it("draws nothing for no steps, and one step in the middle", () => {
     mount.render(<Pace points={[]} />);
     expect(mount.host().querySelector("svg")).toBeNull();

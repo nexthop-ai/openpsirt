@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { carriedTo, metricsOf, read, vectorOf, versionOf } from "./Scoring";
+import { carriedTo, metricsOf, read, vectorOf, versionOf, seeded } from "./Scoring";
 
 const WHOLE = { AV: "N", AC: "L", PR: "N", UI: "N", S: "U", C: "H", I: "H", A: "H" };
 const WHOLE_FOUR = {
@@ -190,5 +190,15 @@ describe("what a pasted vector is read as", () => {
     expect(vectorOf(chosen, versionOf(pasted))).toBe(
       "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
     );
+  });
+});
+
+describe("the answers a vector seeds", () => {
+  it("drops a value the vector's scheme does not offer", () => {
+    expect(seeded("CVSS:3.1/AV:N/UI:P")).toEqual({ AV: "N" });
+  });
+
+  it("keeps every value the scheme offers", () => {
+    expect(seeded("CVSS:3.1/AV:N/UI:R")).toEqual({ AV: "N", UI: "R" });
   });
 });

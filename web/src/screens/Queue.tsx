@@ -21,8 +21,9 @@ import { Count } from "../ui/Count";
 import { QueueFilters } from "./QueueFilters";
 import { REASONS, wordsFor } from "./queueReasons";
 import { fileAt } from "../api/links";
+import { PAGE } from "../api/queries";
 import { Card, Dated } from "./QueueCard";
-import { PAGE, useQueueReads } from "./useQueueReads";
+import { useQueueReads } from "./useQueueReads";
 import { useQueueApproval } from "./useQueueApproval";
 import { Downloads } from "../ui/Downloads";
 
@@ -188,7 +189,7 @@ export function Queue() {
             through. There is no file of what is to re-affirm, so that tab
             offers none rather than another list under its heading. */}
         {!reaffirm && (
-          <span style={{ marginLeft: "auto" }}>
+          <span className="noprint" style={{ marginLeft: "auto" }}>
             <Downloads href={file} />
           </span>
         )}

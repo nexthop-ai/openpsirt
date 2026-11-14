@@ -104,28 +104,8 @@ export function useSelection(asked: URLSearchParams): {
   }
 
   async function through(act: (row: Row) => Promise<unknown>) {
-    const refused: string[] = [];
-    const handled: string[] = [];
-    for (const [key, row] of picked) {
-      handled.push(key);
-      try {
-        await act(row);
-      } catch {
-        refused.push(key);
-      }
-    }
-    // The selection *now*, minus what went through. Written from the
-    // snapshot the loop began with, anything ticked while it ran — eight
-    // seconds for fifty rows, with the checkboxes live throughout — was
-    // discarded and the count dropped with nothing explaining it.
-    const sent = new Set(refused);
-    setPicked((prev) => {
-      const left = new Map(prev);
-      for (const key of handled) {
-        if (!sent.has(key)) left.delete(key);
-      }
-      return left;
-    });
+    const { acted, refused } = await actThrough(picked, act);
+    setPicked((prev) => stillPicked(prev, acted, refused));
     setFailed(refused.length);
   }
 
@@ -141,4 +121,43 @@ export function untaken(
 ): [string, Row][] {
   const stayed = new Set(left.map((each) => `${each.vulnerability} ${each.fold}`));
   return [...picked].filter(([, row]) => stayed.has(`${row.vulnerability} ${row.fold}`));
+}
+
+// One act applied to every entry of a selection, in turn, carrying every
+// refusal to the end rather than stopping at the first. Sequential, because
+// each entry is a separate write and a refusal of one decides nothing about
+// the rest.
+export async function actThrough<T>(
+  picked: Map<string, T>,
+  act: (entry: T) => Promise<unknown>,
+): Promise<{ acted: Set<string>; refused: string[] }> {
+  const acted = new Set<string>();
+  const refused: string[] = [];
+  for (const [key, entry] of picked) {
+    acted.add(key);
+    try {
+      await act(entry);
+    } catch {
+      refused.push(key);
+    }
+  }
+  return { acted, refused };
+}
+
+// What stays ticked once a bulk act has run: the selection as it now stands,
+// less what the act took. Written from the current selection rather than the
+// snapshot the act began with, because the checkboxes stay live while it runs
+// (eight seconds for fifty rows): anything ticked meanwhile survives, and
+// anything unticked meanwhile stays unticked.
+export function stillPicked<T>(
+  now: Map<string, T>,
+  acted: Set<string>,
+  refused: string[],
+): Map<string, T> {
+  const kept = new Set(refused);
+  const left = new Map<string, T>();
+  for (const [key, entry] of now) {
+    if (!acted.has(key) || kept.has(key)) left.set(key, entry);
+  }
+  return left;
 }

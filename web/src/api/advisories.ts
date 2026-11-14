@@ -1,9 +1,10 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { useInvalidating } from "./invalidate";
+import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
-import { statusOf, unwrap } from "./queries";
+import { PAGE, statusOf, unwrap } from "./queries";
 
 // An advisory as the screens read and change it: the list, the one, what it
 // covers, and what has gone out.
@@ -29,20 +30,17 @@ type AdvisoryRelease = Body<"AdvisoryReleaseBody">;
 // `advisories` covers the list screen and the panel on a flaw that asks what
 // already covers it — both are keyed under that name, and a key is matched by
 // its prefix.
-export function useAfterAdvisory() {
-  const queries = useQueryClient();
-  return () => {
-    void queries.invalidateQueries({ queryKey: ["advisories"] });
-    void queries.invalidateQueries({ queryKey: ["advisory"] });
-    void queries.invalidateQueries({ queryKey: ["advisory-document"] });
-    void queries.invalidateQueries({ queryKey: ["advisory-issuances"] });
-    void queries.invalidateQueries({ queryKey: ["advisory-releases"] });
-  };
-}
+const afterAdvisory = [
+  "advisories",
+  "advisory",
+  "advisory-document",
+  "advisory-issuances",
+  "advisory-releases",
+] as const;
 
-// The rows one request carries. The server's own default, named here so the
-// pager and the request cannot disagree about where a page ends.
-export const PAGE = 50;
+export function useAfterAdvisory() {
+  return useInvalidating(afterAdvisory);
+}
 
 export function useAdvisories(offset: number): UseQueryResult<{
   items: Listed[] | null;

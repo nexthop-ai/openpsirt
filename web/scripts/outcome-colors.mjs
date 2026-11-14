@@ -10,6 +10,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { SRC } from "./parsed.mjs";
 
 // Every outcome word the generated client names on any field holding a
 // decision's outcome. Other fields are called outcome too — what became of an
@@ -37,8 +38,7 @@ export function uncolored(outcomes, arms) {
 
 // What the tree holds: the outcomes read, and those with no color.
 export function sweep() {
-  const root = join(import.meta.dirname, "..", "src");
-  const outcomes = outcomesIn(readFileSync(join(root, "api", "schema.d.ts"), "utf8"));
-  const arms = armsIn(readFileSync(join(root, "styles", "states.css"), "utf8"));
+  const outcomes = outcomesIn(readFileSync(join(SRC, "api", "schema.d.ts"), "utf8"));
+  const arms = armsIn(readFileSync(join(SRC, "styles", "states.css"), "utf8"));
   return { outcomes, missing: uncolored(outcomes, arms) };
 }

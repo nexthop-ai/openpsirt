@@ -147,8 +147,7 @@ export function widened(path: string, params: URLSearchParams): string {
   if (rest.get("variants") === "only") rest.delete("variants");
   // A subtree is a walk over one build, and the server refuses it over a
   // selection naming anything else, so it goes with the build.
-  rest.delete("beneath");
-  for (const part of BENEATH_PARTS) rest.delete(part);
+  for (const part of SUBTREE) rest.delete(part);
   const cut = path.indexOf("?");
   const base = cut < 0 ? path : path.slice(0, cut);
   const own = cut < 0 ? "" : path.slice(cut + 1);
@@ -159,7 +158,19 @@ export function widened(path: string, params: URLSearchParams): string {
 // What qualifies the component a subtree starts at. Each belongs to the name it
 // qualifies: kept after that name changes, it asks for the new name at the old
 // one's version.
-export const BENEATH_PARTS = ["beneath_version", "beneath_ecosystem", "beneath_namespace"];
+const BENEATH_PARTS = ["beneath_version", "beneath_ecosystem", "beneath_namespace"] as const;
+
+// Every parameter naming a subtree: either root, by name or by package
+// identifier, and what qualifies the name. The server takes one root.
+export const SUBTREE = ["beneath", "beneath_purl", ...BENEATH_PARTS] as const;
+
+// The query without the named filters.
+function omitting<Q extends object, K extends string>(query: Q, keys: readonly K[]): Omit<Q, K> {
+  const dropped: readonly string[] = keys;
+  return Object.fromEntries(
+    Object.entries(query).filter(([key]) => !dropped.includes(key)),
+  ) as Omit<Q, K>;
+}
 
 // withParam sets one value, or takes the key out where there is none.
 export function withParam(params: URLSearchParams, key: string, value: string): URLSearchParams {
@@ -180,10 +191,10 @@ export function withEach(
     if (value) next.set(key, value);
     else next.delete(key);
   }
-  // A changed subtree root drops what qualified the old one, unless this
-  // change names it too.
-  if ("beneath" in changes) {
-    for (const part of BENEATH_PARTS) if (!(part in changes)) next.delete(part);
+  // A changed subtree root drops the other root and what qualified the old
+  // one, unless this change names it too.
+  if ("beneath" in changes || "beneath_purl" in changes) {
+    for (const part of SUBTREE) if (!(part in changes)) next.delete(part);
   }
   return next;
 }
@@ -297,7 +308,7 @@ type ClosedParameter =
 // A word the server does not have refuses the whole request, so one stale or
 // mistyped word in a saved link would draw the list as a failure. Dropped here
 // it widens the list by that one filter instead, and the chip above the list
-// still names it, because the chips read the address.
+// is dropped with it, through validFilter.
 function pick<K extends ClosedParameter>(name: K, values: string[]): Word<K>[] {
   const allowed = WORDS[name] as Record<string, true>;
   return values.filter((value): value is Word<K> => Object.hasOwn(allowed, value));
@@ -330,6 +341,65 @@ function day(raw: string | null): string | undefined {
   const read = new Date(`${raw}T00:00:00Z`);
   if (Number.isNaN(read.getTime()) || read.toISOString().slice(0, 10) !== raw) return undefined;
   return raw;
+}
+
+// The address parameters whose value is checked before it is sent, by the
+// rule listQuery reads them with.
+// eslint-disable-next-line no-restricted-syntax -- Keyed on the address's own parameter names.
+const CHECKED: Record<string, (value: string) => boolean> = {
+  floor: (value) => one("severity", value) !== undefined,
+  state: (value) => one("state", value) !== undefined,
+  outcome: (value) => one("outcome", value) !== undefined,
+  assigned: (value) => one("assigned", value) !== undefined,
+  fix_state: (value) => one("fix_state", value) !== undefined,
+  declared_as: (value) => one("declared_as", value) !== undefined,
+  on: (value) => one("on", value) !== undefined,
+  support: (value) => one("support", value) !== undefined,
+  vex_status: (value) => one("vex_status", value) !== undefined,
+  build_says: (value) => one("build_says", value) !== undefined,
+  origin: (value) => one("origin", value) !== undefined,
+  planned: (value) => one("planned", value) !== undefined,
+  variants: (value) => one("across_variants", value) !== undefined,
+  decision_state: (value) => one("decision_state", value) !== undefined,
+  epss_at_least: (value) => likelihoodOf(value) !== undefined,
+  open_for: (value) => num(value, 1, Number.MAX_SAFE_INTEGER) !== undefined,
+  open_under: (value) => num(value, 1, Number.MAX_SAFE_INTEGER) !== undefined,
+  opened_by_run: (value) => num(value, 1, Number.MAX_SAFE_INTEGER) !== undefined,
+  decision: (value) => num(value, 1, Number.MAX_SAFE_INTEGER) !== undefined,
+  running: (value) => value === "overdue" || num(value, 1, Number.MAX_SAFE_INTEGER) !== undefined,
+  opened_after: (value) => day(value) !== undefined,
+  opened_before: (value) => day(value) !== undefined,
+  proposed_after: (value) => day(value) !== undefined,
+  closed_after: (value) => day(value) !== undefined,
+  open_on: (value) => day(value) !== undefined,
+  hide: (value) => value.trim() !== "",
+};
+
+// Whether one value of one address parameter is one the list sends. A chip
+// is drawn only for such a value, so the list never says it is narrowed by
+// something the server is not asked.
+export function validFilter(key: string, value: string): boolean {
+  if (value === "") return false;
+  return CHECKED[key]?.(value) ?? true;
+}
+
+// The address with every checked filter's value the list does not send taken
+// out. Such a value narrows nothing and draws no chip, so nothing else
+// removes it.
+export function withoutInvalid(params: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(params);
+  for (const key of Object.keys(CHECKED)) {
+    const kept = next.getAll(key).filter((value) => validFilter(key, value));
+    next.delete(key);
+    for (const value of kept) next.append(key, value);
+  }
+  return next;
+}
+
+// An exploit likelihood the server takes: above nothing, at most certain.
+function likelihoodOf(raw: string | null): number | undefined {
+  const asked = num(raw, 0, 1);
+  return asked !== undefined && asked > 0 ? asked : undefined;
 }
 
 // The components somebody has hidden from this page.
@@ -385,7 +455,7 @@ export function listQuery(params: URLSearchParams) {
   const labels = params.getAll("label").filter(Boolean);
   const publishers = params.getAll("vex_publisher").filter(Boolean);
   const weaknesses = params.getAll("weakness").filter(Boolean);
-  const likelihood = Number(params.get("epss_at_least") ?? "");
+  const likelihood = likelihoodOf(params.get("epss_at_least"));
   // Both are a count of days the server takes from one upward, so a word, an
   // empty box and a zero are all "do not ask about this" rather than values.
   const openFor = num(params.get("open_for"), 1, Number.MAX_SAFE_INTEGER);
@@ -412,7 +482,7 @@ export function listQuery(params: URLSearchParams) {
     ...(floor !== "low" ? { severity: floor } : {}),
     ...(exploited ? { exploited: true } : {}),
     ...(fixable ? { fixable: true } : {}),
-    ...(likelihood > 0 && likelihood <= 1 ? { epss_at_least: likelihood } : {}),
+    ...(likelihood !== undefined ? { epss_at_least: likelihood } : {}),
     ...(openedAfter ? { opened_after: openedAfter } : {}),
     ...(openedBefore ? { opened_before: openedBefore } : {}),
     ...(openedBy !== undefined ? { opened_by_run: openedBy } : {}),
@@ -442,7 +512,10 @@ export function listQuery(params: URLSearchParams) {
     ...(params.get("beneath") && params.get("beneath_namespace")
       ? { beneath_namespace: params.get("beneath_namespace") ?? "" }
       : {}),
-    ...(params.get("beneath_purl") ? { beneath_purl: params.get("beneath_purl") ?? "" } : {}),
+    // One root: the server refuses both, and a component names the narrower.
+    ...(params.get("beneath_purl") && !params.get("beneath")
+      ? { beneath_purl: params.get("beneath_purl") ?? "" }
+      : {}),
     ...(params.get("under_build") === "yes" ? { under_build: true } : {}),
     ...(states.length > 0 ? { state: states } : {}),
     ...(outcomes.length > 0 ? { outcome: outcomes } : {}),
@@ -477,32 +550,7 @@ export function listQuery(params: URLSearchParams) {
 // left in the address, so switching a product off does not silently narrow by
 // something the reader can no longer see or clear.
 export function acrossProducts(query: ReturnType<typeof listQuery>) {
-  const {
-    beneath,
-    beneath_version,
-    beneath_ecosystem,
-    beneath_namespace,
-    beneath_purl,
-    differs,
-    across_variants,
-    ...rest
-  } = query as ReturnType<typeof listQuery> & {
-    beneath?: string;
-    beneath_version?: string;
-    beneath_ecosystem?: string;
-    beneath_namespace?: string;
-    beneath_purl?: string;
-    differs?: boolean;
-    across_variants?: string;
-  };
-  void beneath;
-  void beneath_version;
-  void beneath_ecosystem;
-  void beneath_namespace;
-  void beneath_purl;
-  void differs;
-  void across_variants;
-  return rest;
+  return omitting(query, [...SUBTREE, "differs", "across_variants"] as const);
 }
 
 // What is specific to a variant is a question about one of them, so the
@@ -511,30 +559,28 @@ export function acrossProducts(query: ReturnType<typeof listQuery>) {
 // variant it was about is widened away narrows nothing and refuses the list.
 export function withinVariant(query: ReturnType<typeof listQuery>, named: boolean) {
   if (named || query.across_variants !== "only") return query;
-  const { across_variants, ...rest } = query;
-  void across_variants;
-  return rest;
+  return omitting(query, ["across_variants"] as const);
 }
 
 // A subtree is a walk over one build's edges, and the server refuses it over a
 // selection naming anything else. Dropped where the selection is not one
 // build, for the reason the variant's filter is dropped above.
 export function withinBuild(query: ReturnType<typeof listQuery>, oneBuild: boolean) {
-  if (oneBuild) return query;
-  const { beneath, beneath_version, beneath_ecosystem, beneath_namespace, beneath_purl, ...rest } =
-    query as ReturnType<typeof listQuery> & {
-      beneath?: string;
-      beneath_version?: string;
-      beneath_ecosystem?: string;
-      beneath_namespace?: string;
-      beneath_purl?: string;
-    };
-  void beneath;
-  void beneath_version;
-  void beneath_ecosystem;
-  void beneath_namespace;
-  void beneath_purl;
-  return rest;
+  return oneBuild ? query : omitting(query, SUBTREE);
+}
+
+// Where a list is asked: the product, branch and variant its selection names,
+// each empty where it names none.
+export type ListScope = { product: string; branch_or_tag: string; variant: string };
+
+// The request a list sends for an address, as its selection shapes it: a
+// subtree only over one build, what is specific to a variant only where one
+// is named, and neither those nor what differs between builds across
+// products.
+export function sentFor(params: URLSearchParams, scope: ListScope) {
+  const oneBuild = Boolean(scope.branch_or_tag && scope.variant);
+  const query = withinBuild(withinVariant(listQuery(params), Boolean(scope.variant)), oneBuild);
+  return scope.product ? query : acrossProducts(query);
 }
 
 // A row's own identity, for finding it again in a list read afresh, and the
@@ -543,6 +589,18 @@ export function withinBuild(query: ReturnType<typeof listQuery>, oneBuild: boole
 // product on the list that spans products.
 export function identityOf(row: Row): string {
   return `${row.product ?? ""} ${row.vulnerability} ${row.fold}`;
+}
+
+// The mark a finding's `from` carries where the list it was opened from spans
+// every product. The list's own query never reads it, so it reaches no server.
+export const ACROSS = "across";
+
+// withoutAcross is a carried list's address with that mark taken off, for the
+// list's own address.
+export function withoutAcross(from: string): string {
+  const next = new URLSearchParams(from);
+  next.delete(ACROSS);
+  return next.toString();
 }
 
 // The key the findings list caches a page of rows under. A finding opened from

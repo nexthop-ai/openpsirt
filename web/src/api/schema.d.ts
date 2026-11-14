@@ -1850,14 +1850,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List findings for one issue across every product
-         * @description Every build that carries this issue, across every product you may see, with how far it has been decided in each.
+         * List findings for one issue
+         * @description Every build that carries this issue, across every product you may see or in the one product `product` names, with how far it has been decided in each.
          *
-         *     One row per build and component, not per occurrence: the same component in two builds is two things somebody ships, and sixty occurrences of it in one build is one piece of work with a count.
+         *     One row per build and component, with a count of its occurrences, ordered by product, branch or tag, variant and component; `offset` reads the rows past a page.
          *
-         *     Narrowed the way every other read is, per product and per visibility. A page that spans products is exactly where filtering afterwards gets forgotten, and the count is the leak even when no row is shown.
+         *     The rows, `total` and the count of products cover only products you may read.
          *
-         *     Nothing affected is an answer, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
+         *     An issue that affects nothing you may read answers `total` zero with empty `items`, whether nobody here has seen it or it sits only in products you cannot read. A `product` you cannot see is refused with 404, as one that does not exist is.
          *
          *     Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
          *
@@ -16740,6 +16740,11 @@ export interface components {
              * @enum {string}
              */
             kind: "person";
+            /**
+             * Format: int64
+             * @description The number of weaknesses one recorded flaw states at most. A screen picking them stops at it
+             */
+            most_weaknesses?: number;
             /** @description The display name, where one is recorded */
             name: string;
             /** @description Every triage outcome, in the order the vocabulary lists them, with what each claims */
@@ -19687,7 +19692,11 @@ export interface operations {
     "get-issue": {
         parameters: {
             query?: {
+                /** @description Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused as not found */
+                product?: string;
                 limit?: number;
+                /** @description The number of rows skipped, in the order the rows are listed */
+                offset?: number;
             };
             header?: never;
             path: {

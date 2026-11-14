@@ -6,6 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import {
+  ACROSS,
+  acrossProducts,
   findingsPageKey,
   fromAt,
   listQuery,
@@ -41,6 +43,10 @@ export function useFindingNeighbors(
 ) {
   const { product, vulnerability, component, version, ecosystem, namespace } = at;
   const list = useMemo(() => new URLSearchParams(from), [from]);
+  // A list across every product is a different list from any one product's:
+  // its order interleaves products, so its rows are read from it and never
+  // from the product the finding is in.
+  const across = list.get(ACROSS) === "1";
   // Through the same guard the list applies: what is specific to a variant is
   // a question about one, and an address carrying the filter without a variant
   // is refused by the server — which would take the previous and next row with
@@ -54,18 +60,20 @@ export function useFindingNeighbors(
     [list],
   );
   // By what the row is rather than by where it sat: a row may have moved or
-  // gone since it was drawn.
+  // gone since it was drawn. Across products one issue at one component is a
+  // row per product, so the product is part of what the row is.
   const indexIn = useMemo(
     () => (items: Item[]) =>
       items.findIndex(
         (row) =>
+          (!across || (row.product ?? "") === product) &&
           row.vulnerability === vulnerability &&
           row.component === component &&
           (row.version ?? "") === version &&
           (!ecosystem || (row.ecosystem ?? "") === ecosystem) &&
           (!namespace || (row.namespace ?? "") === namespace),
       ),
-    [vulnerability, component, version, ecosystem, namespace],
+    [across, product, vulnerability, component, version, ecosystem, namespace],
   );
   // The page the list itself holds under the same address, where the reader
   // came from it: the findings list caches its rows under this key. Where the
@@ -75,7 +83,12 @@ export function useFindingNeighbors(
   const held = useMemo(() => {
     if (!walking) return undefined;
     const page = client.getQueryData<Page>(
-      findingsPageKey(product, list.get("branch_or_tag") ?? "", list.get("variant") ?? "", listed),
+      findingsPageKey(
+        across ? "" : product,
+        list.get("branch_or_tag") ?? "",
+        list.get("variant") ?? "",
+        listed,
+      ),
     );
     if (!page) return undefined;
     const items = page.items ?? [];
@@ -87,7 +100,7 @@ export function useFindingNeighbors(
     const first = widens && i === 0 && listed.offset > 0;
     const last = widens && i === items.length - 1 && listed.offset + items.length < page.total;
     return i < 0 || first || last ? undefined : page;
-  }, [client, walking, product, list, listed, indexIn]);
+  }, [client, walking, across, product, list, listed, indexIn]);
   // Otherwise the page is asked for widened by one at each end, so that
   // stepping off a page finds the row on the next one rather than stopping at
   // a boundary the reader never chose.
@@ -100,12 +113,16 @@ export function useFindingNeighbors(
   );
   const asked = useQuery({
     enabled: walking && !held,
-    queryKey: ["walk", product, from],
+    queryKey: ["walk", across ? "" : product, from],
     queryFn: async () =>
       unwrap(
-        await api.GET("/v1/products/{product}/findings", {
-          params: { path: { product }, query: { ...listed, ...span, ...where(list) } },
-        }),
+        across
+          ? await api.GET("/v1/findings", {
+              params: { query: { ...acrossProducts(listed), ...span } },
+            })
+          : await api.GET("/v1/products/{product}/findings", {
+              params: { path: { product }, query: { ...listed, ...span, ...where(list) } },
+            }),
       ),
   });
   const neighbors = held ?? asked.data;
@@ -120,7 +137,7 @@ export function useFindingNeighbors(
         row,
         to: findingAt(
           {
-            product,
+            product: row.product || product,
             branch_or_tag: row.branch_or_tag || (list.get("branch_or_tag") ?? ""),
             variant: row.variant || (list.get("variant") ?? ""),
           },

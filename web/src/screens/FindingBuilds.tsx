@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useIssue } from "../api/issue";
+import { BUILDS_MOST, useIssueIn } from "../api/issue";
 import { Failed } from "../ui/Failed";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { Required } from "../ui/Required";
@@ -50,9 +50,9 @@ export function AffectedBuilds({
       unwrap(await api.GET("/v1/products/{product}/releases", { params: { path: { product } } })),
     retry: false,
   });
-  // The builds holding it now. The same request the issue screen makes, under
-  // the same key, so opening this after reading that page asks nothing.
-  const holds = useIssue(vulnerability, open);
+  // The builds of this product holding it now, asked of this product alone so
+  // that rows in other products never make its answer look cut short.
+  const holds = useIssueIn(vulnerability, product, open);
 
   // A page in hand that is the whole answer.
   //
@@ -63,15 +63,19 @@ export function AffectedBuilds({
   // different build attached to them. There is no safe half: either the whole
   // set is in hand or nothing is written.
   const rows = holds.data?.items ?? [];
-  const partial = (holds.data?.total ?? rows.length) > rows.length;
 
-  const now = useMemo(() => {
-    const held = new Set<string>();
-    for (const row of holds.data?.items ?? []) {
-      if (row.product === product) held.add(buildKey(row));
-    }
-    return held;
-  }, [holds.data, product]);
+  // Every row is this product's, since the server narrowed the answer to it
+  // by name regardless of capitals.
+  const now = useMemo(
+    () => new Set((holds.data?.items ?? []).map((row) => buildKey(row))),
+    [holds.data],
+  );
+  const cut = (holds.data?.total ?? rows.length) > rows.length;
+  // Past the most one write names, the whole list cannot be sent either.
+  const tooMany = now.size > BUILDS_MOST;
+  // The answer changed between two pages, so the rows held may skip one.
+  const moved = holds.data?.moved ?? false;
+  const partial = cut || tooMany || moved;
 
   const set = useMutation({
     mutationFn: async (picked: string[]) =>
@@ -125,14 +129,33 @@ export function AffectedBuilds({
           error={builds.error ?? holds.error}
           what="The builds this is filed against could not be read."
         />
+      ) : moved ? (
+        <div className="alert">
+          <strong>This changed while it was read</strong>
+          <span>
+            It changed between pages, so what is shown may miss a build.{" "}
+            <button type="button" className="linkish" onClick={() => void holds.refetch()}>
+              Read it again
+            </button>
+          </span>
+        </div>
       ) : partial ? (
         <div className="alert">
           <strong>This is open at more builds than this screen can set</strong>
-          <span>
-            {(holds.data?.total ?? 0).toLocaleString()} builds hold it, and this sends the whole
-            list — so writing from what is shown would close the rest as never affected. Close them
-            one build at a time from each build&rsquo;s own finding instead.
-          </span>
+          {tooMany ? (
+            <span>
+              {now.size.toLocaleString()} builds carry it here, and one change names at most{" "}
+              {BUILDS_MOST.toLocaleString()}. Close them one build at a time from each build&rsquo;s
+              own finding instead.
+            </span>
+          ) : (
+            <span>
+              {(holds.data?.total ?? 0).toLocaleString()} builds and components carry it here, and
+              this sends the whole list — so writing from what is shown would close the rest as
+              never affected. Close them one build at a time from each build&rsquo;s own finding
+              instead.
+            </span>
+          )}
         </div>
       ) : (
         <>
@@ -185,7 +208,13 @@ export function AffectedBuilds({
           <button
             type="button"
             className="btn"
-            disabled={!changed || picked.length === 0 || wantsReason || set.isPending}
+            disabled={
+              !changed ||
+              picked.length === 0 ||
+              picked.length > BUILDS_MOST ||
+              wantsReason ||
+              set.isPending
+            }
             onClick={() => set.mutate(picked)}
           >
             {set.isPending ? "Setting…" : "Set which builds it affects"}
@@ -193,6 +222,11 @@ export function AffectedBuilds({
           {picked.length === 0 && (
             <span className="hint" style={{ marginLeft: 8 }}>
               Pick at least one build.
+            </span>
+          )}
+          {picked.length > BUILDS_MOST && (
+            <span className="hint" style={{ marginLeft: 8 }}>
+              {BUILDS_MOST.toLocaleString()} builds at most.
             </span>
           )}
         </>

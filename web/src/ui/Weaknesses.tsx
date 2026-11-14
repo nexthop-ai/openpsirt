@@ -3,7 +3,8 @@
 
 import { notACredential } from "./noautofill";
 import { useState } from "react";
-import { asWeakness, called, MOST_WEAKNESSES, useWeaknessNames, useWeaknessSearch } from "./cwe";
+import { asWeakness, called, useWeaknessNames, useWeaknessSearch } from "./cwe";
+import { useWho } from "../app/session";
 
 // The picker for what kind of flaw something is. What is offered while typing
 // is the server's search over both lists of names, by number or by words, most
@@ -21,6 +22,9 @@ export function Weaknesses({
   const search = useWeaknessSearch(typed);
   const offered = search.data ?? [];
   const names = useWeaknessNames(chosen);
+  // The bound the server refuses past. Before the session is read there is
+  // none here, and the server still holds it.
+  const most = useWho().data?.most_weaknesses ?? 0;
 
   function add(id: string) {
     if (id.trim() === "") return;
@@ -34,8 +38,8 @@ export function Weaknesses({
       setProblem("");
       return;
     }
-    if (chosen.length >= MOST_WEAKNESSES) {
-      setProblem(`${MOST_WEAKNESSES} at most.`);
+    if (most > 0 && chosen.length >= most) {
+      setProblem(`${most} at most.`);
       return;
     }
     onChange([...chosen, clean]);

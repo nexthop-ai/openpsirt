@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { useHandOver } from "./findingsHandover";
 import { listQuery, type Row } from "./list";
-import { mounted, screen, settle } from "../test/mount";
+import { client, mounted, screen, settle, watchInvalidations } from "../test/mount";
 
 const mount = mounted();
 
@@ -79,5 +79,27 @@ describe("handing rows over", () => {
       component: "zlib",
     });
     expect(init.body).toEqual({ team: "core" });
+  });
+
+  it("reads every list of who holds what again once rows are handed over", async () => {
+    const queries = client();
+    const invalidated = watchInvalidations(queries);
+    mount.render(screen(<HandOver />, "/", "*", queries));
+    await settle();
+    act(() => seen?.handed());
+    expect(invalidated()).toEqual(
+      [
+        "assigned",
+        "code-findings",
+        "findings",
+        "findings-by-component",
+        "held-reports",
+        "holdings",
+        "home",
+        "planned-upgrades",
+        "reports",
+        "team-assigned",
+      ].sort(),
+    );
   });
 });

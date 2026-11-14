@@ -47,6 +47,7 @@ The finding is the working screen before a decision and after it.
 | Where it sits shows the chain | One parent is reached by several routes |
 | Where upstream currency is on (REQ-69), it says what upstream released and when; where an issue was named a full year after the last release and is unfixed, that is why there is no fix, never a claim the project is abandoned. Off, the panel is absent | Two year-numbers make five weeks look like five years |
 | The references are cut at twelve, patches first, then advisories and reports; the rest are a control away, with how many | |
+| An address is listed once, under the kind that ranks first where a reference repeats it, the advisory's included | A patch at the advisory's address keeps its label |
 | A shortened description is cut at a whole character with a mark after it | |
 | A patch link carries the branches its commit is on once its repository was asked: three by name in version order, the rest counted, all on hover; a commit the repository lacks says so; not yet asked carries nothing (`design-docs/findings-patch-branches.md` § Display) | "Not yet" is no fact about the patch |
 | A publisher's claim carries the version it was made about, is shown at every version, and offers to fill the form only at that version | An advisory names the fixed version, not the shipped one |
@@ -134,6 +135,7 @@ filter box past a dozen. It reads back "59 of 62, three left open under X".
 |---|---|
 | The filter narrows what the group checkbox acts on | It decides what a decision covers |
 | The count beside the name is read off the same rows, and a consumer matching nothing is not drawn | The number says what the click does |
+| The read-back counts only excluded locations still listed, and the decision names its occurrences only where one listed is excluded; one decided elsewhere since narrows nothing | A decision naming today's rows covers no occurrence the fold gains later |
 
 ## The reach sheet
 

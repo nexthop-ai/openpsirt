@@ -16,7 +16,7 @@ import { notACredential } from "./noautofill";
 export function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <>
-      <span style={{ marginLeft: "auto" }}>
+      <span className="noprint" style={{ marginLeft: "auto" }}>
         <button type="button" className="btn" onClick={onClick}>
           <Icon name="plus" size={14} /> {label}
         </button>

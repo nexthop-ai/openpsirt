@@ -1,9 +1,10 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { useInvalidating } from "./invalidate";
+import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
-import { unwrap } from "./queries";
+import { PAGE, unwrap } from "./queries";
 
 // What arrived, what it was judged to be, and the rulings some of those
 // decisions wait on.
@@ -17,30 +18,28 @@ export type Ruling = Body<"RulingBody">;
 export type Disposition = NonNullable<Report["disposition"]>;
 export type Rulable = Ruling["disposition"];
 
-// The rows one request carries, named so the pager and the request agree.
-export const PAGE = 50;
-
 // Everything an act on a report or a ruling can move. A duplicate ruling moves
 // an issue's disclosure date, and withdrawing one moves it back, so every read
 // carrying that date is among them. A decision takes a report out of the held
 // lists and the holdings counted beside them.
+const afterReport = [
+  "held-reports",
+  "holdings",
+  "reports",
+  "recorded-report",
+  "rulings",
+  "duplicates",
+  "report",
+  "duplicate-disclosure",
+  "finding",
+  "findings",
+  "issue",
+  "disclosure-deadlines",
+  "home",
+] as const;
+
 export function useAfterReport() {
-  const queries = useQueryClient();
-  return () => {
-    void queries.invalidateQueries({ queryKey: ["held-reports"] });
-    void queries.invalidateQueries({ queryKey: ["holdings"] });
-    void queries.invalidateQueries({ queryKey: ["reports"] });
-    void queries.invalidateQueries({ queryKey: ["recorded-report"] });
-    void queries.invalidateQueries({ queryKey: ["rulings"] });
-    void queries.invalidateQueries({ queryKey: ["duplicates"] });
-    void queries.invalidateQueries({ queryKey: ["report"] });
-    void queries.invalidateQueries({ queryKey: ["duplicate-disclosure"] });
-    void queries.invalidateQueries({ queryKey: ["finding"] });
-    void queries.invalidateQueries({ queryKey: ["findings"] });
-    void queries.invalidateQueries({ queryKey: ["issue"] });
-    void queries.invalidateQueries({ queryKey: ["disclosure-deadlines"] });
-    void queries.invalidateQueries({ queryKey: ["home"] });
-  };
+  return useInvalidating(afterReport);
 }
 
 export function useReports(
@@ -337,12 +336,7 @@ export const handedBack = [
 ];
 
 export function useAfterHandBack() {
-  const queries = useQueryClient();
-  return () => {
-    for (const key of handedBack) {
-      void queries.invalidateQueries({ queryKey: [key] });
-    }
-  };
+  return useInvalidating(handedBack);
 }
 
 // Everything one person holds handed back to nobody: their findings and their

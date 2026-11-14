@@ -11,8 +11,8 @@ import { Wide } from "../../ui/Wide";
 import { at as minute } from "../../ui/when";
 import { REASONS } from "../codeTrend";
 import { Sheet } from "./Sheet";
-import { Segments, boundedAsked } from "./Window";
-import { Files, Gate, WEEKS, inDays, queryOf, useFigureAsked, weeksWords } from "./securityTesting";
+import { FIRST_WEEKS, MOST_WEEKS, Segments, TREND_WEEKS, boundedAsked, weeksWords } from "./Window";
+import { Files, Gate, inDays, queryOf, useFigureAsked } from "./securityTesting";
 
 // What is analyzed, and what has gone quiet: every series on every build in
 // use, its newest run and what it covered, and its own expected interval.
@@ -30,7 +30,7 @@ function standing(each: Analyzed): string {
 
 export function AnalysisCoverage() {
   const { product, asked, code, reads, of, params } = useFigureAsked();
-  const weeks = boundedAsked(params.get("weeks"), 104, 13);
+  const weeks = boundedAsked(params.get("weeks"), MOST_WEEKS, FIRST_WEEKS);
   const narrowed = {
     branch_or_tag: asked.branch_or_tag,
     variant: asked.variant,
@@ -52,7 +52,7 @@ export function AnalysisCoverage() {
         <Segments
           label="Runs over"
           param="weeks"
-          offered={WEEKS}
+          offered={TREND_WEEKS}
           chosen={weeks}
           words={weeksWords}
         />

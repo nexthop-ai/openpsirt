@@ -9,8 +9,8 @@
 // A read that may quietly offer nothing, such as a suggestion list, carries
 // `silent-read:` and its reason in a comment on the line or the line above.
 
-import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
+import { isMain, sourceFiles } from "./parsed.mjs";
 
 // A query's data defaulted to an empty list: `name.data ?? []`, or one field
 // of it, `name.data?.items ?? []`, the name being whatever stands before
@@ -55,19 +55,9 @@ export function silentReads(file, source) {
   return { examined, found };
 }
 
-function sources(dir) {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name);
-    if (statSync(path).isDirectory()) return sources(path);
-    return /\.tsx?$/.test(path) && !/\.test\.tsx?$/.test(path) && !path.endsWith(".d.ts")
-      ? [path]
-      : [];
-  });
-}
-
 // Every silent read under src, and how many files and reads were examined.
 export function sweep() {
-  const files = sources(join(import.meta.dirname, "..", "src"));
+  const files = sourceFiles({ ext: [".ts", ".tsx"] });
   let examined = 0;
   const found = [];
   for (const file of files) {
@@ -78,7 +68,7 @@ export function sweep() {
   return { files: files.length, examined, found };
 }
 
-if (process.argv[1] === import.meta.filename) {
+if (isMain(import.meta)) {
   const { files, examined, found } = sweep();
   if (files === 0 || examined === 0) {
     console.error("silent-reads: no reads were found in the source, so this checked nothing");
