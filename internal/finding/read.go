@@ -19,6 +19,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
@@ -67,8 +68,10 @@ func issuesNamed(ctx context.Context, db bun.IDB, subject access.Subject,
 // out (WithholdRecorded). Every column is read where none is named, and the
 // identifier the answer is keyed by is read whichever are.
 //
-// The one read of issue rows by identifier for a reader, so what is withheld
-// from one surface showing an issue row is withheld from every one.
+// The one read of issue rows by identifier for a reader that shows the row
+// alone, so what is withheld from one such surface is withheld from every
+// one. A reader withholding the issue's other names, addresses or kinds
+// beside the row reads them together and asks RecordedOutOfReach for all.
 func IssuesFor(ctx context.Context, db bun.IDB, subject access.Subject, ids []int64,
 	columns ...string) (map[int64]Vulnerability, error) {
 
@@ -77,7 +80,10 @@ func IssuesFor(ctx context.Context, db bun.IDB, subject access.Subject, ids []in
 		return held, nil
 	}
 	var issues []Vulnerability
-	q := db.NewSelect().Model(&issues).Where(`"id" IN (?)`, bun.List(ids))
+	// A published document names every issue of its builds, so the list may
+	// pass what one IN takes.
+	where, args := database.InAnyOf(`"id"`, ids)
+	q := db.NewSelect().Model(&issues).Where(where, args...)
 	if len(columns) > 0 {
 		if !slices.Contains(columns, "id") {
 			columns = append([]string{"id"}, columns...)

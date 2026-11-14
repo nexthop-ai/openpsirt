@@ -74,7 +74,7 @@ row is read by every product holding it, so these follow the record (REQ-42).
 | Description, other names and addresses are left out where a flaw recorded about the issue sits where the reader may not read it | An undisclosed flaw's summary is the embargo |
 | A finding's evidence leaves out the weakness kinds too | |
 | Every reader asks one rule: issue page and document, merges, evidence, findings and assignment lists, a component's issues, approaching disclosure, a decision's issue, an approver's outliers, an advisory's issues and document | A new reader is not the one that forgets |
-| An issue row read by identifier for a reader is read by one read that withholds, whichever columns it names | A copy of the read is a reader that forgets |
+| An issue row read by identifier for a reader is read by one read that withholds, whichever columns it names: lists, a decision's issue and a published document's summaries. The issue page, an issue's document and a finding's evidence read the row beside its other names, addresses and kinds, and ask the rule for all of them | A copy of the read is a reader that forgets |
 | A text match over descriptions matches nothing withheld | A filter would leak one guess at a time |
 | A findings search matches no withheld name | It would say where an undisclosed record is filed |
 | An advisory document leaves these out wherever another product holds a record of the issue, whoever generates it | A document is public |
