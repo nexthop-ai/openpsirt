@@ -52,9 +52,9 @@ func analysisRuns(db bun.IDB) *bun.SelectQuery {
 		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"sr"."series_id" AS "series_id"`).
 		ColumnExpr(`"sr"."build_id" AS "build_id"`).
-		ColumnExpr(`"p"."display_name" AS "product"`).
-		ColumnExpr(`"st"."display_name" AS "branch_or_tag"`).
-		ColumnExpr(`"va"."display_name" AS "variant"`).
+		ColumnExpr(catalog.ShownExpr("p")+` AS "product"`).
+		ColumnExpr(catalog.ShownExpr("st")+` AS "branch_or_tag"`).
+		ColumnExpr(catalog.ShownExpr("va")+` AS "variant"`).
 		ColumnExpr(`"p"."name" AS "product_name"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant_name"`).

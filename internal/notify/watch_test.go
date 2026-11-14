@@ -666,3 +666,60 @@ func statedAs(t *testing.T, db *database.DB, buildID int64, component graph.Desc
 		t.Fatal(err)
 	}
 }
+
+// A notice the watch raises names a product as it is shown, while the alert is
+// still identified and linked by the product's name.
+func TestTheWatchNamesAProductAsItIsShown(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		db := w.DB
+		ctx := t.Context()
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if _, err := db.DB.NewUpdate().Table("product").Set(`"display_name" = ?`, "SONiC Enterprise").
+			Where(`"id" = ?`, w.Product.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		rights := access.NewStore(db.DB)
+		admin := recordPerson(t, rights, "admin@example.com", true, 0, "")
+		triager := recordPerson(t, rights, "triager@example.com", false, w.Product.ID, access.PublicTriage)
+		owner, err := rights.Ensure(ctx, "owner@example.com", "Owner", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Declared a month ago and never filed against, so it is quiet.
+		if _, err := db.DB.NewUpdate().Table("build").
+			Set(`"created_at" = ?`, time.Now().UTC().Add(-30*24*time.Hour)).
+			Where(`"id" = ?`, w.Build.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		critical(t, db, w.BuildFor(w.Tag, w.Customer).ID, "CVE-2026-SHIPPED", "critical")
+		embargoedAt(t, db, w.Build.ID, "SONIC-2026-0001", "libnl", owner.PartyID,
+			time.Now().UTC().Add(-24*time.Hour))
+		embargoedAt(t, db, w.Build.ID, "SONIC-2026-0002", "libnl", owner.PartyID,
+			time.Now().UTC().Add(time.Hour))
+		if _, _, err := notify.NewWatch(db.DB, quiet).Once(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		said := map[notify.Kind][]string{}
+		for _, who := range []int64{admin, triager} {
+			rows, _, err := notify.NewStore(db.DB).Waiting(ctx, asksByID(t, db, who), 50, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, row := range rows {
+				said[row.Kind] = append(said[row.Kind], row.Body)
+			}
+		}
+		for _, kind := range []notify.Kind{notify.BuildQuiet, notify.CriticalOnRelease,
+			notify.DisclosureDue, notify.DisclosureNear} {
+			if len(said[kind]) == 0 {
+				t.Errorf("no %s notice was raised", kind)
+			}
+			for _, body := range said[kind] {
+				if !strings.Contains(body, "SONiC Enterprise") {
+					t.Errorf("a %s notice says %q, want the product as it is shown", kind, body)
+				}
+			}
+		}
+	})
+}

@@ -340,6 +340,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 
 	var rows []struct {
 		Product       string `bun:"product"`
+		ProductShown  string `bun:"product_shown"`
 		BranchOrTag   string `bun:"branch_or_tag"`
 		Variant       string `bun:"variant"`
 		Component     string `bun:"component"`
@@ -388,7 +389,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 
 	for _, row := range rows {
 		private := row.Undisclosed
-		where := row.Product + " " + row.BranchOrTag + " " + row.Variant
+		where := row.ProductShown + " " + row.BranchOrTag + " " + row.Variant
 		why := "is rated critical"
 		if row.Exploited {
 			why = "is being exploited"
@@ -451,7 +452,7 @@ func (w *Watch) quietBuilds(ctx context.Context) ([]Holds, error) {
 		if !row.Quiet {
 			continue
 		}
-		where := row.Product + " " + row.BranchOrTag + " " + row.Variant
+		where := row.ProductShown + " " + row.BranchOrTag + " " + row.Variant
 		days := int(row.Since.Hours() / 24)
 		// Put into words rather than printed, because "0 days" is what
 		// arithmetic gives for a threshold measured in hours and is not

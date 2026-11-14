@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
@@ -70,7 +71,7 @@ func tellSuperseded(ctx context.Context, db *bun.DB, gone []finding.Displaced) e
 			Join(`JOIN "vulnerability_merge" AS "vm" ON "vm"."id" = ?`, one.MergeID).
 			Join(`JOIN "vulnerability" AS "va" ON "va"."id" = "vm"."absorbed_id"`).
 			Join(`JOIN "vulnerability" AS "vk" ON "vk"."id" = "vm"."kept_id"`).
-			ColumnExpr(`"p"."name" AS "product"`).
+			ColumnExpr(catalog.ShownExpr("p")+` AS "product"`).
 			ColumnExpr(`"vk"."issue_id" AS "issue_id"`).
 			ColumnExpr(`"va"."identifier" AS "absorbed"`).
 			ColumnExpr(`"vk"."identifier" AS "kept"`).

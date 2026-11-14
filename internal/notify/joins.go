@@ -6,6 +6,7 @@ package notify
 import (
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
@@ -51,6 +52,9 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 	}
 	return q.
 		ColumnExpr(`"p"."name" AS "product"`).
+		// The product as a message names it; identity and links keep the
+		// name. Under MIN, since every caller groups by the product's name.
+		ColumnExpr(`MIN(` + catalog.ShownExpr("p") + `) AS "product_shown"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		// One stated name per alert: a group is the component row's name,

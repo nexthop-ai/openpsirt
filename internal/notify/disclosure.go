@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -91,7 +92,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		ColumnExpr(`MIN("de"."id") AS "decision_occurrence_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
-		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product"`).
 		ColumnExpr(`MIN("v"."identifier") AS "vulnerability"`).
 		ColumnExpr(`"ss"."publisher" AS "publisher"`).
 		ColumnExpr(undisclosed+` AS "undisclosed"`, private).
@@ -180,6 +181,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 
 	var rows []struct {
 		Product         string    `bun:"product"`
+		ProductShown    string    `bun:"product_shown"`
 		BranchOrTag     string    `bun:"branch_or_tag"`
 		Variant         string    `bun:"variant"`
 		Component       string    `bun:"component"`
@@ -243,12 +245,12 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		// that has arrived clear differently, and a single alert would go on
 		// saying "coming" after the date had passed.
 		about, body := "disclosure",
-			row.Vulnerability+" in "+row.Product+" at "+row.Component+
+			row.Vulnerability+" in "+row.ProductShown+" at "+row.Component+
 				" reached its disclosure date on "+
 				day(row.DiscloseAt)+" and nothing has been decided."
 		if lead > 0 {
 			about = "disclosure-near"
-			body = row.Vulnerability + " in " + row.Product + " at " + row.Component +
+			body = row.Vulnerability + " in " + row.ProductShown + " at " + row.Component +
 				" discloses on " +
 				day(row.DiscloseAt) +
 				" and nothing has been decided. Extending it needs a second person, " +
