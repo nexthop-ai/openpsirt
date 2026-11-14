@@ -96,7 +96,10 @@ func (p Paths) place(uri, base string) (string, bool) {
 		return clean(at)
 	case start == uribase.FromWork:
 		return clean(p.working + at)
-	case p.root == "" || !strings.HasPrefix(fold(at), fold(p.root)):
+	}
+	// The root itself is the checkout, written with or without its slash.
+	at = dir(at)
+	if p.root == "" || !strings.HasPrefix(fold(at), fold(p.root)) {
 		return "", false
 	}
 	return clean(at[len(p.root):])

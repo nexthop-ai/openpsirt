@@ -361,6 +361,18 @@ func TestAChainEndingAtTheUndefinedRootIsUnderTheTop(t *testing.T) {
 	}
 }
 
+func TestARepositoryMappedToTheRootWrittenWithoutItsSlashIsTheCheckout(t *testing.T) {
+	for _, root := range []string{"file:///src/checkout", "file:///src/checkout/"} {
+		r := read(t, run(`,"originalUriBaseIds":{"SRCROOT":{"uri":"`+root+`"}},
+		"versionControlProvenance":[
+			{"repositoryUri":"https://github.com/sonic-net/sonic-buildimage","revisionId":"abc","mappedTo":{"uriBaseId":"SRCROOT"}}],
+		"results":[]`)).Runs[0]
+		if at, ok := PathsOf(&r, "").ModulePath(0); !ok || at != "" {
+			t.Errorf("with SRCROOT at %s, the repository is at %q, placed %v; want the checkout itself", root, at, ok)
+		}
+	}
+}
+
 func TestAWindowsPathIsPlacedLikeAnyOther(t *testing.T) {
 	r := read(t, run(`,"results":[
 		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"file:///C:/build/sonic/src/a.c"}}}]},

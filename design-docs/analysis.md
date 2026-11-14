@@ -108,9 +108,9 @@ and entries are bounded across the upload as memory: placed results take about
 | Kind `pass`, `notApplicable` or `informational` drops the result as `not-a-problem`; no kind is `fail`; `review` and `open` stay | |
 | A suppression with no status or `accepted` drops the result as `suppressed-by-the-tool`; `underReview` and `rejected` do not | |
 | `baselineState` `absent` drops the result as `absent` | It could never be found again |
-| Paths resolve through named starting points and place against the source root | Paths arrive absolute, as `file://`, relative, or under undefined starting points |
+| Paths resolve through named starting points and place against the source root; the root's own address, with or without its trailing slash, is the top of the checkout | Paths arrive absolute, as `file://`, relative, or under undefined starting points; a repository mapped to the root alone names the root's own address |
 | A path with no starting point is relative to the first invocation's working directory where that is in the checkout, else the top; one under the source root's own undefined name, directly or through a chain of starting points, is relative to the top | cppcheck run from a subdirectory |
-| The deployment and the upload client resolve a chain of starting points with one resolver | A document uploaded directly places as the client would have placed it, where its chains are within the deployment's chain bound |
+| The deployment and the upload client resolve a chain of starting points with one resolver | A chain ends at the same starting point on both, where it is within the deployment's chain bound |
 | A starting point whose own address names no starting point is relative to where the tool ran; the source root's name defined so is the undefined root | Tools write an output directory so; the top is where the root's name places |
 | A path outside the checkout drops its result, counted | |
 | A result repeating another on rule, path, line, column and message is dropped, counted | clang repeats a header per unit |
