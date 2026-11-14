@@ -123,3 +123,32 @@ func TestAPairDeclaredUnderTwoScopesShowsTheSameWordEveryRead(t *testing.T) {
 		}
 	})
 }
+
+// A scope stated on an edge from a component to itself is no scope under any
+// consumer, because a component is never its own consumer.
+func TestAScopeOnAnEdgeToItselfIsShownUnderNoConsumer(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{zlib},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: zlib},
+				{Parent: zlib, Child: zlib, Kind: "test"},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		id, err := f.store.ComponentAs(ctx, f.buildID, zlib.Name, graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		scopes, err := f.store.DeclaredScopes(ctx, f.buildID, []int64{id})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(scopes) != 0 {
+			t.Errorf("zlib shows the scopes %v, want none", scopes)
+		}
+	})
+}

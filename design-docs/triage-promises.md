@@ -26,6 +26,7 @@ bump once, which answers 2,831 of 7,612 rows at sibling packages.
 |---|---|
 | No build is in the key, and it proposes once per key | Per row, the second write collides with the one-live-decision index in every product with two builds |
 | An occurrence undisclosed in one build and public in another carries the stricter | |
+| Each version pair at an occurrence is reached and proposed about, carrying the earliest deadline of its rows | One occurrence under two consumers of one name at two versions holds two decisions, and a promise covering one of them reads the other as unplanned |
 | The builds named, which are past end-of-life, and the occurrences reached are read inside the transaction | A retry re-runs against a moved database |
 | One request, one transaction, one decision, written with the fix targets | |
 | A named release past end-of-life refuses the whole as 422, "release X is retired" | |

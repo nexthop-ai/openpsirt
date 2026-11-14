@@ -273,3 +273,48 @@ func TestARuleBeneathAComponentPlacesAFlawOnAVersionARescanReplaced(t *testing.T
 		}
 	})
 }
+
+// A component a rescan dropped is counted where a live one carries its name in
+// its own ecosystem: an npm package and a Python one of one name are different
+// software, and a version bump within one ecosystem still carries over.
+func TestAReplacedComponentIsCarriedOnlyByANamesakeInItsEcosystem(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		npm := graph.Described{Purl: "pkg:npm/left-pad@1.0.0", Name: "left-pad", Version: "1.0.0"}
+		npmNew := graph.Described{Purl: "pkg:npm/left-pad@1.1.0", Name: "left-pad", Version: "1.1.0"}
+		pypi := graph.Described{Purl: "pkg:pypi/left-pad@2.0.0", Name: "left-pad", Version: "2.0.0"}
+		pypiOld := graph.Described{Purl: "pkg:pypi/left-pad@1.9.0", Name: "left-pad", Version: "1.9.0"}
+		shipping := func(parts ...graph.Described) graph.Snapshot {
+			snap := graph.Snapshot{Root: root, Components: append([]graph.Described{swss}, parts...),
+				Dependencies: []graph.Dependency{{Parent: root, Child: swss}}}
+			for _, p := range parts {
+				snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: swss, Child: p})
+			}
+			return snap
+		}
+		f.shipped(t, shipping(npm, pypiOld))
+		f.shipped(t, shipping(npmNew, pypi))
+		f.shipped(t, shipping(pypi))
+		id := func(c graph.Described) int64 {
+			t.Helper()
+			var ids []int64
+			if err := f.db.DB.NewSelect().Table("component").Column("id").
+				Where(`"purl" = ?`, c.Purl).Scan(ctx, &ids); err != nil || len(ids) != 1 {
+				t.Fatalf("component %s reads %v (%v)", c.Purl, ids, err)
+			}
+			return ids[0]
+		}
+		replaced, err := graph.Replaced(ctx, f.db.DB, f.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, gone := range []graph.Described{npm, npmNew} {
+			if got := replaced[id(gone)]; len(got) != 0 {
+				t.Errorf("%s, gone, is carried by %v, want nothing live in its ecosystem", gone.Purl, got)
+			}
+		}
+		if got := replaced[id(pypiOld)]; len(got) != 1 || got[0] != id(pypi) {
+			t.Errorf("%s, gone, is carried by %v, want the live %s", pypiOld.Purl, got, pypi.Purl)
+		}
+	})
+}

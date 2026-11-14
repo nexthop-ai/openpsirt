@@ -16,6 +16,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/chunked"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -242,7 +243,7 @@ func (r *Reader) read(ctx context.Context, reference string) (*Result, error) {
 	// sender sent is told on its receipt whether or not a newer scan has
 	// since applied.
 	var sentLetGo letGoError
-	if !errors.Is(err, ErrReleased) && !errors.As(err, &sentLetGo) {
+	if !errors.Is(err, chunked.ErrReleased) && !errors.As(err, &sentLetGo) {
 		return nil, err
 	}
 	if scan, found := NewStore(r.db.DB).ByID(ctx, scanID); found == nil {
@@ -417,8 +418,10 @@ func (r *Reader) readScan(ctx context.Context, scanID int64) (*Result, error) {
 	// copy of the inventory does not carry. It is empty where the document
 	// declared nothing, because a reader sets the root and says it declared one
 	// in the same breath — and equally where it declared a root and gave it no
-	// package identifier, which is the same answer for the same reason.
-	rootIdentifier := doc.Root.Purl
+	// package identifier, which is the same answer for the same reason. It is
+	// stored as the root's node holds it, without a credential, since the
+	// published documents name the build by it.
+	rootIdentifier := graph.StoredPurl(doc.Root.Purl)
 
 	// The three writes are one act. Applied separately, a graph stored beside
 	// claims that were not recorded reads as a build that has withdrawn every

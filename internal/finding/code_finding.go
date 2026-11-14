@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -18,7 +17,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
-	"github.com/nexthop-ai/openpsirt/internal/markdown"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 )
@@ -75,11 +73,8 @@ var ErrNotAFixingRun = refusal.New("name the run whose build fixed it: a compara
 func (s *Store) FixCodeFinding(ctx context.Context, subject access.Subject, buildID int64,
 	occurrenceIdentity, because string, fixedIn int64) (*Resolved, error) {
 
-	because = strings.TrimSpace(because)
-	if because == "" {
-		return nil, ErrNoReason
-	}
-	if err := markdown.Check(because); err != nil {
+	because, err := closingNote(because)
+	if err != nil {
 		return nil, err
 	}
 	productID, err := productOf(ctx, s.db, buildID)

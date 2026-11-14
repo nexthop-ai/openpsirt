@@ -1319,3 +1319,26 @@ func TestACodeFindingOnAVersionMovedOffPairsByTheNameTheBuildStated(t *testing.T
 		}
 	})
 }
+
+func TestACodeFindingOnAVersionMovedOffIsNotCountedAtAnotherEcosystemsPackage(t *testing.T) {
+	// The build stops shipping FRR from GitHub and ships a Python package of
+	// the same name: different software, so nothing replaces the version left.
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventory(t, w.Build.ID)
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		left := w.frr
+		w.inventoryAt(t, w.Build.ID, "inventory-frr-python", time.Now().UTC().Add(-30*time.Minute),
+			graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"},
+			graph.Described{Purl: "pkg:pypi/frr@10.3", Name: "frr", Version: "10.3"})
+		replaced, err := replacedIn(t.Context(), w.DB.DB, w.Build.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if live := replaced[left]; len(live) != 0 {
+			t.Errorf("the GitHub package the build moved off is counted at %v, a Python package", live)
+		}
+	})
+}

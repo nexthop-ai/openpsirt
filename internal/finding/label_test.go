@@ -4,9 +4,15 @@
 package finding_test
 
 import (
+	"context"
+	"strings"
+	"sync"
 	"testing"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -329,6 +335,55 @@ func TestALabelThatIsADotSegmentIsRefused(t *testing.T) {
 			if err := f.store.LabelIt(t.Context(), who, f.productID, issue, component, label); !refusal.In(err) {
 				t.Errorf("a label %q answered %v, want a refusal", label, err)
 			}
+		}
+	})
+}
+
+// insertsInto counts the statements inserting into one table.
+type insertsInto struct {
+	table    string
+	mu       sync.Mutex
+	inserted int
+}
+
+func (h *insertsInto) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if strings.HasPrefix(strings.TrimSpace(e.Query), "INSERT") && (strings.Contains(e.Query, `"`+h.table+`"`) ||
+		strings.Contains(e.Query, "`"+h.table+"`")) {
+		h.mu.Lock()
+		h.inserted++
+		h.mu.Unlock()
+	}
+	return ctx
+}
+
+func (h *insertsInto) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+func TestALabelIsPutOnTheWholeFoldInOneWrite(t *testing.T) {
+	// Labeling is one act over every package of the fold: one statement
+	// writes them all, so no failure leaves part of the fold labeled.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		lib, tool := f.curlFold(t)
+		who := f.someoneElse(t, access.PublicTriage)
+		issue := f.issueID(t, "CVE-2026-CURL")
+		viaLib, viaTool := f.componentID(t, lib.Name), f.componentID(t, tool.Name)
+
+		counted := &insertsInto{table: "finding_label"}
+		hooked := dbtest.Hooked(f.db, counted)
+		if err := finding.NewStore(hooked.DB).LabelIt(ctx, who, f.productID, issue, viaTool, "Vendor"); err != nil {
+			t.Fatal(err)
+		}
+		labeled, err := f.db.DB.NewSelect().Model((*finding.Label)(nil)).
+			Where(`"vulnerability_id" = ?`, issue).
+			Where(`"component_id" IN (?)`, bun.List([]int64{viaLib, viaTool})).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if labeled != 2 {
+			t.Fatalf("%d of the fold's two packages carry the word, so this checked nothing", labeled)
+		}
+		if counted.inserted != 1 {
+			t.Errorf("the fold's two packages were labeled in %d writes, want one", counted.inserted)
 		}
 	})
 }

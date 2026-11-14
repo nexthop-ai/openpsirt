@@ -61,7 +61,7 @@ commitment's build. Nothing is written onto findings.
 | Source | Change |
 |---|---|
 | A decision somebody agreed to | Through the act revising it, with a reason; it withdraws every agreement and returns the rows to the queue, and the revisions keep what was promised before |
-| Intent nobody argued for | The row is edited |
+| A commitment no decision made | The decision committing its build takes it over; withdrawing commitments elsewhere leaves it, because only the decision that made a commitment withdraws it |
 
 `design-docs/triage-promises.md` § Approval gate holds when a promise needs a
 second person, and refuses a promise with no date.

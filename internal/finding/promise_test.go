@@ -30,7 +30,7 @@ func TestASecondDecisionDoesNotMoveACommitmentAnotherDecisionMade(t *testing.T) 
 		who := f.planner(t, access.PublicTriage)
 		commit := func(to string, decision int64) error {
 			_, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID, component,
-				to, nil, &decision, []int64{f.build}, nil)
+				to, nil, decision, []int64{f.build}, nil)
 			return err
 		}
 		standing := func() finding.Upgrade {
@@ -81,7 +81,7 @@ func TestASecondDecisionKeepsTheCommitmentsAnotherDecisionMade(t *testing.T) {
 		who := f.planner(t, access.PublicTriage)
 		commit := func(to string, decision int64, builds ...int64) error {
 			_, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID, component,
-				to, nil, &decision, builds, nil)
+				to, nil, decision, builds, nil)
 			return err
 		}
 		owner := func(build int64) *int64 {
@@ -126,6 +126,41 @@ func TestASecondDecisionKeepsTheCommitmentsAnotherDecisionMade(t *testing.T) {
 		}
 		if got := owner(other); got != nil {
 			t.Errorf("the second decision narrowed its builds and its commitment is held by %v", got)
+		}
+	})
+}
+
+// A decision committing a bump withdraws only the commitments it made: one no
+// decision made, in a build it does not name, stays.
+func TestADecisionWithdrawsOnlyTheCommitmentsItMade(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		component, err := f.graph.ComponentAs(ctx, f.build, "libnl-3-200", graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		other := f.anotherBranch(t, "release-2")
+		who := f.planner(t, access.PublicTriage)
+		if _, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID, component,
+			"3.9.0", nil, 101, []int64{other}, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Upgrade)(nil)).
+			Set(`"decision_id" = NULL`).Where(`"build_id" = ?`, other).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID, component,
+			"3.9.0", nil, 202, []int64{f.build}, nil); err != nil {
+			t.Fatal(err)
+		}
+		held, err := f.db.DB.NewSelect().Model((*finding.Upgrade)(nil)).
+			Where(`"build_id" = ?`, other).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held != 1 {
+			t.Errorf("a decision about one build withdrew a commitment no decision made in another")
 		}
 	})
 }

@@ -14,15 +14,18 @@ import (
 )
 
 // replacedIn is the components a code finding of this build sits on that the
-// build no longer holds, each with the live components of the same name it is
-// counted at: a code finding keeps the component it opened on, and a rescan at
-// a new version replaces the component. A root the build no longer holds is
-// left out, since the build's root counts every root it has had.
+// build no longer holds, each with the live components of the same name in
+// its ecosystem it is counted at: a code finding keeps the component it opened
+// on, and a rescan at a new version replaces the component. A root the build
+// no longer holds is left out, since the build's root counts every root it
+// has had.
 //
 // Read from the build's code findings, each component once, and paired with
 // the live components by the name the build stated each under, as the
 // inventory's changes pair them: a replaced one by its latest node's, a live
-// one by its open node's.
+// one by its open node's. The ecosystem is the type the package identifier
+// names, matched as graph.Replaced matches it: where either side names none,
+// the name alone matches.
 func replacedIn(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64, error) {
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	held := db.NewSelect().TableExpr(`"finding" AS "f"`).
@@ -35,10 +38,11 @@ func replacedIn(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int
 	var replaced []struct {
 		Component int64  `bun:"component_id"`
 		Name      string `bun:"name_folded"`
+		Purl      string `bun:"purl"`
 	}
 	if err := db.NewSelect().TableExpr(`(?) AS "h"`, held).
 		Join(`JOIN "component" AS "cr" ON "cr"."id" = "h"."component_id"`).
-		ColumnExpr(`"cr"."id" AS "component_id"`).
+		ColumnExpr(`"cr"."id" AS "component_id", COALESCE("cr"."purl", '') AS "purl"`).
 		ColumnExpr(graph.BuildFolded("?", `"cr"."id"`, "cr")+` AS "name_folded"`, buildID).
 		Scan(ctx, &replaced); err != nil {
 		return nil, fmt.Errorf("read the components build %d no longer holds a code finding sits on: %w", buildID, err)
@@ -49,24 +53,37 @@ func replacedIn(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int
 	var live []struct {
 		Component int64  `bun:"component_id"`
 		Name      string `bun:"name_folded"`
+		Purl      string `bun:"purl"`
 	}
 	if err := db.NewSelect().TableExpr(`"graph_node" AS "nl"`).
 		Join(`JOIN "component" AS "cl" ON "cl"."id" = "nl"."component_id"`).
 		ColumnExpr(`"cl"."id" AS "component_id", `+graph.NodeFolded("nl", "cl")+` AS "name_folded"`).
+		ColumnExpr(`COALESCE("cl"."purl", '') AS "purl"`).
 		Where(`"nl"."build_id" = ?`, buildID).
 		Where(`"nl"."closed_scan_id" IS NULL`).
 		Where(`"nl"."is_root" = ?`, false).
 		Scan(ctx, &live); err != nil {
 		return nil, fmt.Errorf("read the components build %d holds: %w", buildID, err)
 	}
-	byName := map[string][]int64{}
+	type typed struct {
+		component int64
+		ecosystem string
+	}
+	byName := map[string][]typed{}
 	for _, one := range live {
-		byName[one.Name] = append(byName[one.Name], one.Component)
+		byName[one.Name] = append(byName[one.Name], typed{one.Component, graph.EcosystemOf(one.Purl)})
 	}
 	out := map[int64][]int64{}
 	for _, one := range replaced {
-		if named := byName[one.Name]; len(named) > 0 {
-			out[one.Component] = named
+		ecosystem := graph.EcosystemOf(one.Purl)
+		var same []int64
+		for _, namesake := range byName[one.Name] {
+			if ecosystem == "" || namesake.ecosystem == "" || namesake.ecosystem == ecosystem {
+				same = append(same, namesake.component)
+			}
+		}
+		if len(same) > 0 {
+			out[one.Component] = same
 		}
 	}
 	return out, nil

@@ -329,14 +329,19 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	}
 	evidence.FixState = agreedFixState(least, most)
 	evidence.FixedIn = agreedFixedIn(least, most, rows[0].FixedIn)
-	// An upstream release that closes any of these occurrences. Asked of both
-	// ends here rather than of the word above, because that word is "mixed"
-	// wherever the occurrences disagree — which is not a state upstream is ever
-	// in, and reading it as one says a supported release is past its end of
-	// life.
+	// An upstream release that closes any of these occurrences. Asked of
+	// every occurrence rather than of the word above, because that word is
+	// "mixed" wherever the occurrences disagree — which is not a state
+	// upstream is ever in, and reading it as one says a supported release is
+	// past its end of life.
 	exploited := evidence.Exploited || evidence.Incident
-	evidence.nothingToTake = !Clocked(FixState(least), exploited) &&
-		!Clocked(FixState(most), exploited)
+	evidence.nothingToTake = true
+	for _, row := range rows {
+		if Clocked(FixState(row.FixState), exploited) {
+			evidence.nothingToTake = false
+			break
+		}
+	}
 	evidence.unrated = Kind(rows[0].Kind) == Entered && issue.InForce() == ""
 	// Any occurrence answers. They all come from one line of a scanner's report,
 	// which the applier writes to every occurrence of the group.
@@ -860,31 +865,45 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, buildID, vul
 // undisclosed work.
 func (s *Store) heldBy(ctx context.Context, buildID, vulnerabilityID, componentID int64,
 	visible []access.Visibility) (string, error) {
-	var holders []struct {
-		Identity *string `bun:"identity"`
+
+	// Joined on the party a person is assignable as, which is what the
+	// assignment column holds. A team's queue names no person and answers
+	// empty here, which is what a queue is.
+	held, err := s.oneAcrossFold(ctx, buildID, vulnerabilityID, componentID, visible,
+		`LEFT JOIN "person" AS "p" ON "p"."party_id" = "f"."assigned_to"`, `"p"."identity"`)
+	if err != nil {
+		return "", fmt.Errorf("read who is dealing with this: %w", err)
+	}
+	return held, nil
+}
+
+// oneAcrossFold is the one value a joined column holds across the open
+// occurrences of an issue in a fold the reader may read, or empty where they
+// hold several or none.
+func (s *Store) oneAcrossFold(ctx context.Context, buildID, vulnerabilityID, componentID int64,
+	visible []access.Visibility, join, column string) (string, error) {
+
+	var values []struct {
+		Value *string `bun:"value"`
 	}
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	err := InTheFoldOf(s.db.NewSelect().
+	if err := InTheFoldOf(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Where(kinds, kindArgs...).
-		// Joined on the party a person is assignable as, which is what
-		// the assignment column holds. A team's queue names no person
-		// and answers empty here, which is what a queue is.
-		Join(`LEFT JOIN "person" AS "p" ON "p"."party_id" = "f"."assigned_to"`).
-		ColumnExpr(`"p"."identity" AS "identity"`).
+		Join(join).
+		ColumnExpr(column+` AS "value"`).
 		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"p"."identity"`), componentID).
-		Scan(ctx, &holders)
-	if err != nil {
-		return "", fmt.Errorf("read who is dealing with this: %w", err)
+		GroupExpr(column), componentID).
+		Scan(ctx, &values); err != nil {
+		return "", err
 	}
-	if len(holders) != 1 || holders[0].Identity == nil {
+	if len(values) != 1 || values[0].Value == nil {
 		return "", nil
 	}
-	return *holders[0].Identity, nil
+	return *values[0].Value, nil
 }
 
 // assignedByRule is the name of the rule that placed this finding, or empty where a
@@ -901,28 +920,12 @@ func (s *Store) heldBy(ctx context.Context, buildID, vulnerabilityID, componentI
 func (s *Store) assignedByRule(ctx context.Context, buildID, vulnerabilityID,
 	componentID int64, visible []access.Visibility) (string, error) {
 
-	var named []struct {
-		Name *string `bun:"name"`
-	}
-	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
-	err := InTheFoldOf(s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Where(kinds, kindArgs...).
-		Join(`LEFT JOIN "assignment_rule" AS "rr" ON "rr"."id" = "f"."assigned_by_rule"`).
-		ColumnExpr(`"rr"."name" AS "name"`).
-		Where(`"f"."build_id" = ?`, buildID).
-		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
-		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"rr"."name"`), componentID).
-		Scan(ctx, &named)
+	name, err := s.oneAcrossFold(ctx, buildID, vulnerabilityID, componentID, visible,
+		`LEFT JOIN "assignment_rule" AS "rr" ON "rr"."id" = "f"."assigned_by_rule"`, `"rr"."name"`)
 	if err != nil {
 		return "", fmt.Errorf("read what placed this: %w", err)
 	}
-	if len(named) != 1 || named[0].Name == nil {
-		return "", nil
-	}
-	return *named[0].Name, nil
+	return name, nil
 }
 
 // measured reads what one run was made with.

@@ -906,16 +906,12 @@ func (s *Store) severalFixes(ctx context.Context, buildIDs []int64, visible []ac
 	held heldBy, several map[foldIn]map[int64]bool, per map[foldIn][]namedFix) error {
 
 	var issues []int64
-	asked := map[int64]bool{}
 	for _, ids := range several {
 		for id := range ids {
-			if !asked[id] {
-				asked[id] = true
-				issues = append(issues, id)
-			}
+			issues = append(issues, id)
 		}
 	}
-	sort.Slice(issues, func(i, j int) bool { return issues[i] < issues[j] })
+	issues = distinctIDs(issues)
 	var rows []struct {
 		BuildID     int64  `bun:"build_id"`
 		ComponentID int64  `bun:"component_id"`

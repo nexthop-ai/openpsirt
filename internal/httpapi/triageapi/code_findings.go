@@ -47,11 +47,8 @@ func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 			"is refused with 409, because its flaw is judged instead.",
 		Tags: []string{"Triage"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "", access.SecurityTestingTriage), func(ctx context.Context, input *struct {
-		Product     string `path:"product"`
-		BranchOrTag string `path:"branch_or_tag"`
-		Variant     string `path:"variant"`
-		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body        CodeFindingDecisionBody
+		core.CodeFindingRoute
+		Body CodeFindingDecisionBody
 	}) (*struct{ Body core.DecisionOccurrenceBody }, error) {
 		in := core.Of(ctx, in)
 		subject, store, err := core.Triaging(ctx, in)
@@ -138,11 +135,8 @@ func registerCodeFindingFixed(api huma.API, in core.Deps) {
 			"A code finding seen again opens anew at the same occurrence.",
 		Tags: []string{"Triage"},
 	}, core.PerProduct, "", access.SecurityTestingTriage), func(ctx context.Context, input *struct {
-		Product     string `path:"product"`
-		BranchOrTag string `path:"branch_or_tag"`
-		Variant     string `path:"variant"`
-		Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
-		Body        struct {
+		core.CodeFindingRoute
+		Body struct {
 			Because string `json:"because" minLength:"1" doc:"What fixed it, in markdown"`
 			FixedIn int64  `json:"fixed_in" minimum:"1" doc:"The run whose build fixed it"`
 		}

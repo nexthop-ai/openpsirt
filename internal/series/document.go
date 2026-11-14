@@ -5,22 +5,14 @@ package series
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/chunked"
 )
-
-// chunkSize is how much of a document one row holds: far inside the smallest
-// statement size any engine allows by default, the bound the inventory
-// documents are stored under.
-const chunkSize = 512 << 10
 
 // Document is what a run is held as until it is applied, stored in parts.
 type Document struct {
@@ -35,15 +27,6 @@ type Document struct {
 	DiscardedAt *time.Time `bun:"discarded_at"`
 }
 
-type chunk struct {
-	bun.BaseModel `bun:"table:series_document_chunk,alias:sdc"`
-
-	ID         int64  `bun:"id,pk,autoincrement"`
-	DocumentID int64  `bun:"document_id,notnull"`
-	Seq        int    `bun:"seq,notnull"`
-	Body       []byte `bun:"body,notnull"`
-}
-
 // Write stores one document of a run, reading it as a stream. The hash is
 // over the bytes stored.
 func (s *Store) Write(ctx context.Context, runID int64, ordinal int, r io.Reader) (*Document, error) {
@@ -51,26 +34,11 @@ func (s *Store) Write(ctx context.Context, runID int64, ordinal int, r io.Reader
 	if _, err := s.db.NewInsert().Model(doc).Exec(ctx); err != nil {
 		return nil, fmt.Errorf("record a document: %w", err)
 	}
-	digest := sha256.New()
-	buf := make([]byte, chunkSize)
-	for seq := 0; ; seq++ {
-		n, err := io.ReadFull(r, buf)
-		if n > 0 {
-			digest.Write(buf[:n])
-			doc.SizeBytes += int64(n)
-			row := &chunk{DocumentID: doc.ID, Seq: seq, Body: buf[:n]}
-			if _, err := s.db.NewInsert().Model(row).Exec(ctx); err != nil {
-				return nil, fmt.Errorf("store part %d of a document: %w", seq, err)
-			}
-		}
-		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("read a document: %w", err)
-		}
+	size, hash, err := chunked.Write(ctx, s.db, chunked.SeriesParts, doc.ID, r)
+	if err != nil {
+		return nil, err
 	}
-	doc.ContentHash = hex.EncodeToString(digest.Sum(nil))
+	doc.SizeBytes, doc.ContentHash = size, hash
 	if _, err := s.db.NewUpdate().Model(doc).Column("content_hash", "size_bytes").WherePK().Exec(ctx); err != nil {
 		return nil, fmt.Errorf("record a document's size and hash: %w", err)
 	}
@@ -92,43 +60,10 @@ func (s *Store) Documents(ctx context.Context, runID int64) ([]Document, error) 
 	return docs, nil
 }
 
-// Open reads a document back, one part at a time.
+// Open reads a document back as a stream. A document let go while it is read
+// ends with chunked.ErrReleased.
 func (s *Store) Open(ctx context.Context, doc *Document) io.Reader {
-	return &chunks{ctx: ctx, db: s.db, documentID: doc.ID}
-}
-
-type chunks struct {
-	ctx        context.Context
-	db         bun.IDB
-	documentID int64
-	next       int
-	held       []byte
-	done       bool
-}
-
-func (c *chunks) Read(p []byte) (int, error) {
-	for len(c.held) == 0 {
-		if c.done {
-			return 0, io.EOF
-		}
-		var row chunk
-		err := c.db.NewSelect().Model(&row).
-			Where(`"document_id" = ?`, c.documentID).
-			Where(`"seq" = ?`, c.next).
-			Limit(1).Scan(c.ctx)
-		switch {
-		case database.IsNoRows(err):
-			c.done = true
-			return 0, io.EOF
-		case err != nil:
-			return 0, fmt.Errorf("read part %d of a document: %w", c.next, err)
-		}
-		c.held = row.Body
-		c.next++
-	}
-	n := copy(p, c.held)
-	c.held = c.held[n:]
-	return n, nil
+	return chunked.Open(ctx, s.db, chunked.SeriesParts, doc.ID, doc.SizeBytes)
 }
 
 // Discard lets a run's documents go once the run ends. The rows
@@ -145,11 +80,7 @@ func (s *Store) Discard(ctx context.Context, runID int64) error {
 	if len(ids) == 0 {
 		return nil
 	}
-	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		_, err := s.db.NewDelete().Model((*chunk)(nil)).
-			Where(`"document_id" IN (?)`, bun.List(batch)).Exec(ctx)
-		return err
-	}); err != nil {
+	if err := chunked.Delete(ctx, s.db, chunked.SeriesParts, ids); err != nil {
 		return fmt.Errorf("let go of the documents of run %d: %w", runID, err)
 	}
 	if _, err := s.db.NewUpdate().Model((*Document)(nil)).

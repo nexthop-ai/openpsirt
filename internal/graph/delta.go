@@ -75,7 +75,7 @@ func (s *Store) Deltas(ctx context.Context, subject access.Subject, buildID int6
 		return out, nil
 	}
 
-	rows, err := s.moved(ctx, buildID, wanted)
+	rows, err := s.moved(ctx, buildID, wanted, s.standingOnce(ctx, buildID, wanted))
 	if err != nil {
 		return nil, err
 	}
@@ -206,11 +206,10 @@ func (f *folder) folded() []movedRow {
 // third column: 54,902 lookups each reading the build's whole range, 40.5 s for
 // one upload that removed a file inventory. Read once by the build instead,
 // the rows are matched to the names here.
-func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64) ([]movedRow, error) {
-	earliest, latest := scanIDs[0], scanIDs[0]
+func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64,
+	standing func() ([]standingNode, error)) ([]movedRow, error) {
 	asked := make(map[int64]bool, len(scanIDs))
 	for _, id := range scanIDs {
-		earliest, latest = min(earliest, id), max(latest, id)
 		asked[id] = true
 	}
 
@@ -252,40 +251,7 @@ func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64) ([]mo
 		return nil, nil
 	}
 
-	// Every row of the build that stood on either side of any of these scans.
-	// Rows that stood on neither count towards none of them, and a year of
-	// nights leaves most of a build's rows closed long before the page being
-	// read, so this bound is what keeps the cost with the page rather than the
-	// calendar: unbounded, on SQLite, a page of fifty takes 78 ms behind 73
-	// nights of history and 264 ms behind 365.
-	var nodes []struct {
-		Opened  int64  `bun:"opened"`
-		Closed  *int64 `bun:"closed"`
-		Name    string `bun:"nm"`
-		Display string `bun:"dsp"`
-		Version string `bun:"ver"`
-	}
-	err = s.db.NewSelect().
-		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-		ColumnExpr(`"n"."opened_scan_id" AS "opened"`).
-		ColumnExpr(`"n"."closed_scan_id" AS "closed"`).
-		ColumnExpr(NodeFolded("n", "c")+` AS "nm"`).
-		// The name as a producer wrote it, for the listing to show. Two
-		// producers writing one dependency in different capitals are one name
-		// here, and either spelling names the same thing on a screen.
-		ColumnExpr(NodeName("n", "c")+` AS "dsp"`).
-		ColumnExpr(NodeVersion("n", "c")+` AS "ver"`).
-		Where(`"n"."build_id" = ?`, buildID).
-		// The build's own root is not one of its components, and its version
-		// is not stored, so it can neither arrive nor move.
-		Where(`"n"."is_root" = ?`, false).
-		Where(`"n"."opened_scan_id" <= ?`, latest).
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where(`"n"."closed_scan_id" IS NULL`).
-				WhereOr(`"n"."closed_scan_id" >= ?`, earliest)
-		}).
-		Scan(ctx, &nodes)
+	nodes, err := standing()
 	if err != nil {
 		return nil, fmt.Errorf("read what these scans changed: %w", err)
 	}
@@ -310,6 +276,68 @@ func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64) ([]mo
 		}
 	}
 	return fold.folded(), nil
+}
+
+// standingOnce reads standing when first asked and answers the same rows to
+// every later reader of one comparison.
+func (s *Store) standingOnce(ctx context.Context, buildID int64, scanIDs []int64) func() ([]standingNode, error) {
+	var nodes []standingNode
+	var err error
+	read := false
+	return func() ([]standingNode, error) {
+		if !read {
+			nodes, err = s.standing(ctx, buildID, scanIDs)
+			read = true
+		}
+		return nodes, err
+	}
+}
+
+// standingNode is one row of a build's inventory and the scans bounding it.
+type standingNode struct {
+	Opened  int64  `bun:"opened"`
+	Closed  *int64 `bun:"closed"`
+	Name    string `bun:"nm"`
+	Display string `bun:"dsp"`
+	Version string `bun:"ver"`
+}
+
+// standing reads every row of a build's inventory that stood on either side
+// of any of these scans, the build's own root left out: its version is not
+// stored, so it can neither arrive nor move, and it is not one of the build's
+// components.
+//
+// Rows that stood on neither side count towards none of them, and a year of
+// nights leaves most of a build's rows closed long before the page being
+// read, so this bound is what keeps the cost with the page rather than the
+// calendar: unbounded, on SQLite, a page of fifty takes 78 ms behind 73
+// nights of history and 264 ms behind 365.
+func (s *Store) standing(ctx context.Context, buildID int64, scanIDs []int64) ([]standingNode, error) {
+	earliest, latest := scanIDs[0], scanIDs[0]
+	for _, id := range scanIDs {
+		earliest, latest = min(earliest, id), max(latest, id)
+	}
+	var nodes []standingNode
+	err := s.db.NewSelect().
+		TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(`"n"."opened_scan_id" AS "opened"`).
+		ColumnExpr(`"n"."closed_scan_id" AS "closed"`).
+		ColumnExpr(NodeFolded("n", "c")+` AS "nm"`).
+		// The name as a producer wrote it, for the listing to show. Two
+		// producers writing one dependency in different capitals are one name
+		// here, and either spelling names the same thing on a screen.
+		ColumnExpr(NodeName("n", "c")+` AS "dsp"`).
+		ColumnExpr(NodeVersion("n", "c")+` AS "ver"`).
+		Where(`"n"."build_id" = ?`, buildID).
+		Where(`"n"."is_root" = ?`, false).
+		Where(`"n"."opened_scan_id" <= ?`, latest).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where(`"n"."closed_scan_id" IS NULL`).
+				WhereOr(`"n"."closed_scan_id" >= ?`, earliest)
+		}).
+		Scan(ctx, &nodes)
+	return nodes, err
 }
 
 // Change is what one scan did to one name in a build's inventory.
@@ -378,7 +406,7 @@ func (s *Store) Changes(ctx context.Context, subject access.Subject, buildID, sc
 		return nil, 0, nil
 	}
 
-	rows, err := s.moved(ctx, buildID, wanted)
+	rows, err := s.moved(ctx, buildID, wanted, s.standingOnce(ctx, buildID, wanted))
 	if err != nil {
 		return nil, 0, err
 	}
@@ -591,11 +619,13 @@ func (s *Store) Movements(ctx context.Context, buildID int64, scanIDs []int64) (
 		if len(wanted) == 0 {
 			continue
 		}
-		rows, err := s.moved(ctx, buildID, wanted)
+		// Both read the same rows, so they read them once.
+		standing := s.standingOnce(ctx, buildID, wanted)
+		rows, err := s.moved(ctx, buildID, wanted, standing)
 		if err != nil {
 			return nil, err
 		}
-		held, err := s.held(ctx, buildID, wanted)
+		held, err := heldAt(wanted, standing)
 		if err != nil {
 			return nil, err
 		}
@@ -607,7 +637,7 @@ func (s *Store) Movements(ctx context.Context, buildID int64, scanIDs []int64) (
 	return out, nil
 }
 
-// held is how many names stood in a build's inventory immediately before each
+// heldAt is how many names stood in a build's inventory immediately before each
 // of these scans.
 //
 // The same side of the scan the comparison reads, since a row the scan closed
@@ -615,30 +645,8 @@ func (s *Store) Movements(ctx context.Context, buildID int64, scanIDs []int64) (
 // own root is not one of its components. One read of the rows standing
 // anywhere between the earliest and the latest scan, counted here per scan,
 // because a count per scan is a statement per scan.
-func (s *Store) held(ctx context.Context, buildID int64, scanIDs []int64) (map[int64]int, error) {
-	earliest, latest := scanIDs[0], scanIDs[0]
-	for _, id := range scanIDs {
-		earliest, latest = min(earliest, id), max(latest, id)
-	}
-	var nodes []struct {
-		Opened int64  `bun:"opened"`
-		Closed *int64 `bun:"closed"`
-		Name   string `bun:"nm"`
-	}
-	err := s.db.NewSelect().
-		TableExpr(`"graph_node" AS "n"`).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-		ColumnExpr(`"n"."opened_scan_id" AS "opened"`).
-		ColumnExpr(`"n"."closed_scan_id" AS "closed"`).
-		ColumnExpr(NodeFolded("n", "c")+` AS "nm"`).
-		Where(`"n"."build_id" = ?`, buildID).
-		Where(`"n"."is_root" = ?`, false).
-		Where(`"n"."opened_scan_id" < ?`, latest).
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where(`"n"."closed_scan_id" IS NULL`).
-				WhereOr(`"n"."closed_scan_id" >= ?`, earliest)
-		}).
-		Scan(ctx, &nodes)
+func heldAt(scanIDs []int64, standing func() ([]standingNode, error)) (map[int64]int, error) {
+	nodes, err := standing()
 	if err != nil {
 		return nil, fmt.Errorf("read how many names this build held: %w", err)
 	}

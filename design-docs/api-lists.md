@@ -86,7 +86,7 @@ sits at, with how far it is decided in each.
 | How far it is decided uses the findings list's expression | |
 | The narrowing is in the query | A count leaks with no row shown |
 | The search box lands on an issue's page where the term names one, and on the component chooser otherwise (`design-docs/interface-shell.md` § The search box) | |
-| `/v1/findings` spans products: one row per product, issue and component, with the same filters, sort keys and paging | |
+| `/v1/findings` spans products: one row per product, issue and fold, the source package at a version, with the same filters, sort keys and paging | The unit a decision covers (`design-docs/findings.md` § The row a person reads) |
 | Each row applies its own product's minimum severity; `severity` raises it for the page and never lowers it, an exploited row passes both, and `below_minimum_severity` turns every one off | |
 | `beneath`, `differs` and `across_variants` are not offered across products; every other filter is shared | They are about one build or a selection of builds |
 | `across_variants` compares a row with the other builds of its branch: `only` keeps what no other variant holds and needs a variant selected; `every` keeps what every build of the branch holds | |

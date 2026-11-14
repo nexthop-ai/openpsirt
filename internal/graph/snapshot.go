@@ -224,7 +224,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			id := ids[stored.Identity()]
 			if _, already := wanted[id]; !already {
 				wanted[id] = stated{
-					purl: strings.TrimSpace(stored.Purl), cpe: strings.TrimSpace(stored.CPE),
+					purl: StoredPurl(stored.Purl), cpe: strings.TrimSpace(stored.CPE),
 					upstreamName:    strings.TrimSpace(stored.UpstreamName),
 					upstreamVersion: strings.TrimSpace(stored.UpstreamVersion),
 					repository:      statedRepository(stored.Repository),
@@ -248,7 +248,7 @@ func ApplyWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 				continue
 			}
 			statedImages[nodeIDs[ids[image.Identity()]]] = statedImage{
-				version: strings.TrimSpace(d.Version), purl: strings.TrimSpace(d.Purl),
+				version: strings.TrimSpace(d.Version), purl: StoredPurl(d.Purl),
 			}
 		}
 		applied.VersionsOpened, applied.VersionsClosed, err = reconcileImageVersions(ctx, tx,
@@ -296,6 +296,30 @@ func (s *Store) CurrentComponents(ctx context.Context, buildID int64) ([]Describ
 // ComponentsAt is what a build contained at a moment, as CurrentComponents
 // gives it to the scanner.
 func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]Described, error) {
+	_, described, err := s.componentsAt(ctx, buildID, at)
+	return described, err
+}
+
+// ScannedAs is each component a build contained at a moment, by component,
+// as ComponentsAt gives it to the scanner. A scanner's report names a
+// component by what it was given, and a component stored before identity was
+// read the way it is now holds an identity that description no longer hashes
+// to.
+func (s *Store) ScannedAs(ctx context.Context, buildID int64, at Moment) (map[int64]Described, error) {
+	ids, described, err := s.componentsAt(ctx, buildID, at)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]Described, len(ids))
+	for i, id := range ids {
+		out[id] = described[i]
+	}
+	return out, nil
+}
+
+// componentsAt is ComponentsAt with the component each description is of,
+// in the same order.
+func (s *Store) componentsAt(ctx context.Context, buildID int64, at Moment) ([]int64, []Described, error) {
 	held, args := at.Held("n")
 	var rows []struct {
 		ComponentID     int64  `bun:"component_id"`
@@ -321,7 +345,7 @@ func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]D
 		Where(`"n"."is_root" = ?`, false).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read what a build contains: %w", err)
+		return nil, nil, fmt.Errorf("read what a build contains: %w", err)
 	}
 	ids := make([]int64, 0, len(rows))
 	for _, row := range rows {
@@ -329,7 +353,7 @@ func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]D
 	}
 	others, err := s.statedInProduct(ctx, buildID, ids)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	described := make([]Described, 0, len(rows))
@@ -343,7 +367,30 @@ func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]D
 		}
 		described = append(described, stated)
 	}
-	return described, nil
+	return ids, described, nil
+}
+
+// statedRow is what one node states for its component.
+type statedRow struct {
+	ComponentID     int64  `bun:"component_id"`
+	Purl            string `bun:"purl"`
+	CPE             string `bun:"cpe"`
+	UpstreamName    string `bun:"upstream_name"`
+	UpstreamVersion string `bun:"upstream_version"`
+}
+
+// statedColumns reads a statedRow from the nodes as "n".
+func statedColumns(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."component_id" AS "component_id"`).
+		ColumnExpr(`"n"."purl" AS "purl"`).
+		ColumnExpr(`"n"."cpe" AS "cpe"`).
+		ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
+		ColumnExpr(`"n"."upstream_version" AS "upstream_version"`)
+}
+
+func (r statedRow) described() Described {
+	return Described{Purl: r.Purl, CPE: r.CPE, UpstreamName: r.UpstreamName, UpstreamVersion: r.UpstreamVersion}
 }
 
 // Stated is what a build states for each of these components, as
@@ -361,20 +408,8 @@ func (s *Store) Stated(ctx context.Context, buildID int64, componentIDs []int64)
 		return out, nil
 	}
 	err := database.IDsInBatches(ctx, componentIDs, func(ctx context.Context, batch []int64) error {
-		var rows []struct {
-			ComponentID     int64  `bun:"component_id"`
-			Purl            string `bun:"purl"`
-			CPE             string `bun:"cpe"`
-			UpstreamName    string `bun:"upstream_name"`
-			UpstreamVersion string `bun:"upstream_version"`
-		}
-		err := s.db.NewSelect().
-			TableExpr(`"graph_node" AS "n"`).
-			ColumnExpr(`"n"."component_id" AS "component_id"`).
-			ColumnExpr(`"n"."purl" AS "purl"`).
-			ColumnExpr(`"n"."cpe" AS "cpe"`).
-			ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
-			ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
+		var rows []statedRow
+		err := statedColumns(s.db.NewSelect()).
 			Where(`"n"."build_id" = ?`, buildID).
 			Where(`"n"."component_id" IN (?)`, bun.List(batch)).
 			OrderExpr(`"n"."opened_scan_id", "n"."id"`).
@@ -384,10 +419,7 @@ func (s *Store) Stated(ctx context.Context, buildID int64, componentIDs []int64)
 		}
 		// Ordered earliest first, so the latest node is the one left.
 		for _, row := range rows {
-			out[row.ComponentID] = Described{
-				Purl: row.Purl, CPE: row.CPE,
-				UpstreamName: row.UpstreamName, UpstreamVersion: row.UpstreamVersion,
-			}
+			out[row.ComponentID] = row.described()
 		}
 		return nil
 	})
@@ -426,20 +458,8 @@ func (s *Store) statedInProduct(ctx context.Context, buildID int64,
 		return nil, err
 	}
 	err = database.IDsInBatches(ctx, componentIDs, func(ctx context.Context, batch []int64) error {
-		var rows []struct {
-			ComponentID     int64  `bun:"component_id"`
-			Purl            string `bun:"purl"`
-			CPE             string `bun:"cpe"`
-			UpstreamName    string `bun:"upstream_name"`
-			UpstreamVersion string `bun:"upstream_version"`
-		}
-		err := s.db.NewSelect().
-			TableExpr(`"graph_node" AS "n"`).
-			ColumnExpr(`"n"."component_id" AS "component_id"`).
-			ColumnExpr(`"n"."purl" AS "purl"`).
-			ColumnExpr(`"n"."cpe" AS "cpe"`).
-			ColumnExpr(`"n"."upstream_name" AS "upstream_name"`).
-			ColumnExpr(`"n"."upstream_version" AS "upstream_version"`).
+		var rows []statedRow
+		err := statedColumns(s.db.NewSelect()).
 			// By build first, which the node index leads with: a product
 			// has a handful of builds and the node table holds every
 			// product's history.
@@ -458,10 +478,7 @@ func (s *Store) statedInProduct(ctx context.Context, buildID int64,
 			return err
 		}
 		for _, row := range rows {
-			out[row.ComponentID] = append(out[row.ComponentID], Described{
-				Purl: row.Purl, CPE: row.CPE,
-				UpstreamName: row.UpstreamName, UpstreamVersion: row.UpstreamVersion,
-			})
+			out[row.ComponentID] = append(out[row.ComponentID], row.described())
 		}
 		return nil
 	})
@@ -1040,7 +1057,9 @@ func (s *Store) step(ctx context.Context, readable []access.Visibility, buildID,
 			Join(`JOIN "graph_node" AS "fn" ON "fn"."id" = "e"."`+far+`"`).
 			Where(`"e"."build_id" = ?`, buildID).
 			Where(`"nn"."component_id" = ?`, componentID).
-			Where(`"e"."closed_scan_id" IS NULL`)
+			Where(`"e"."closed_scan_id" IS NULL`).
+			// A node is never its own neighbor, as every walk reads it.
+			Where(`"e"."parent_id" <> "e"."child_id"`)
 	}
 	// The neighbors first, so what is counted against each is counted for
 	// them alone. Counted for the whole build and joined, the step above the
@@ -1165,7 +1184,8 @@ func childrenJoin(query *bun.SelectQuery, buildID int64, only []int64) *bun.Sele
 		Join(`LEFT JOIN (SELECT "dp"."component_id" AS "cid", COUNT(*) AS "n"
 			FROM "graph_edge" AS "d"
 			JOIN "graph_node" AS "dp" ON "dp"."id" = "d"."parent_id"
-			WHERE "d"."build_id" = ? AND "d"."closed_scan_id" IS NULL`+within+`
+			WHERE "d"."build_id" = ? AND "d"."closed_scan_id" IS NULL
+			  AND "d"."parent_id" <> "d"."child_id"`+within+`
 			GROUP BY "dp"."component_id") AS "kids" ON "kids"."cid" = "c"."id"`, args...).
 		ColumnExpr(`COALESCE("kids"."n", 0) AS "children"`)
 }
@@ -1178,8 +1198,11 @@ func childrenJoin(query *bun.SelectQuery, buildID int64, only []int64) *bun.Sele
 // where the child is the fourth column: every open edge in the build scanned
 // once per node, 7.28 s for 59,982 nodes against 45 ms on the index led by the
 // child.
+//
+// An edge from the node to itself pulls nothing in, as every walk reads it.
 const orphaned = `NOT EXISTS (SELECT 1 FROM "graph_edge" AS "pe"
-	WHERE "pe"."child_id" = "fn"."id" AND "pe"."closed_scan_id" IS NULL)`
+	WHERE "pe"."child_id" = "fn"."id" AND "pe"."closed_scan_id" IS NULL
+	  AND "pe"."parent_id" <> "pe"."child_id")`
 
 // topLevel reads what the root pulls in and what nothing pulls in, as one
 // list in one statement: the two are read with the same per-build counts, and
@@ -1201,7 +1224,8 @@ func (s *Store) topLevel(ctx context.Context, readable []access.Visibility,
 			return q.Where(orphaned).
 				WhereOr(`EXISTS (SELECT 1 FROM "graph_edge" AS "re"
 					JOIN "graph_node" AS "rn" ON "rn"."id" = "re"."parent_id"
-					WHERE "re"."child_id" = "fn"."id" AND "re"."closed_scan_id" IS NULL AND "rn"."is_root" = ?)`, true)
+					WHERE "re"."child_id" = "fn"."id" AND "re"."closed_scan_id" IS NULL
+					  AND "rn"."is_root" = ?)`, true)
 		}).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -1331,6 +1355,8 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, buildID int6
 		TableExpr(`"graph_edge" AS "e"`).
 		Where(`"e"."build_id" = ?`, buildID).
 		Where(`"e"."closed_scan_id" IS NULL`).
+		// An edge from a component to itself places nothing.
+		Where(`"e"."parent_id" <> "e"."child_id"`).
 		Count(ctx)
 	if err != nil {
 		return Tally{}, fmt.Errorf("count what this build's edges are: %w", err)
@@ -1454,6 +1480,7 @@ func (s *Store) DeclaredScopes(ctx context.Context, buildID int64,
 		Where(`"e"."build_id" = ?`, buildID).
 		Where(`"e"."closed_scan_id" IS NULL`).
 		Where(`"e"."kind" <> ?`, "").
+		Where(`"e"."parent_id" <> "e"."child_id"`).
 		Where(`"child"."component_id" IN (?)`, bun.List(componentIDs)).
 		// The earliest scan first, and within one scan the words in byte
 		// order, so the word kept below is the same on every engine and every

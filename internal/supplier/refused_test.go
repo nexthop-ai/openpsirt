@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
 
@@ -347,4 +348,55 @@ func TestADatabaseFailureDuringAPassIsNotRecordedAgainstTheSupplier(t *testing.T
 			})
 		})
 	}
+}
+
+// A document naming a publisher longer than a claim records is refused by the
+// store's own check and stepped over, and the pass reads the one after it.
+func TestADocumentTheStoreRefusesIsSteppedOver(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		long := strings.Repeat("x", finding.MostPublisher+1)
+		p.publishes("/2026/EL-45.json", "2026-09-20T00:00:00Z",
+			strings.Replace(advisory("EL-2026-0045", "libnl-3-200", "3.7.1", "CVE-2026-5205"),
+				`"name":"Example Linux","namespace"`, `"name":"`+long+`","namespace"`, 1))
+		p.publishes("/2026/EL-46.json", "2026-09-21T00:00:00Z",
+			advisory("EL-2026-0046", "libnl-3-200", "3.7.1", "CVE-2026-5206"))
+
+		_, _, pass := passOver(t, f, p, "test")
+		took, err := pass.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if took.Refused != 1 || took.Documents != 1 {
+			t.Errorf("read %+v, want the document the store refuses stepped over", took)
+		}
+		// Refused before anything further is asked of the publisher about it,
+		// while the document beside it has its digest asked for.
+		asked := strings.Join(p.asked, " ")
+		if strings.Contains(asked, "/2026/EL-45.json.") {
+			t.Errorf("the publisher was asked %s, want nothing beside a document already refused", asked)
+		}
+		if !strings.Contains(asked, "/2026/EL-46.json.sha") {
+			t.Errorf("the publisher was asked %s, want the recorded document's digest", asked)
+		}
+	})
+}
+
+// The store refuses what it will not record, and a refusal is about the
+// document: read as a failure of this deployment, it would hold the mark
+// before the document for ever.
+func TestARefusalFromTheStoreIsAboutTheDocument(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		p := serving(t)
+		long := strings.Repeat("x", finding.MostPublisher+1)
+		err := supplier.RecordForTest(t.Context(), fetching(t, f, p), f.by, from(t, f, p),
+			p.server.URL+"/2026/EL-47.json", long, "EL-2026-0047")
+		if err == nil {
+			t.Fatal("the store recorded a publisher past its bound")
+		}
+		if !supplier.SteppedOver(err) {
+			t.Errorf("the refusal %v reads as a failure of this deployment", err)
+		}
+	})
 }

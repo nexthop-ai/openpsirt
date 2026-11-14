@@ -57,14 +57,8 @@ type Resolved struct {
 func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 	buildID, vulnerabilityID int64, because string) (*Resolved, error) {
 
-	because = strings.TrimSpace(because)
-	if because == "" {
-		return nil, ErrNoReason
-	}
-	// The submission policy, before the note is stored. A closure by a person
-	// is the one thing here nothing else evidences, so what it says is kept
-	// forever and read back on every screen that asks why.
-	if err := markdown.Check(because); err != nil {
+	because, err := closingNote(because)
+	if err != nil {
 		return nil, err
 	}
 	productID, err := productOf(ctx, s.db, buildID)
@@ -170,4 +164,20 @@ func (s *Store) Resolve(ctx context.Context, subject access.Subject,
 		return nil, err
 	}
 	return out, nil
+}
+
+// closingNote is the note a person closes a finding with, trimmed, or the
+// refusal of one that says nothing or fails the submission policy. Checked
+// before the note is stored: a closure by a person is the one thing here
+// nothing else evidences, so what it says is kept forever and read back on
+// every screen that asks why.
+func closingNote(because string) (string, error) {
+	because = strings.TrimSpace(because)
+	if because == "" {
+		return "", ErrNoReason
+	}
+	if err := markdown.Check(because); err != nil {
+		return "", err
+	}
+	return because, nil
 }

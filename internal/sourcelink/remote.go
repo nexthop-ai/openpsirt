@@ -55,13 +55,21 @@ func parse(remote string) (host, path string) {
 	return strings.ToLower(host), path
 }
 
-// WithoutCredential is a remote with any credential and query taken out of
-// it, where it is written as an address. A remote comes from an upload, and a
-// token in it would reach every reader of what it is shown on.
+// WithoutCredential is a remote with any credential, query and fragment taken
+// out of it. A remote comes from an upload, and a token in it would reach
+// every reader of what it is shown on; nothing reads a remote's fragment. One
+// whose credential cannot be told apart from the rest is not shown.
 func WithoutCredential(remote string) string {
 	s := strings.TrimSpace(remote)
-	if !strings.Contains(s, "://") {
-		return s
+	if !Schemed(s) {
+		bare, readable := WithoutPassword(s)
+		if !readable {
+			return ""
+		}
+		if at := strings.IndexAny(bare, "?#"); at >= 0 {
+			bare = bare[:at]
+		}
+		return bare
 	}
 	u, err := url.Parse(s)
 	if err != nil {
@@ -70,7 +78,58 @@ func WithoutCredential(remote string) string {
 		return ""
 	}
 	u.User, u.RawQuery, u.ForceQuery = nil, "", false
+	u.Fragment, u.RawFragment = "", ""
 	return u.String()
+}
+
+// Schemed is whether an address opens on a scheme and "://", or on "//"
+// naming a host with no scheme. Either is read as an address with a user,
+// host, query and fragment; anything else, a "://" later in a path included,
+// is read as written without a scheme.
+func Schemed(address string) bool {
+	if strings.HasPrefix(address, "//") {
+		return true
+	}
+	end := strings.Index(address, "://")
+	if end <= 0 {
+		return false
+	}
+	for i, c := range address[:end] {
+		letter := ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+		later := ('0' <= c && c <= '9') || c == '+' || c == '-' || c == '.'
+		if !letter && (i == 0 || !later) {
+			return false
+		}
+	}
+	return true
+}
+
+// WithoutPassword is an address written without a scheme, such as a purl's
+// `repository_url` or an scp-style remote, with a user and password written
+// before its host taken out, and whether it can be read at all.
+//
+// A user with no password is kept: it is the account an scp-style address
+// such as `git@host:path` names. A colon before the first slash with no `@`
+// there, and an `@` after it, is a password holding a slash or a path holding
+// an `@`; the two cannot be told apart, so it cannot be read.
+func WithoutPassword(address string) (string, bool) {
+	// Read to the first slash and no shorter: a password may hold a question
+	// mark or a fragment mark, and cutting there first hides the "@" that
+	// ends it.
+	host := address
+	if end := strings.IndexByte(host, '/'); end >= 0 {
+		host = host[:end]
+	}
+	if at := strings.LastIndex(host, "@"); at >= 0 {
+		if at > 0 && strings.Contains(host[:at], ":") {
+			return address[at+1:], true
+		}
+		return address, true
+	}
+	if strings.Contains(host, ":") && strings.Contains(address[len(host):], "@") {
+		return "", false
+	}
+	return address, true
 }
 
 // relative is whether a remote is written relative to the repository that

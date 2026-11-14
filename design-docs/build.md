@@ -38,6 +38,7 @@ Satisfies REQ-43, REQ-61, REQ-62, REQ-63, REQ-75.
 | `internal/dbtest/` | Runs a test against every available database |
 | `internal/catalog/` | Products, branches and tags, variants. See `design-docs/data-model.md` |
 | `internal/ingest/` | Arriving scans. See `design-docs/ingest.md` |
+| `internal/chunked/` | A stored document's bounded parts, written and read as a stream. See `design-docs/ingest.md` § Document storage |
 | `internal/queue/` | Durable background work. See `design-docs/queue.md` |
 | `internal/sbom/`, `internal/scanner/` | Reading and scanning an inventory. See `design-docs/ingest-parsing.md`, `design-docs/ingest-scanner.md` |
 | `internal/docread/` | A third party's document as a bounded stream. See `design-docs/ingest-parsing.md` |

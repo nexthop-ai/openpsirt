@@ -10,6 +10,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 func TestARowCarriesItsOwnAgeAndSaysWhyItHasNoDeadline(t *testing.T) {
@@ -246,6 +247,60 @@ func TestARefusalOnAnExploitedIssueIsNotCalledNothingToTake(t *testing.T) {
 		if got := details["CVE-2026-USED"].NoDeadline; got != finding.OutOfSupport {
 			t.Errorf("an exploited refusal past end of life says %q in detail, want %q",
 				got, finding.OutOfSupport)
+		}
+	})
+}
+
+func TestAClockedStateBetweenTwoUnclockedOnesIsOutOfSupportOnTheListAndInDetail(t *testing.T) {
+	// A group whose occurrences say none, unknown and wont-fix holds one
+	// occurrence on the clock, so past end of life it is out of support
+	// rather than nothing to take, however the three words sort.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		third := at("lldpd", "1.0.17")
+		f.shipped(t, graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{swss, teamd, third, libnl},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: swss}, {Parent: root, Child: teamd}, {Parent: root, Child: third},
+				{Parent: swss, Child: libnl}, {Parent: teamd, Child: libnl}, {Parent: third, Child: libnl},
+			},
+		})
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{found("CVE-2026-3S", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		issue, component := f.issueID(t, "CVE-2026-3S"), f.componentID(t, libnl.Name)
+		for consumer, state := range map[string]finding.FixState{
+			swss.Name: finding.NoFix, teamd.Name: finding.FixUnknown, third.Name: finding.WontFix,
+		} {
+			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+				Set(`"fix_state" = ?`, state).Set(`"fixed_in" = NULL`).
+				Where(`"vulnerability_id" = ?`, issue).
+				Where(`"consumer_id" = ?`, f.componentID(t, consumer)).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		gone := time.Now().UTC().AddDate(0, 0, -1)
+		if err := catalog.NewStore(f.db.DB).SetBranchOrTagEndOfLife(ctx, *f.scope.BranchOrTagID, &gone); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Recompute(ctx, finding.DefaultWindows()); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+		listed, _, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(listed) != 1 || listed[0].NoDeadline != finding.OutOfSupport {
+			t.Errorf("the list reads %+v, want one row out of support", listed)
+		}
+		evidence, err := f.store.Detail(ctx, who, f.build, issue, component)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if evidence.NoDeadline != finding.OutOfSupport {
+			t.Errorf("the finding says %q, want %q", evidence.NoDeadline, finding.OutOfSupport)
 		}
 	})
 }

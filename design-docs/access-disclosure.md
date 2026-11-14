@@ -56,7 +56,7 @@ with a reason (REQ-40), recorded as the embargo's last movement, `disclosure`.
 | A decision's row written after the occurrence was read takes the issue's visibility inside the write | No private row survives a disclosure landing between |
 | One way: nothing makes a disclosed issue undisclosed, and a later extension or shortening finds nothing to move | |
 | One disclosure waits at a time; a second that would wait is refused, and one taking effect at once is not and removes the waiting one | |
-| The end is read from the open occurrences, and from a closed occurrence's date only where nothing is open | |
+| The end is read from the open occurrences whenever one is held, an undated one included, and from a closed occurrence's date only where nothing is open | A closed occurrence keeps the date it closed with, and an issue whose open occurrences carry none has no date, which needs a second person to disclose |
 | The disclosure date is cleared; the movement keeps where the embargo stood | |
 | The embargo's history is public once disclosed, and before that read only by readers of undisclosed work in the product | |
 | A disclosure waiting for agreement changes nothing | |

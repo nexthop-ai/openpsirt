@@ -46,6 +46,10 @@ func Exploiting(urgency int64) bool { return urgency >= exploiting }
 // the condition can be deleted with the suite green.
 func (s *Store) JudgingAfter(fn func()) { s.afterReadingReport = fn }
 
+// PlacingAfter runs fn as a sweep reaches each rule, before the transaction
+// placing its work opens.
+func (s *Store) PlacingAfter(fn func()) { s.beforePlacing = fn }
+
 // Clock replaces the moment the store reads, for the test.
 //
 // Exported for the test alone: an identifier and a reference carry the year

@@ -501,15 +501,24 @@ type momentKey struct {
 }
 
 func (r trendRow) moment() momentKey {
+	return momentOf(r.VulnerabilityID, r.ComponentID, r.ProductID, r.OpenedAt, r.ClosedAt, r.OpenedRunID,
+		r.ClosedBecause)
+}
+
+// momentOf is the moment a finding's facts reduce to, for every reader keying
+// on one.
+func momentOf(vulnerability, component, product int64, opened time.Time, closed *time.Time, run *int64,
+	because string) momentKey {
+
 	k := momentKey{
-		vulnerability: r.VulnerabilityID, component: r.ComponentID, product: r.ProductID,
-		opened: r.OpenedAt.UnixNano(), because: r.ClosedBecause,
+		vulnerability: vulnerability, component: component, product: product,
+		opened: opened.UnixNano(), because: because,
 	}
-	if r.ClosedAt != nil {
-		k.closed = r.ClosedAt.UnixNano()
+	if closed != nil {
+		k.closed = closed.UnixNano()
 	}
-	if r.OpenedRunID != nil {
-		k.run = *r.OpenedRunID
+	if run != nil {
+		k.run = *run
 	}
 	return k
 }
@@ -678,16 +687,8 @@ func (s *Store) dismissedSpans(ctx context.Context, narrow trendNarrowing, since
 	}
 
 	for _, r := range read {
-		key := momentKey{
-			vulnerability: r.VulnerabilityID, component: r.ComponentID, product: r.ProductID,
-			opened: r.OpenedAt.UnixNano(), because: r.ClosedBecause,
-		}
-		if r.ClosedAt != nil {
-			key.closed = r.ClosedAt.UnixNano()
-		}
-		if r.OpenedRunID != nil {
-			key.run = *r.OpenedRunID
-		}
+		key := momentOf(r.VulnerabilityID, r.ComponentID, r.ProductID, r.OpenedAt, r.ClosedAt, r.OpenedRunID,
+			r.ClosedBecause)
 		if !wanted[key] {
 			continue
 		}

@@ -62,30 +62,56 @@ func Within(db *bun.DB, buildID, componentID int64) *bun.RawQuery {
 // MySQL 8.4, beneath a leaf package after 52 weekly rescans, a burndown read
 // in 1,034 ms with it and 22 ms without.
 func WithinAny(db bun.IDB, buildID int64, componentIDs []int64, fromRoot bool) *bun.RawQuery {
-	// No depth in the rows, for the reason the count beneath carries none:
-	// 167,785 rows for 10,045 components under one real product, 0.81 s
-	// against 0.10 s, and the union ends a cycle on its own.
-	seeds := `SELECT "n"."id" AS "node"
+	return db.NewRaw(downWalk(false, fromRoot)+
+		`SELECT DISTINCT "n"."component_id" FROM "down" AS "d" JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`,
+		downArgs(buildID, componentIDs, fromRoot)...)
+}
+
+// downWalk is the recursive statement "down" both downward walks run over a
+// build's live edges, so the count beneath a component and the list it opens
+// take the same steps. It starts from every live node of the components asked
+// about and, with fromRoot, from every component nothing pulls in as well
+// (§ unplacedSeeds). With started, each row also carries the node its walk
+// began at as "start". downArgs binds it.
+//
+// No depth in the rows. With one, the union keeps a node once per depth it is
+// reached at, and a node reached along many paths is walked again from each:
+// under one real product's root, 1,612,405 rows for 43,904 pairs, 9.0 s
+// against 0.19 s, and for the list alone 167,785 rows for 10,045 components,
+// 0.81 s against 0.10 s. Without one, a row already reached is not added
+// again, which is also what ends a cycle.
+func downWalk(started, fromRoot bool) string {
+	start, rootStart, carried, kept := "", "", "", ""
+	if started {
+		start, rootStart, carried, kept = `"n"."id" AS "start", `, `"rn"."id", `, `"seed"."start", `, `"d"."start", `
+	}
+	seeds := `SELECT ` + start + `"n"."id" AS "node"
 			FROM "graph_node" AS "n"
 			WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
-	args := []any{buildID, bun.List(componentIDs)}
 	if fromRoot {
 		seeds += `
 			UNION ALL
-			SELECT "fn"."id" FROM "graph_node" AS "rn" CROSS JOIN "graph_node" AS "fn"
+			SELECT ` + rootStart + `"fn"."id" FROM "graph_node" AS "rn" CROSS JOIN "graph_node" AS "fn"
 			WHERE ` + unplacedSeeds
-		args = append(args, buildID, true, bun.List(componentIDs), false)
 	}
-	return db.NewRaw(`WITH RECURSIVE "down" AS (
-		SELECT "seed"."node" FROM (`+seeds+`) AS "seed"
+	return `WITH RECURSIVE "down" AS (
+		SELECT ` + carried + `"seed"."node" FROM (` + seeds + `) AS "seed"
 		UNION
-		SELECT "e"."child_id"
+		SELECT ` + kept + `"e"."child_id"
 		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
 		WHERE "e"."build_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
 		  AND "e"."parent_id" <> "e"."child_id"
 	)
-	SELECT DISTINCT "n"."component_id" FROM "down" AS "d" JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`,
-		append(args, buildID)...)
+	`
+}
+
+// downArgs binds downWalk, in the order it writes its placeholders.
+func downArgs(buildID int64, of []int64, fromRoot bool) []any {
+	args := []any{buildID, bun.List(of)}
+	if fromRoot {
+		args = append(args, buildID, true, bun.List(of), false)
+	}
+	return append(args, buildID)
 }
 
 // RootAmong says whether one of these components is the live root of a build:
@@ -120,10 +146,15 @@ const unplacedSeeds = `"rn"."build_id" = ? AND "rn"."closed_scan_id" IS NULL AND
 			  AND ` + orphaned
 
 // Replaced is the components a build held and holds no longer, each with the
-// live components of the build carrying its name, as the build stated each. A finding keeps the
-// component it opened on, so a rescan at a new version replaces the component
-// and not the finding, and what was found on the old version is counted
-// wherever the present one sits. A component no live one names is left out.
+// live components of the build carrying its name in its ecosystem, as the build
+// stated each. A finding keeps the component it opened on, so a rescan at a new
+// version replaces the component and not the finding, and what was found on the
+// old version is counted wherever the present one sits. A component no live one
+// names is left out.
+//
+// The ecosystem is the type its package identifier names: an npm package and a
+// Python one of one name are different software. Where either side names no
+// type, the name alone matches.
 //
 // Two reads of the build's own nodes, on the index the build leads, matched by
 // name here. Joined to the live nodes by name in one statement, MySQL 8.4 probes
@@ -136,12 +167,13 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 		Name      string `bun:"name_folded"`
 		Opened    int64  `bun:"opened_scan_id"`
 		Node      int64  `bun:"id"`
+		Purl      string `bun:"purl"`
 	}
 	read := func(live bool) ([]named, error) {
 		var rows []named
 		q := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-			ColumnExpr(`"n"."component_id", `+NodeFolded("n", "c")+` AS "name_folded"`).
+			ColumnExpr(`"n"."component_id", `+NodeFolded("n", "c")+` AS "name_folded", "c"."purl"`).
 			Where(`"n"."build_id" = ?`, buildID).
 			Distinct()
 		if live {
@@ -167,22 +199,33 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 	if err != nil {
 		return nil, fmt.Errorf("read the components build %d held: %w", buildID, err)
 	}
+	type typed struct {
+		Component int64
+		Ecosystem string
+	}
 	live := map[int64]bool{}
-	byName := map[string][]int64{}
+	byName := map[string][]typed{}
 	for _, row := range held {
 		live[row.Component] = true
-		byName[row.Name] = append(byName[row.Name], row.Component)
+		byName[row.Name] = append(byName[row.Name], typed{row.Component, EcosystemOf(row.Purl)})
 	}
 	out := map[int64][]int64{}
-	last := map[int64]string{}
+	last := map[int64]named{}
 	for _, row := range closed {
 		if !live[row.Component] {
-			last[row.Component] = row.Name
+			last[row.Component] = row
 		}
 	}
-	for component, name := range last {
-		if len(byName[name]) > 0 {
-			out[component] = byName[name]
+	for component, row := range last {
+		ecosystem := EcosystemOf(row.Purl)
+		var same []int64
+		for _, namesake := range byName[row.Name] {
+			if ecosystem == "" || namesake.Ecosystem == "" || namesake.Ecosystem == ecosystem {
+				same = append(same, namesake.Component)
+			}
+		}
+		if len(same) > 0 {
+			out[component] = same
 		}
 	}
 	return out, nil
@@ -237,38 +280,11 @@ func (s *Store) reach(ctx context.Context, buildID int64, of []int64) ([]reachin
 	if err != nil {
 		return nil, err
 	}
-	seeds := `SELECT "n"."id" AS "start", "n"."id" AS "node"
-		FROM "graph_node" AS "n"
-		WHERE "n"."build_id" = ? AND "n"."closed_scan_id" IS NULL AND "n"."component_id" IN (?)`
-	walkArgs := []any{buildID, bun.List(of)}
-	if fromRoot {
-		seeds += `
-		UNION ALL
-		SELECT "rn"."id", "fn"."id" FROM "graph_node" AS "rn" CROSS JOIN "graph_node" AS "fn"
-		WHERE ` + unplacedSeeds
-		walkArgs = append(walkArgs, buildID, true, bun.List(of), false)
-	}
-	walkArgs = append(walkArgs, buildID)
-	// No depth in the rows. With one, the union keeps a node once per depth
-	// it is reached at, and a node reached along many paths is walked again
-	// from each: 1,612,405 rows for 43,904 pairs under one real product's
-	// root, 9.0 s against 0.19 s. Without one, a pair already reached is not
-	// added again, which is also what ends a cycle.
-	walk := `WITH RECURSIVE "down" AS (
-		SELECT "seed"."start", "seed"."node" FROM (` + seeds + `) AS "seed"
-		UNION
-		SELECT "d"."start", "e"."child_id"
-		FROM "down" AS "d" CROSS JOIN "graph_edge" AS "e"
-		WHERE "e"."build_id" = ? AND "e"."closed_scan_id" IS NULL AND "e"."parent_id" = "d"."node"
-		  AND "e"."parent_id" <> "e"."child_id"
-	)
-	`
-
 	var reached []reaching
-	err = s.db.NewRaw(walk+`SELECT DISTINCT "sn"."component_id" AS "start", "n"."component_id" AS "reached"
+	err = s.db.NewRaw(downWalk(true, fromRoot)+`SELECT DISTINCT "sn"."component_id" AS "start", "n"."component_id" AS "reached"
 	FROM "down" AS "d"
 	JOIN "graph_node" AS "sn" ON "sn"."id" = "d"."start"
-	JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`, walkArgs...).
+	JOIN "graph_node" AS "n" ON "n"."id" = "d"."node"`, downArgs(buildID, of, fromRoot)...).
 		Scan(ctx, &reached)
 	if err != nil {
 		return nil, fmt.Errorf("walk beneath each component: %w", err)

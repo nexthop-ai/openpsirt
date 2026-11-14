@@ -153,13 +153,16 @@ func registerWhoTold(api huma.API, in core.Deps) {
 			if err != nil {
 				return core.WentWrong(in.Logger, "that issue could not be looked up", err)
 			}
-			switch err := finding.NewVulnerabilities(tx).
-				AlsoKnownAs(ctx, subject, issue, input.Alias); {
+			added, err := finding.NewVulnerabilities(tx).AlsoKnownAs(ctx, subject, issue, input.Alias)
+			switch {
 			case errors.Is(err, finding.ErrNameTaken):
 				return huma.Error409Conflict(
 					"another issue already goes by that name, so this would merge two records")
 			case err != nil:
 				return core.Asked(in.Logger, err)
+			}
+			if !added {
+				return nil
 			}
 			// Recorded deployment-wide, because that is what it is: from here
 			// on a scan of any product reporting that name resolves to this

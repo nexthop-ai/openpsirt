@@ -50,7 +50,7 @@ type PlannedUpgradeItemBody struct {
 	// In names the builds that hold it, which is what a declaration is
 	// offered against: a bump is declared for releases, and the ones worth
 	// offering are the ones that have it.
-	In []BuildName `json:"in" doc:"The builds that hold this upgrade"`
+	In []core.BuildNamed `json:"in" doc:"The builds that hold this upgrade"`
 }
 
 // PlannedUpgradeQuery is the narrowing the planned-upgrade list takes.
@@ -220,10 +220,10 @@ func plannedUpgradeBodies(upgrades []finding.PlannedUpgrade, oneBuild bool) []Pl
 			Issues:     upgrade.Issues, Occurrences: upgrade.Occurrences,
 			Severity: upgrade.Severity, Exploited: upgrade.Exploited,
 			Incident: upgrade.Incident,
-			In:       make([]BuildName, 0, len(upgrade.In)),
+			In:       make([]core.BuildNamed, 0, len(upgrade.In)),
 		}
 		for _, at := range upgrade.In {
-			body.In = append(body.In, BuildName{BranchOrTag: at.BranchOrTag, Variant: at.Variant})
+			body.In = append(body.In, core.BuildNamed{BranchOrTag: at.BranchOrTag, Variant: at.Variant})
 		}
 		// Absent where the selection is one build, because then it is the
 		// same number on every row.
@@ -233,12 +233,6 @@ func plannedUpgradeBodies(upgrades []finding.PlannedUpgrade, oneBuild bool) []Pl
 		out = append(out, body)
 	}
 	return out
-}
-
-// BuildName is a release and variant, as the catalog names them.
-type BuildName struct {
-	BranchOrTag string `json:"branch_or_tag"`
-	Variant     string `json:"variant"`
 }
 
 // PlannedBody is one bump a release is waiting on.

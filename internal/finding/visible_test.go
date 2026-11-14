@@ -310,18 +310,16 @@ func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
 				ctx := t.Context()
 				f.shipped(t, twoConsumers())
 				f.foundOnLibnl(t)
-				var decisionID *int64
+				by := f.somebodyElse(t)
+				decisionID := decisionSaying(t, f.db, by, "upgrade-needed")
 				if argued {
 					// The build's findings stay disclosed; the decision
 					// covers an undisclosed occurrence, so only the
 					// decision withholds the commitment.
-					by := f.somebodyElse(t)
-					id := decisionSaying(t, f.db, by, "upgrade-needed")
 					f.decision(t, decisionRow{
-						By: by, Decision: id, Issue: f.issue(t, "CVE-2026-1"),
+						By: by, Decision: decisionID, Issue: f.issue(t, "CVE-2026-1"),
 						Occurrence: "libnl", State: "approved", Visibility: string(access.Private),
 					})
-					decisionID = &id
 				} else if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 					Set(`"visibility" = ?`, access.Private).Where("1 = 1").Exec(ctx); err != nil {
 					t.Fatal(err)
@@ -331,6 +329,14 @@ func TestACommitmentOverUndisclosedWorkIsToldOnlyToItsReaders(t *testing.T) {
 					f.componentID(t, libnl.Name), "3.9.0", nil, decisionID,
 					[]int64{f.build}, map[int64]string{}); err != nil {
 					t.Fatal(err)
+				}
+				// Every commitment this records names its decision, so one
+				// without a decision is written directly.
+				if !argued {
+					if _, err := f.db.DB.NewUpdate().TableExpr(`"upgrade"`).
+						Set(`"decision_id" = NULL`).Where("1 = 1").Exec(ctx); err != nil {
+						t.Fatal(err)
+					}
 				}
 
 				cases := []struct {
@@ -377,7 +383,7 @@ func TestACommitmentWhoseDecisionCoversNothingIsToldToNobody(t *testing.T) {
 		id := decisionSaying(t, f.db, f.somebodyElse(t), "upgrade-needed")
 		committer := f.someoneElse(t, access.PrivateTriage)
 		if _, err := f.store.CommitWithin(ctx, f.db.DB, committer, f.productID,
-			f.componentID(t, libnl.Name), "3.9.0", nil, &id,
+			f.componentID(t, libnl.Name), "3.9.0", nil, id,
 			[]int64{f.build}, map[int64]string{}); err != nil {
 			t.Fatal(err)
 		}
@@ -415,7 +421,7 @@ func TestACommitmentIsReadAtEachDecisionRowInItsOwnProduct(t *testing.T) {
 		})
 		committer := f.someoneElse(t, access.PrivateTriage)
 		if _, err := f.store.CommitWithin(ctx, f.db.DB, committer, f.productID,
-			f.componentID(t, libnl.Name), "3.9.0", nil, &id,
+			f.componentID(t, libnl.Name), "3.9.0", nil, id,
 			[]int64{f.build}, map[int64]string{}); err != nil {
 			t.Fatal(err)
 		}

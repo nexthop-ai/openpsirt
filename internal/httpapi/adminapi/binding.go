@@ -50,11 +50,11 @@ func registerBindings(api huma.API, a core.Administering, settings func(bun.IDB)
 		if _, _, err := readable(ctx, a, a.Handle()); err != nil {
 			return nil, err
 		}
-		stored, _, err := settings(a.Handle()).Get(ctx, setting.RoleMode)
+		mode, err := roleModeIn(settings)(ctx, a.Handle())
 		if err != nil {
 			return nil, core.WentWrong(a.Logger, "cannot read where roles come from", err)
 		}
-		return &struct{ Body ModeBody }{Body: ModeBody{Mode: core.Mode(access.AsMode(stored))}}, nil
+		return &struct{ Body ModeBody }{Body: ModeBody{Mode: core.Mode(mode)}}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{

@@ -6,6 +6,7 @@ package finding_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
@@ -610,6 +612,79 @@ func TestTwoEditsOfANoteAtOnceKeepEveryWording(t *testing.T) {
 		}
 		if !slices.Equal(said, []string{"First.", "The rival's."}) {
 			t.Errorf("the wordings kept read %q, want the first, then the rival's", said)
+		}
+	})
+}
+
+func TestTakingAReportOneAlreadyHoldsKeepsWhenItWasTaken(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		worker := f.holder(t, "worker@example.com", access.PrivateTriage)
+		row := f.aReport(t, worker, "Something.")
+		mine := worker.Party()
+		at := time.Now().UTC().Truncate(time.Second)
+		f.store.Clock(func() time.Time { return at })
+		taken, err := f.store.AssignReport(ctx, worker, f.productID, row.Reference, &mine, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.store.Clock(func() time.Time { return at.Add(time.Hour) })
+		again, err := f.store.AssignReport(ctx, worker, f.productID, row.Reference, &mine, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.AssignedAt == nil || !again.AssignedAt.Equal(*taken.AssignedAt) {
+			t.Errorf("taking it again answered held since %v, want %v", again.AssignedAt, taken.AssignedAt)
+		}
+		stored, err := f.store.ReportBy(ctx, worker, f.productID, row.Reference)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if stored.AssignedAt == nil || !stored.AssignedAt.Equal(at) {
+			t.Errorf("taking it again stored held since %v, want %v", stored.AssignedAt, at)
+		}
+		history, err := f.store.ReportHistory(ctx, worker, f.productID, row.Reference)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assigned := 0
+		for _, e := range history {
+			if e.Act == finding.ActAssigned {
+				assigned++
+			}
+		}
+		if assigned != 1 {
+			t.Errorf("taking it twice left %d assignments in its history, want one", assigned)
+		}
+	})
+}
+
+func TestReportHoldingsCountsEveryPartyHoldingAReport(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		worker := f.holder(t, "worker@example.com", access.PrivateTriage)
+		parties := database.InBulk.Most + 1
+		for i := 0; i < parties; i++ {
+			row := f.aReport(t, worker, fmt.Sprintf("Report %d.", i))
+			party := &struct {
+				bun.BaseModel `bun:"table:party"`
+				ID            int64  `bun:"id,pk,autoincrement"`
+				Kind          string `bun:"kind"`
+			}{Kind: "team"}
+			if _, err := f.db.DB.NewInsert().Model(party).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := f.db.DB.NewUpdate().Model((*finding.FlawReport)(nil)).
+				Set(`"assigned_to" = ?`, party.ID).Where(`"id" = ?`, row.ID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		counts, err := f.store.ReportHoldings(ctx, worker, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(counts) != parties {
+			t.Errorf("the holdings count %d parties, want every one of %d", len(counts), parties)
 		}
 	})
 }

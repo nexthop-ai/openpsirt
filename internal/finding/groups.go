@@ -623,13 +623,13 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 			group.NoDeadline = NotRated
 		case !floor.Admits(group.Exploited || group.Incident, group.Severity):
 			group.NoDeadline = BelowMinimumSeverity
-		// Asked of both ends rather than of the word they agree on. A group
-		// whose occurrences disagree reports "mixed", which is not a state
-		// upstream is ever in — and reading it as one tells a reader that a
-		// supported release is past its end of life, on the ordinary shape
-		// where a scanner says one thing in one build and another in the next.
-		case !Clocked(FixState(row.FixStateLeast), group.Exploited || group.Incident) &&
-			!Clocked(FixState(row.FixStateMost), group.Exploited || group.Incident):
+		// Asked of every occurrence rather than of the word they agree on. A
+		// group whose occurrences disagree reports "mixed", which is not a
+		// state upstream is ever in — and reading it as one tells a reader
+		// that a supported release is past its end of life, on the ordinary
+		// shape where a scanner says one thing in one build and another in
+		// the next.
+		case row.ClosableAny == 0 && (row.WontFixAny == 0 || (!group.Exploited && !group.Incident)):
 			group.NoDeadline = NothingToTake
 		default:
 			group.NoDeadline = OutOfSupport
@@ -777,11 +777,15 @@ type decorated struct {
 	// clock.
 	Recorded     int    `bun:"recorded"`
 	FixStateMost string `bun:"fix_state_most"`
-	FixedIn      string `bun:"fixed_in"`
-	Matched      string `bun:"matched"`
-	ConsumerID   *int64 `bun:"consumer_id"`
-	Consumers    int    `bun:"consumers"`
-	Direct       int    `bun:"direct"`
+	// ClosableAny and WontFixAny say whether any occurrence is in a state
+	// with a clock, and any in the state exploitation puts back on it.
+	ClosableAny int    `bun:"closable_any"`
+	WontFixAny  int    `bun:"wont_fix_any"`
+	FixedIn     string `bun:"fixed_in"`
+	Matched     string `bun:"matched"`
+	ConsumerID  *int64 `bun:"consumer_id"`
+	Consumers   int    `bun:"consumers"`
+	Direct      int    `bun:"direct"`
 	// Packages is how many binaries of the fold sit here and ConsumerOccurrences
 	// how many things pull them in — the two numbers a reader is shown.
 	Packages            int   `bun:"packages"`
@@ -795,6 +799,80 @@ type decorated struct {
 	// PublicationUnknown is how many occurrences open over the widest
 	// stretch because no date was known for the issue.
 	PublicationUnknown int `bun:"publication_unknown"`
+}
+
+// groupDecorations adds what a list row shows about a group to a query over
+// finding AS "f", joined to the issue as "v", the component as "c" and its
+// consumer as "uc", and grouped by issue and fold. Every list reading groups
+// adds them through here, so a row answers alike on each.
+func groupDecorations(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.
+		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
+		ColumnExpr(`MAX(COALESCE("v"."likelihood_ppm", 0)) AS "likelihood_ppm"`).
+		ColumnExpr(`MAX(COALESCE(`+ScoreHere+`, 0)) AS "score_centi"`).
+		// Any of the issues folded here carrying a score at all.
+		// Written as a number rather than as a boolean, because the four
+		// engines do not agree about what a boolean out of an aggregate is.
+		ColumnExpr(`MAX(CASE WHEN `+ScoreHere+` IS NULL THEN 0 ELSE 1 END) AS "scored"`).
+		// The scheme that score is on. A group is one issue, so every row it
+		// folds carries the same one and the aggregate is that value.
+		ColumnExpr(`MAX(COALESCE(`+ScoreVersionHere+`, '')) AS "score_version"`).
+		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
+		// The earliest opening among these occurrences, and the earliest deadline
+		// any of them carries. The age a deadline relates to is this one, not
+		// the year in the identifier.
+		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
+		ColumnExpr(openDue+` AS "due_at"`).
+		// Anything here undisclosed, and the earliest embargo
+		// ends. One undisclosed occurrence among fifty makes the group
+		// undisclosed, which is what it is for anybody deciding what may be
+		// said about it.
+		//
+		// Counted rather than aggregated over the word. "private" does not
+		// sort after "public", so a maximum of the word answers "public" for
+		// a mixed group. The four engines do not agree on a boolean aggregate
+		// either, and counting is the same question asked portably.
+		ColumnExpr(access.AnyPrivateAs(`"f"."visibility"`, "undisclosed")).
+		ColumnExpr(`MIN("f"."disclose_at") AS "disclose_at"`).
+		// Both ends of what the occurrences say, because a group whose
+		// occurrences disagree is what FixMixed is for and a minimum alone
+		// cannot say it: the filter selected exactly that set and every row
+		// came back claiming one definite state, with a version taken from
+		// whichever of the disagreeing rows sorted first.
+		ColumnExpr(`MIN("f"."fix_state") AS "fix_state_least"`).
+		// Whether any occurrence is in a state with a clock, and any in the
+		// one state exploitation puts back on it (Clocked), so a reason for
+		// no deadline is asked of every occurrence rather than of the ends
+		// of an order the words happen to sort in.
+		ColumnExpr(`MAX(CASE WHEN "f"."fix_state" IN (?) THEN 0 ELSE 1 END) AS "closable_any"`,
+			bun.List(noVersionToTake)).
+		ColumnExpr(`MAX(CASE WHEN "f"."fix_state" = ? THEN 1 ELSE 0 END) AS "wont_fix_any"`, WontFix).
+		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
+		ColumnExpr(`MAX("f"."fix_state") AS "fix_state_most"`).
+		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
+		// Any of them: a group is an issue at a component, every occurrence of it
+		// comes from one line of a scanner's report, and the applier writes
+		// that line to all of them.
+		ColumnExpr(`MIN(COALESCE("f"."matched", '')) AS "matched"`).
+		// One of the ways down, and how many there are. MIN passes over the
+		// occurrences the build pulls in directly, whose consumer is null, so
+		// those are counted separately rather than being read as "no route at
+		// all".
+		ColumnExpr(`MIN("f"."consumer_id") AS "consumer_id"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."consumer_id") AS "consumers"`).
+		// The other number a reader is shown, counted here rather than beside
+		// the window function that pages the list — see groupHead. The
+		// consumers are already counted just above, and a distinct count of
+		// occurrence identities would not do: an occurrence is a package under
+		// a consumer, so across a fold of three packages that is the occurrence
+		// count with a different word on it.
+		ColumnExpr(`COUNT(DISTINCT "f"."component_id") AS "packages"`).
+		ColumnExpr(`SUM(CASE WHEN "f"."consumer_id" IS NULL THEN 1 ELSE 0 END) AS "direct"`).
+		// The number of builds in the selection holding this group, and one of
+		// them to name. Both are one where the selection is a single build,
+		// which is why the row says nothing about either there.
+		ColumnExpr(`COUNT(DISTINCT "f"."build_id") AS "builds"`).
+		ColumnExpr(`MIN("f"."build_id") AS "build_id"`)
 }
 
 // heads reads one page of the findings list's groups, most urgent first, from
@@ -973,66 +1051,8 @@ func (s *Store) decorate(ctx context.Context, buildIDs []int64, productID int64,
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(FoldedOn+` AS "fold"`).
-		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
-		ColumnExpr(`MAX(COALESCE("v"."likelihood_ppm", 0)) AS "likelihood_ppm"`).
-		ColumnExpr(`MAX(COALESCE(`+ScoreHere+`, 0)) AS "score_centi"`).
-		// Any of the issues folded here carrying a score at all.
-		// Written as a number rather than as a boolean, because the four
-		// engines do not agree about what a boolean out of an aggregate is.
-		ColumnExpr(`MAX(CASE WHEN `+ScoreHere+` IS NULL THEN 0 ELSE 1 END) AS "scored"`).
-		// The scheme that score is on. A group is one issue, so every row it
-		// folds carries the same one and the aggregate is that value.
-		ColumnExpr(`MAX(COALESCE(`+ScoreVersionHere+`, '')) AS "score_version"`).
-		ColumnExpr(`SUM(CASE WHEN `+NotArguedAway+` THEN 0 ELSE 1 END) AS "answered"`).
-		// The earliest opening among these occurrences, and the earliest deadline
-		// any of them carries. The age a deadline relates to is this one, not
-		// the year in the identifier.
-		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
-		ColumnExpr(openDue+` AS "due_at"`).
-		// Anything here undisclosed, and the earliest embargo
-		// ends. One undisclosed occurrence among fifty makes the group
-		// undisclosed, which is what it is for anybody deciding what may be
-		// said about it.
-		//
-		// Counted rather than aggregated over the word. "private" does not
-		// sort after "public", so a maximum of the word answers "public" for
-		// a mixed group. The four engines do not agree on a boolean aggregate
-		// either, and counting is the same question asked portably.
-		ColumnExpr(access.AnyPrivateAs(`"f"."visibility"`, "undisclosed")).
-		ColumnExpr(`MIN("f"."disclose_at") AS "disclose_at"`).
-		// Both ends of what the occurrences say, because a group whose
-		// occurrences disagree is what FixMixed is for and a minimum alone
-		// cannot say it: the filter selected exactly that set and every row
-		// came back claiming one definite state, with a version taken from
-		// whichever of the disagreeing rows sorted first.
-		ColumnExpr(`MIN("f"."fix_state") AS "fix_state_least"`).
-		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
-		ColumnExpr(`MAX("f"."fix_state") AS "fix_state_most"`).
-		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
-		// Any of them: a group is an issue at a component, every occurrence of it
-		// comes from one line of a scanner's report, and the applier writes
-		// that line to all of them.
-		ColumnExpr(`MIN(COALESCE("f"."matched", '')) AS "matched"`).
-		// One of the ways down, and how many there are. MIN passes over the
-		// occurrences the build pulls in directly, whose consumer is null, so
-		// those are counted separately rather than being read as "no route at
-		// all".
-		ColumnExpr(`MIN("f"."consumer_id") AS "consumer_id"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."consumer_id") AS "consumers"`).
-		// The other number a reader is shown, counted here rather than beside
-		// the window function that pages the list — see groupHead. The
-		// consumers are already counted just above, and a distinct count of
-		// occurrence identities would not do: an occurrence is a package under
-		// a consumer, so across a fold of three packages that is the occurrence
-		// count with a different word on it.
-		ColumnExpr(`COUNT(DISTINCT "f"."component_id") AS "packages"`).
-		ColumnExpr(`SUM(CASE WHEN "f"."consumer_id" IS NULL THEN 1 ELSE 0 END) AS "direct"`).
-		// The number of builds in the selection holding this group, and one of
-		// them to name. Both are one where the selection is a single build,
-		// which is why the row says nothing about either there.
-		ColumnExpr(`COUNT(DISTINCT "f"."build_id") AS "builds"`).
-		ColumnExpr(`MIN("f"."build_id") AS "build_id"`)
+		ColumnExpr(FoldedOn + ` AS "fold"`)
+	q = groupDecorations(q)
 	// The decision state of each group, counted the way the state filter
 	// counts it, so the row and the filter cannot disagree. One spelling of
 	// each state, in decided.go.
