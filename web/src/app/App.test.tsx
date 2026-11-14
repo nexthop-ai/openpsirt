@@ -109,6 +109,17 @@ describe("the application after a refused sign-in", () => {
   });
 });
 
+describe("the application after a refused sign-in with no way in", () => {
+  afterEach(() => window.history.replaceState({}, "", "/"));
+
+  it("says no way in is configured, and not to ask for access", async () => {
+    window.history.replaceState({}, "", "/?no-access");
+    await drawn(() => ({ status: 401 }), "/");
+    expect(text()).toContain("No way in is configured.");
+    expect(text()).not.toContain("Ask an administrator for access.");
+  });
+});
+
 describe("the application for somebody signed in", () => {
   it("keeps an address it does not answer in the bar and says so", async () => {
     await drawn(() => ({ data: WHO }));
