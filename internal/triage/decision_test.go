@@ -1136,6 +1136,45 @@ func TestAWithdrawalIsReportedAsTheWithdrawersAct(t *testing.T) {
 	})
 }
 
+func TestARevisedDecisionNamesNobodyWhoEndedIt(t *testing.T) {
+	// Revising a withdrawn decision brings it back to life, so nobody
+	// withdrew what stands.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		claimed := f.decisions(t, f.at())
+		other := f.privateTriager(t, "other-triager", "Other Triager")
+		if _, err := f.store.Withdraw(ctx, other, claimed.DecisionID); err != nil {
+			t.Fatal(err)
+		}
+		endedBy := func() []*int64 {
+			var rows []triage.DecisionOccurrence
+			if err := f.db.DB.NewSelect().Model(&rows).
+				Where(`"de"."decision_id" = ?`, claimed.DecisionID).Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			out := make([]*int64, 0, len(rows))
+			for _, row := range rows {
+				out = append(out, row.EndedBy)
+			}
+			return out
+		}
+		for _, by := range endedBy() {
+			if by == nil || *by != other.ID {
+				t.Fatalf("a withdrawn row names %v as its withdrawer; want %d, or this tests nothing", by, other.ID)
+			}
+		}
+		if _, err := f.store.Revise(ctx, f.triager, claimed.DecisionID,
+			"Looked again: the call site is reachable after all."); err != nil {
+			t.Fatal(err)
+		}
+		for _, by := range endedBy() {
+			if by != nil {
+				t.Errorf("a revised row still names %d as its withdrawer", *by)
+			}
+		}
+	})
+}
+
 func TestProposingUnderAMergedNameLeavesTheRequestAsGivenAndNamesWhatStands(t *testing.T) {
 	// A proposal naming an issue that merged into another is written under
 	// the issue that stands. The rewrite is the write's own: the proposals a

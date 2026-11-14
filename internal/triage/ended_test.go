@@ -339,6 +339,23 @@ func TestAWithdrawalCountsForWhoeverWithdrewIt(t *testing.T) {
 			t.Errorf("throughput reads %+v; want the withdrawer and the proposer, alike in work, by name",
 				measured.Throughput)
 		}
+		// Narrowed to people, a withdrawal is theirs who withdrew it: a team's
+		// count is of what its own people took back, whoever proposed it.
+		narrowed, err := f.store.Measure(ctx, f.reviewer, triage.Measuring{People: []int64{f.approver}},
+			time.Time{}, time.Time{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		withdrew := 0
+		for _, one := range narrowed.Throughput {
+			if one.Person == "approver" {
+				withdrew = one.Withdrawn
+			}
+		}
+		if withdrew != 1 {
+			t.Errorf("narrowed to the withdrawer, throughput reads %+v; want their one withdrawal",
+				narrowed.Throughput)
+		}
 	})
 }
 
