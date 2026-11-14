@@ -64,8 +64,9 @@ var lockAttemptSeconds = 5
 var waitLogEvery = time.Minute
 
 // resetWait bounds unwinding the session before the connection goes back to
-// the pool. It is one round trip against a server that has just answered.
-const resetWait = 5 * time.Second
+// the pool. It is one round trip against a server that has just answered. A
+// variable only so tests can shorten it.
+var resetWait = 5 * time.Second
 
 // keepAliveEvery is how often the connection holding the lock is used while
 // the migration runs on another. A variable only so tests can shorten it.
@@ -108,6 +109,10 @@ func keepAlive(ctx context.Context, conn *sql.Conn) keeper {
 // does when the driver gives up on it or the server answers late. Closed, the
 // session ends and the server frees the lock; returned to the pool, the
 // connection would carry the lock to whichever query takes it next.
+//
+// An unlock that failed abandons the connection too. A statement whose
+// context had already ended is refused before it is sent, and neither driver
+// closes the connection for it, so its session still holds the lock.
 func abandon(k keeper, conn *sql.Conn) {
 	go func() {
 		<-k.finished
@@ -218,15 +223,16 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 				abandon(keeping, conn)
 				return err
 			}
-			defer closeConn()
 			// pg_advisory_unlock answers false when this session did not hold
 			// the lock. Executing it without reading the result would report
 			// success while leaking the lock.
 			var released *int
 			if err := conn.QueryRowContext(ctx,
 				"SELECT CAST(pg_advisory_unlock($1) AS INTEGER)", lockID).Scan(&released); err != nil {
+				abandon(keeping, conn)
 				return fmt.Errorf("release migration lock: %w", err)
 			}
+			closeConn()
 			return heldWhenReleased(released)
 		}, nil
 
@@ -266,14 +272,15 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 				abandon(keeping, conn)
 				return err
 			}
-			defer closeConn()
 			// RELEASE_LOCK answers 0 when held by another session and NULL
 			// when no such lock exists. Neither is an error to the driver.
 			var released *int
 			if err := conn.QueryRowContext(ctx,
 				"SELECT RELEASE_LOCK(?)", name).Scan(&released); err != nil {
+				abandon(keeping, conn)
 				return fmt.Errorf("release migration lock: %w", err)
 			}
+			closeConn()
 			return heldWhenReleased(released)
 		}, nil
 	}

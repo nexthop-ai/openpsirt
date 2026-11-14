@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -427,4 +428,35 @@ func TestTheCleanDropsOnlyANameTheHarnessMakes(t *testing.T) {
 			t.Errorf("%q was read as a name the harness makes", name)
 		}
 	}
+}
+
+// A database under the prefix whose name the harness never makes is left by
+// the clean, which says so, rather than dropped through a statement its name
+// is written into.
+func TestTheCleanLeavesANameTheHarnessNeverMakes(t *testing.T) {
+	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
+		ctx := t.Context()
+		admin := Open(t, base)
+		namespace := slotSpace(t, engine)
+		dropAfter(t, admin, engine, namespace)
+		foreign := namespace + "by-hand"
+		if _, err := admin.ExecContext(ctx, `CREATE DATABASE "`+foreign+`"`); err != nil {
+			t.Fatalf("make %s: %v", foreign, err)
+		}
+
+		dropped, _, err := dropUnheld(ctx, engine, base, namespace, nil, true)
+		if err == nil || !strings.Contains(err.Error(), "not a name this harness makes") {
+			t.Errorf("the clean answered %v, want it to say it left %s", err, foreign)
+		}
+		if slices.Contains(dropped, foreign) {
+			t.Errorf("the clean dropped %s, a name the harness never makes", foreign)
+		}
+		left, err := databasesFor(ctx, admin, engine, namespace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(left, foreign) {
+			t.Errorf("the server no longer holds %s, so the clean dropped it", foreign)
+		}
+	})
 }

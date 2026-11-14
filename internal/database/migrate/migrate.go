@@ -275,10 +275,9 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 
 // releaseWithin releases the migration lock within resetWait, whatever
 // happened to ctx, and a release answering past it is reported. An unlock
-// statement outliving its context has its connection closed by both
-// drivers, which ends the session and frees the lock on the server. A
-// keep-alive use still running leaves the connection to be closed once that
-// use ends.
+// that fails has its connection closed, never pooled, which ends the session
+// and frees the lock on the server. A keep-alive use still running leaves the
+// connection to be closed once that use ends.
 func releaseWithin(ctx context.Context, release unlock) error {
 	releasing, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
 	defer cancel()

@@ -286,6 +286,7 @@ One instance migrates at a time (REQ-72).
 | The pinned connection is used every half minute while held | Checked out past the idle timeout, a server's or intermediary's idle timeout would end the session and release the lock to a waiter |
 | A keep-alive use carries no deadline | Both drivers close a connection whose query outlives its context, which loses the lock the same way |
 | The release is bounded, as unwinding the session is, and waits for a keep-alive use no longer than that | A stalled connection otherwise holds the start for as long as the operating system retransmits, after the work is done. The failure is reported, and the connection is closed once its use ends, never returned to the pool, so its session ends and the server frees the lock |
+| An unlock that fails closes its connection, never returning it to the pool | A statement whose context has already ended is refused before it is sent, and neither driver closes the connection for it, so its session still holds the lock |
 | A pool of one is refused before the lock is taken, on the three servers, naming `OPENPSIRT_DB_MAX_OPEN` | The lock holds one connection and the migration needs another, so it would wait for ever |
 | PostgreSQL's attempt bound is a session setting unwound before the connection goes back, on every path | Left set, one pooled connection carries a five-second bound and the same query waits or is canceled by which connection it gets. `GET_LOCK` takes its bound as an argument |
 
