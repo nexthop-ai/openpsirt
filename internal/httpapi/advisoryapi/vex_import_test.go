@@ -553,13 +553,9 @@ func TestADocumentPastTheByteLimitIsRefusedAsTooLarge(t *testing.T) {
 	})
 }
 
-// Supersession is keyed on who issued a document, never on the name of the
-// file it arrived as. A revision under a new file name sets aside what the
-// publisher no longer says; another publisher's file of the same name sets
-// aside nothing of theirs; a document naming nobody is refused.
 // A VEX document is replaced by a later revision of itself, its publisher and
 // its own identifier, and never by its file name or by another document from
-// the same publisher.
+// the same publisher. A document naming no publisher is refused.
 func TestAVexDocumentIsSupersededByItsRevisionAndNeverByItsFileName(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
