@@ -128,6 +128,41 @@ describe("the application after a refused sign-in with no way in", () => {
   });
 });
 
+describe("the application for a browser the proxy named and this deployment refused", () => {
+  it("says there is no access here, and offers no way in the proxy would override", async () => {
+    await drawn(() => ({ status: 401 }), "/", {
+      data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }], named_by_proxy: true },
+    });
+    expect(text()).toContain("No access here");
+    expect(text()).toContain("Ask an administrator for access.");
+    expect(text()).not.toContain("Sign in to continue");
+    expect(text()).not.toContain("Continue with");
+  });
+
+  it("says there is no access here where no provider is configured", async () => {
+    await drawn(() => ({ status: 401 }), "/", { data: { items: [], named_by_proxy: true } });
+    expect(text()).toContain("No access here");
+    expect(text()).not.toContain("No way in is configured.");
+  });
+});
+
+describe("the application after a sign-in that failed on this side", () => {
+  afterEach(() => window.history.replaceState({}, "", "/"));
+
+  it("says to try again, and offers the way in without forwarding", async () => {
+    window.history.replaceState({}, "", "/?sign-in-failed");
+    await drawn(() => ({ status: 401 }), "/", {
+      data: { items: [{ name: "oidc", path: "/v1/sign-in/oidc" }] },
+    });
+    expect(text()).toContain("Sign-in didn\u2019t finish");
+    expect(text()).toContain("Try again shortly.");
+    expect(text()).not.toContain("No access here");
+    expect(text()).not.toContain("Sign in to continue");
+    const way = mount.host().querySelector<HTMLAnchorElement>('a[href^="/v1/sign-in/oidc"]');
+    expect(way?.getAttribute("href")).toBe("/v1/sign-in/oidc");
+  });
+});
+
 describe("the application for somebody signed in", () => {
   it("keeps an address it does not answer in the bar and says so", async () => {
     await drawn(() => ({ data: WHO }));

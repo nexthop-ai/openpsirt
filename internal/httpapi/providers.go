@@ -13,6 +13,18 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
+// namedByProxy marks a request the trusted proxy named somebody on.
+type namedByProxy struct{}
+
+// ProvidersBody is the ways in, and whether the proxy named the browser asking.
+type ProvidersBody struct {
+	Items []ProviderBody `json:"items"`
+	// NamedByProxy lets a browser the proxy named, and that is refused here,
+	// show the screen a refused sign-in lands on. It is the same for every
+	// reason a person is refused.
+	NamedByProxy bool `json:"named_by_proxy,omitempty" doc:"Whether the trusted proxy in front of this deployment named the person asking. Where it did and a request as them is refused, they were refused, for a reason this does not say"`
+}
+
 // ProviderBody is one way in.
 type ProviderBody struct {
 	Name string `json:"name" doc:"The segment in the sign-in path"`
@@ -26,13 +38,15 @@ func registerProviders(api huma.API, in core.Deps) {
 		Description: "Returns the sign-in providers this deployment has configured, so a " +
 			"sign-in page can offer them.\n\n" +
 			"Answered without a credential, because it is what somebody sees before they " +
-			"have one. It is the only reading endpoint that is, and it reports names an " +
-			"operator configured and nothing else — no account exists or does not exist as far " +
-			"as this is concerned, which is the disclosure that would matter.",
+			"have one. It is the only reading endpoint that is. It reports names an " +
+			"operator configured, and whether the trusted proxy in front of this deployment " +
+			"named the person asking; no account exists or does not exist as far as this is " +
+			"concerned, which is the disclosure that would matter.",
 		Tags: []string{"Access"},
-	}, core.NoCredential, ""), func(ctx context.Context, _ *struct{}) (*core.ListOutput[ProviderBody], error) {
+	}, core.NoCredential, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body ProvidersBody }, error) {
 		in := core.Of(ctx, in)
-		out := &core.ListOutput[ProviderBody]{}
+		out := &struct{ Body ProvidersBody }{}
+		out.Body.NamedByProxy, _ = ctx.Value(namedByProxy{}).(bool)
 		out.Body.Items = make([]ProviderBody, 0, len(in.Providers))
 		for name := range in.Providers {
 			out.Body.Items = append(out.Body.Items, ProviderBody{

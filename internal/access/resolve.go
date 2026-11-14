@@ -187,6 +187,14 @@ func NewResolver(store *Store, trust Trust) *Resolver {
 	}
 }
 
+// NamedByProxy reports whether a request carries the trusted header from a
+// source it is honored from: the proxy in front of this deployment named
+// somebody. It says nothing about whether they are let in.
+func (r *Resolver) NamedByProxy(req *http.Request) bool {
+	return r.trust.Enabled() && strings.TrimSpace(req.Header.Get(r.trust.Header)) != "" &&
+		r.trust.trusts(req.RemoteAddr)
+}
+
 // WithMode tells the resolver where roles come from.
 func (r *Resolver) WithMode(mode func(context.Context) Mode) *Resolver {
 	if mode != nil {
