@@ -3295,8 +3295,13 @@ this tells nobody anything outside it, which is an ordinary way to run: the
 notification area in the interface still works.</p>
 <p><code>MAIL_FROM</code> and <code>MAIL_SERVER</code> are both needed for mail to happen at all — a
 server with nobody to send as is half a configuration, and either alone sends
-nothing rather than failing at startup. Credentials are optional, and are
-refused over a connection the server would not secure with STARTTLS.</p>
+nothing rather than failing at startup. Credentials are optional. A message
+goes only over a connection the server secured with STARTTLS, since a network
+that strips STARTTLS from the server's answer looks like a server offering
+none. <code>OPENPSIRT_MAIL_ALLOW_PLAINTEXT</code> accepts a server without it, and a
+deployment that sets it is told so at every start:</p>
+<pre><code>WARN mail may cross the network in the clear server=relay.internal:25
+</code></pre>
 <table>
 <thead>
 <tr>
@@ -3331,10 +3336,18 @@ refused over a connection the server would not secure with STARTTLS.</p>
 <td>Password for that username. Sent only after STARTTLS</td>
 <td>unset</td>
 </tr>
+<tr>
+<td><code>OPENPSIRT_MAIL_ALLOW_PLAINTEXT</code></td>
+<td><code>mail.allow_plaintext</code></td>
+<td>Send to a server that offers no STARTTLS, which is otherwise refused. For a relay on a network you accept mail crossing in the clear. Refused beside <code>OPENPSIRT_MAIL_USERNAME</code>, since a username is sent only after STARTTLS</td>
+<td>off</td>
+</tr>
 </tbody>
 </table>
 <p>Who gets what is not configuration: each person chooses in their own settings,
-and the daily digest is off until somebody asks for it. A message about a
+and the daily digest is off until somebody asks for it. Mail carries a notice as
+it happens only where somebody must act on it, such as work assigned to them or
+a decision waiting on them; every other notice reaches mail in the digest. A message about a
 finding nobody has announced carries no detail — only that there is something,
 and a link.</p>
 <p>On the Helm chart these are the <code>mail</code> values, and the password goes in a
@@ -5520,6 +5533,22 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <tr>
 <td>A build's OpenVEX document states a decision not to fix that names no mitigation as affected, its action saying no fix is planned. v0.12.0 left such a decision out</td>
 <td>Nothing, unless one should not be stated: the first publishing pass after the upgrade states every one</td>
+</tr>
+<tr>
+<td>Mail carries a notice as it happens only where somebody must act on it: work assigned to them, a mention, a decision or suppression rule waiting on them, a decision sent back, an embargo's disclosure date coming or arriving, a response window coming due or passed, a deferral ending, an approval withdrawn or undone, a decision lapsing, a critical finding in a release, an unanswered report and a reporter's message. Every other notice reaches mail in the daily digest, which lists it. v0.12.0 mailed every notice as it happened</td>
+<td>Nothing. Somebody who wants the rest by mail turns the daily digest on in their own settings; without it, those notices stay in the application</td>
+</tr>
+<tr>
+<td>Mail to a server that offers no STARTTLS is refused and logged at error, and every notice and digest waits unsent until the configuration changes. v0.12.0 sent it in the clear</td>
+<td>Give the mail server STARTTLS. For a relay on a network you accept mail crossing in the clear, set <code>OPENPSIRT_MAIL_ALLOW_PLAINTEXT</code> with no username, which is sent only after STARTTLS</td>
+</tr>
+<tr>
+<td>A process whose clock stands more than 15 seconds from the database's stops at startup, naming by how far. v0.12.0 started with any clock</td>
+<td>Synchronize every host's clock and the database server's before upgrading</td>
+</tr>
+<tr>
+<td>A patch link's repository on github.com or gitlab.com is known by its path in lower case, as those hosts compare it. A repository recorded under a path with capitals is cloned once more under the new key, and the earlier copy is evicted like any unused one</td>
+<td>Nothing. The first pass after the upgrade takes longer for those repositories</td>
 </tr>
 </tbody>
 </table>
