@@ -46,8 +46,9 @@ line, each on what the last left.
 | Rule | Reason |
 |---|---|
 | A code finding the last comparable run missed is a candidate in every layer; one it saw comes first on a tie | Of 28 absences hand-checked, 5 returned within two builds |
-| Where a whole key is held twice, by two results of a run or by two code findings, a code finding last seen at a result's column with its message is paired with it before any other holding the key | Each keeps its code finding whatever order a run lists them in, and a lone result returning takes its own |
-| Where a function key is held twice, a code finding last seen at a result's column is paired with it first; on the nearest line, at one distance, a code finding at the result's column comes first | A line inserted above results sharing a line moves them all off the whole key |
+| Where a whole key is held twice, by two results of a run or by two occurrences, a code finding last seen at a result's column with its message is paired with it before any other holding the key | Each keeps its code finding whatever order a run lists them in, and a lone result returning takes its own |
+| Where a function key is held twice, a code finding last seen at a result's column is paired with it first; on the nearest line, at one distance, the code finding nearest the result's column comes first | A line inserted above results sharing a line moves them all off the whole key |
+| Where a whole or function key is held twice, the results no column paired are paired with the code findings left in the order of their columns, then messages; the code findings taking part are the first by the tie order, as many as there are results | A shift of indent moves every result on a line off its column, and the run may list them in any order |
 | The line layer offers the eight nearest code findings sharing the line key | A generated file holds thousands under one key |
 | Each sighting records its pairing layer | A dismissal carries on strong and lapses on probable (`design-docs/analysis-triage.md` § Code finding triage) |
 
@@ -68,10 +69,10 @@ key, so first seen on two builds at once it is one occurrence.
 
 | Rule | Reason |
 |---|---|
-| An occurrence is carried to one result of a run at most, and never one open on the build already | Two code findings open at one occurrence on one build would be answered by one decision |
+| An occurrence is carried to one result of a run at most, and never one open on the build already; two code findings open at one occurrence on the parent build carry it to one result | Two code findings open at one occurrence on one build would be answered by one decision |
 | Results of one run sharing a whole key open one occurrence each: the first at the key's, each later one at the key's with an ordinal, ordered by column then message | The key holds no column and no digits, so two flaws on one line share it; the first keeps the key's own occurrence |
 | An occurrence derived for a result that is open on the build already, under a key that has since moved, takes the next ordinal | |
-| Where a whole key is held twice, by two results of a run or by two code findings of the series, an occurrence carried on it last seen at a result's column with its message goes to that result first | As on the build; only those keys' messages are read, since a key's code findings span the series' builds |
+| Where a whole key is held twice, by two results of a run or by two occurrences of the series, an occurrence carried on it last seen at a result's column with its message goes to that result first, and the rest go in the order of their columns and messages | As on the build; only those keys' messages are read, since one occurrence's code findings span the series' builds |
 
 ## Fingerprint change
 

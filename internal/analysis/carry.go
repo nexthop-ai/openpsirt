@@ -108,8 +108,17 @@ func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fr
 	if printsChanged {
 		layers = pairAcross
 	}
+	// Two code findings open at one occurrence on the parent build are two
+	// candidates; the occurrence goes to the first result paired with either,
+	// and the other result is looked up across the series.
+	given := map[string]bool{}
 	for _, p := range layers(candidates, fresh) {
-		out[p.result] = carried{occurrence: candidates[p.candidate].occurrence, on: p.on, from: fromParent}
+		o := candidates[p.candidate].occurrence
+		if given[o] {
+			continue
+		}
+		given[o] = true
+		out[p.result] = carried{occurrence: o, on: p.on, from: fromParent}
 	}
 	return nil
 }
@@ -230,9 +239,32 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 			take(i, at[spotKey{k.Key, spot{k.StartColumn, k.Message}}])
 		}
 	}
+	// Under a key held twice, the results no spot answered take what is
+	// left in the order of their spots, so a shift moving every result on a
+	// line keeps each with its own, whatever order the run lists them in.
+	left := map[string][]int{}
 	for i, k := range fresh {
-		if _, done := out[i]; !done {
-			take(i, byKey[k.Key])
+		if _, done := out[i]; done {
+			continue
+		}
+		if shared[k.Key] {
+			left[k.Key] = append(left[k.Key], i)
+			continue
+		}
+		take(i, byKey[k.Key])
+	}
+	for k, rs := range left {
+		var open []keyHit
+		seen := map[string]bool{}
+		for _, h := range byKey[k] {
+			if !used[h.Occurrence] && !seen[h.Occurrence] {
+				seen[h.Occurrence] = true
+				open = append(open, h)
+			}
+		}
+		for _, p := range byRank(rs, open, func(i int) spot { return spot{fresh[i].StartColumn, fresh[i].Message} },
+			func(h keyHit) spot { n := newest[h.Occurrence]; return spotOf(n.Column, messages[n.ID]) }) {
+			take(p.result, []keyHit{p.codeFinding})
 		}
 	}
 	return nil

@@ -254,3 +254,99 @@ func TestResultsOnOneLineKeepTheirCodeFindingsWhenALineMovesThem(t *testing.T) {
 		})
 	}
 }
+
+func TestResultsOnOneLineKeepTheirCodeFindingsWhenAnIndentShiftsThemAll(t *testing.T) {
+	for name, move := range map[string]struct {
+		lines    int
+		function string
+		another  bool
+	}{
+		"on the whole key":                  {},
+		"on the function":                   {lines: 1, function: "orch::doTask"},
+		"on the nearest line":               {lines: 1},
+		"on the whole key on another build": {another: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			eachWorld(t, func(t *testing.T, w *world) {
+				w.inventory(t, w.Build.ID)
+				now := time.Now().UTC()
+				at := func(line, column int) inFunction {
+					s := inSWSS
+					s.line = line
+					return inFunction{columned{s, column}, move.function}
+				}
+				before := documentOf([]interface{ json() string }{at(12, 5), at(12, 30)}, 10, "")
+				// An indent of four moves both, and the run lists them the
+				// other way round, so neither sits at a column seen before.
+				after := documentOf([]interface{ json() string }{at(12+move.lines, 34), at(12+move.lines, 9)}, 10, "")
+				if _, status := w.send(t, w.Build.ID, now.Add(-2*time.Hour), before); status != series.Applied {
+					t.Fatalf("status %s; want applied", status)
+				}
+				first := w.occurrenceByColumn(t, w.Build.ID)
+				if len(first) != 2 {
+					t.Fatalf("the two results opened at %v; want two occurrences", first)
+				}
+				on := w.Build.ID
+				if move.another {
+					other := w.BuildFor(w.Branch, w.Internal)
+					w.inventory(t, other.ID)
+					on = other.ID
+				}
+				if _, status := w.send(t, on, now.Add(-time.Hour), after); status != series.Applied {
+					t.Fatalf("status %s; want applied", status)
+				}
+				got := w.occurrenceByColumn(t, on)
+				if got[9] != first[5] || got[34] != first[30] {
+					t.Errorf("shifted by four, column 9 is at %s and 34 at %s; want %s and %s, where 5 and 30 were",
+						got[9], got[34], first[5], first[30])
+				}
+			})
+		})
+	}
+}
+
+func TestAnOccurrenceTwoParentCodeFindingsShareIsCarriedToOneResult(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		tag := w.BuildFor(w.Tag, w.Customer)
+		w.inventory(t, w.Build.ID)
+		w.inventory(t, tag.ID)
+		now := time.Now().UTC()
+		both := documentOf([]interface{ json() string }{columned{inSWSS, 5}, columned{inSWSS, 30}}, 10, "")
+		if _, status := w.send(t, w.Build.ID, now.Add(-2*time.Hour), both); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		// Two code findings open at one occurrence on the branch, as a
+		// database written before occurrences took ordinals holds them.
+		opened := w.occurrenceByColumn(t, w.Build.ID)
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"finding"`).
+			Set(`"occurrence_identity" = ?`, opened[5]).
+			Where(`"occurrence_identity" = ?`, opened[30]).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if _, status := w.send(t, tag.ID, now.Add(-time.Hour), both); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		if got := w.occurrencesOn(t, tag.ID); len(got) != 2 || got[0] == got[1] {
+			t.Errorf("the tag holds %v; want its two results at two occurrences", got)
+		}
+	})
+}
+
+func TestLaterResultsOfOneKeyTakeOrdinalsInTheOrderOfTheirSpots(t *testing.T) {
+	result := func(column int, message string) Keyed {
+		k := Keyed{Key: "k"}
+		k.StartColumn, k.Message = column, message
+		return k
+	}
+	for name, fresh := range map[string][]Keyed{
+		"by column":  {result(30, "m"), result(5, "m")},
+		"by message": {result(5, "n"), result(5, "m")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := freshOccurrences(1, fresh, nil, nil)
+			if got[1] != identity(1, "k") || got[0] != identity(1, "k\x001") {
+				t.Errorf("listed second, the first by spot took %s; want the key's own, %s", got[1], identity(1, "k"))
+			}
+		})
+	}
+}
