@@ -417,36 +417,50 @@ func TestRowsUnderTwoNamesOfOneIssueAreReaffirmedOnce(t *testing.T) {
 	// One decision holding a row under each of two names that merged, at
 	// one occurrence and versions, leads to one finding. Re-made once per
 	// row, the second write repeats the first's live key and the whole act is
-	// refused as though a decision already stood there.
-	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		judged := lapsedUnderMergedName(t, f)
-		var lapsed triage.DecisionOccurrence
-		if err := f.db.DB.NewSelect().Model(&lapsed).Where(`"de"."id" = ?`, judged.ID).Scan(ctx); err != nil {
-			t.Fatal(err)
-		}
-		// Read second, and undisclosed where the first is not, at a finding
-		// undisclosed now: the one row re-made stays undisclosed whichever is
-		// read first.
-		if _, err := f.db.DB.NewUpdate().Table("finding").Set(`"visibility" = ?`, access.Private).
-			Where(`"occurrence_identity" = ?`, "merged").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		twin := lapsed
-		twin.ID, twin.LiveKey, twin.VulnerabilityID, twin.Visibility = 0, nil, f.issue, access.Private
-		if _, err := f.db.DB.NewInsert().Model(&twin).Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		both := access.NewPerson(f.proposer, "proposer", false,
-			map[int64][]access.Role{f.product: {access.PublicTriage, access.PrivateTriage}}, 0)
-		remade := reaffirmedOnce(t, f, both, judged.DecisionID)
-		if remade.VulnerabilityID != f.issue {
-			t.Errorf("the re-made row is filed under issue %d; want %d", remade.VulnerabilityID, f.issue)
-		}
-		if remade.Visibility != access.Private {
-			t.Errorf("the re-made row is %s; want it undisclosed, as one row it stands for was", remade.Visibility)
-		}
-	})
+	// refused as though a decision already stood there. The one row re-made
+	// stays undisclosed where either row was, whichever is read first.
+	for _, order := range []struct {
+		name          string
+		first, second access.Visibility
+	}{
+		{"undisclosed read second", access.Public, access.Private},
+		{"undisclosed read first", access.Private, access.Public},
+	} {
+		t.Run(order.name, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				ctx := t.Context()
+				judged := lapsedUnderMergedName(t, f)
+				if _, err := f.db.DB.NewUpdate().Model((*triage.DecisionOccurrence)(nil)).
+					Set(`"visibility" = ?`, order.first).Where(`"id" = ?`, judged.ID).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				var lapsed triage.DecisionOccurrence
+				if err := f.db.DB.NewSelect().Model(&lapsed).Where(`"de"."id" = ?`, judged.ID).Scan(ctx); err != nil {
+					t.Fatal(err)
+				}
+				// At a finding undisclosed now, so an undisclosed row may be
+				// re-made there.
+				if _, err := f.db.DB.NewUpdate().Table("finding").Set(`"visibility" = ?`, access.Private).
+					Where(`"occurrence_identity" = ?`, "merged").Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				twin := lapsed
+				twin.ID, twin.LiveKey, twin.VulnerabilityID, twin.Visibility = 0, nil, f.issue, order.second
+				if _, err := f.db.DB.NewInsert().Model(&twin).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				both := access.NewPerson(f.proposer, "proposer", false,
+					map[int64][]access.Role{f.product: {access.PublicTriage, access.PrivateTriage}}, 0)
+				remade := reaffirmedOnce(t, f, both, judged.DecisionID)
+				if remade.VulnerabilityID != f.issue {
+					t.Errorf("the re-made row is filed under issue %d; want %d", remade.VulnerabilityID, f.issue)
+				}
+				if remade.Visibility != access.Private {
+					t.Errorf("the re-made row is %s; want it undisclosed, as one row it stands for was", remade.Visibility)
+				}
+			})
+		})
+	}
 }
 
 func TestSeveritiesAreReadPerProductAndAsTheIssueStandsFor(t *testing.T) {
