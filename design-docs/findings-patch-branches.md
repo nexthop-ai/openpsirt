@@ -65,6 +65,8 @@ the report.
 
 A row per repository, per commit in it, and per branch a commit is on. Keyed on
 the commit, because one fix is linked from several records in several spellings.
+A repository on github.com or gitlab.com is keyed on its path in lower case,
+because those hosts serve it under any capitalization.
 
 | Recorded per commit | Detail |
 |---|---|
@@ -129,6 +131,7 @@ due commit, most urgent first.
 |---|---|
 | Every due commit looked up | Reached and ended, and the copy's size |
 | The repository could not be fetched or read | What stopped it in git's words; retried a day after the visit began |
+| The process was killed part way | That the visit did not finish, which a visit records as it begins; retried a day after it began, and no mark against the host. The report reads it as under way while a replica holds the lease, until the pass next chooses and ends it, which no visit is under way beside |
 | The lease was lost, or shutdown | Nothing; the repository is left as before the visit |
 | This deployment failed (database or lease) | Nothing, and logged. A dropped connection is not the repository's fault |
 
@@ -154,7 +157,7 @@ the dialer every other request uses never sees git's connections.
 | https only, no redirects; below 1 KB/s for two minutes is abandoned | |
 | One thread for packing and indexing, with small pack windows | Commit-graph memory falls from 1.7 GB to 0.6 GB on the kernel tree |
 | A copy holds commits without files where the host sends that | A host that cannot sends everything, and its warning is not a failure |
-| Missing objects are never fetched on demand | That fetch is outside the guarded one |
+| Missing objects are never fetched on demand: git is told not to, and only an invocation reaching the host is allowed its transport | That fetch is outside the guarded one, and an older git ignores the instruction |
 | A copy's directory is named by a digest of the address (REQ-66) | A report never chooses a path |
 
 ## The cache
@@ -169,6 +172,7 @@ the dialer every other request uses never sees git's connections.
 | An update asks the remote the copy was made from, never the bare address | Asked by address, a host sends trees the copy cannot hold |
 | The copies directory is made absolute at start | Git runs inside it |
 | A half-made copy from a dead process is removed before the next starts | |
+| A directory where a copy belongs, holding no HEAD, is removed before a clone | The new copy could not be put in its place |
 
 ## Display
 

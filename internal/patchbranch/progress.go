@@ -13,6 +13,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 // State is where one repository stands.
@@ -81,6 +82,9 @@ type RepositoryProgress struct {
 	Reason    string
 	// HeldBytes is the size of the copy when the last visit finished.
 	HeldBytes *int64
+
+	// unended is a visit begun and not ended.
+	unended bool
 }
 
 // Totals is the whole of the work.
@@ -138,6 +142,8 @@ func Progress(ctx context.Context, db bun.IDB, excluded outward.Excluded) ([]Rep
 		if repository.Failed != nil {
 			one.Reason = *repository.Failed
 		}
+		one.unended = repository.FetchedAt != nil &&
+			(repository.EndedAt == nil || repository.EndedAt.Before(*repository.FetchedAt))
 		if repository.HeldBytes != nil {
 			held += *repository.HeldBytes
 		}
@@ -190,14 +196,22 @@ func Progress(ctx context.Context, db bun.IDB, excluded outward.Excluded) ([]Rep
 		one.Worst = severityOf(worst)
 	}
 
+	// A visit under way records itself as unfinished and is not ended, while
+	// a replica holds the lease; the pass ends one the process did not
+	// survive before it chooses the next.
+	visiting, err := queue.Held(ctx, db, Lease, now)
+	if err != nil {
+		return nil, Totals{}, err
+	}
 	out := make([]RepositoryProgress, 0, len(byURL))
 	for _, one := range byURL {
 		if one.Commits == 0 {
 			continue
 		}
-		one.State = stateOf(*one, excluded)
+		one.State = stateOf(*one, excluded, visiting)
 		switch one.State {
 		case Working:
+			one.Reason = ""
 			one.Step = Fetching
 			if one.VisitLooked > 0 {
 				one.Step = LookingUp
@@ -264,10 +278,12 @@ func severityOf(how urgency) string {
 }
 
 // stateOf reads where a repository stands from what its row records.
-func stateOf(one RepositoryProgress, excluded outward.Excluded) State {
+func stateOf(one RepositoryProgress, excluded outward.Excluded, visiting bool) State {
 	switch {
 	case excluded.Host(Commit{Repository: one.URL}.Host()):
 		return Refused
+	case one.Reason == unfinished && one.unended && visiting:
+		return Working
 	case one.Reason != "":
 		return Failed
 	case one.FetchedAt != nil && (one.ReachedAt == nil || one.ReachedAt.Before(*one.FetchedAt)):

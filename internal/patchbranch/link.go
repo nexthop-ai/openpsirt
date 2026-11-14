@@ -97,6 +97,10 @@ var cgitSites = map[string]cgitSite{
 	"sourceware.org":               {Host: "sourceware.org", Pages: "cgit", Under: []string{"git"}},
 }
 
+// caseless is the hosts that serve a repository under any capitalization of
+// its path, so one fix linked in two spellings is one repository.
+var caseless = map[string]bool{"github.com": true, "gitlab.com": true}
+
 // moved is repositories a retired site's links still name, keyed on the
 // address a link is read as, with the address the repository is fetched from
 // now. cgit.freedesktop.org answers 503 since its projects moved to
@@ -190,7 +194,11 @@ func at(host string, path []string, hash string) (Commit, bool) {
 			return Commit{}, false
 		}
 	}
-	repository := "https://" + host + "/" + strings.Join(path, "/")
+	written := strings.Join(path, "/")
+	if caseless[host] {
+		written = strings.ToLower(written)
+	}
+	repository := "https://" + host + "/" + written
 	if !strings.HasSuffix(repository, ".git") {
 		repository += ".git"
 	}

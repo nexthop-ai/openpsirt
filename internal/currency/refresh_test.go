@@ -326,6 +326,10 @@ func TestTheNameAskedComesFromTheIdentifier(t *testing.T) {
 		// either way as this component's upstream version.
 		{"pkg:npm/%zz/node@20.1.0", "", "", false},
 		{"pkg:golang/example.com/%2@v1", "", "", false},
+		{"pkg:golang/x/../../github.com/other/mod@v1", "", "", false},
+		{"pkg:golang/example.com/./mod@v1", "", "", false},
+		{"pkg:npm/%2e%2e/node@20.1.0", "", "", false},
+		{"pkg:golang/example.com//mod@v1", "", "", false},
 	} {
 		ecosystem, name, ok := currency.Asked(c.purl)
 		if ok != c.ok || ecosystem != c.ecosystem || name != c.name {
@@ -810,7 +814,7 @@ func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
 		ctx := t.Context()
 		var of []component
 		says := map[string]currency.Latest{}
-		for i := range currency.RenewEvery * 3 {
+		for i := range queue.RenewEvery * 3 {
 			name := fmt.Sprintf("thing-%03d", i)
 			of = append(of, component{purl: "pkg:cargo/" + name + "@1.0.0"})
 			says[name] = currency.Latest{Version: "2.0.0"}
@@ -833,9 +837,9 @@ func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
 		// It gets through the first stretch and then stops, rather than
 		// asking about every one of them while another replica holds the
 		// lease and is asking about the same ones.
-		if len(*asked) != currency.RenewEvery {
+		if len(*asked) != queue.RenewEvery {
 			t.Errorf("asked about %d components after losing the lease, want the %d "+
-				"it had already started", len(*asked), currency.RenewEvery)
+				"it had already started", len(*asked), queue.RenewEvery)
 		}
 	})
 }
@@ -1055,7 +1059,7 @@ func TestASlowIndexDoesNotOutlastTheLease(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		var of []component
-		for i := range currency.RenewEvery {
+		for i := range queue.RenewEvery {
 			of = append(of, component{purl: fmt.Sprintf("pkg:cargo/thing-%03d@1.0.0", i)})
 		}
 		r, _ := seed(t, db, of, nil, nil)

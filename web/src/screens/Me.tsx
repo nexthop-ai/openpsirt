@@ -150,8 +150,8 @@ function Digest({
     <div className="card">
       <h3>Notifications</h3>
       <p className="reading" style={{ marginBottom: 8 }}>
-        A daily digest of work that became yours without a message, and optionally new unassigned
-        findings.
+        A daily digest of work assigned without a message, notices not mailed at once, and
+        optionally new unassigned findings.
       </p>
       {set.error != null && <Failed error={set.error} what="That could not be changed." />}
       {!reachable ? (

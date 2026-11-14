@@ -5,6 +5,7 @@ package notify
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -18,10 +19,9 @@ import (
 
 // betweenPosts is how often what is unsent is carried out of the application.
 //
-// A minute, because the categories that leave here at all are the ones
-// immediate mail only for an action calls worth interrupting somebody for, and
-// an hour's delay on "this is now yours" makes the message a record of
-// something rather than a prompt.
+// A minute, because the kinds mailed as they happen are the ones a person must
+// act on (REQ-47), and an hour's delay on "this is now yours" makes the message
+// a record of something rather than a prompt.
 const betweenPosts = time.Minute
 
 // sweepBatch is how many messages one cycle carries.
@@ -160,6 +160,9 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 		ColumnExpr(`"pe"."email" AS "email"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "nt"."person_id"`).
 		Where(`"nt"."sent_at" IS NULL`).
+		// Only what a person must act on is mailed as it happens (REQ-47).
+		// The rest stays unsent and reaches mail through the digest.
+		Where(`"nt"."kind" IN (?)`, bun.List(immediate)).
 		// A condition the application has already withdrawn is not news. The
 		// sibling sweep carries the rule and this one did not, so mail went
 		// about a build that had resumed being scanned or an embargo whose
@@ -187,6 +190,13 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 	for _, row := range rows {
 		message := Compose(row.Notification, p.baseURL)
 		sendErr := p.channel.Send(ctx, row.Email, message)
+		if errors.Is(sendErr, ErrUnsecured) {
+			// Every message would be refused alike, and none of it is the
+			// message's fault: nothing is counted against them.
+			p.logger.Error("mail is refused until the server offers STARTTLS or plain mail is accepted",
+				"channel", p.channel.Name(), "error", sendErr)
+			return sent, failed, nil
+		}
 		if sendErr != nil {
 			failed++
 			// Counted rather than recorded as a failure: the row is still
@@ -226,9 +236,8 @@ const atMostInADigest = 50
 // Digests sends one message to each person who asked for one.
 //
 // Daily rather than per event: that is what makes it a digest, and what
-// separates it from the categories immediate mail only for an action says are
-// worth interrupting somebody for. A person is sent nothing where there is
-// nothing to say.
+// separates it from the kinds mailed as they happen. A person is sent nothing
+// where there is nothing to say.
 func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 	// A lease of its own, for the reason the two constants are separate: a
 	// cycle of immediate messages and a day's digests are different work and
@@ -287,7 +296,15 @@ func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 			// The stamp still moves. Otherwise a quiet week means the next
 			// digest reports the whole week as new, and "since the last
 			// digest" stops meaning what it says.
-			if err := p.channel.Send(ctx, person.Email, digest.Message(p.baseURL)); err != nil {
+			err := p.channel.Send(ctx, person.Email, digest.Message(p.baseURL))
+			if errors.Is(err, ErrUnsecured) {
+				// The configuration refused it, so the stamp stays and the
+				// digest goes once the configuration changes.
+				p.logger.Error("digests are refused until the server offers STARTTLS or plain mail is accepted",
+					"channel", p.channel.Name(), "error", err)
+				return sent, nil
+			}
+			if err != nil {
 				p.logger.Warn("could not send a digest",
 					"channel", p.channel.Name(), "person", person.Identity, "error", err)
 				// The stamp still moves. A mailbox that refuses is retried
@@ -316,6 +333,5 @@ const aDay = 24 * time.Hour
 
 // DigestLease names the work of assembling and sending digests. Separate from
 // the immediate messages so that a long digest cycle does not stop the
-// messages immediate mail only for an action says are worth interrupting
-// somebody for.
+// messages a person must act on.
 const DigestLease = "notification.digest"

@@ -27,6 +27,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
@@ -272,6 +273,31 @@ func (q *Queue) AddUnlessWaitingTx(ctx context.Context, db bun.IDB, kind, refere
 	return err
 }
 
+// MostSkew is how far this process's clock may stand from the database's.
+//
+// Claims, leases and burials compare a moment one replica wrote with another
+// replica's clock, so a clock ahead by more than a lease takes over work
+// another replica holds. A quarter of the shortest lease any pass holds, a
+// minute, and far past what a synchronized clock drifts.
+const MostSkew = 15 * time.Second
+
+// CheckClock refuses a clock standing further than MostSkew from the
+// database's, naming by how far.
+func (q *Queue) CheckClock(ctx context.Context) error {
+	before := q.now()
+	server, err := q.db.ServerTime(ctx)
+	if err != nil {
+		return err
+	}
+	after := q.now()
+	skew := before.Add(after.Sub(before) / 2).Sub(server)
+	if skew > MostSkew || skew < -MostSkew {
+		return refusal.Errorf("this machine's clock stands %s from the database's, past the %s "+
+			"replicas may differ by: a replica ahead takes over work another holds", skew.Round(time.Second), MostSkew)
+	}
+	return nil
+}
+
 // Depth counts work of one kind waiting to be done.
 //
 // Per kind, because the cap it feeds exists so that a runaway producer cannot
@@ -292,14 +318,12 @@ func (q *Queue) depthIn(ctx context.Context, db bun.IDB, kind string) (int, erro
 	// do. A claim past its timeout is work waiting for whoever takes it next,
 	// which is what this counts.
 	stale := q.now().Truncate(time.Microsecond).Add(-q.opts.ClaimTimeout)
+	// Waiting whether or not it is due yet: a job backing off is still
+	// backlog.
+	arm, args := reclaimable(stale)
 	n, err := db.NewSelect().Model((*Job)(nil)).
 		Where(`"kind" = ?`, kind).
-		WhereGroup(" AND ", func(s *bun.SelectQuery) *bun.SelectQuery {
-			return s.
-				WhereOr(`"state" = ?`, Pending).
-				WhereOr(`"state" = ? AND "claimed_at" < ? AND "attempts" < "max_attempts"`,
-					Running, stale)
-		}).
+		Where(`("state" = ? OR `+arm+`)`, append([]any{Pending}, args...)...).
 		Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("measure backlog: %w", err)
@@ -369,6 +393,7 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 		// getting it wrong for some future engine would mean handing the same
 		// work out twice, which on an ingest looks like real change. This way
 		// the worst case is slow.
+		still, args := claimable(now, staleBefore)
 		res, err := tx.NewUpdate().Model((*Job)(nil)).
 			Set(`"state" = ?`, Running).
 			Set(`"attempts" = "attempts" + 1`).
@@ -376,12 +401,7 @@ func (q *Queue) Claim(ctx context.Context, worker, kind string) (*Job, error) {
 			Set(`"claimed_at" = ?`, now).
 			Set(`"updated_at" = ?`, now).
 			Where(`"id" = ?`, id).
-			WhereGroup(" AND ", func(u *bun.UpdateQuery) *bun.UpdateQuery {
-				return u.
-					WhereOr(`"state" = ? AND "run_after" <= ?`, Pending, now).
-					WhereOr(`"state" = ? AND "claimed_at" < ? AND "attempts" < "max_attempts"`,
-						Running, staleBefore)
-			}).
+			Where(still, args...).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("claim job %d: %w", id, err)
@@ -434,8 +454,8 @@ func (q *Queue) Bury(ctx context.Context) (int, error) {
 			Set(`"last_error" = ?`, ErrWorkerGone.Error()).
 			Set(`"claimed_by" = NULL`).
 			Set(`"updated_at" = ?`, now).
-			Where(`"state" = ?`, Running).
-			Where(`"claimed_at" < ?`, stale).
+			// A stale claim with no attempts left: what reclaiming leaves.
+			Where(staleClaim, Running, stale).
 			Where(`"attempts" >= "max_attempts"`).
 			Exec(ctx)
 		if err != nil {
@@ -664,7 +684,7 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 	// transaction, so whether this was the last attempt rests on the value
 	// the statement that buries or re-queues the job was written against.
 	// A scanner's standard error is quoted in it, in bytes of its choosing.
-	said := head(bound.Text(cause.Error()), mostOfAnError)
+	said := head(cause.Error(), mostOfAnError)
 	var matched bool
 	return database.InTransaction(ctx, q.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		job := new(Job)
@@ -773,7 +793,12 @@ const mostOfAnError = 4096
 // tail, which three of the four engines then refuse to store — so the bound
 // meant to keep a write small is what makes it fail. The cut itself is the
 // shared one.
+//
+// Every reason a caller supplies to Fail or Postpone goes through here, so
+// each is made storable alike: PostgreSQL refuses a NUL and invalid UTF-8, and a
+// reason the write refuses leaves the job claimed.
 func head(s string, n int) string {
+	s = bound.Text(s)
 	if len(s) <= n {
 		return s
 	}

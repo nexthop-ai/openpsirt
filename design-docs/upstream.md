@@ -32,7 +32,7 @@ Neighbors: `design-docs/publishing.md` (what this deployment publishes),
 | One upstream per product | A fork descends from one project |
 | The upstream is named by the address of its CSAF `provider-metadata.json`, over https, with a host and no user, spilled or otherwise | A spilled password reads as the host it is pinned to (`design-docs/access-trail.md` § Spilled user information) |
 | An administrator inspects it, learning whose statements they are and the key's fingerprint, then trusts it by sending the fingerprint back; another fingerprint is refused naming the current one | |
-| The keys are those the description names, at its addresses, and must carry the fingerprints it states, or the set is refused. The whole set is trusted, up to four, and the armored keys are kept | A rotation is trusted with both |
+| The keys are those the description names, at its addresses, and must carry the fingerprints it states, or the set is refused. The whole set is trusted, up to four, and the armored keys are kept; a key at its own address is armored alone, and every block is read | A rotation is trusted with both |
 | An upstream naming no key is trusted unsigned, documents checked against their digests alone | |
 | The publisher is fixed at trust, as the description named it then | |
 | Trusting the same address again keeps what was read, and clears a key offered in place of the trusted one | |
@@ -49,8 +49,10 @@ copy of the upstream ordinarily sits.
 
 | Rule | Reason |
 |---|---|
-| Only that host, at its port: a description, feed or list of changes naming another host is refused before anything is resolved | |
+| Only that host, at its port: a description, feed or list of changes naming another host is refused before anything is resolved. A host compares without regard to capitals or a closing dot, and no port is port 443 | |
 | https only, no redirect followed, no user in an address | |
+| A listing entry naming a document off https or on another host is never requested, and counts as an entry that cannot be read | |
+| A document answered with a redirect is refused alone, and the read goes on | It is refused the same way every time |
 | Two minutes for one request, in which a listing or document is read whole | |
 | A read, and the inspection before trusting an upstream, build a client of their own and close its connections when done | A client dropped with connections open strands them until the far end closes them |
 
@@ -61,9 +63,11 @@ copy of the upstream ordinarily sits.
 | A document | 32 MiB, and the bounds every VEX document read here is held to |
 | A digest file | 4 KiB |
 | A signature | 64 KiB |
-| A public key | 1 MiB |
+| A public key | 1 MiB, and four named by a description |
+| Listings one description names | 32, or the read is refused before any is fetched |
+| Entries every listing of one upstream names | 200,000 between them, or the read is refused |
 | Documents per pass per upstream | 200; a pass taking that many leaves the upstream due |
-| The lease | Asked for again before every document; a pass that lost it stops, leaves the upstream due and withdraws nothing |
+| The lease | Asked for again before every listing and every document; a pass that lost it stops, leaves the upstream due, withdraws nothing and records nothing. It is asked once more before anything is recorded, since one step can outlast it, and the replica holding it records what it reads |
 
 ## Reading
 
@@ -73,12 +77,16 @@ reaches out, settled by a lease.
 | Step | What happens |
 |---|---|
 | A read that fails | Withdraws nothing, however it failed: a 404 or other error, a TLS fault, a timeout. It is recorded and raised (§ Failure notices) |
+| A failure here | This deployment's database or lease failing leaves the upstream due and what was read as it was. It is recorded in fixed words, "this deployment failed, not the upstream; its log says why", and the error itself reaches the log alone. A pass cut short by shutdown, or one that cannot show it still holds the lease, records none |
 | The description | Read every pass. Any set of keys other than the trusted set (one added, dropped or replaced, any where none was trusted, none where some were) stops the read and is recorded as the keys offered until the upstream is trusted again. Only a successful read clears what stopped the last one |
 | The listings | Each feed labeled WHITE or CLEAR, otherwise each directory's list of changes, asked with the entity tag and date each last answered. Where all answer that nothing moved, nothing else is asked; where one moved, every listing is read whole |
 | What moved | A document listed at a new moment is read and replaces what it said: a repeated statement stays as it is, declined or not, a revised one is replaced, a dropped one withdrawn |
 | What is gone | A document no listing names is withdrawn only by a complete read: every listing read whole, every entry naming a document and a moment, every moved document taken and checked. Otherwise nothing is withdrawn, and an unreadable entry is recorded as what stopped the read |
 | A moved upstream | Its first complete read lets a document under the same tracking identifier replace the old address's, as a revision, and withdraws what the new address does not list |
 | A document | Compared against the digest served beside it, and its signature where a key is trusted. One failing either is not taken, and the next pass reads the listings whole |
+| An entry that cannot be read | Counted beside its listing's validator, so an answer that nothing moved records it again and never clears it. A validator stored without the count is never sent, and its listing is read whole |
+| A document refused again | Each replica remembers what it refused at the moment its listing named, and tries those after every other entry, so refusals at the head of a listing never fill a pass |
+| An address that comes to hold another document | What the document it held said is set aside, unless another address recorded for the upstream still holds it, until a complete read withdraws that address |
 | Its name | The tracking identifier it names itself by; its next revision replaces its statements |
 | A security advisory | Read, recorded as read, nothing kept |
 

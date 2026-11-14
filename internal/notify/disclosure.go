@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -45,8 +46,9 @@ func (w *sweep) pastDisclosure(ctx context.Context, admins []int64) (map[int64][
 // Before the date, not on it. The date arriving is the last moment to act
 // rather than the first useful warning, and an approver who touches disclosure
 // a few times a year has no reason to open the screen that would have told
-// them. In the application rather than by mail, because mail may not name an
-// undisclosed issue.
+// them. Mailed as it happens, since an extension needs a second person and
+// arranging one takes time; a message about an undisclosed issue says only
+// that there is something.
 func (w *sweep) approachingDisclosure(ctx context.Context, admins []int64) (map[int64][]Holds, error) {
 	lead, err := setting.NewStore(w.db).Duration(ctx, setting.DisclosureLead,
 		setting.DefaultDisclosureLead)
@@ -91,7 +93,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		ColumnExpr(`MIN("de"."id") AS "decision_occurrence_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"v"."id" AS "vulnerability_id"`).
-		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product"`).
 		ColumnExpr(`MIN("v"."identifier") AS "vulnerability"`).
 		ColumnExpr(`"ss"."publisher" AS "publisher"`).
 		ColumnExpr(undisclosed+` AS "undisclosed"`, private).
@@ -180,6 +182,7 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 
 	var rows []struct {
 		Product         string    `bun:"product"`
+		ProductShown    string    `bun:"product_shown"`
 		BranchOrTag     string    `bun:"branch_or_tag"`
 		Variant         string    `bun:"variant"`
 		Component       string    `bun:"component"`
@@ -243,12 +246,12 @@ func (w *sweep) disclosureWithin(ctx context.Context, admins []int64, kind Kind,
 		// that has arrived clear differently, and a single alert would go on
 		// saying "coming" after the date had passed.
 		about, body := "disclosure",
-			row.Vulnerability+" in "+row.Product+" at "+row.Component+
+			row.Vulnerability+" in "+row.ProductShown+" at "+row.Component+
 				" reached its disclosure date on "+
 				day(row.DiscloseAt)+" and nothing has been decided."
 		if lead > 0 {
 			about = "disclosure-near"
-			body = row.Vulnerability + " in " + row.Product + " at " + row.Component +
+			body = row.Vulnerability + " in " + row.ProductShown + " at " + row.Component +
 				" discloses on " +
 				day(row.DiscloseAt) +
 				" and nothing has been decided. Extending it needs a second person, " +

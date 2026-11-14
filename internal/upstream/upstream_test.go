@@ -681,12 +681,19 @@ func TestStoppingTrustingAnUpstreamIsSaidAsThatToADecisionCitingIt(t *testing.T)
 			}
 			return out
 		}
+		if _, err := w.DB.DB.NewUpdate().Table("product").Set(`"display_name" = ?`, "SONiC Fork").
+			Where(`"id" = ?`, w.fork.ID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := upstream.NewStore(w.DB.DB).Withdraw(t.Context(), w.admin, w.fork.ID); err != nil {
 			t.Fatal(err)
 		}
 		got := said()
 		if len(got) != 1 || !strings.Contains(got[0], "stopped trusting its upstream") {
 			t.Fatalf("a decision citing an upstream no longer trusted is told %v", got)
+		}
+		if !strings.HasPrefix(got[0], "SONiC Fork ") {
+			t.Errorf("the notice says %q, want the product as it is shown", got[0])
 		}
 		w.trust()
 		w.read()

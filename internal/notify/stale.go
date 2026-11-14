@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -144,6 +145,7 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 		RulingID    int64     `bun:"ruling_id"`
 		ProductID   int64     `bun:"product_id"`
 		Product     string    `bun:"product"`
+		Shown       string    `bun:"product_shown"`
 		Disposition string    `bun:"disposition"`
 		ProposedBy  int64     `bun:"proposed_by"`
 		ProposedAt  time.Time `bun:"proposed_at"`
@@ -156,6 +158,7 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 		ColumnExpr(`"rr"."id" AS "ruling_id"`).
 		ColumnExpr(`"rr"."product_id" AS "product_id"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_shown"`).
 		ColumnExpr(`MIN("rr"."disposition") AS "disposition"`).
 		ColumnExpr(`MIN("rr"."proposed_by") AS "proposed_by"`).
 		ColumnExpr(`MIN("rr"."proposed_at") AS "proposed_at"`).
@@ -180,7 +183,7 @@ func (w *Watch) waitingRulings(ctx context.Context, since time.Time,
 			About: identify(fmt.Sprintf("ruling-waiting %d", row.RulingID)),
 			Body: fmt.Sprintf("A ruling in %s calling %s %s has been waiting %s for a "+
 				"second person. It takes effect only once somebody agrees to it.",
-				row.Product, reports, strings.ReplaceAll(row.Disposition, "-", " "),
+				row.Shown, reports, strings.ReplaceAll(row.Disposition, "-", " "),
 				plainly(days)),
 			Link: weblink.VulnerabilityReportsWaiting(row.Product),
 			// A claim nobody has agreed to set aside is one nobody has
@@ -293,7 +296,9 @@ func decisionRollup(db bun.IDB, counted string) *bun.SelectQuery {
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"de"."product_id" AS "product_id"`).
 		ColumnExpr(`"de"."proposed_by" AS "proposed_by"`).
-		ColumnExpr(`MIN("p"."name") AS "product"`).
+		// What a sentence calls the product; no notice built from this
+		// links by the product's name.
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product"`).
 		ColumnExpr(`COUNT(*) AS ?`, bun.Ident(counted)).
 		ColumnExpr(access.WithheldCountAs(`"de"."visibility"`, "private_rows")).
 		ColumnExpr(access.SecurityTestingCountAs(`"de"."visibility"`, "security_testing_rows")).
@@ -426,7 +431,7 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
 		ColumnExpr(`"tm"."id" AS "team_id"`).
-		ColumnExpr(`"tm"."display_name" AS "team_display"`).
+		ColumnExpr(catalog.ShownExpr("tm")+` AS "team_shown"`).
 		ColumnExpr(`"tm"."name" AS "team_name"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
@@ -449,12 +454,12 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	err = w.db.NewSelect().
 		TableExpr(`(?) AS "q"`, work).
 		ColumnExpr(`"q"."team_id" AS "team_id"`).
-		ColumnExpr(`MIN(COALESCE(NULLIF("q"."team_display", ''), "q"."team_name")) AS "team"`).
+		ColumnExpr(`MIN("q"."team_shown") AS "team"`).
 		// The matched name for the link and the typed one for the sentence:
 		// what a screen resolves a queue by is not what somebody calls it.
 		ColumnExpr(`MIN("q"."team_name") AS "team_name"`).
 		ColumnExpr(`"q"."product_id" AS "product_id"`).
-		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product"`).
 		ColumnExpr(`COUNT(*) AS "waiting"`).
 		ColumnExpr(`MAX("q"."private_rows") AS "private_rows"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "q"."product_id"`).
@@ -464,7 +469,6 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		return nil, fmt.Errorf("read what is sitting in a queue: %w", err)
 	}
 
-	reach := w.reach
 	out, err := w.everybody(ctx, QueueUntaken)
 	if err != nil {
 		return nil, err
@@ -486,10 +490,10 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "fr"."assigned_to"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "fr"."product_id"`).
 		ColumnExpr(`"tm"."id" AS "team_id"`).
-		ColumnExpr(`MIN(COALESCE(NULLIF("tm"."display_name", ''), "tm"."name")) AS "team"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("tm")+`) AS "team"`).
 		ColumnExpr(`MIN("tm"."name") AS "team_name"`).
 		ColumnExpr(`"fr"."product_id" AS "product_id"`).
-		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product"`).
 		ColumnExpr(`COUNT(*) AS "waiting"`).
 		// Untouched only, as a finding is: one judged, or under a ruling,
 		// has been acted on.
@@ -502,12 +506,7 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		Scan(ctx, &reports); err != nil {
 		return nil, fmt.Errorf("read the reports sitting in a queue: %w", err)
 	}
-	rights := access.NewStore(w.db)
 	for _, row := range reports {
-		members, err := rights.MembersOf(ctx, row.TeamID)
-		if err != nil {
-			return nil, fmt.Errorf("read who is on that team: %w", err)
-		}
 		holds := Holds{
 			About: identify(fmt.Sprintf("queue-untaken-reports %d %d", row.TeamID, row.ProductID)),
 			Body: fmt.Sprintf("%s has %s waiting in %s that nobody has taken.",
@@ -517,17 +516,12 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			ProductID: &row.ProductID,
 			TeamID:    &row.TeamID,
 		}
-		for _, personID := range members {
-			if reach[personID][row.ProductID].reads(true) {
-				out[personID] = append(out[personID], holds)
-			}
+		if err := w.tellTeam(ctx, out, row.TeamID, row.ProductID, holds,
+			func(at acts) bool { return at.reads(true) }); err != nil {
+			return nil, err
 		}
 	}
 	for _, row := range rows {
-		members, err := rights.MembersOf(ctx, row.TeamID)
-		if err != nil {
-			return nil, fmt.Errorf("read who is on that team: %w", err)
-		}
 		private := row.PrivateRows > 0
 		holds := Holds{
 			About: identify(fmt.Sprintf("queue-untaken %d %d", row.TeamID, row.ProductID)),
@@ -539,15 +533,13 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 			ProductID: &row.ProductID,
 			TeamID:    &row.TeamID,
 		}
-		for _, personID := range members {
-			at := reach[personID][row.ProductID]
-			// Disclosed work travels with the assignment to whoever holds
-			// it, so a member reading the product at any visibility may
-			// take it. Withheld work needs one who reads it.
-			if (private && !at.reads(true)) || (!private && !at.readsIn()) {
-				continue
-			}
-			out[personID] = append(out[personID], holds)
+		// Disclosed work travels with the assignment to whoever holds it, so
+		// a member reading the product at any visibility may take it.
+		// Withheld work needs one who reads it.
+		if err := w.tellTeam(ctx, out, row.TeamID, row.ProductID, holds, func(at acts) bool {
+			return (private && at.reads(true)) || (!private && at.readsIn())
+		}); err != nil {
+			return nil, err
 		}
 	}
 	return out, w.codeFindingQueuesUntaken(ctx, since, out)
@@ -576,7 +568,7 @@ func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, o
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
 		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
 		ColumnExpr(`"tm"."id" AS "team_id"`).
-		ColumnExpr(`"tm"."display_name" AS "team_display"`).
+		ColumnExpr(catalog.ShownExpr("tm")+` AS "team_shown"`).
 		ColumnExpr(`"tm"."name" AS "team_name"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."occurrence_identity" AS "occurrence_identity"`).
@@ -595,10 +587,10 @@ func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, o
 	if err := w.db.NewSelect().
 		TableExpr(`(?) AS "q"`, work).
 		ColumnExpr(`"q"."team_id" AS "team_id"`).
-		ColumnExpr(`MIN(COALESCE(NULLIF("q"."team_display", ''), "q"."team_name")) AS "team"`).
+		ColumnExpr(`MIN("q"."team_shown") AS "team"`).
 		ColumnExpr(`MIN("q"."team_name") AS "team_name"`).
 		ColumnExpr(`"q"."product_id" AS "product_id"`).
-		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product"`).
 		ColumnExpr(`COUNT(*) AS "waiting"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "q"."product_id"`).
 		GroupExpr(`"q"."team_id", "q"."product_id"`).
@@ -606,12 +598,7 @@ func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, o
 		return fmt.Errorf("read which code findings are sitting in a queue: %w", err)
 	}
 
-	rights := access.NewStore(w.db)
 	for _, row := range rows {
-		members, err := rights.MembersOf(ctx, row.TeamID)
-		if err != nil {
-			return fmt.Errorf("read who is on that team: %w", err)
-		}
 		productID, teamID := row.ProductID, row.TeamID
 		holds := Holds{
 			About: identify(fmt.Sprintf("code-finding-queue-untaken %d %d", row.TeamID, row.ProductID)),
@@ -623,10 +610,35 @@ func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, o
 			ProductID: &productID,
 			TeamID:    &teamID,
 		}
-		for _, personID := range members {
-			if !w.reach[personID][row.ProductID].readsSecurityTesting {
-				continue
-			}
+		if err := w.tellTeam(ctx, out, row.TeamID, row.ProductID, holds,
+			func(at acts) bool { return at.readsSecurityTesting }); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// tellTeam hands a notice about a team's queue to each member whose reach in
+// the product lets them hear it.
+//
+// Membership is read once per team in a sweep, however many products and
+// kinds of work its queue holds.
+func (w *sweep) tellTeam(ctx context.Context, out map[int64][]Holds, teamID, productID int64,
+	holds Holds, may func(acts) bool) error {
+
+	members, ok := w.members[teamID]
+	if !ok {
+		var err error
+		if members, err = access.NewStore(w.db).MembersOf(ctx, teamID); err != nil {
+			return fmt.Errorf("read who is on that team: %w", err)
+		}
+		if w.members == nil {
+			w.members = map[int64][]int64{}
+		}
+		w.members[teamID] = members
+	}
+	for _, personID := range members {
+		if may(w.reach[personID][productID]) {
 			out[personID] = append(out[personID], holds)
 		}
 	}
@@ -728,7 +740,7 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 			Body: fmt.Sprintf("%s reported %s in %s%s and has not been answered. "+
 				"The first message recorded as sent to them is the acknowledgement, "+
 				"and it is what starts the timeline the record has to evidence.",
-				who, row.Identifier, row.Product, when),
+				who, row.Identifier, row.ProductShown, when),
 			Link: weblink.ProductFindings(row.Product, row.Identifier),
 			// Undisclosed whatever the issue is: the reporter and the fact of
 			// the letter are the report, and nothing leaving the deployment
@@ -747,7 +759,7 @@ func (w *sweep) unanswered(ctx context.Context) (map[int64][]Holds, error) {
 			holds.Body = fmt.Sprintf("%s sent %s in %s%s and has not been answered. "+
 				"The first message recorded as sent to them is the acknowledgement, "+
 				"and it is what starts the timeline the record has to evidence.",
-				who, row.Reference, row.Product, when)
+				who, row.Reference, row.ProductShown, when)
 			holds.Link = weblink.VulnerabilityReport(row.Product, row.Reference)
 			holds.VulnerabilityID = nil
 		}

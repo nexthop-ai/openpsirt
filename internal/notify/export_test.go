@@ -110,3 +110,22 @@ func (n Note) Plain() string {
 	}
 	return b.String()
 }
+
+// ImmediateKinds is the kinds mail carries as they happen, so a test can hold
+// the list against every kind there is.
+func ImmediateKinds() []Kind { return immediate }
+
+// DerivationForTest is one kind and how a sweep works out who holds it.
+type DerivationForTest struct {
+	Kind Kind
+	Of   func(context.Context) (map[int64][]Holds, error)
+}
+
+// DeriveForTest works out and reconciles each kind in turn, as a sweep does.
+func DeriveForTest(w *Watch, ctx context.Context, list ...DerivationForTest) (opened, cleared int, err error) {
+	var derivations []derivation
+	for _, each := range list {
+		derivations = append(derivations, derivation{kind: each.Kind, of: each.Of, what: string(each.Kind)})
+	}
+	return w.derive(ctx, derivations)
+}

@@ -59,10 +59,13 @@ func Asked(purl string) (ecosystem, name string, ok bool) {
 	// raw. Kept, a malformed escape became part of the name asked about, and
 	// what came back was an answer about a different package or no package at
 	// all — recorded either way as this component's upstream version.
+	//
+	// A segment that is empty, "." or "..", decoded, is refused too: sent, a
+	// server resolving it answers about another package.
 	segments := strings.Split(path, "/")
 	for i, segment := range segments {
 		unescaped, err := url.PathUnescape(segment)
-		if err != nil {
+		if err != nil || unescaped == "" || unescaped == "." || unescaped == ".." {
 			return "", "", false
 		}
 		segments[i] = unescaped

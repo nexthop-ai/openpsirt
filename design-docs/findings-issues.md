@@ -144,7 +144,8 @@ background, because no scanner report carries either (REQ-82).
 | An empty answer keeps dates already held | A record OSV stops serving was still published when it said |
 | A first published date rewrites what a replaced inventory's check recorded of the issue undated, in the same transaction, after taking the issue's row (`design-docs/findings-closure.md` § Replaced inventories) | A check holding the row commits its matches first |
 | A known issue is asked again after thirty days; an unknown one daily for its first fourteen days here, then every thirty | OSV revises records; a fresh issue reaches it within hours, and an unknown answer rarely changes |
-| OSV not answering ends the pass and leaves the issue due: a failed connection, a refusal by the outbound guard, a status other than success, not found or a bad request | A proxy or a resolver inside the network says nothing about the issue |
+| OSV not answering ends the pass and leaves the issue due: a failed connection, a refusal by the outbound guard, a status other than success, not found or a bad request, or a success that is not JSON | A proxy or a resolver inside the network says nothing about the issue |
+| A JSON answer that does not read is recorded as unaskable | One malformed record must not stall every pass on the oldest issue due |
 | The client reaches `api.osv.dev` alone, follows no redirect and connects nowhere inside this network (REQ-69) | |
 | The issue page states both dates and whether they are stated, unknown or not yet asked | |
 | Time to fix is given from the published date beside the first sighting, and an issue with no date is counted apart (`design-docs/analytics-program.md` § Remediation metrics) | |

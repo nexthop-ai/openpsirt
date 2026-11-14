@@ -232,9 +232,10 @@ mail:
   # operator would never notice.
   server: ""
   from: ""
-  # Credentials, where the server wants them. They are sent only over a
-  # connection STARTTLS secured; a server that will not secure one is refused
-  # rather than handed the password anyway.
+  # Mail goes only over a connection STARTTLS secured. A relay that offers no
+  # STARTTLS is refused unless OPENPSIRT_MAIL_ALLOW_PLAINTEXT is set to true in
+  # extraEnv. Credentials, where the server wants them, are never sent without
+  # STARTTLS.
   username: ""
   # Set password here and the chart puts it in a Secret, or name one you
   # manage yourself. A secret in values.yaml ends up in your release history

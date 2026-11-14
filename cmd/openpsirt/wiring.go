@@ -227,12 +227,17 @@ func roleMode(settings *setting.Store) func(context.Context) access.Mode {
 // here is either a whole one or none — and "none" is ordinary rather than a
 // fault, which is exactly why it has to be said out loud.
 func mailChannel(cfg config.Config, logger *slog.Logger) notify.Channel {
-	mail := notify.NewMail(cfg.MailServer, cfg.MailFrom, cfg.MailUsername, cfg.MailPassword)
+	mail := notify.NewMail(cfg.MailServer, cfg.MailFrom, cfg.MailUsername, cfg.MailPassword,
+		cfg.MailAllowPlaintext)
 	if mail == nil {
 		logger.Info("mail is not configured, so nothing is sent outside the application")
 		return nil
 	}
 	logger.Info("mail is configured", "server", cfg.MailServer, "from", cfg.MailFrom)
+	if cfg.MailAllowPlaintext {
+		// Said at every start, as a plaintext attachment store is.
+		logger.Warn("mail may cross the network in the clear", "server", cfg.MailServer)
+	}
 	return mail
 }
 

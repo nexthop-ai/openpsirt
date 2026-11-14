@@ -31,8 +31,11 @@ import (
 // declared and never pointed at anything fails silently, and this is what
 // says so.
 type LastUpload struct {
-	ProductID       int64
-	Product         string
+	ProductID int64
+	Product   string
+	// ProductShown is the product as a person reads it, where Product is
+	// its name, which links and identity use.
+	ProductShown    string
 	BranchOrTag     string
 	BranchOrTagKind string
 	Variant         string
@@ -108,6 +111,7 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 		ProductID       int64      `bun:"product_id"`
 		BranchOrTagID   int64      `bun:"branch_or_tag_id"`
 		Product         string     `bun:"product"`
+		ProductShown    string     `bun:"product_shown"`
 		BranchOrTag     string     `bun:"branch_or_tag"`
 		BranchOrTagKind string     `bun:"branch_or_tag_kind"`
 		Variant         string     `bun:"variant"`
@@ -134,6 +138,7 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"p"."name" AS "product"`).
+		ColumnExpr(catalog.ShownExpr("p")+` AS "product_shown"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"st"."kind" AS "branch_or_tag_kind"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
@@ -198,6 +203,7 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 		out = append(out, LastUpload{
 			ProductID:       r.ProductID,
 			Product:         r.Product,
+			ProductShown:    r.ProductShown,
 			BranchOrTag:     r.BranchOrTag,
 			BranchOrTagKind: r.BranchOrTagKind,
 			Variant:         r.Variant,

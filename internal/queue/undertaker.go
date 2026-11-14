@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 // betweenBurials is how often work abandoned by its worker is looked for.
@@ -50,9 +51,20 @@ func NewUndertaker(q *Queue, leases *Leases, replica string, logger *slog.Logger
 }
 
 // Once fails whatever has run out of attempts with nobody left to say so.
+//
+// Every replica first holds its clock against the database's, since a burial
+// and a lease each compare a moment one replica wrote with another's clock.
+// Logged at error on each pass where it drifted past the bound after start.
 func (u *Undertaker) Once(ctx context.Context) (int, error) {
 	if u == nil {
 		return 0, nil
+	}
+	if err := u.queue.CheckClock(ctx); err != nil && u.logger != nil {
+		message := "this replica's clock disagrees with the database's"
+		if !refusal.In(err) {
+			message = "could not compare this replica's clock with the database's"
+		}
+		u.logger.ErrorContext(ctx, message, "error", err)
 	}
 	// One replica carries, the rest skip. The work may be skipped rather than
 	// waited for: what it finds is still there next cycle.

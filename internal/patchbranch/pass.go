@@ -208,11 +208,9 @@ func (p *Pass) holding(ctx context.Context) (bool, error) {
 	if p.leases == nil {
 		return true, nil
 	}
-	held := 5 * p.interval
-	if held < 30*time.Minute {
-		held = 30 * time.Minute
-	}
-	return p.leases.Take(ctx, Lease, p.replica, held)
+	// At least half an hour, which a visit renews every minute through a
+	// fetch that may run for a quarter of an hour.
+	return p.leases.Take(ctx, Lease, p.replica, max(queue.LeaseFor(p.interval), 30*time.Minute))
 }
 
 // Once records what patch links name, visits the one repository most worth
@@ -230,6 +228,9 @@ func (p *Pass) Once(ctx context.Context) (string, error) {
 		return "", err
 	}
 	if err := intern(ctx, p.db, commits, now); err != nil {
+		return "", err
+	}
+	if err := endAbandoned(ctx, p.db); err != nil {
 		return "", err
 	}
 	next, err := p.choose(ctx, commits, now)
@@ -476,7 +477,8 @@ func hostsDown(repositories []repositoryRow, now time.Time) map[string]bool {
 	failed, reached := map[string]bool{}, map[string]bool{}
 	for _, repository := range repositories {
 		host := Commit{Repository: repository.URL}.Host()
-		if waitingOut(repository, now) {
+		// A visit the process did not survive says nothing about the host.
+		if waitingOut(repository, now) && *repository.Failed != unfinished {
 			failed[host] = true
 		}
 		if repository.ReachedAt != nil && repository.ReachedAt.After(since) {
@@ -528,6 +530,27 @@ func (c *candidate) before(other *candidate) bool {
 	return c.repository.URL < other.repository.URL
 }
 
+// unfinished is what a visit records as having stopped it while it runs. A
+// visit that ends records how; one still recording this, unended, when the
+// pass next chooses was ended by something that stopped the process.
+const unfinished = "the visit did not finish"
+
+// endAbandoned ends every visit still recorded as unfinished, at the moment it
+// began. Asked by the pass before it chooses, which no visit is under way
+// beside, since the lease holder visits one repository at a time: any such row
+// is a visit the process did not survive.
+func endAbandoned(ctx context.Context, db bun.IDB) error {
+	if _, err := db.NewUpdate().Model((*repositoryRow)(nil)).
+		Set(`"ended_at" = "fetched_at"`).
+		Where(`"failed" = ?`, unfinished).
+		Where(`"fetched_at" IS NOT NULL`).
+		Where(`("ended_at" IS NULL OR "ended_at" < "fetched_at")`).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("end the visits the process did not survive: %w", err)
+	}
+	return nil
+}
+
 // errStopped is a visit that stopped because the lease was lost. Not a
 // failure of the repository.
 var errStopped = errors.New("stopped")
@@ -550,9 +573,12 @@ const renewTick = time.Minute
 // visit brings one repository's copy up to date and looks up every commit due
 // in it, most urgent first.
 func (p *Pass) visit(ctx context.Context, c candidate, commits map[Commit]urgency) error {
+	// Begun as failed, so a visit whose process is killed part way, which
+	// finish never records, waits out a day like any failure rather than
+	// being chosen first again on restart and killing the process again.
 	if _, err := p.db.NewUpdate().Model((*repositoryRow)(nil)).
 		Set(`"fetched_at" = ?`, p.Now().UTC()).
-		Set(`"failed" = NULL`).
+		Set(`"failed" = ?`, unfinished).
 		Where(`"id" = ?`, c.repository.ID).Exec(ctx); err != nil {
 		return fmt.Errorf("record that a visit began: %w", err)
 	}

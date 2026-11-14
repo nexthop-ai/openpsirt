@@ -68,6 +68,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Connection setup | Driver-specific settings, including how PostgreSQL's statements are sent (§ Statement preparation) and the settings its sessions start with (§ PostgreSQL session settings) |
 | Recognizing what an engine reports | Each driver has its own error type. Three questions, each silent when wrong: a lost race worth retrying (REQ-71), a unique constraint refusing a duplicate, a failure from the engine rather than an impossible request |
 | Subtracting two moments | No portable expression yields seconds: one engine returns an interval, one a number of days |
+| Reading the server's clock | A timestamp follows the session's time zone and each engine's text form; seconds since the epoch are spelled differently on each |
 | Inserting a row another writer may already have written | `ON CONFLICT DO NOTHING` on two engines, `ON DUPLICATE KEY UPDATE` setting the key to itself on two. Never `INSERT IGNORE`, which also stores a value cut to fit, a dangling reference or a missing value as a warning. Only for a table of facts, where two writers agree |
 | The job queue's locking | The one application file outside the database package, because the queue owns the statement |
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped and PostgreSQL refuses it in a timestamp column. PostgreSQL casts to a zoned timestamp, MySQL and MariaDB to a six-digit datetime, SQLite to nothing |

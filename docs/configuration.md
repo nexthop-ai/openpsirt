@@ -627,8 +627,15 @@ notification area in the interface still works.
 
 `MAIL_FROM` and `MAIL_SERVER` are both needed for mail to happen at all — a
 server with nobody to send as is half a configuration, and either alone sends
-nothing rather than failing at startup. Credentials are optional, and are
-refused over a connection the server would not secure with STARTTLS.
+nothing rather than failing at startup. Credentials are optional. A message
+goes only over a connection the server secured with STARTTLS, since a network
+that strips STARTTLS from the server's answer looks like a server offering
+none. `OPENPSIRT_MAIL_ALLOW_PLAINTEXT` accepts a server without it, and a
+deployment that sets it is told so at every start:
+
+```
+WARN mail may cross the network in the clear server=relay.internal:25
+```
 
 | Variable | File key | Meaning | Default |
 |---|---|---|---|
@@ -636,9 +643,12 @@ refused over a connection the server would not secure with STARTTLS.
 | `OPENPSIRT_MAIL_SERVER` | `mail.server` | The SMTP server as `host:port`, e.g. `smtp.example.com:587` | unset |
 | `OPENPSIRT_MAIL_USERNAME` | `mail.username` | Username, where the server wants one. Sent only after STARTTLS | unset |
 | `OPENPSIRT_MAIL_PASSWORD` | `mail.password` | Password for that username. Sent only after STARTTLS | unset |
+| `OPENPSIRT_MAIL_ALLOW_PLAINTEXT` | `mail.allow_plaintext` | Send to a server that offers no STARTTLS, which is otherwise refused. For a relay on a network you accept mail crossing in the clear. Refused beside `OPENPSIRT_MAIL_USERNAME`, since a username is sent only after STARTTLS | off |
 
 Who gets what is not configuration: each person chooses in their own settings,
-and the daily digest is off until somebody asks for it. A message about a
+and the daily digest is off until somebody asks for it. Mail carries a notice as
+it happens only where somebody must act on it, such as work assigned to them or
+a decision waiting on them; every other notice reaches mail in the digest. A message about a
 finding nobody has announced carries no detail — only that there is something,
 and a link.
 
@@ -1665,6 +1675,10 @@ v0.10.2 named `reaffirm-claim`.
 | Turning publishing on for a product, and renaming one that publishes, are no longer refused for a name that folds like another product's | Nothing |
 | `POST /v1/advisories/{advisory}/approval` takes `{"edition": n}`, the edition agreed to, and answers 409 where the advisory has moved to another edition since. v0.12.0 took no body | Send the `edition` the advisory reported, or the oldest of the `Advisory-Edition` values its releases and its document named where those were read too. A request without it is refused |
 | A build's OpenVEX document states a decision not to fix that names no mitigation as affected, its action saying no fix is planned. v0.12.0 left such a decision out | Nothing, unless one should not be stated: the first publishing pass after the upgrade states every one |
+| Mail carries a notice as it happens only where somebody must act on it: work assigned to them, a mention, a decision or suppression rule waiting on them, a decision sent back, an embargo's disclosure date coming or arriving, a response window coming due or passed, a deferral ending, an approval withdrawn or undone, a decision lapsing, a critical finding in a release, an unanswered report and a reporter's message. Every other notice reaches mail in the daily digest, which lists it. v0.12.0 mailed every notice as it happened | Nothing. Somebody who wants the rest by mail turns the daily digest on in their own settings; without it, those notices stay in the application |
+| Mail to a server that offers no STARTTLS is refused and logged at error, and every notice and digest waits unsent until the configuration changes. v0.12.0 sent it in the clear | Give the mail server STARTTLS. For a relay on a network you accept mail crossing in the clear, set `OPENPSIRT_MAIL_ALLOW_PLAINTEXT` with no username, which is sent only after STARTTLS |
+| A process whose clock stands more than 15 seconds from the database's stops at startup, naming by how far. v0.12.0 started with any clock | Synchronize every host's clock and the database server's before upgrading |
+| A patch link's repository on github.com or gitlab.com is known by its path in lower case, as those hosts compare it. A repository recorded under a path with capitals is cloned once more under the new key, and the earlier copy is evicted like any unused one | Nothing. The first pass after the upgrade takes longer for those repositories |
 
 #### VEX statements from v0.12.0
 

@@ -37,7 +37,9 @@ func NewLocalPass(db bun.IDB, dir string, quota int64, excluded outward.Excluded
 func Environment(home string) []string { return git{transport: "https"}.environment(home) }
 
 // Settings is the configuration every git invocation carries.
-func Settings(proxy string) []string { return git{transport: "https"}.settings(proxy) }
+func Settings(proxy string, network bool) []string {
+	return git{transport: "https"}.settings(proxy, network)
+}
 
 // Leased is the pass holding leases as replica, asking for the lease again
 // every renew while a visit runs.
@@ -118,3 +120,6 @@ func (p *Pass) Running(program string) *Pass {
 	p.git.path = program
 	return p
 }
+
+// Unfinished is what a visit records as having stopped it while it runs.
+const Unfinished = unfinished

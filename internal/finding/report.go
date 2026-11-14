@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 )
@@ -194,9 +195,12 @@ type Unanswered struct {
 	VulnerabilityID int64
 	Identifier      string
 	ProductID       int64
-	Product         string
-	ReportedBy      string
-	ReceivedOn      *time.Time
+	// Product is the product's name, which a link resolves, and ProductShown
+	// what a sentence calls it.
+	Product      string
+	ProductShown string
+	ReportedBy   string
+	ReceivedOn   *time.Time
 	// AssignedTo is the party holding it, a person or a team's queue, and
 	// absent where nobody does. It decides who is told.
 	AssignedTo *int64
@@ -237,6 +241,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		VulnerabilityID int64      `bun:"vulnerability_id"`
 		ProductID       int64      `bun:"product_id"`
 		Product         string     `bun:"product"`
+		ProductShown    string     `bun:"product_shown"`
 		Identifier      string     `bun:"identifier"`
 		ReportedBy      string     `bun:"reported_by"`
 		ReceivedOn      *time.Time `bun:"received_on"`
@@ -256,6 +261,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		ColumnExpr(`"fr"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).
+		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product_shown"`).
 		ColumnExpr(`MIN("v"."identifier") AS "identifier"`).
 		ColumnExpr(`MIN("fr"."reported_by") AS "reported_by"`).
 		ColumnExpr(`MIN("fr"."received_on") AS "received_on"`).
@@ -280,7 +286,7 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		out = append(out, Unanswered{
 			ReportID: row.ReportID, Reference: row.Reference,
 			VulnerabilityID: row.VulnerabilityID, ProductID: row.ProductID,
-			Product: row.Product, Identifier: row.Identifier,
+			Product: row.Product, ProductShown: row.ProductShown, Identifier: row.Identifier,
 			ReportedBy: row.ReportedBy, ReceivedOn: row.ReceivedOn,
 			AssignedTo: row.AssignedTo,
 		})
@@ -293,13 +299,14 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 // answer.
 func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, error) {
 	var rows []struct {
-		ReportID   int64      `bun:"report_id"`
-		Reference  string     `bun:"reference"`
-		ProductID  int64      `bun:"product_id"`
-		Product    string     `bun:"product"`
-		ReportedBy string     `bun:"reported_by"`
-		ReceivedOn *time.Time `bun:"received_on"`
-		AssignedTo *int64     `bun:"assigned_to"`
+		ReportID     int64      `bun:"report_id"`
+		Reference    string     `bun:"reference"`
+		ProductID    int64      `bun:"product_id"`
+		Product      string     `bun:"product"`
+		ProductShown string     `bun:"product_shown"`
+		ReportedBy   string     `bun:"reported_by"`
+		ReceivedOn   *time.Time `bun:"received_on"`
+		AssignedTo   *int64     `bun:"assigned_to"`
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"flaw_report" AS "fr"`).
@@ -308,6 +315,7 @@ func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, e
 		ColumnExpr(`"fr"."reference" AS "reference"`).
 		ColumnExpr(`"fr"."product_id" AS "product_id"`).
 		ColumnExpr(`"p"."name" AS "product"`).
+		ColumnExpr(catalog.ShownExpr("p")+` AS "product_shown"`).
 		ColumnExpr(`"fr"."reported_by" AS "reported_by"`).
 		ColumnExpr(`"fr"."received_on" AS "received_on"`).
 		ColumnExpr(`"fr"."assigned_to" AS "assigned_to"`).
@@ -322,7 +330,7 @@ func (s *Store) unacknowledgedWithoutIssue(ctx context.Context) ([]Unanswered, e
 	for _, row := range rows {
 		out = append(out, Unanswered{
 			ReportID: row.ReportID, Reference: row.Reference,
-			ProductID: row.ProductID, Product: row.Product,
+			ProductID: row.ProductID, Product: row.Product, ProductShown: row.ProductShown,
 			ReportedBy: row.ReportedBy, ReceivedOn: row.ReceivedOn,
 			AssignedTo: row.AssignedTo,
 		})

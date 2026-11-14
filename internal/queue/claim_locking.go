@@ -13,6 +13,24 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
+// staleClaim is a job held by a worker that has stopped reporting: running,
+// claimed before staleBefore. The one spelling of staleness, which reclaiming,
+// counting the backlog and burying all build on.
+const staleClaim = `"state" = ? AND "claimed_at" < ?`
+
+// reclaimable is a stale claim with attempts left, which any worker may take.
+func reclaimable(staleBefore time.Time) (string, []any) {
+	return `(` + staleClaim + ` AND "attempts" < "max_attempts")`, []any{Running, staleBefore}
+}
+
+// claimable is a job a worker may take at now: waiting and due, or a stale
+// claim with attempts left. The select choosing a job and the update taking it
+// both ask it, so the update only succeeds while the job still is.
+func claimable(now, staleBefore time.Time) (string, []any) {
+	arm, args := reclaimable(staleBefore)
+	return `(("state" = ? AND "run_after" <= ?) OR ` + arm + `)`, append([]any{Pending, now}, args...)
+}
+
 // claimableID finds the oldest job this worker may take, and holds it against
 // every other worker until the surrounding transaction ends.
 //
@@ -43,14 +61,8 @@ func claimableID(ctx context.Context, tx bun.Tx, engine database.Engine, locking
 	// the count the claim itself incremented — and without the ceiling here,
 	// a job whose worker is killed every time is reclaimed for ever and the
 	// state that says so is never reached.
-	const base = `SELECT "id" FROM "job"
-		 WHERE "kind" = ?
-		   AND (("state" = ? AND "run_after" <= ?)
-		    OR  ("state" = ? AND "claimed_at" < ? AND "attempts" < "max_attempts"))
-		 ORDER BY "id"
-		 LIMIT 1`
-
-	query := base
+	arm, armArgs := claimable(now, staleBefore)
+	query := `SELECT "id" FROM "job" WHERE "kind" = ? AND ` + arm + ` ORDER BY "id" LIMIT 1`
 	switch engine {
 	case database.Postgres, database.MySQL, database.MariaDB:
 		// FOR UPDATE takes the row. SKIP LOCKED is what makes several workers
@@ -70,7 +82,7 @@ func claimableID(ctx context.Context, tx bun.Tx, engine database.Engine, locking
 	}
 
 	var id int64
-	err := tx.NewRaw(query, kind, Pending, now, Running, staleBefore).Scan(ctx, &id)
+	err := tx.NewRaw(query, append([]any{kind}, armArgs...)...).Scan(ctx, &id)
 	if err != nil {
 		if database.IsNoRows(err) {
 			return 0, nil

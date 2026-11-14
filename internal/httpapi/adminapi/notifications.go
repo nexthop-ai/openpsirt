@@ -149,7 +149,8 @@ func registerDigest(api huma.API, in core.Deps) {
 		Description: "Turns the daily digest on or off, and says whether it lists findings " +
 			"nobody owns as well as your own outstanding work.\n\n" +
 			"Both are off until asked for. The digest carries what nothing else told you: " +
-			"work that became yours without a message, and — where asked for — findings " +
+			"work that became yours without a message, the notices mail does not send as " +
+			"they happen, and — where asked for — findings " +
 			"that opened since the last one and nobody has picked up.\n\n" +
 			"Asking for the second without the first is refused: a digest listing what " +
 			"nobody owns is still a digest.\n\n" +

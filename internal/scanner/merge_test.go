@@ -278,6 +278,10 @@ func TestAMergeMeetingTwoDecisionsThatDisagreeKeepsTheApprovedOneAndTellsTheTria
 			triage.NotApplicable, true)
 		waiting := f.decisions(t, proposer, approver, f.occurrenceOf(t, proposer, national, "libnl-3-200"),
 			triage.Affected, false)
+		if _, err := f.db.DB.NewUpdate().Table("product").Set(`"display_name" = ?`, "SONiC Enterprise").
+			Where("1 = 1").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
 
 		f.reporting(t, named(advisory, libnl, national))
 
@@ -315,6 +319,16 @@ func TestAMergeMeetingTwoDecisionsThatDisagreeKeepsTheApprovedOneAndTellsTheTria
 			if told := f.toldOf(t, who, notify.MergeSuperseded); told != 1 {
 				t.Errorf("%s was told %d times that a merge superseded a decision",
 					who.Identity, told)
+			}
+		}
+		// Named as the product is shown.
+		waitingFor, _, err := notify.NewStore(f.db.DB).Waiting(ctx, proposer, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, one := range waitingFor {
+			if one.Kind == notify.MergeSuperseded && !strings.Contains(one.Body, "SONiC Enterprise") {
+				t.Errorf("the notice says %q, want the product as it is shown", one.Body)
 			}
 		}
 	})

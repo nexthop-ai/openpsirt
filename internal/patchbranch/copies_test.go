@@ -81,6 +81,32 @@ func TestRoomIsMadeWhileANewCopyArrives(t *testing.T) {
 	}
 }
 
+// A directory left where a copy belongs, without HEAD, is no copy: it is
+// replaced by a new one rather than blocking every clone after it.
+func TestADirectoryWithoutHEADIsReplacedByANewCopy(t *testing.T) {
+	var gone []string
+	c := copies{root: t.TempDir(), quota: 1_000_000, now: time.Now, poll: 5 * time.Millisecond,
+		gone: func(names []string) { gone = append(gone, names...) }}
+	repository := "https://example.org/left.git"
+	left := c.dirFor(repository)
+	if err := os.MkdirAll(left, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(left, "pack"), make([]byte, 100), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := c.ensure(t.Context(), stubGit(t), repository)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "HEAD")); err != nil {
+		t.Errorf("the new copy is not in place: %v", err)
+	}
+	if !slices.Equal(gone, []string{filepath.Base(left)}) {
+		t.Errorf("reported %v as removed, want what was left", gone)
+	}
+}
+
 func TestAFetchThatOutgrowsTheCacheIsStoppedAndItsCopyRemoved(t *testing.T) {
 	var gone []string
 	c := copies{root: t.TempDir(), quota: 10_000, now: time.Now, poll: 5 * time.Millisecond,

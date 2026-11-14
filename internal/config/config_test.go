@@ -297,6 +297,22 @@ func TestAMailServerAndWhoItSendsAsAreAcceptedTogether(t *testing.T) {
 	}
 }
 
+// Plain mail beside a username configures nothing: the username is sent only
+// after STARTTLS, so a server without it is refused either way.
+func TestPlainMailBesideAUsernameIsRefused(t *testing.T) {
+	t.Setenv(envPrefix+"MAIL_SERVER", "relay.example.test:25")
+	t.Setenv(envPrefix+"MAIL_FROM", "psirt@example.test")
+	t.Setenv(envPrefix+"MAIL_ALLOW_PLAINTEXT", "true")
+	if _, err := Load(os.Environ()); err != nil {
+		t.Fatalf("plain mail with no username was refused: %v", err)
+	}
+	t.Setenv(envPrefix+"MAIL_USERNAME", "mailer")
+	if _, err := Load(os.Environ()); err == nil ||
+		!strings.Contains(err.Error(), "OPENPSIRT_MAIL_ALLOW_PLAINTEXT and OPENPSIRT_MAIL_USERNAME") {
+		t.Errorf("plain mail beside a username was answered %v", err)
+	}
+}
+
 func TestASwitchMeansWhatItSays(t *testing.T) {
 	// Read as "set at all", "PLAIN_HTTP=false" turns plain HTTP on; read as
 	// "anything but the word false", "AUTO_MIGRATE=0" still migrates.

@@ -76,6 +76,19 @@ func Kinds() []Kind {
 	}
 }
 
+// immediate is every kind mail carries as it happens: something a person must
+// act on (REQ-47). Every other kind reaches mail through the opt-in digest
+// alone, and chat carries every kind as it happens (REQ-80).
+//
+// Kept against Kinds by a test, because this is a hand-maintained list over a
+// closed vocabulary.
+var immediate = []Kind{
+	Assigned, Mentioned, SentBack, DecisionWaiting, SentBackWaiting, SuppressionRuleWaiting,
+	DisclosureDue, DisclosureNear, ResponseWindowNear, ResponseWindowPassed, DeferralEnding,
+	ApprovalWithdrawn, ApprovalUndone, DecisionLapsed, CriticalOnRelease,
+	Unanswered, ReportMessage,
+}
+
 const (
 	// Assigned is work arriving, which is what a triager most wants to notice.
 	Assigned Kind = "assigned"
@@ -621,6 +634,8 @@ func (s *Store) ReconcileTelling(ctx context.Context, personID int64, kind Kind,
 				if err != nil {
 					return fmt.Errorf("clear a condition that ended: %w", err)
 				}
+				// Somebody else clearing it first is no row; a count that
+				// cannot be read is a failure, never that.
 				n, err := database.Affected(res)
 				if err != nil {
 					return fmt.Errorf("clear a condition that ended: %w", err)

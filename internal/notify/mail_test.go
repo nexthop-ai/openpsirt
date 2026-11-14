@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // plainServer is an SMTP server that accepts whatever it is sent, recording
@@ -140,7 +141,7 @@ func TestAPasswordIsSentOnlyAfterSTARTTLS(t *testing.T) {
 	defer issuer.Close()
 	server := serveSMTP(t, &tls.Config{Certificates: issuer.TLS.Certificates, MinVersion: tls.VersionTLS12})
 
-	mail := NewMail(server.addr, "psirt@example.test", "psirt", "hunter2")
+	mail := NewMail(server.addr, "psirt@example.test", "psirt", "hunter2", false)
 	mail.roots = issuer.Client().Transport.(*http.Transport).TLSClientConfig.RootCAs
 	if err := mail.Send(t.Context(), "ana@example.test", Message{Subject: "s", Text: "t"}); err != nil {
 		t.Fatalf("sending over a server offering STARTTLS: %v", err)
@@ -164,18 +165,14 @@ func TestAPasswordIsSentOnlyAfterSTARTTLS(t *testing.T) {
 	}
 }
 
-// A password is not sent over a connection nothing secured. A server that
-// offers no STARTTLS is refused before any AUTH is written to it, where a
-// username is configured; with none, the message is delivered in the clear,
-// because there is nothing to give away.
-//
-// Verified by deleting the `!secured` refusal in Send: the credentials are
-// then written to the server, which accepts them.
+// A password is not sent over a connection nothing secured, even where
+// plaintext is accepted: a server that offers no STARTTLS is refused before any
+// AUTH is written to it.
 func TestAPasswordIsNeverSentWithoutSTARTTLS(t *testing.T) {
 	server := servePlain(t)
-	err := NewMail(server.addr, "psirt@example.test", "psirt", "hunter2").
+	err := NewMail(server.addr, "psirt@example.test", "psirt", "hunter2", true).
 		Send(t.Context(), "ana@example.test", Message{Subject: "s", Text: "t"})
-	if err == nil || !strings.Contains(err.Error(), "STARTTLS") {
+	if err == nil || !strings.Contains(err.Error(), "password") {
 		t.Errorf("sending with a password over an unsecured connection got %v", err)
 	}
 	commands, _ := server.sent()
@@ -184,14 +181,29 @@ func TestAPasswordIsNeverSentWithoutSTARTTLS(t *testing.T) {
 			t.Errorf("credentials were written to a server that secured nothing: %q", command)
 		}
 	}
+}
+
+// A message goes in the clear only where the operator accepted that. A
+// network that strips STARTTLS from the server's answer reads as a server
+// offering none, so without the setting nothing is written past the greeting.
+func TestMailIsNeverSentInTheClearUnlessAccepted(t *testing.T) {
+	refused := servePlain(t)
+	err := NewMail(refused.addr, "psirt@example.test", "", "", false).
+		Send(t.Context(), "ana@example.test", Message{Subject: "s", Text: "t"})
+	if err == nil || !strings.Contains(err.Error(), "STARTTLS") {
+		t.Errorf("sending over an unsecured connection got %v", err)
+	}
+	if _, data := refused.sent(); data != "" {
+		t.Errorf("a message was delivered in the clear: %q", data)
+	}
 
 	open := servePlain(t)
-	if err := NewMail(open.addr, "psirt@example.test", "", "").
+	if err := NewMail(open.addr, "psirt@example.test", "", "", true).
 		Send(t.Context(), "ana@example.test", Message{Subject: "s", Text: "t"}); err != nil {
-		t.Fatalf("sending with no credentials was refused: %v", err)
+		t.Fatalf("sending where plaintext is accepted was refused: %v", err)
 	}
-	if _, data := open.sent(); !strings.HasPrefix(data, "From: psirt@example.test\r\n") {
-		t.Errorf("the message delivered opens %q", data)
+	if _, data := open.sent(); !strings.Contains(data, "From: psirt@example.test\r\n") {
+		t.Errorf("the message delivered reads %q", data)
 	}
 }
 
@@ -201,8 +213,9 @@ func TestAPasswordIsNeverSentWithoutSTARTTLS(t *testing.T) {
 // Verified by making sanitizedHeader return its value unchanged: the injected
 // Bcc and Cc headers are then written.
 func TestAnAddressCannotAddAHeader(t *testing.T) {
+	at := time.Date(2026, 11, 12, 9, 30, 0, 0, time.UTC)
 	rendered := string(headers("psirt@example.test\r\nBcc: evil@example.test",
-		"ana@example.test\nCc: evil@example.test",
+		"ana@example.test\nCc: evil@example.test", at, "<1@example.test>",
 		Message{Subject: "Findings\r\nX-Injected: yes", Text: "body"}))
 	head, _, _ := strings.Cut(rendered, "\r\n\r\n")
 	// Split at either character, since a server reading a bare one as the end
@@ -222,6 +235,53 @@ func TestAnAddressCannotAddAHeader(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("no header reads %q in %q", want, head)
+		}
+	}
+}
+
+// A message carries the date and identifier RFC 5322 asks of it, and says how
+// its body is encoded.
+func TestAMessageCarriesItsDateAndIdentifier(t *testing.T) {
+	server := servePlain(t)
+	if err := NewMail(server.addr, "psirt@example.test", "", "", true).
+		Send(t.Context(), "ana@example.test", Message{Subject: "s", Text: "t"}); err != nil {
+		t.Fatal(err)
+	}
+	_, data := server.sent()
+	head, _, _ := strings.Cut(data, "\r\n\r\n")
+	fields := map[string]string{}
+	for _, line := range strings.Split(head, "\r\n") {
+		if name, value, ok := strings.Cut(line, ": "); ok {
+			fields[name] = value
+		}
+	}
+	if _, err := time.Parse(time.RFC1123Z, fields["Date"]); err != nil {
+		t.Errorf("the date reads %q: %v", fields["Date"], err)
+	}
+	if id := fields["Message-ID"]; !strings.HasPrefix(id, "<") || !strings.HasSuffix(id, "@example.test>") {
+		t.Errorf("the identifier reads %q", id)
+	}
+	if got := fields["Content-Transfer-Encoding"]; got != "8bit" {
+		t.Errorf("the encoding reads %q", got)
+	}
+}
+
+// A message's identifier is at the domain of the sender's address, however the
+// sender is written, and at a reserved domain where it names none.
+func TestAMessageIdentifierIsAtTheSendersDomain(t *testing.T) {
+	for from, want := range map[string]string{
+		"psirt@example.test":                 "@example.test>",
+		`"psirt@corp" <psirt@corp.example>`:  "@corp.example>",
+		"PSIRT <psirt@example.test>":         "@example.test>",
+		"psirt@example.test (Security Team)": "@example.test>",
+		"nobody":                             "@openpsirt.invalid>",
+	} {
+		id, err := messageID(from)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(id, "<") || !strings.HasSuffix(id, want) || strings.ContainsAny(id, ` "()`) {
+			t.Errorf("%q names its message %q, want it at %s", from, id, want)
 		}
 	}
 }

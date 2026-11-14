@@ -204,3 +204,31 @@ func TestASeriesSilentForThreeOfItsUsualGapsHasGoneQuiet(t *testing.T) {
 		}
 	})
 }
+
+// A product, release or variant with no display name is named in a notice by
+// its name.
+func TestAnAnalysisNoticeNamesWhatHasNoDisplayNameByItsName(t *testing.T) {
+	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
+		ctx := t.Context()
+		analyst := w.DeclarePerson("analyst@example.com", "An Analyst", false)
+		if err := w.Access.GrantRole(ctx, analyst.ID, w.Product.ID, access.SecurityTestingRead); err != nil {
+			t.Fatal(err)
+		}
+		for _, table := range []string{"product", "branch_or_tag", "variant"} {
+			if _, err := w.DB.DB.NewUpdate().Table(table).Set(`"display_name" = ?`, "").
+				Where("1 = 1").Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		set := analysisSeries(t, w)
+		now := time.Now().UTC().Truncate(time.Second)
+		for days := 10; days >= 8; days-- {
+			analyzed(t, w, set, now.Add(-time.Duration(days)*24*time.Hour), true)
+		}
+		heard := toldOf(t, w, analyst, access.SecurityTestingRead, notify.SecurityTestingStopped)
+		want := fixtures.ProductName + " " + fixtures.BranchName + " " + fixtures.CustomerVariant
+		if len(heard) != 1 || !strings.Contains(heard[0].Body, want) {
+			t.Fatalf("the analyst was told %+v; want the build named %q", heard, want)
+		}
+	})
+}

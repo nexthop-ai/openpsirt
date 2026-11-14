@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 func TestAWindowReadAgainAfterAFailingIndexKeepsToWhatIsLeftOfThePass(t *testing.T) {
@@ -56,7 +57,7 @@ func TestAPassStillHoldingTheLeaseAsksAboutEveryComponent(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		var of []component
 		says := map[string]currency.Latest{}
-		for i := range currency.RenewEvery*2 + 1 {
+		for i := range queue.RenewEvery*2 + 1 {
 			name := fmt.Sprintf("thing-%03d", i)
 			of = append(of, component{purl: "pkg:cargo/" + name + "@1.0.0"})
 			says[name] = currency.Latest{Version: "2.0.0"}

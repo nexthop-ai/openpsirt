@@ -3,7 +3,10 @@
 
 package supplier
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // FetchForTest points the pass at a fetcher that answers without a network.
 //
@@ -15,3 +18,6 @@ func FetchForTest(p *Pass, fetch *Fetcher) { p.fetch = fetch }
 
 // At fixes the clock, for a test that asks what happens at a given moment.
 func (s *Store) At(now func() time.Time) *Store { return &Store{db: s.db, now: now} }
+
+// FromForTest reads one supplier as a pass does, recording how it went.
+func FromForTest(ctx context.Context, p *Pass, feed Feed) (Taken, error) { return p.from(ctx, feed) }

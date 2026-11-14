@@ -42,6 +42,13 @@ func TestTheNamespaceYieldsThreeSpellings(t *testing.T) {
 		{"a forge is nobody's organization",
 			"https://example.github.io",
 			[]string{"example", "example.github.io", "io.github.example"}},
+		{"a forge host names nobody; the account under it does",
+			"https://github.com/acme", []string{"acme"}},
+		{"a forge host written bare, and its account under it",
+			"gitlab.com/acme/psirt", []string{"acme"}},
+		{"a forge host alone names nobody", "https://github.com", nil},
+		{"an organization's page names its account", "https://github.com/orgs/acme", []string{"acme"}},
+		{"a project's page names the project", "https://sourceforge.net/projects/acme", []string{"acme"}},
 		{"a name stated twice in two spellings is held once",
 			"https://acme.test", []string{"acme", "acme.test", "test.acme"}},
 		{"nothing configured holds nothing back", "", nil},
@@ -242,5 +249,21 @@ func TestFoldingARootInDoesNotChangeWhatItCameFrom(t *testing.T) {
 	ours.With("pkg:golang/github.com/somebody/thing")
 	if got := ours.Labels(); !reflect.DeepEqual(got, before) {
 		t.Fatalf("folding a root in changed the original to %q, from %q", got, before)
+	}
+}
+
+// A deployment publishing under an account on a forge holds back that
+// account's names and nobody else's on the same forge.
+func TestAForgeAccountHoldsBackItsOwnNamesAlone(t *testing.T) {
+	ours := currency.Ourselves("https://github.com/acme", nil)
+	for purl, want := range map[string]bool{
+		"pkg:golang/github.com/acme/tooling":     true,
+		"pkg:npm/@acme/internal":                 true,
+		"pkg:golang/github.com/someone/else":     false,
+		"pkg:maven/com.github.someone/thing@1.0": false,
+	} {
+		if got := ours.HeldBack(purl); got != want {
+			t.Errorf("%s held back %v, want %v", purl, got, want)
+		}
 	}
 }

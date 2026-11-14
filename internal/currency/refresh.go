@@ -184,44 +184,16 @@ func (r *Refresher) asking(ctx context.Context, interval time.Duration) (bool, e
 		// a test drives directly, where there is one of it by construction.
 		return true, nil
 	}
-	return r.leases.Take(ctx, AskingLease, r.replica, leaseFor(interval))
+	return r.leases.Take(ctx, AskingLease, r.replica, queue.LeaseFor(interval))
 }
 
 // AskingLease names the work of asking the public indexes what has been
 // released, so that one replica does it.
 const AskingLease = "upstream.currency"
 
-// renewEvery is how many components a pass gets through before it asks for
-// the lease again.
-//
-// Often enough that a slow index cannot outlast the lease between renewals —
-// twenty-five requests at the outward timeout is well inside it — and rarely
-// enough that the pass is not a conditional update every time it asks a
-// question.
-const renewEvery = 25
-
-// leaseFor is how long to hold the lease, given how often the pass runs.
-//
-// Several cycles, so a replica that is briefly slow does not lose the work to
-// another and then take it back; bounded below so a very short interval in a
-// test does not produce a lease that has already lapsed by the time it is
-// read. What keeps it alive across a long pass is the renewal inside the pass
-// rather than this number.
-func leaseFor(interval time.Duration) time.Duration {
-	held := 5 * interval
-	if held < time.Minute {
-		held = time.Minute
-	}
-	return held
-}
-
 // enabled reports whether this deployment has turned asking on.
 func (r *Refresher) enabled(ctx context.Context) (bool, error) {
-	value, set, err := setting.NewStore(r.db).Get(ctx, setting.UpstreamCurrency)
-	if err != nil {
-		return false, err
-	}
-	return set && value == setting.On, nil
+	return setting.NewStore(r.db).Switch(ctx, setting.UpstreamCurrency, false)
 }
 
 // stale is one component due a question.
@@ -259,7 +231,9 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 	// takes the one answer rather than asking the same name again.
 	answered := map[string]Latest{}
 	asked, at := 0, 0
-	renewed := r.Now()
+	renewal := queue.NewRenewal(func(ctx context.Context) (bool, error) {
+		return r.asking(ctx, r.interval)
+	}, queue.LeaseFor(r.interval), r.Now)
 	for len(due) > 0 {
 		component := due[0]
 		due = due[1:]
@@ -271,18 +245,11 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		// that has already lost the lease from going on asking: two replicas
 		// asking is the thing the lease exists to prevent, and the asking is
 		// at somebody else's expense.
-		//
-		// On a count and on the clock, whichever comes first. A component is
-		// one request to some indexes and several to others, so a count alone
-		// lets a slow index outlast the lease between renewals.
-		if at > 0 && (at%renewEvery == 0 || r.Now().Sub(renewed) > leaseFor(r.interval)/2) {
-			switch mine, err := r.asking(ctx, r.interval); {
-			case err != nil:
-				return asked, fmt.Errorf("keep the lease on asking upstream: %w", err)
-			case !mine:
-				return asked, nil
-			}
-			renewed = r.Now()
+		switch mine, err := renewal.Keep(ctx); {
+		case err != nil:
+			return asked, fmt.Errorf("keep the lease on asking upstream: %w", err)
+		case !mine:
+			return asked, nil
 		}
 		at++
 		// Read every time round rather than once per cycle. A pass is up to
@@ -387,7 +354,7 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 					due = due[:left]
 				}
 			}
-			r.pause(ctx)
+			background.Pause(ctx, r.Pause)
 			continue
 		}
 
@@ -396,25 +363,9 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 			return asked, err
 		}
 		asked++
-		r.pause(ctx)
+		background.Pause(ctx, r.Pause)
 	}
 	return asked, nil
-}
-
-// pause waits between requests, and stops waiting if we are shutting down.
-//
-// A bare time.Sleep in a worker driven by a context is a worker ignoring the
-// signal it was given; the wait is short, but short is not cancellable.
-func (r *Refresher) pause(ctx context.Context) {
-	if r.Pause <= 0 {
-		return
-	}
-	timer := time.NewTimer(r.Pause)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-	case <-timer.C:
-	}
 }
 
 // due reads the components whose answer is missing or old.
@@ -593,10 +544,7 @@ const MostSummary = 300
 // clip shortens text to a bound, on a rune boundary, and trims what is left.
 func clip(text string, most int) string {
 	text = strings.Join(strings.Fields(bound.Text(text)), " ")
-	if len([]rune(text)) <= most {
-		return text
-	}
-	return strings.TrimSpace(string([]rune(text)[:most]))
+	return strings.TrimSpace(bound.HeadRunes(text, most))
 }
 
 // MostAddress bounds an address an index hands over.

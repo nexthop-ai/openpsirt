@@ -251,8 +251,22 @@ var generic = map[string]bool{
 // the first alone would hold back everything called "psirt" and nothing called
 // "example", which is the opposite of what was wanted from both.
 func fromNamespace(namespace string) []string {
-	host := publisherHost(namespace)
+	host, path := publisherHost(namespace)
 	if host == "" {
+		return nil
+	}
+	// A forge host is shared by everybody, so it names nobody; the account
+	// under it is the organization.
+	if forges[host] {
+		for _, segment := range strings.Split(strings.Trim(path, "/"), "/") {
+			switch {
+			case segment == "" || generic[segment]:
+				return nil
+			case forgePaths[segment]:
+				continue
+			}
+			return []string{segment}
+		}
 		return nil
 	}
 	labels := strings.Split(host, ".")
@@ -274,31 +288,41 @@ func fromNamespace(namespace string) []string {
 	return found
 }
 
+// forges are the hosts everybody publishes under, each account at the first
+// segment of its path.
+var forges = map[string]bool{
+	"github.com": true, "gitlab.com": true, "bitbucket.org": true, "sourceforge.net": true,
+}
+
+// forgePaths are the words a forge puts in front of an account in a page's
+// path: an organization's page on GitHub, a project's on SourceForge.
+var forgePaths = map[string]bool{"orgs": true, "users": true, "groups": true, "projects": true, "p": true}
+
 // publisherHost reads the host out of what a deployment configured as its
-// namespace.
+// namespace, and the path after it.
 //
 // A URL is what the formats require and what an operator usually writes, and a
 // bare host is what several write anyway, so both are read. "www." is cut
 // because it names a web server rather than an organization.
-func publisherHost(namespace string) string {
+func publisherHost(namespace string) (string, string) {
 	namespace = strings.ToLower(strings.TrimSpace(namespace))
 	if namespace == "" {
-		return ""
+		return "", ""
 	}
-	host := ""
+	host, path := "", ""
 	if parsed, err := url.Parse(namespace); err == nil {
-		host = parsed.Hostname()
+		host, path = parsed.Hostname(), parsed.Path
 		if host == "" {
 			// Written without a scheme, where the whole thing lands in the
 			// path. Taken up to the first separator, so "example.test/psirt"
 			// answers the same as "https://example.test/psirt".
-			host, _, _ = strings.Cut(parsed.Path, "/")
+			host, path, _ = strings.Cut(parsed.Path, "/")
 		}
 	}
 	if host == "" {
-		host, _, _ = strings.Cut(namespace, "/")
+		host, path, _ = strings.Cut(namespace, "/")
 	}
-	return strings.TrimPrefix(host, "www.")
+	return strings.TrimPrefix(host, "www."), path
 }
 
 // RootOwners reads who publishes the things the scans were about.

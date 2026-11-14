@@ -14,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/background"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -176,7 +177,7 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 			var rows []noting
 			q := unsettled(t.db.NewSelect().Model(&rows), to).
 				ColumnExpr("nt.*").
-				ColumnExpr(`COALESCE(NULLIF("p"."display_name", ''), "p"."name", '') AS "product"`).
+				ColumnExpr(`COALESCE(` + catalog.ShownExpr("p") + `, '') AS "product"`).
 				Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "nt"."product_id"`)
 			q = forChannel(q, to, offered, t.now().Add(-chatHorizon)).
 				OrderExpr(`"nt"."created_at" ASC, "nt"."id" ASC`).
@@ -291,7 +292,7 @@ func (t *Talk) directs(ctx context.Context, chat Chat, offered []string) (sent, 
 		var rows []noting
 		if err := direct(t.db.NewSelect().Model(&rows), chat.Platform(), offered, since).
 			ColumnExpr("nt.*").
-			ColumnExpr(`COALESCE(NULLIF("p"."display_name", ''), "p"."name", '') AS "product"`).
+			ColumnExpr(`COALESCE(`+catalog.ShownExpr("p")+`, '') AS "product"`).
 			Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "nt"."product_id"`).
 			Where(`"nt"."person_id" = ?`, person.PersonID).
 			OrderExpr(`"nt"."created_at" ASC, "nt"."id" ASC`).

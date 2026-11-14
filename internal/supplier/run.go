@@ -5,6 +5,7 @@ package supplier
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -212,6 +213,22 @@ func (p *Pass) from(ctx context.Context, feed Feed) (Taken, error) {
 		barred = refusal.Errorf("that publisher refused %d of what it lists, the last %s",
 			took.Barred, took.BarredBy)
 	}
+	// A failure of this deployment says nothing about the publisher: the mark
+	// moves as far as the pass read and the supplier stays due. It is recorded
+	// as this deployment's in fixed words, since a database's own text is never
+	// shown, so one that repeats at the same document shows on the supplier
+	// rather than in the log alone. A pass cut short by shutdown records none.
+	if errors.As(err, new(local)) && !cut {
+		ours := errFailedHere
+		if barred != nil {
+			ours = refusal.Errorf("%v; %v", errFailedHere, barred)
+		}
+		if marked := store.CaughtUp(ctx, feed.ID, took.CaughtUpTo, took.Mark, ours); marked != nil {
+			p.logger.Error("recording how far a supplier was read",
+				"supplier", feed.Display, "error", marked)
+		}
+		return took, err
+	}
 	if cut || (took.Filled && err == nil) {
 		if marked := store.CaughtUp(ctx, feed.ID, took.CaughtUpTo, took.Mark,
 			barred); marked != nil {
@@ -229,6 +246,10 @@ func (p *Pass) from(ctx context.Context, feed Feed) (Taken, error) {
 	}
 	return took, err
 }
+
+// errFailedHere is what a supplier records where this deployment, not the
+// publisher, stopped the pass.
+var errFailedHere = refusal.New("this deployment failed, not the publisher; its log says why")
 
 // recordedAs is who a fetched claim is recorded as having been brought in by.
 //
@@ -251,7 +272,7 @@ func (p *Pass) fetching(ctx context.Context) (bool, error) {
 		// test drives directly, where there is one of it by construction.
 		return true, nil
 	}
-	return p.leases.Take(ctx, FetchLease, p.replica, leaseFor(p.interval))
+	return p.leases.Take(ctx, FetchLease, p.replica, queue.LeaseFor(p.interval))
 }
 
 // every is how long a supplier stands before it is read again.
@@ -261,19 +282,4 @@ func (p *Pass) every(ctx context.Context) (time.Duration, error) {
 		return 0, fmt.Errorf("read how often to read suppliers again: %w", err)
 	}
 	return held, nil
-}
-
-// leaseFor is how long to hold the lease, given how often the pass runs.
-//
-// Several cycles, so a replica that is briefly slow does not lose the work to
-// another and then take it back; bounded below so a very short interval in a
-// test does not produce a lease that has already lapsed by the time it is read.
-// What keeps it alive across a long pass is the renewal inside the pass rather
-// than this number.
-func leaseFor(interval time.Duration) time.Duration {
-	held := 5 * interval
-	if held < time.Minute {
-		held = time.Minute
-	}
-	return held
 }
