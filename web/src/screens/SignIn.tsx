@@ -22,7 +22,8 @@ type Provider = { name: string; path: string };
 // carries nothing and the server's own default applies.
 export function returningHere(): string {
   const here = window.location.pathname + window.location.search;
-  if (here === "/" || here === "" || marked(signedOut) || marked(refused)) return "";
+  if (here === "/" || here === "") return "";
+  if (window.location.pathname === "/" && (marked(signedOut) || marked(refused))) return "";
   return "?return=" + encodeURIComponent(here);
 }
 
@@ -31,8 +32,7 @@ export function returningHere(): string {
 // One provider means the button is the only thing on the screen, so the screen
 // is a stop on the way rather than a choice — but a forward that repeats is a
 // person who can never read that they were refused. Coming back to the
-// application after a refusal shows the way in rather than sending them round
-// again.
+// application after a refusal shows the way in.
 //
 // Per tab, and cleared once somebody is actually signed in. Storage can be
 // unavailable or throw, and the honest answer then is to draw the button: a
@@ -178,7 +178,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
               <p className="mt-1 text-sm text-[var(--muted)]">Ask an administrator for access.</p>
             </div>
           ) : (
-            !(refusedHere && providers.isPending) && (
+            !(refusedHere && (providers.isPending || providers.isError)) && (
               <p className="text-sm text-[var(--muted)]">
                 {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
               </p>

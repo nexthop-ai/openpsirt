@@ -42,6 +42,9 @@ describe("where a sign-in comes back to", () => {
     // However the marker is spelled, as the screen reads it.
     at("/", "?no-access=&x=1");
     expect(returningHere()).toBe("");
+    // A screen's own query carrying the word keeps its place.
+    at("/findings", "?no-access");
+    expect(returningHere()).toBe("?return=%2Ffindings%3Fno-access");
   });
 
   it("carries nothing from the address a sign-out lands on", () => {
@@ -115,8 +118,7 @@ describe("sending somebody straight on to the only provider", () => {
   });
 
   it("does not forward twice in one tab", () => {
-    // A forward that comes back without a session has to offer the way in
-    // rather than send them round again.
+    // A forward that comes back without a session offers the way in.
     expect(forwardable(1, false)).toBe(true);
     rememberForward();
     expect(forwardable(1, false)).toBe(false);

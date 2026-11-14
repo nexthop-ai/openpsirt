@@ -72,7 +72,9 @@ export function Home({ who }: { who: Who }) {
       <WorkFigures who={who} counting={counting} />
 
       <div className="panels">
-        {readsNothing(who) && (keepsRecords(who) || !who.collaborates) && <Records who={who} />}
+        {readsNothing(who) && (keepsRecords(who) || (!who.collaborates && !openNowhere(who))) && (
+          <Records who={who} />
+        )}
         {who.collaborates && <YourCases />}
         <Pending />
         <InProgress me={who.identity} />
@@ -318,6 +320,12 @@ function keepsRecords(who: Who): boolean {
   return who.admin || !!who.audits;
 }
 
+// Whether the reader holds a role on every product and no product is open, so
+// the greeting already says what they hold.
+function openNowhere(who: Who): boolean {
+  return !!who.everywhere && (who.reach ?? []).length === 0;
+}
+
 // The panel standing for the estate's figures for a reader holding no finding
 // in any product: an auditor, an administrator with no role on a product, or
 // somebody holding a capability alone and collaborating on nothing, whose
@@ -419,7 +427,7 @@ function holdings(who: Who): string {
   if (reach.length === 0) {
     if (who.audits) return "You audit this deployment";
     // A role across every product reaches nothing while no product is open.
-    if (who.everywhere && (who.reach ?? []).length === 0) return "You hold a role on every product";
+    if (openNowhere(who)) return "You hold a role on every product";
     return "You hold no role on a product";
   }
   const triage = reach

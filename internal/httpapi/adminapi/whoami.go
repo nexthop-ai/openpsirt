@@ -81,8 +81,8 @@ type WhoBody struct {
 	// sign-out only where this deployment holds a session to end.
 	ByProxy bool      `json:"by_proxy,omitempty" doc:"Whether the trusted proxy in front of this deployment signed this browser in, so that signing out happens there"`
 	Reach   []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
-	// Everywhere says an empty Reach is a catalog with nothing in it yet
-	// rather than nothing granted.
+	// Everywhere tells an empty Reach over a catalog with no open product from
+	// one over nothing granted.
 	Everywhere bool `json:"everywhere,omitempty" doc:"Whether they hold a role across every product, which covers each product as it is declared"`
 	// Collaborates says a screen has their own cases to ask for: a grant on
 	// one issue or one code finding reaches nothing in Reach.

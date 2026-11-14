@@ -123,6 +123,7 @@ describe("the application after a refused sign-in with no way in", () => {
     await drawn(() => ({ status: 401 }), "/", { status: 503 });
     expect(text()).toContain("The ways in could not be read.");
     expect(text()).not.toContain("Ask an administrator for access.");
+    expect(text()).not.toContain("Sign in to continue");
   });
 });
 

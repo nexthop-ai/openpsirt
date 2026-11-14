@@ -58,6 +58,7 @@ describe("the front page's greeting", () => {
     await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("You hold a role on every product");
+    expect(text).not.toContain("read findings in any product");
     expect(text).not.toContain("You hold no role on a product");
   });
 });
