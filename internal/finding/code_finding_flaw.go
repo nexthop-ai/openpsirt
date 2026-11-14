@@ -49,10 +49,25 @@ type CodeFindingFlaw struct {
 // matchedOn narrows an update of one flaw record to the run it was read after,
 // for a write that a run describing the code finding since has to send round again.
 func (h CodeFindingFlaw) matchedOn(q *bun.UpdateQuery) *bun.UpdateQuery {
+	cond, args := h.lastRun()
+	return q.Where(cond, args...)
+}
+
+// lastRun is the condition that the flaw record was last described by the run
+// it was read after.
+func (h CodeFindingFlaw) lastRun() (string, []any) {
 	if h.LastRunID == nil {
-		return q.Where(`"last_run_id" IS NULL`)
+		return `"last_run_id" IS NULL`, nil
 	}
-	return q.Where(`"last_run_id" = ?`, *h.LastRunID)
+	return `"last_run_id" = ?`, []any{*h.LastRunID}
+}
+
+// asReadCondition is the condition that the flaw record is as it was read, for
+// an update or a delete.
+func (h CodeFindingFlaw) asReadCondition() (string, []any) {
+	run, runArgs := h.lastRun()
+	return `"id" = ? AND "visibility" = ? AND ` + h.asPlaced() + ` AND "disclosed_at" IS NULL AND ` + run,
+		append([]any{h.ID, h.Visibility}, runArgs...)
 }
 
 // asPlaced narrows a write of one flaw record to whether it was included in its
@@ -70,8 +85,8 @@ func (h CodeFindingFlaw) asPlaced() string {
 // describe it. An inclusion, a removal, a disclosure or a run landing since is a lost
 // race, which the retry reads again.
 func (h CodeFindingFlaw) AsRead(q *bun.UpdateQuery) *bun.UpdateQuery {
-	return h.matchedOn(q.Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).
-		Where(h.asPlaced()).Where(`"disclosed_at" IS NULL`))
+	cond, args := h.asReadCondition()
+	return q.Where(cond, args...)
 }
 
 // Unlink deletes the flaw record as it was read: its visibility, whether it was
@@ -79,15 +94,8 @@ func (h CodeFindingFlaw) AsRead(q *bun.UpdateQuery) *bun.UpdateQuery {
 // An inclusion, a removal, a disclosure or a run landing since is a lost race, answered with
 // database.ErrGoAgain.
 func (h CodeFindingFlaw) Unlink(ctx context.Context, db bun.IDB) error {
-	q := db.NewDelete().Model((*CodeFindingFlaw)(nil)).
-		Where(`"id" = ?`, h.ID).Where(`"visibility" = ?`, h.Visibility).Where(h.asPlaced()).
-		Where(`"disclosed_at" IS NULL`)
-	if h.LastRunID == nil {
-		q = q.Where(`"last_run_id" IS NULL`)
-	} else {
-		q = q.Where(`"last_run_id" = ?`, *h.LastRunID)
-	}
-	result, err := q.Exec(ctx)
+	cond, args := h.asReadCondition()
+	result, err := db.NewDelete().Model((*CodeFindingFlaw)(nil)).Where(cond, args...).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("undo the flaw record: %w", err)
 	}

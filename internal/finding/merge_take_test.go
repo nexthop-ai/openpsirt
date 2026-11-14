@@ -118,3 +118,72 @@ func TestTwoMergesOfOneIssueAtOnceLeaveOneIssue(t *testing.T) {
 		}
 	})
 }
+
+// Two writers meeting one new issue at once both record it: the second finds
+// the first's row once its insert collides, and the issue is one row.
+func TestTwoWritersRecordingOneNewIssueAtOnceBothSucceed(t *testing.T) {
+	servers(t, func(t *testing.T, f *fixture) {
+		const name = "CVE-2026-8301"
+		hooked, rival := dbtest.RivalAfterRead(t, f.db, "vulnerability", "vulnerability", 2*time.Second,
+			func() error {
+				return mergeWithin(context.Background(), f.db.DB, finding.Named{Identifier: name})
+			})
+		if err := mergeWithin(t.Context(), hooked, finding.Named{Identifier: name}); err != nil {
+			t.Fatalf("the writer that lost the race: %v", err)
+		}
+		if err := rival(); err != nil {
+			t.Fatalf("the rival: %v", err)
+		}
+		held, err := f.db.DB.NewSelect().Model((*finding.Vulnerability)(nil)).
+			Where(`"identifier_folded" = ?`, finding.FoldIdentifier(name)).Count(t.Context())
+		if err != nil || held != 1 {
+			t.Errorf("the issue is held by %d rows (%v), want one", held, err)
+		}
+	})
+}
+
+// Two writers recording one new name for an issue already held both succeed:
+// the one whose write collides goes again and reads the other's name.
+func TestTwoWritersRecordingOneNewNameAtOnceBothSucceed(t *testing.T) {
+	servers(t, func(t *testing.T, f *fixture) {
+		const name, alias = "CVE-2026-8401", "GHSA-aaaa-8401-0001"
+		f.internAlone(t, name)
+		named := finding.Named{Identifier: name, Aliases: []string{alias}}
+		hooked, rival := dbtest.RivalAfterRead(t, f.db, "vulnerability_alias", "vulnerability_alias", 2*time.Second,
+			func() error { return mergeWithin(context.Background(), f.db.DB, named) })
+		if err := mergeWithin(t.Context(), hooked, named); err != nil {
+			t.Fatalf("the first writer: %v", err)
+		}
+		if err := rival(); err != nil {
+			t.Fatalf("the rival: %v", err)
+		}
+		held, err := f.db.DB.NewSelect().Model((*finding.Alias)(nil)).
+			Where(`"identifier_folded" = ?`, finding.FoldIdentifier(alias)).Count(t.Context())
+		if err != nil || held != 1 {
+			t.Errorf("the name is held by %d rows (%v), want one", held, err)
+		}
+	})
+}
+
+// Two writers recording one new reference for an issue already held both
+// succeed: the one whose write collides goes again and reads the other's.
+func TestTwoWritersRecordingOneNewReferenceAtOnceBothSucceed(t *testing.T) {
+	servers(t, func(t *testing.T, f *fixture) {
+		const name, address = "CVE-2026-8402", "https://example.com/advisories/8402"
+		f.internAlone(t, name)
+		named := finding.Named{Identifier: name, References: []finding.Reference{{URL: address}}}
+		hooked, rival := dbtest.RivalAfterRead(t, f.db, "vulnerability_reference", "vulnerability_reference",
+			2*time.Second, func() error { return mergeWithin(context.Background(), f.db.DB, named) })
+		if err := mergeWithin(t.Context(), hooked, named); err != nil {
+			t.Fatalf("the first writer: %v", err)
+		}
+		if err := rival(); err != nil {
+			t.Fatalf("the rival: %v", err)
+		}
+		held, err := f.db.DB.NewSelect().Model((*finding.Reference)(nil)).
+			Where(`"url" = ?`, address).Count(t.Context())
+		if err != nil || held != 1 {
+			t.Errorf("the reference is held by %d rows (%v), want one", held, err)
+		}
+	})
+}

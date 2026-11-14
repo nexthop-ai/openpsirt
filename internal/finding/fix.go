@@ -72,7 +72,7 @@ type Upgrade struct {
 // transaction gives: a retry runs this against a database that has moved, so a
 // build list settled beforehand describes a world that may be gone.
 func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Subject,
-	productID, componentID int64, to string, by *time.Time, decisionID *int64,
+	productID, componentID int64, to string, by *time.Time, decisionID int64,
 	wanted []int64, retired map[int64]string) (int, error) {
 
 	fold, from, err := s.foldOf(ctx, db, componentID)
@@ -83,19 +83,13 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 	declared := 0
 	// Everything this decision no longer wants goes. Withdrawing a commitment
 	// is not a different kind of act from making one, and making it one
-	// produces two paths that drift. A commitment another decision argued for
-	// is that decision's to move, so it is kept: its occurrences still stand
-	// on it.
+	// produces two paths that drift. A commitment this decision did not make
+	// is not its to withdraw, so it is kept: another decision's occurrences
+	// still stand on it.
 	remove := db.NewDelete().Model((*Upgrade)(nil)).
 		Where(`"fold_key" = ?`, fold).
-		Where(inThisProduct, productID)
-	if decisionID != nil {
-		remove = remove.WhereGroup(" AND ", func(q *bun.DeleteQuery) *bun.DeleteQuery {
-			return q.Where(`"decision_id" IS NULL`).WhereOr(`"decision_id" = ?`, *decisionID)
-		})
-	} else {
-		remove = remove.Where(`"decision_id" IS NULL`)
-	}
+		Where(inThisProduct, productID).
+		Where(`"decision_id" = ?`, decisionID)
 	if len(wanted) > 0 {
 		remove = remove.Where(`"build_id" NOT IN (?)`, bun.List(wanted))
 	}
@@ -139,12 +133,12 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		// today.
 		if have[id] {
 			// The version a release is moving to is what somebody agreed
-			// to. Where a decision argued for it, changing it here would leave
-			// the agreement standing over a promise nobody read, so it is
+			// to. Where another decision argued for it, changing it here would
+			// leave the agreement standing over a promise nobody read, so it is
 			// refused and the decision named — revising that is the act that
-			// withdraws the agreement. Where nothing argued for it, the
-			// commitment is intent and moving it is editing one row, which is
-			// the whole reason it is one row.
+			// withdraws the agreement. Where this decision made it, or none
+			// did, moving it is editing one row, which is the whole reason it
+			// is one row.
 			if err := s.movedTo(ctx, db, fold, id, strings.TrimSpace(to), by, decisionID); err != nil {
 				return 0, err
 			}
@@ -153,7 +147,7 @@ func (s *Store) CommitWithin(ctx context.Context, db bun.IDB, subject access.Sub
 		row := &Upgrade{
 			BuildID: id, FoldKey: fold,
 			FromVersion: from, ToVersion: strings.TrimSpace(to),
-			CommittedTo: by, DecisionID: decisionID,
+			CommittedTo: by, DecisionID: &decisionID,
 			DeclaredBy: subject.ID, DeclaredAt: now,
 		}
 		if _, err := db.NewInsert().Model(row).Exec(ctx); err != nil {
@@ -454,7 +448,7 @@ func (s *Store) toldOf(ctx context.Context, subject access.Subject, buildID int6
 // movedTo changes what a commitment is moving to, or refuses where an
 // agreement stands over it.
 func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, buildID int64,
-	to string, by *time.Time, decisionID *int64) error {
+	to string, by *time.Time, decisionID int64) error {
 
 	var standing Upgrade
 	if err := db.NewSelect().Model(&standing).
@@ -468,7 +462,7 @@ func (s *Store) movedTo(ctx context.Context, db bun.IDB, fold string, buildID in
 	// date without this one's approver. A commitment made by the same decision
 	// is that decision writing its own promise again, which is what revising it
 	// does.
-	if standing.DecisionID != nil && (decisionID == nil || *decisionID != *standing.DecisionID) {
+	if standing.DecisionID != nil && decisionID != *standing.DecisionID {
 		return refusal.Errorf(
 			"this release is committed to %s under decision %d: revise that decision rather than "+
 				"recording a second promise about the same package",

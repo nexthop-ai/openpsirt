@@ -474,3 +474,13 @@ func RefusedFinding(in Deps, err error) error {
 	}
 	return WentWrong(in.Logger, "that could not be recorded", err)
 }
+
+// CodeFindingRoute is the path naming one code finding on one build, embedded
+// in every input on a code finding's route so each publishes the same
+// parameters.
+type CodeFindingRoute struct {
+	Product     string `path:"product"`
+	BranchOrTag string `path:"branch_or_tag"`
+	Variant     string `path:"variant"`
+	Occurrence  string `path:"occurrence" doc:"The code finding's occurrence identity"`
+}

@@ -153,7 +153,7 @@ func (s *Store) OccurrenceFor(ctx context.Context, subject access.Subject, build
 		Where(Decidable).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
-		OrderExpr("component_upstream, consumer_upstream").
+		OrderExpr(`"component_upstream", "consumer_upstream"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read what is open at that occurrence: %w", err)
@@ -414,7 +414,8 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 		// fold it names in the builds asked about, so a source package named
 		// in two builds at two versions moves both.
 		Where(FoldedOn+` IN (?)`, bun.List(folds)).
-		OrderExpr(`"f"."vulnerability_id", "f"."component_id", "f"."build_id", "occurrence_identity"`)
+		OrderExpr(`"f"."vulnerability_id", "f"."component_id", "f"."build_id", "occurrence_identity", ` +
+			`"component_upstream", "consumer_upstream", "f"."id"`)
 	err = query.Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where that bump would reach: %w", err)
@@ -422,7 +423,9 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 
 	order := []string{}
 	grouped := map[string]*InPlannedUpgrade{}
-	seen := map[string]bool{}
+	// Where each occurrence and version pair sits among its entry's
+	// occurrences.
+	seen := map[string]int{}
 	for _, row := range rows {
 		at := fmt.Sprintf("%d\x00%d\x00%d", row.VulnerabilityID, row.ComponentID, row.BuildID)
 		one, held := grouped[at]
@@ -434,14 +437,26 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 			grouped[at] = one
 			order = append(order, at)
 		}
-		// One entry per occurrence, however many rows an occurrence has: an
-		// occurrence with two consumers is one thing to decide about, and
-		// counting it twice would write two decision occurrences about the same
-		// code.
-		if seen[at+"\x00"+row.OccurrenceIdentity] {
+		// One entry per occurrence and version pair, however many rows it
+		// has: an occurrence with two consumers is one thing to decide about,
+		// and counting it twice would write two decision occurrences about the
+		// same code. A second version pair at the occurrence is a decision of
+		// its own, which is how a promise keys them. The earliest deadline of
+		// the rows stands, since it is what the promise is measured against.
+		key := at + "\x00" + row.OccurrenceIdentity + "\x00" + row.ComponentUpstream + "\x00" + row.ConsumerUpstream
+		if i, held := seen[key]; held {
+			entry := &one.Occurrences[i]
+			entry.Occurrences++
+			if access.AsVisibility(row.Visibility) == access.Private {
+				entry.Visibility = access.Private
+			}
+			if row.DueAt != nil && (entry.DueAt == nil || row.DueAt.Before(*entry.DueAt)) {
+				due := *row.DueAt
+				entry.DueAt = &due
+			}
 			continue
 		}
-		seen[at+"\x00"+row.OccurrenceIdentity] = true
+		seen[key] = len(one.Occurrences)
 		one.Occurrences = append(one.Occurrences, Deciding{
 			ProductID: productID, VulnerabilityID: row.VulnerabilityID,
 			OccurrenceIdentity: row.OccurrenceIdentity,
@@ -499,7 +514,7 @@ func (s *Store) OccurrencesFor(ctx context.Context, subject access.Subject, buil
 		ColumnExpr(`COALESCE(`+graph.StatedName("sun", `"f"."build_id"`, `"f"."consumer_id"`, "uc")+`, '') AS "consumer"`).
 		ColumnExpr(`COALESCE("f"."fixed_in", '') AS "fixed_in"`).
 		Apply(inFoldOf(buildID, vulnerabilityID, componentID, visible)).
-		OrderExpr(`consumer, "occurrence_identity", component_upstream, consumer_upstream`).
+		OrderExpr(`"consumer", "occurrence_identity", "component_upstream", "consumer_upstream"`).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read where this sits: %w", err)

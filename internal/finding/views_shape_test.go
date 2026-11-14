@@ -8,15 +8,11 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
-	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
 // aView reads a page of fifty from one of the views beside the findings list,
@@ -41,19 +37,7 @@ func upgradesPage(ctx context.Context, store *finding.Store, who access.Subject,
 func viewStatements(t *testing.T, db *database.DB, view aView, filter finding.Filter) []string {
 	t.Helper()
 	ctx := t.Context()
-	w, err := world.Declare(ctx, db)
-	if err != nil {
-		t.Fatal(err)
-	}
-	f := &fixture{
-		db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
-		build: w.Build.ID, productID: w.Product.ID, tag: w.Tag.ID, variant: w.Customer.ID,
-		scans: ingest.NewStore(db.DB),
-		scope: finding.Scope{
-			ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID,
-		},
-		built: time.Now().UTC().Add(-72 * time.Hour),
-	}
+	f := declaredFixture(t, db)
 	two := f.acrossProducts(t)
 	who := f.holdingIn(t, []int64{two.first, two.second}, access.PublicRead, access.PrivateRead)
 

@@ -43,7 +43,7 @@ type FindingBody struct {
 	Component string        `json:"component" doc:"The component that carries it"`
 	Version   string        `json:"version" doc:"The version that ships"`
 	Upstream  string        `json:"upstream,omitempty" doc:"The upstream a fork was made from, where it is one"`
-	Source    string        `json:"source,omitempty" doc:"The package this binary was built from, where the two differ. The same issue at two binaries of one source is two rows here and one piece of work everywhere else: decided once, upgraded once, assigned by one rule"`
+	Source    string        `json:"source,omitempty" doc:"The source package this binary was built from, where the two differ. Every binary of one source at one version carrying one issue is one row; packages counts them"`
 	Ecosystem string        `json:"ecosystem,omitempty" doc:"The kind of package, as its identifier spells it — deb, apk, rpm, golang, cargo, pypi, npm, gem, generic, oci, github, maven and whatever else a producer emits. Read out of the identifier rather than chosen from a list, so the set is open. With the component and version it tells one row from another, which those two alone do not: one build can hold one name at one version as two components, a source repository and the package built from it"`
 	Namespace string        `json:"namespace,omitempty" doc:"The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version"`
 	FixState  core.FixState `json:"fix_state,omitempty" doc:"Upstream's answer about it"`
@@ -192,8 +192,8 @@ func registerFindings(api huma.API, in core.Deps) {
 		OperationID: "list-findings", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/findings",
 		Summary: "List vulnerability findings",
-		Description: "Returns one row per vulnerability-and-component pair, not one row per " +
-			"occurrence of the component. Each row gives the number of occurrences it has and " +
+		Description: "Returns one row per issue and source package at a version, not one row per " +
+			"binary package or per occurrence. Each row gives the number of occurrences it has and " +
 			"how many of those the build's VEX documents already answer.\n\n" +
 			"Ordered by urgency — known-exploited first, then whether the build ships to " +
 			"customers, then severity, then likelihood. Supports limit and offset.\n\n" +

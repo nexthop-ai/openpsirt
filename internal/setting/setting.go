@@ -657,6 +657,21 @@ func (s *Store) Switch(ctx context.Context, name string, fallback bool) (bool, e
 	return fallback, nil
 }
 
+// Word reads a setting that takes one of a few words, answering fallback where
+// it is unset or holds a word not among them.
+func (s *Store) Word(ctx context.Context, name string, words []string, fallback string) (string, error) {
+	value, set, err := s.Get(ctx, name)
+	if err != nil || !set {
+		return fallback, err
+	}
+	for _, word := range words {
+		if value == word {
+			return value, nil
+		}
+	}
+	return fallback, nil
+}
+
 // Store reads and writes settings.
 type Store struct {
 	db  bun.IDB

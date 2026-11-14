@@ -9,6 +9,8 @@ package finding
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/uptrace/bun"
 
@@ -172,6 +174,24 @@ func openComponents(ctx context.Context, db bun.IDB, buildID int64, at graph.Mom
 		held.byIdentity[row.Identity] = row
 		held.byName[row.Name] = append(held.byName[row.Name], row)
 	}
+	// A report names a component by what the scanner was given, hashed as
+	// identity is read now. A component stored before then holds an identity
+	// that description no longer hashes to, and is matched by the
+	// description too; a stored identity is never displaced by one.
+	scanned, err := graph.NewStore(db).ScannedAs(ctx, buildID, at)
+	if err != nil {
+		return inventory{}, err
+	}
+	for _, id := range slices.Sorted(maps.Keys(scanned)) {
+		described := scanned[id]
+		row, present := held.byID[id]
+		if !present {
+			continue
+		}
+		if _, taken := held.byIdentity[described.Identity()]; !taken {
+			held.byIdentity[described.Identity()] = row
+		}
+	}
 	return held, nil
 }
 
@@ -280,6 +300,9 @@ func occurrenceEdges(ctx context.Context, db bun.IDB, buildID, componentID int64
 		ColumnExpr(`"parent"."component_id" AS "parent_component_id"`).
 		ColumnExpr(`"parent"."is_root" AS "parent_is_root"`).
 		Where(`"e"."build_id" = ?`, buildID).
+		// An edge from a component to itself pulls in nothing, as the walks
+		// read it, so it places no occurrence.
+		Where(`"e"."parent_id" <> "e"."child_id"`).
 		Where(held, args...).
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if componentID == 0 {

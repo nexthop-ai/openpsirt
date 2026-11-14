@@ -191,6 +191,16 @@ func TestAnSecurityTestingOnlyCodeFindingNamesItsFlawOnlyToThePeopleOnTheCase(t 
 		if granted.At.Message != "p is leaked" || granted.RecordedAsFlaw == nil || granted.RecordedAsFlaw.Flaw != flaw {
 			t.Errorf("somebody granted the code finding read %+v; want the code finding and its flaw", granted)
 		}
+		// They are told which flaw the code finding is behind.
+		var told struct {
+			Items []struct {
+				Body string `json:"body"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "embargo-reader", "/v1/notifications", &told)
+		if len(told.Items) == 0 || !strings.Contains(told.Items[0].Body, "behind "+flaw+" in ") {
+			t.Errorf("somebody granted the code finding was told %+v; want the flaw named", told.Items)
+		}
 		// The grant is the code finding and nothing else of the security testing work.
 		var listed struct {
 			Items []json.RawMessage `json:"items"`

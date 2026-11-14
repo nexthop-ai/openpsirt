@@ -722,7 +722,9 @@ func (f *Fetcher) document(ctx context.Context, client *http.Client, by access.S
 		return 0, false, got, unreadable{err: err}
 	}
 	got.publisher, got.identifier = advisory.Publisher, advisory.Identifier
-	if err := shaped(advisory); err != nil {
+	if err := (finding.Supplied{
+		Source: finding.FromAdvisory, Publisher: advisory.Publisher, Identifier: advisory.Identifier,
+	}).Valid(); err != nil {
 		return 0, false, got, unreadable{err: err}
 	}
 	checked, err := f.matches(ctx, client, one, body, sums)
@@ -782,6 +784,10 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, feed Feed, one 
 	switch {
 	case errors.Is(err, errWithdrawn):
 		return 0, err
+	// A refusal from the store is about this document, so the pass steps over
+	// it; read as a fault, it would hold the mark before the document for ever.
+	case err != nil && refusal.In(err):
+		return 0, unreadable{err: err}
 	case err != nil:
 		return 0, local{err}
 	}
@@ -967,24 +973,6 @@ func recording(document []byte, kept []finding.Statement) string {
 		sum.Write([]byte(name))
 	}
 	return hex.EncodeToString(sum.Sum(nil))
-}
-
-// shaped refuses an advisory whose two names do not fit what a claim records.
-//
-// Both are part of the key a later revision supersedes on and both are stored
-// in a column of a fixed width. Refused rather than shortened: two advisories
-// agreeing for the width of the column would collapse into one, and a revision
-// of one would set aside claims it has nothing to do with.
-func shaped(advisory sbom.Advisory) error {
-	if len([]rune(advisory.Publisher)) > finding.MostPublisher {
-		return refusal.Errorf("who published it is longer than the %d characters this records",
-			finding.MostPublisher)
-	}
-	if len([]rune(advisory.Identifier)) > finding.MostDocumentName {
-		return refusal.Errorf("the name the publisher gave it is longer than the %d "+
-			"characters this records", finding.MostDocumentName)
-	}
-	return nil
 }
 
 // ours is the claims in one advisory that name a component this product ships.

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/chunked"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 )
 
@@ -205,7 +206,7 @@ func TestADocumentLetGoWhileItIsReadEndsShortWithAnError(t *testing.T) {
 		if err := docs.Discard(ctx, rec.ID); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := io.ReadAll(reading); !errors.Is(err, ingest.ErrReleased) {
+		if _, err := io.ReadAll(reading); !errors.Is(err, chunked.ErrReleased) {
 			t.Errorf("reading on past a discard ended with %v, want the document released", err)
 		}
 	})

@@ -549,6 +549,9 @@ type Store struct {
 	// waiting for two callers to land in it by themselves is a test that
 	// passes by not racing.
 	afterReadingReport func()
+	// beforePlacing runs as a sweep reaches one rule, ahead of the transaction
+	// that places its work, so a test can retire the rule there.
+	beforePlacing func()
 	// sweeps is the queue a write opening work asks to place it on, or nothing
 	// where the caller places nothing: a tool or a test applying a fixture.
 	sweeps *queue.Queue

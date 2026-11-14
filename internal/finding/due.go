@@ -6,6 +6,7 @@ package finding
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -120,6 +121,18 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 	}
 }
 
+// noVersionToTake is each state in which upstream offers no version to take.
+// A list asks it of every occurrence in SQL, so the two read one set.
+var noVersionToTake = []FixState{NoFix, WontFix}
+
+// unclocked is the condition, over a finding's own columns, under which it
+// carries no deadline: Clocked as the statements that set and clear deadlines
+// ask it, from the one set of states.
+func unclocked() (string, []any) {
+	return `("fix_state" IN (?) AND NOT ("fix_state" = ? AND ("urgency_exploited" = ? OR "urgency_incident" = ?)))`,
+		[]any{bun.List(noVersionToTake), WontFix, true, true}
+}
+
 // Closable reports whether anything upstream would close a finding in this
 // state, which is what makes a deadline on it meetable.
 //
@@ -136,12 +149,7 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 // and it is the direction that loses a deadline somebody could have met. So an
 // unstated state stays on the clock.
 func Closable(state FixState) bool {
-	switch state {
-	case NoFix, WontFix:
-		return false
-	default:
-		return true
-	}
+	return !slices.Contains(noVersionToTake, state)
 }
 
 // Clocked is whether a finding in this state carries a deadline at all.
@@ -233,10 +241,6 @@ type Late struct {
 	// Occurrences is how many occurrences this issue has in this component. One
 	// row covers all of them, because they are one thing to answer.
 	Occurrences int `bun:"places"`
-	// AssignedHigh and AssignedCount decide whether one name can be reported
-	// for the group. They are read and then discarded.
-	AssignedHigh  *int64 `bun:"assigned_high"`
-	AssignedCount int    `bun:"assigned_count"`
 	// Total is how many rows the question has in all, counted after the
 	// grouping and before the limit. It rides on the page rather than being
 	// asked for separately, and it is read off the first row and discarded.
@@ -449,9 +453,7 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// Named only where every occurrence has the same person. Reporting one of
 		// several would tell somebody a finding is being dealt with when most
 		// of it is not.
-		ColumnExpr(`MIN("f"."assigned_to") AS "assigned_to"`).
-		ColumnExpr(`MAX("f"."assigned_to") AS "assigned_high"`).
-		ColumnExpr(`COUNT("f"."assigned_to") AS "assigned_count"`).
+		ColumnExpr(soleHolderExpr + ` AS "assigned_to"`).
 		// The number of groups the question has, counted over the grouped
 		// result and before the limit. A screen that counted its own page said
 		// two hundred over a list of four hundred and sixty-two.
@@ -470,12 +472,6 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	var late []Late
 	if err := query.Scan(ctx, &late); err != nil {
 		return nil, 0, fmt.Errorf("read what is running out of time: %w", err)
-	}
-	for i := range late {
-		if late[i].AssignedCount != late[i].Occurrences || late[i].AssignedTo == nil ||
-			late[i].AssignedHigh == nil || *late[i].AssignedTo != *late[i].AssignedHigh {
-			late[i].AssignedTo = nil
-		}
 	}
 	// A page past the end of the answer carries no row to read the count off.
 	// The groups are counted on their own in that case, which is the one call
@@ -591,6 +587,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	unclockedWhere, unclockedArgs := unclocked()
 
 	// Written in slices of the identifier range rather than as one statement
 	// per band. SQLite has one writer, so a statement rewriting four hundred
@@ -715,9 +712,7 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 							// carries no deadline.
 							Where(`"stated_by" IS NULL`).
 							Where(onClock, onClockArgs...).
-							Where(`"fix_state" <> ?`, NoFix).
-							Where(`NOT ("fix_state" = ? AND "urgency_exploited" = ? AND `+
-								`"urgency_incident" = ?)`, WontFix, false, false)
+							Where(`NOT `+unclockedWhere, unclockedArgs...)
 						result, err := each.where(query).Exec(ctx)
 						if err != nil {
 							return changed, fmt.Errorf("rewrite deadlines: %w", err)
@@ -821,20 +816,14 @@ func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
 // because on an exploited issue it leaves work only this deployment can do.
 func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
 	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
+	unclockedWhere, unclockedArgs := unclocked()
 	result, err := s.db.NewUpdate().
 		Model((*Finding)(nil)).
 		Set(`"due_at" = NULL`).
 		Where(kinds, kindArgs...).
 		Where(`"closed_at" IS NULL`).
 		Where(`"due_at" IS NOT NULL`).
-		WhereGroup(" AND ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
-			return q.Where(`"fix_state" = ?`, NoFix).
-				WhereGroup(" OR ", func(q *bun.UpdateQuery) *bun.UpdateQuery {
-					return q.Where(`"fix_state" = ?`, WontFix).
-						Where(`"urgency_exploited" = ?`, false).
-						Where(`"urgency_incident" = ?`, false)
-				})
-		}).
+		Where(unclockedWhere, unclockedArgs...).
 		Exec(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("take the deadline off what has nothing to take: %w", err)
@@ -989,3 +978,9 @@ func (s *Store) everyProduct(ctx context.Context) ([]int64, error) {
 	}
 	return products, nil
 }
+
+// soleHolderExpr is the party holding every occurrence a grouped row over
+// findings under "f" covers, and NULL where any is unheld or two hold them.
+const soleHolderExpr = `CASE WHEN COUNT("f"."assigned_to") = COUNT(*)
+	AND MIN("f"."assigned_to") = MAX("f"."assigned_to")
+	THEN MIN("f"."assigned_to") END`

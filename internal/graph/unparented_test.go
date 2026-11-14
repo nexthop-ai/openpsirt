@@ -67,6 +67,97 @@ func TestWhatNothingPullsInHangsFromTheRoot(t *testing.T) {
 	})
 }
 
+// A component whose one edge in is from itself is pulled in by nothing, as the
+// walks read it, so it hangs from the root with what nothing else pulls in.
+func TestAComponentPulledInOnlyByItselfHangsFromTheRoot(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		looped := at("libloop", "1.0")
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{curl, looped},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: curl},
+				{Parent: looped, Child: looped},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		edges, err := f.db.DB.NewSelect().Table("graph_edge").
+			Where(`"parent_id" = "child_id"`).Count(ctx)
+		if err != nil || edges != 1 {
+			t.Fatalf("the build holds %d edges from a node to itself (%v), so this checked nothing", edges, err)
+		}
+		_, kids, err := f.store.Roots(ctx, everyone(f), f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var names []string
+		for _, kid := range kids {
+			names = append(names, kid.Name)
+			if kid.Name == looped.Name && kid.Children != 0 {
+				t.Errorf("%s says it pulls in %d, want none: an edge to itself pulls nothing in", kid.Name, kid.Children)
+			}
+		}
+		slices.Sort(names)
+		if want := []string{curl.Name, looped.Name}; !slices.Equal(names, want) {
+			t.Errorf("the root lists %v, want %v", names, want)
+		}
+		above, below, err := f.store.Around(ctx, everyone(f), f.buildID, looped.Name, graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(above) != 0 || len(below) != 0 {
+			t.Errorf("%s is shown with %d above and %d below, want neither: it is not its own neighbor",
+				looped.Name, len(above), len(below))
+		}
+		tally, err := f.store.Counts(ctx, everyone(f), f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tally.Edges != 1 {
+			t.Errorf("the build counts %d edges placing its components, want 1: an edge to itself places nothing",
+				tally.Edges)
+		}
+	})
+}
+
+// A root whose edge to itself is stated is not listed beneath itself.
+func TestARootPullingInItselfIsNotItsOwnChild(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
+			Root:       root,
+			Components: []graph.Described{curl},
+			Dependencies: []graph.Dependency{
+				{Parent: root, Child: curl},
+				{Parent: root, Child: root},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		edges, err := f.db.DB.NewSelect().Table("graph_edge").
+			Where(`"parent_id" = "child_id"`).Count(ctx)
+		if err != nil || edges != 1 {
+			t.Fatalf("the build holds %d edges from a node to itself (%v), so this checked nothing", edges, err)
+		}
+		top, kids, err := f.store.Roots(ctx, everyone(f), f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var names []string
+		for _, kid := range kids {
+			names = append(names, kid.Name)
+		}
+		if want := []string{curl.Name}; !slices.Equal(names, want) {
+			t.Errorf("the root lists %v, want %v", names, want)
+		}
+		if top == nil || top.Children != 1 {
+			t.Errorf("the root says it pulls in %v, want 1", top)
+		}
+	})
+}
+
 func TestTheChoiceForAComponentWithNoNamespaceResolvesIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

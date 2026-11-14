@@ -30,6 +30,7 @@ Satisfies REQ-42, REQ-61, REQ-66.
 | A name reaching nothing, or what the caller may not have, answers 404; an act refused on something already shown answers 403 or 422 | |
 | The sentences are kept in one place | |
 | Every store refusal is typed, and every handler meeting one answers it as a name reaching nothing | Unmapped, it answers 500 where a stranger gets 404, naming which of product, branch or tag, and variant is undeclared. A case collaborator meets these on every product-wide read |
+| A build a request body names, in a product the caller is authorized on, is refused 404 naming which of branch or tag and variant is undeclared; every route taking builds in its body resolves them one way | The caller already holds the product, so naming the build tells them nothing new |
 | A streamed answer is refused before its first byte | After it, only the file can say the export stopped, behind a 200 |
 
 ## Refusal shape

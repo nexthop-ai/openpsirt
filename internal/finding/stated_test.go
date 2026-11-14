@@ -285,8 +285,13 @@ func TestAClosedRowIsShownByTheNameItsBuildLastStated(t *testing.T) {
 		f.shipped(t, twoConsumers())
 		f.applied(t, found("CVE-2026-1", libnl))
 		who := f.someoneElse(t, access.PublicTriage)
+		by := f.somebodyElse(t)
+		decided := decisionSaying(t, f.db, by, "upgrade-needed")
+		f.decision(t, decisionRow{
+			By: by, Decision: decided, Issue: f.issue(t, "CVE-2026-1"), Occurrence: "libnl", State: "approved",
+		})
 		if _, err := f.store.CommitWithin(ctx, f.db.DB, who, f.productID,
-			f.componentID(t, libnl.Name), "3.9.0", nil, nil,
+			f.componentID(t, libnl.Name), "3.9.0", nil, decided,
 			[]int64{f.build}, map[int64]string{}); err != nil {
 			t.Fatal(err)
 		}

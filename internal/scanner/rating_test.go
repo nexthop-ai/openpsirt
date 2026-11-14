@@ -119,7 +119,7 @@ func TestBothGenerationsAreKeptWhereAReportStatesBoth(t *testing.T) {
 	// format has a field for, so neither can be the one thrown away.
 	_, kept := rating([]publishedRating{
 		published("3.1", three, 8.2),
-		// A second version 3 rating from somebody else: the first stated in
+		// A second version 3 rating from somebody else: the worst stated in
 		// a generation is the one kept.
 		published("3.0", "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", 9.8),
 		published("4.0", four, 7.1),
@@ -134,7 +134,7 @@ func TestBothGenerationsAreKeptWhereAReportStatesBoth(t *testing.T) {
 		vector            string
 	}{
 		{4, 710, four},
-		{3, 820, three},
+		{3, 980, "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
 		{2, 750, "AV:N/AC:L/Au:N/C:P/I:P/A:P"},
 	} {
 		got := kept[at]
@@ -148,5 +148,23 @@ func TestBothGenerationsAreKeptWhereAReportStatesBoth(t *testing.T) {
 	}
 	if _, none := rating(nil); none != nil {
 		t.Errorf("a report stating no rating kept %+v", none)
+	}
+}
+
+func TestAMatchRatingOneGenerationTwiceKeepsTheWorstInEitherOrder(t *testing.T) {
+	// The number held does not depend on which publisher the match listed
+	// first.
+	const higher = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+	for _, order := range [][]publishedRating{
+		{published("3.1", three, 7.5), published("3.1", higher, 9.8)},
+		{published("3.1", higher, 9.8), published("3.1", three, 7.5)},
+	} {
+		got, kept := rating(order)
+		if got.score != 9.8 || got.vector != higher {
+			t.Errorf("listed %v first, the issue is rated %v %s, want 9.8", order[0].Metrics.BaseScore, got.score, got.vector)
+		}
+		if len(kept) != 1 || kept[0].ScoreCenti != 980 {
+			t.Errorf("listed %v first, the ratings kept are %+v, want 9.8 alone", order[0].Metrics.BaseScore, kept)
+		}
 	}
 }

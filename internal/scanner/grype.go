@@ -813,9 +813,10 @@ type publishedRating struct {
 // rating picks the severity score to record, the vector it assumes, and
 // every rating the report states beside it.
 //
-// One per generation of the scheme, the first stated in each: a report
-// carries several ratings from different sources and they disagree, and
-// taking the first stated is at least a stable answer. The vector travels with
+// One per generation of the scheme, the worst stated in each, with the source
+// and kind of the rating that stated it: a report carries several ratings from
+// different sources and they disagree, and the worst does not depend on the
+// order a match lists them. The vector travels with
 // the number so that what the number assumed is readable rather than lost, and
 // who published it travels with them for the same reason: everything else a
 // scan says carries its provenance.
@@ -837,7 +838,9 @@ func rating(published []publishedRating) (rated, []finding.CVSS) {
 		kept finding.CVSS
 	}
 	var all []stated
-	held := map[int]bool{}
+	// Where each generation sits in all. The worst rating of a generation is
+	// kept, so what is held does not depend on the order a match lists them.
+	held := map[int]int{}
 	for _, each := range published {
 		if each.Metrics.BaseScore <= 0 || each.Vector == "" {
 			continue
@@ -849,16 +852,20 @@ func rating(published []publishedRating) (rated, []finding.CVSS) {
 			kind:    strings.TrimSpace(each.Type),
 		}
 		generation := finding.GenerationOf(one.version, one.vector)
-		if held[generation] {
-			continue
-		}
-		held[generation] = true
-		all = append(all, stated{rated: one, kept: finding.CVSS{
+		this := stated{rated: one, kept: finding.CVSS{
 			// Rounded rather than cut: 8.2 is 819.999… hundredths as a float.
 			Generation: generation, ScoreCenti: int(math.Round(one.score * 100)),
 			Vector: one.vector, Version: one.version,
 			Source: one.source, Kind: one.kind,
-		}})
+		}}
+		if at, seen := held[generation]; seen {
+			if this.kept.ScoreCenti > all[at].kept.ScoreCenti {
+				all[at] = this
+			}
+			continue
+		}
+		held[generation] = len(all)
+		all = append(all, this)
 	}
 	if len(all) == 0 {
 		return rated{}, nil

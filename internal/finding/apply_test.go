@@ -4,12 +4,18 @@
 package finding_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 func TestAnIssueBecomingWorseMovesTheFindingsItIsOpenAgainst(t *testing.T) {
@@ -739,6 +745,61 @@ func TestLearningSomethingIsExploitedDoesNotHandBackAClockNothingCouldMeet(t *te
 				t.Errorf("a finding with nothing to take carries a deadline of %s",
 					row.DueAt.Format(time.RFC3339))
 			}
+		}
+	})
+}
+
+// A component stored before identity was read as it is now keeps the
+// identity it was stored under until its build's inventory arrives again, and
+// a scan of the build in between still reaches it: the report names it by
+// what the scanner was given, which hashes the new way.
+func TestAScanReachesAComponentHeldUnderAnEarlierIdentity(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		// An identifier stating no version, which identity once read as every
+		// version of the package.
+		zlib := graph.Described{Name: "zlib1g", Version: "1.3", Purl: "pkg:deb/debian/zlib1g"}
+		f.shipped(t, graph.Snapshot{
+			Root: root, Components: []graph.Described{zlib},
+			Dependencies: []graph.Dependency{{Parent: root, Child: zlib}},
+		})
+		earlier := sha256.Sum256([]byte("purl\x00pkg:deb/debian/zlib1g"))
+		if _, err := f.db.DB.NewUpdate().Model((*graph.Component)(nil)).
+			Set(`"identity" = ?`, hex.EncodeToString(earlier[:])).
+			Where(`"identity" = ?`, zlib.Identity()).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
+			[]finding.Reported{found("CVE-2026-7", zlib)}); err != nil {
+			t.Fatal(err)
+		}
+		if open := f.open(t); len(open) != 1 {
+			t.Errorf("a scan reporting a component held under its earlier identity left %d findings open, want 1",
+				len(open))
+		}
+	})
+}
+
+// A scanner naming an issue by a name an analyzer's rule holds is refused as
+// that collision, which no attempt changes, and never retried as a lost race.
+func TestAReportedNameARuleHoldsIsRefusedAsHeldElsewhere(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		const name = "SQL-INJECTION"
+		rule := &finding.Vulnerability{
+			Identifier: name, IdentifierFolded: finding.FoldIdentifier(name), Kind: kind.Rule,
+			FirstSeenAt: time.Now().UTC().Truncate(time.Microsecond),
+		}
+		if _, err := f.db.DB.NewInsert().Model(rule).Value("issue_id", "?", 0).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		_, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{found(name, libnl)})
+		if !errors.Is(err, finding.ErrNameHeldElsewhere) {
+			t.Errorf("reporting a name a rule holds answered %v, want ErrNameHeldElsewhere", err)
+		}
+		if errors.Is(err, database.ErrGoAgain) {
+			t.Errorf("reporting a name a rule holds was read as a lost race: %v", err)
 		}
 	})
 }

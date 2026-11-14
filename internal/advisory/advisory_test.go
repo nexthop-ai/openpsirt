@@ -424,7 +424,7 @@ func TestADocumentCarriesEveryNameTheIssueGoesByAndSaysWhenItIsFinal(t *testing.
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := finding.NewVulnerabilities(f.db.DB).
+		if _, err := finding.NewVulnerabilities(f.db.DB).
 			AlsoKnownAs(ctx, f.who, issue, "CVE-2026-4242"); err != nil {
 			t.Fatal(err)
 		}

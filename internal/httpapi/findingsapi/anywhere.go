@@ -31,7 +31,7 @@ func registerAnywhere(api huma.API, in core.Deps) {
 		OperationID: "list-findings-anywhere", Method: http.MethodGet, Path: "/v1/findings",
 		Summary: "List findings across every product",
 		Description: "The findings list, without a product picked.\n\n" +
-			"One row per product, issue and component. The same library carrying the same " +
+			"One row per product, issue and source package at a version. The same library carrying the same " +
 			"issue in two products is two pieces of work, decided separately by different " +
 			"people; in three builds of one product it is one row, and `builds` says how " +
 			"many. Each row names one of those builds so there is somewhere to link to.\n\n" +

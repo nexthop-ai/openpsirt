@@ -6,6 +6,8 @@ package finding
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -985,14 +987,7 @@ func latestClosed(ctx context.Context, db bun.IDB, buildID int64,
 	if len(vulnerabilities) == 0 {
 		return byKey, byAt, nil
 	}
-	seen := map[int64]bool{}
-	var issues []int64
-	for _, id := range vulnerabilities {
-		if !seen[id] {
-			seen[id] = true
-			issues = append(issues, id)
-		}
-	}
+	issues := distinct(vulnerabilities)
 	err := database.IDsInBatches(ctx, issues, func(ctx context.Context, batch []int64) error {
 		// The latest row of each grouping, by identifier, rather than every
 		// closed row ever recorded: an occurrence whose version moves gathers a
@@ -1159,14 +1154,7 @@ type ratingRow struct {
 func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
 	interned map[string]int64) (map[int64]Rating, error) {
 
-	ids := make([]int64, 0, len(interned))
-	seen := map[int64]bool{}
-	for _, id := range interned {
-		if !seen[id] {
-			seen[id] = true
-			ids = append(ids, id)
-		}
-	}
+	ids := distinct(slices.Collect(maps.Values(interned)))
 	ratings := map[int64]Rating{}
 	if len(ids) == 0 {
 		return ratings, nil

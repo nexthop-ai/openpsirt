@@ -28,6 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
 // Component is a package at a version, shared across every product that ships
@@ -165,6 +166,14 @@ func (d Described) Identity() string {
 		basis = "name\x00" + strconv.Itoa(len(name)) + "\x00" + name + strings.TrimSpace(d.Version)
 	} else {
 		basis = "purl\x00" + basis
+		// An identifier stating no version names the package and not one
+		// version of it, so the version stated beside it is kept, or every
+		// version of the package is one component.
+		if _, stated := PackageOf(d.Purl); stated == "" {
+			if version := strings.TrimSpace(d.Version); version != "" {
+				basis += "\x00version\x00" + strconv.Itoa(len(version)) + "\x00" + version
+			}
+		}
 	}
 	sum := sha256.Sum256([]byte(basis))
 	return hex.EncodeToString(sum[:])
@@ -190,9 +199,14 @@ func (d Described) Identity() string {
 //
 // Escapes are decoded. The same version arrives as `2.3.2-2%2Bb1` and
 // `2.3.2-2+b1` from the two sources, which byte comparison calls two packages.
+// Each segment is decoded on its own, and a slash or percent sign it decodes
+// to is escaped again, so `pkg:npm/a%2Fb`, one package named "a/b", stays
+// apart from `pkg:npm/a/b`, the package "b" in the namespace "a".
 //
 // The type is lowercased, which the specification requires and which
-// nothing else here relies on.
+// nothing else here relies on. Slashes after the scheme are dropped, as the
+// specification has a parser do: `pkg://deb/debian/curl` is
+// `pkg:deb/debian/curl`.
 func canonicalPurl(purl string) string {
 	purl = strings.TrimSpace(purl)
 	if purl == "" {
@@ -207,15 +221,197 @@ func canonicalPurl(purl string) string {
 
 	scheme, rest, found := strings.Cut(purl, ":")
 	if !found {
-		return decoded(purl)
+		return decodedPath(purl)
+	}
+	if strings.EqualFold(scheme, "pkg") {
+		rest = strings.TrimLeft(rest, "/")
 	}
 	// The type is the first segment after the scheme, not the scheme itself,
 	// and it is the part the specification calls case-insensitive.
 	kind, path, split := strings.Cut(rest, "/")
 	if !split {
-		return strings.ToLower(scheme) + ":" + decoded(rest)
+		return strings.ToLower(scheme) + ":" + decodedPath(rest)
 	}
-	return strings.ToLower(scheme) + ":" + strings.ToLower(kind) + "/" + decoded(path)
+	return strings.ToLower(scheme) + ":" + strings.ToLower(kind) + "/" + decodedPath(path)
+}
+
+// decodedPath is a path of segments, each decoded, with a separator or escape
+// character a segment decodes to escaped again.
+func decodedPath(path string) string {
+	segments := strings.Split(path, "/")
+	for i, segment := range segments {
+		segment = strings.ReplaceAll(decoded(segment), "%", "%25")
+		segments[i] = strings.ReplaceAll(segment, "/", "%2F")
+	}
+	return strings.Join(segments, "/")
+}
+
+// StoredPurl is a package identifier as a row holds it: trimmed, with the
+// slashes after the scheme dropped, and with any credential, query and
+// fragment taken out of a qualifier's address. A qualifier such as `vcs_url` or
+// `download_url` names an address, a build pipeline can write it with a token
+// in its user, its query or its fragment, and the identifier reaches every reader of the
+// component.
+func StoredPurl(purl string) string {
+	purl = strings.TrimSpace(purl)
+	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.EqualFold(scheme, "pkg") {
+		purl = scheme + ":" + strings.TrimLeft(rest, "/")
+	}
+	body, qualifiers, found := strings.Cut(purl, "?")
+	if !found {
+		return purl
+	}
+	qualifiers, subpath, hasSubpath := strings.Cut(qualifiers, "#")
+	if hasSubpath && strings.Contains(subpath, "@") {
+		// A subpath holding an "@" is the rest of an address whose password
+		// holds a fragment mark, so it is read as part of that address.
+		qualifiers, subpath, hasSubpath = qualifiers+"#"+subpath, "", false
+	}
+	pairs := strings.Split(qualifiers, "&")
+	kept := make([]string, 0, len(pairs))
+	// How many pairs the walk read through, so that a walk stopping early,
+	// after which the subpath may be the rest of an address it did not keep,
+	// is told apart.
+	walked := 0
+	for _, pair := range pairs {
+		key, value, found := strings.Cut(pair, "=")
+		if !found || !qualifierKey(key) {
+			// No qualifier the specification allows: the rest of a value
+			// holding a raw "&", such as a password or a path, so that value
+			// and every pair after it go.
+			if len(kept) > 0 {
+				kept = kept[:len(kept)-1]
+			}
+			break
+		}
+		decoded, err := url.PathUnescape(value)
+		if err != nil {
+			// An escape that does not decode hides where an address and its
+			// credential end. Neither the pair nor any after it is kept: a
+			// credential holding a raw "&" goes on into the pairs after it.
+			break
+		}
+		// An address escaped twice is read as it would be decoded again, or
+		// a reader decoding it once more finds the credential.
+		if again, err := url.PathUnescape(decoded); err == nil {
+			decoded = again
+		}
+		if !sourcelink.Schemed(decoded) {
+			// An address written without a scheme loses a password before
+			// its host and anything from its query on.
+			bare, readable := sourcelink.WithoutPassword(decoded)
+			if !readable {
+				// Where its credential ends cannot be told; it and the pairs
+				// after it, which may hold the rest, are not kept.
+				break
+			}
+			if at := strings.IndexAny(bare, "?#"); at >= 0 {
+				bare = bare[:at]
+			}
+			if bare != decoded {
+				pair = key + "=" + qualifierEscaped(bare)
+			}
+			kept = append(kept, pair)
+			if queryUnescaped(value) {
+				break
+			}
+			walked++
+			continue
+		}
+		parsed, err := url.Parse(decoded)
+		if err != nil {
+			// Where its credential ends cannot be told; it and the pairs
+			// after it, which may hold the rest, are not kept.
+			break
+		}
+		// A user with no password on an ssh address names the account the
+		// host serves, such as git; any other user may be a token.
+		_, password := parsed.User.Password()
+		user := parsed.User != nil && (password || !strings.Contains(strings.ToLower(parsed.Scheme), "ssh"))
+		queried := parsed.RawQuery != "" || parsed.ForceQuery
+		if !user && !queried && parsed.Fragment == "" {
+			kept = append(kept, pair)
+		} else {
+			if user {
+				parsed.User = nil
+			}
+			parsed.RawQuery, parsed.ForceQuery = "", false
+			parsed.Fragment, parsed.RawFragment = "", ""
+			kept = append(kept, key+"="+qualifierEscaped(parsed.String()))
+		}
+		if queryUnescaped(value) {
+			// An address whose query is written in part unescaped carries
+			// the pairs after it as that query, so they are not kept.
+			break
+		}
+		walked++
+	}
+	purl = body
+	if len(kept) > 0 {
+		purl += "?" + strings.Join(kept, "&")
+	}
+	// A subpath after a walk that stopped may be the rest of an address it
+	// dropped, and one holding a value or a user, escaped or not, is the
+	// fragment of an address written unescaped. Neither is kept.
+	if hasSubpath && walked == len(pairs) && plainSubpath(subpath) {
+		purl += "#" + subpath
+	}
+	return purl
+}
+
+// plainSubpath is whether a subpath decodes, and holds no equals sign, "@"
+// or question mark once decoded: a path within the package and nothing of an
+// address.
+func plainSubpath(subpath string) bool {
+	decoded, err := url.PathUnescape(subpath)
+	return err == nil && !strings.ContainsAny(decoded, "=@?")
+}
+
+// qualifierKey is whether a qualifier's key is one the purl specification
+// allows: ASCII letters, digits, ".", "-" and "_", not starting with a digit.
+func qualifierKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		switch {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', c == '.', c == '-', c == '_':
+		case '0' <= c && c <= '9' && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// queryUnescaped says whether a qualifier's value holds an address whose query
+// is written in part unescaped: a question mark written as it is, or an
+// escaped one followed by an equals sign written as it is. An equals sign in
+// the address's path is no query.
+func queryUnescaped(value string) bool {
+	if strings.Contains(value, "?") {
+		return true
+	}
+	at := strings.Index(strings.ToLower(value), "%3f")
+	return at >= 0 && strings.Contains(value[at:], "=")
+}
+
+// qualifierEscaped percent-encodes a qualifier's value, leaving the
+// characters an address is read by.
+func qualifierEscaped(value string) string {
+	var b strings.Builder
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		switch {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9',
+			strings.IndexByte("-._~:/@", c) >= 0:
+			b.WriteByte(c)
+		default:
+			fmt.Fprintf(&b, "%%%02X", c)
+		}
+	}
+	return b.String()
 }
 
 // PackageOf splits a package identifier into the package it names and the
@@ -372,10 +568,11 @@ func NewComponents(db bun.IDB) *Components {
 // application compares bytes. A decision is keyed on the trimmed version, and
 // untrimmed, a component stated at "1.0 " matches it on two engines of four.
 func (d Described) trimmed() Described {
-	for _, field := range []*string{&d.Purl, &d.CPE, &d.Name, &d.Version, &d.UpstreamName,
+	for _, field := range []*string{&d.CPE, &d.Name, &d.Version, &d.UpstreamName,
 		&d.UpstreamVersion, &d.Supplier, &d.License} {
 		*field = strings.TrimSpace(*field)
 	}
+	d.Purl = StoredPurl(d.Purl)
 	return d
 }
 

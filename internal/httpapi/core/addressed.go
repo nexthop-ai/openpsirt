@@ -14,6 +14,13 @@ type BuildNamesBody struct {
 	VariantName     string `json:"variant_name,omitempty" doc:"The variant as it was spelled, or its name where no spelling was recorded"`
 }
 
+// BuildNamed is one build a request or an answer names by its branch or tag
+// and variant.
+type BuildNamed struct {
+	BranchOrTag string `json:"branch_or_tag" minLength:"1" doc:"A branch or a tag"`
+	Variant     string `json:"variant" minLength:"1" doc:"The way that line is built"`
+}
+
 // PackageKindBody is the kind and namespace a component's package identifier
 // names, embedded in the answers that tell two components of one name apart.
 type PackageKindBody struct {

@@ -72,6 +72,7 @@ groups to use instead.
 | A team assignment is a queue: unheld until a person takes it, which asks for triage alone. Filling the queue is dispatching | Hundreds of rows would otherwise read as owned and unseen |
 | Assigning to a team asks that one member reads it, at every visibility its open occurrences carry; for disclosed work a member reading the product at either visibility is enough. A rule's sweep asks it per occurrence (§ Assignment rules) | One undisclosed occurrence among fifty makes the whole undisclosed |
 | The queue is narrowed per viewer, counts included, and a matrix test asserts it | "Kernel team · 14" says two embargoed items exist |
+| The count of open reports each party holds is read for every party holding one | A party left out reads as holding none |
 | A team gives up queued work no remaining member reads, whenever its members or their reading change; retiring empties the queue | § Lost reading |
 | Retiring a team keeps its row and name, and declaring the name again brings it back | Assigned work keeps a name to show |
 | Declaring one team, or putting one person on a team, from two requests at once is one team or one membership, and neither request is refused | A deployment script run twice at once is the ordinary case; the request losing the race to the index runs again and finds the row |
@@ -98,7 +99,8 @@ every binary built from it.
 | A place in the tree also holds every component a rescan replaced whose name a component there carries, as the tree counts it (`design-docs/data-model-graph.md` § Path traversal) | A flaw recorded on a version a rescan replaced stays open on it, and a rule and the count beside a node agree |
 | A place that is the build's root, named or matched by a pattern, also holds every component nothing pulls in and what it pulls in (`design-docs/data-model-graph.md` § Path traversal) | The tree draws them under the root. Such a rule, at an upgrade from a release that walked edges alone, takes at its first sweep the unheld work beneath them that a later rule placing beneath one of them used to take |
 | The preview records nothing and answers which components the rule names, how many pieces of work sit there, and how many nobody holds | Only the last would be placed; it ignores rules already there, so it reports what the rule matches |
-| The preview shares the sweep's predicate | |
+| The preview shares the sweep's predicate, and reads the releases past their end of life and the subtree a place names once for all its counts | Each walk is one recursive query per build |
+| A piece of work in the preview is one as every work list counts it: an issue at a component, or one code finding whatever component its builds name | |
 | The preview names a sample of components and counts all of them | A rule beneath a kernel matches hundreds |
 | The preview is narrowed like every count (REQ-42, REQ-43); somebody who may see nothing is told nothing, never zero | Unnarrowed, its gap from the findings list is the undisclosed work |
 | The preview names no team and counts what the asker reads | |
@@ -113,6 +115,7 @@ every binary built from it.
 | Reading and previewing ask for triage at any visibility, security testing included | |
 | Somebody who sees the product and lacks the right is refused 403; an unseen product answers as not declared | |
 | A rule pointing at a retired team places nothing; retiring a rule leaves what it placed | |
+| Whether a rule and its team are in force, and what the team may hold, are read in the transaction placing that rule's work | A rule or team retired, or a member's reading taken away, while a sweep runs places nothing more; a retry asks again |
 | The listing names a rule's team by identifier and marks a retired one | |
 
 ### The sweep

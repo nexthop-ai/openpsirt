@@ -22,8 +22,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
@@ -697,6 +699,45 @@ func TestAPassLandingInsideATurnOffServesNothingWhenTurnedOnAgain(t *testing.T) 
 		if listed := w.listed("all"); len(listed) != 0 {
 			t.Errorf("turned on again, the product serves %d documents a pass inside the turn-off wrote: %+v",
 				len(listed), listed)
+		}
+	})
+}
+
+// A credential an inventory or a claim writes into a package identifier's
+// qualifier never reaches a published document: the component and the build's
+// root are stored without it, and a claim's identifier is not published.
+func TestACredentialInAPackageIdentifierIsNeverPublished(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		const token = "glpat-SECRET"
+		leaky := graph.Described{
+			Purl: "pkg:deb/debian/zlib1g@1.3?vcs_url=git%2Bhttps://oauth2:" + token + "@gitlab.example.com/zlib.git",
+			Name: "zlib1g", Version: "1.3",
+		}
+		w.ship(w.Build, sonicRoot, edge{sonicRoot, leaky})
+		var scanID int64
+		if err := w.DB.DB.NewSelect().TableExpr(`"build"`).ColumnExpr(`"last_scan_id"`).
+			Where(`"id" = ?`, w.Build.ID).Scan(t.Context(), &scanID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := finding.RecordClaimsWithin(t.Context(), w.DB.DB, w.Build.ID, scanID, []sbom.Suppression{{
+			Vulnerability: "CVE-2026-1003", Status: sbom.NotAffected, Justification: "code_not_present",
+			Targets: []sbom.Target{{Purl: leaky.Purl}}, Origin: sbom.FromStatement,
+		}}, map[sbom.Origin]bool{sbom.FromStatement: true}); err != nil {
+			t.Fatal(err)
+		}
+		w.report(w.Build, reported{"CVE-2026-1003", leaky}, reported{"CVE-2026-1004", leaky})
+		w.decide(w.Build, "CVE-2026-1004", leaky,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(w.Product, true)
+		w.write()
+
+		all := w.everything()
+		if !strings.Contains(all, "zlib1g") {
+			t.Fatal("nothing about the component was published, so this checked nothing")
+		}
+		if strings.Contains(all, token) {
+			t.Errorf("a published document carries the credential:\n%s", all)
 		}
 	})
 }

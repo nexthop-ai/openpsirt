@@ -220,22 +220,12 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 	if len(rules) == 0 {
 		return 0, false, nil, nil
 	}
-	teams, err := s.partiesOf(ctx, rules)
-	if err != nil {
-		return 0, false, nil, err
-	}
 
 	placed, seen := 0, 0
 	var outgrown []int64
 	for _, rule := range rules {
 		if seen >= cap {
 			break
-		}
-		party, held := teams[rule.TeamID]
-		if !held {
-			// A rule pointing at a team that has been retired places nothing,
-			// rather than placing work where nothing can be picked up from.
-			continue
 		}
 		// The room a rule gets is what the batch has left to read, not what it
 		// has left to write. The room the last rule lost to a human assignment
@@ -245,7 +235,10 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 		if rule.Reports {
 			applying = s.applyReportRule
 		}
-		read, n, err := applying(ctx, productID, rule, party, cap-seen)
+		if s.beforePlacing != nil {
+			s.beforePlacing()
+		}
+		read, n, err := applying(ctx, productID, rule, cap-seen)
 		if errors.Is(err, ErrTooBroad) {
 			outgrown = append(outgrown, rule.ID)
 			continue
@@ -259,10 +252,49 @@ func (s *Store) ApplyRules(ctx context.Context, productID int64, cap int) (int, 
 	return placed, seen >= cap, outgrown, nil
 }
 
-// applyOne is one rule's share of a batch.
-func (s *Store) applyOne(ctx context.Context, productID int64, rule AssignmentRule,
-	party int64, room int) (read, placed int, err error) {
+// liveParty is the party of the team a rule places work with, read in the
+// transaction that places it: zero where the rule or its team is retired,
+// since work placed there is work nothing picks up.
+func liveParty(ctx context.Context, tx bun.IDB, ruleID int64) (int64, error) {
+	var rules []AssignmentRule
+	if err := tx.NewSelect().Model(&rules).
+		Where(`"id" = ?`, ruleID).
+		Where(`"retired_at" IS NULL`).
+		Scan(ctx); err != nil {
+		return 0, fmt.Errorf("read whether that rule is live: %w", err)
+	}
+	if len(rules) == 0 {
+		return 0, nil
+	}
+	parties, err := (&Store{db: tx}).partiesOf(ctx, rules)
+	if err != nil {
+		return 0, err
+	}
+	return parties[rules[0].TeamID], nil
+}
 
+// applyOne is one rule's share of a batch, decided and written in one
+// transaction: whether the rule and its team are live, what the team may
+// hold, and what the rule matches.
+func (s *Store) applyOne(ctx context.Context, productID int64, rule AssignmentRule,
+	room int) (read, placed int, err error) {
+
+	err = database.Within(ctx, s.db, func(ctx context.Context, tx bun.IDB) error {
+		inner := &Store{db: tx, now: s.now, reach: s.reach}
+		read, placed, err = inner.applyOneIn(ctx, productID, rule, room)
+		return err
+	})
+	return read, placed, err
+}
+
+// applyOneIn is applyOne over the store's transaction.
+func (s *Store) applyOneIn(ctx context.Context, productID int64, rule AssignmentRule,
+	room int) (read, placed int, err error) {
+
+	party, err := liveParty(ctx, s.db, rule.ID)
+	if err != nil || party == 0 {
+		return 0, 0, err
+	}
 	now := s.now().UTC().Truncate(time.Microsecond)
 	// The identifiers to place, read as a bounded page and then written by
 	// identifier. Bounded on rows read rather than on rows placed, so a rule
@@ -287,10 +319,11 @@ func (s *Store) applyOne(ctx context.Context, productID int64, rule AssignmentRu
 		Where(inThisProduct, productID).
 		Where(kinds, kindArgs...).
 		Limit(int64(room))
-	page, err = s.codeFindingsInSupport(ctx, page, productID)
+	ended, err := catalog.NewStore(s.db).BranchesAndTagsPastEndOfLife(ctx, now)
 	if err != nil {
 		return 0, 0, err
 	}
+	page = codeFindingsInSupport(page, productID, ended)
 	if rule.Upstream != "" {
 		if page, err = bySource(ctx, s.db, page, productID, rule.Upstream); err != nil {
 			return 0, 0, err
@@ -511,6 +544,18 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 		return Catches{}, nil
 	}
 
+	// Read once for the counts below, which ask them alike.
+	ended, err := catalog.NewStore(s.db).BranchesAndTagsPastEndOfLife(ctx, s.now().UTC())
+	if err != nil {
+		return Catches{}, err
+	}
+	var under []int64
+	if beneath != "" {
+		if under, err = s.beneathIn(ctx, productID, beneath); err != nil {
+			return Catches{}, err
+		}
+	}
+
 	// The same narrowing the sweep does, minus the holder: what a rule matches
 	// and what it would place differ by who holds it, and both are worth
 	// seeing.
@@ -521,20 +566,13 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 			Where(notRecordedAsFlawIn).
 			Where(inThisProductAs(`"f"."build_id"`), productID).
 			Where(kinds, kindArgs...)
-		q, err := s.codeFindingsInSupport(ctx, q, productID)
-		if err != nil {
-			return nil, err
-		}
+		q = codeFindingsInSupport(q, productID, ended)
 		if upstream != "" {
 			if q, err = bySource(ctx, s.db, q, productID, upstream); err != nil {
 				return nil, err
 			}
 		}
 		if beneath != "" {
-			under, err := s.beneathIn(ctx, productID, beneath)
-			if err != nil {
-				return nil, err
-			}
 			if len(under) == 0 {
 				// Nothing is called that, which is a real answer and not an
 				// empty one: it is what a typo looks like from here.
@@ -578,9 +616,11 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	}
 	found.Total = int(total)
 
+	// A piece of work as every work list counts one: a code finding is one
+	// whatever component its builds name.
 	counted, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id", ` + codeFindingPiece + ` AS "code_finding_place"`))
+		ColumnExpr(`DISTINCT ` + pieceInProductColumns))
 	if err != nil {
 		return Catches{}, err
 	}
@@ -592,7 +632,7 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 
 	unheld, err := narrow(s.db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		ColumnExpr(`DISTINCT "f"."vulnerability_id", "f"."component_id", ` + codeFindingPiece + ` AS "code_finding_place"`).
+		ColumnExpr(`DISTINCT ` + pieceInProductColumns).
 		Where(`"f"."assigned_to" IS NULL`))
 	if err != nil {
 		return Catches{}, err
@@ -605,30 +645,22 @@ func (s *Store) WouldMatch(ctx context.Context, subject access.Subject,
 	return found, nil
 }
 
-// codeFindingPiece is what tells one code finding from another at one issue and component,
-// over a finding under "f": its occurrence. A piece of work is an issue at a
-// component, and a code finding is one occurrence under its analyzer's rule, so two
-// results of one rule in one component are two pieces of work.
-const codeFindingPiece = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN "f"."occurrence_identity" ELSE '' END`
-
 // codeFindingsInSupport leaves out of a query over findings under "f" every code finding past
 // its end of life: one every release of the product it was seen in is past
 // its end of life, which is kept as it stands (REQ-15). The rule CodeFindingEnded
 // holds, asked of each row.
-func (s *Store) codeFindingsInSupport(ctx context.Context, q *bun.SelectQuery, productID int64) (*bun.SelectQuery, error) {
-	ended, err := catalog.NewStore(s.db).BranchesAndTagsPastEndOfLife(ctx, s.now().UTC())
-	if err != nil {
-		return nil, err
-	}
+// ended is the catalog's releases past their end of life, read once by the
+// caller.
+func codeFindingsInSupport(q *bun.SelectQuery, productID int64, ended []int64) *bun.SelectQuery {
 	if len(ended) == 0 {
-		return q, nil
+		return q
 	}
 	return q.Where(`("f"."kind" <> ? OR EXISTS (SELECT 1 FROM "finding" AS "fs"
 		JOIN "build" AS "ts" ON "ts"."id" = "fs"."build_id"
 		JOIN "branch_or_tag" AS "ss" ON "ss"."id" = "ts"."branch_or_tag_id"
 		WHERE "fs"."occurrence_identity" = "f"."occurrence_identity" AND "fs"."kind" = ?
 		  AND "ss"."product_id" = ? AND "ts"."branch_or_tag_id" NOT IN (?)))`,
-		kind.Analysis, kind.Analysis, productID, bun.List(ended)), nil
+		kind.Analysis, kind.Analysis, productID, bun.List(ended))
 }
 
 // beneathIn is every component sitting at or under a named one, across a

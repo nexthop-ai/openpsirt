@@ -846,8 +846,16 @@ const notRecordedAsFlawIn = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "l
 // under "f" and its branch or tag under "st": an issue in a component in a product,
 // or one code finding in a product. A code finding's builds may name different versions of
 // its component, and it is still one occurrence to judge.
-const pieceOfWork = `"f"."vulnerability_id", "st"."product_id", ` +
-	`CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN 0 ELSE "f"."component_id" END, ` + codeFindingOccurrence
+const pieceOfWork = `"f"."vulnerability_id", "st"."product_id", ` + pieceComponent + `, ` + codeFindingOccurrence
+
+// pieceComponent is the component a piece of work under "f" is keyed on: none
+// for a code finding.
+const pieceComponent = `CASE WHEN "f"."kind" = '` + string(kind.Analysis) + `' THEN 0 ELSE "f"."component_id" END`
+
+// pieceInProductColumns is pieceOfWork within one product, with every column
+// named, so a derived table can select it.
+const pieceInProductColumns = `"f"."vulnerability_id", ` + pieceComponent + ` AS "piece_component", ` +
+	codeFindingOccurrence + ` AS "code_finding_place"`
 
 // Unassigned reports the work nobody is dealing with, across every product the
 // subject may see, most urgent first.

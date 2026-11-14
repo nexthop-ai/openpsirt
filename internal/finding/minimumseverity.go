@@ -289,13 +289,20 @@ func MinimumSeverityFor(ctx context.Context, db bun.IDB, productID int64) (Minim
 		word, known := MinimumSeverityWord(*stated.MinimumSeverity)
 		return MinimumSeverity{Word: word, FromProduct: known, ProductID: productID}, nil
 	}
-	word, set, err := setting.NewStore(db).Get(ctx, setting.MinimumSeverity)
+	word, err := deploymentMinimumSeverity(ctx, db)
 	if err != nil {
 		return MinimumSeverity{}, err
 	}
-	if !set || word == "" {
-		return MinimumSeverity{Word: NoMinimumSeverity, ProductID: productID}, nil
+	return MinimumSeverity{Word: word, ProductID: productID}, nil
+}
+
+// deploymentMinimumSeverity is the deployment's minimum severity, which a
+// product stating none inherits: a word nothing recognizes reads as none.
+func deploymentMinimumSeverity(ctx context.Context, db bun.IDB) (string, error) {
+	word, _, err := setting.NewStore(db).Get(ctx, setting.MinimumSeverity)
+	if err != nil {
+		return "", err
 	}
 	word, _ = MinimumSeverityWord(word)
-	return MinimumSeverity{Word: word, ProductID: productID}, nil
+	return word, nil
 }

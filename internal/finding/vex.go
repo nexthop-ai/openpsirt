@@ -301,11 +301,13 @@ func (s Statement) PrefillsFor(version string) (outcome string, offers bool) {
 	return "", false
 }
 
-// valid refuses a document whose key would collapse into somebody else's.
+// Valid refuses a document whose key would collapse into somebody else's.
 //
-// Refused in the store as well as at the endpoint, because this is reachable
-// from any other caller and every one of these is a key rather than a label.
-func (from Supplied) valid() error {
+// Refused in the store as well as by every caller, because every one of these
+// is a key rather than a label. Both names are stored in a column of a fixed
+// width and refused rather than shortened: two documents agreeing for the
+// width of the column would collapse into one.
+func (from Supplied) Valid() error {
 	switch from.Source {
 	case FromVex:
 		if utf8.RuneCountInString(from.Identifier) > MostDocumentName {
@@ -361,7 +363,7 @@ func (from Supplied) valid() error {
 func (s *Store) RecordStatements(ctx context.Context, by access.Subject, productID int64,
 	from Supplied, said []Statement) (recorded, superseded int, err error) {
 
-	if err := from.valid(); err != nil {
+	if err := from.Valid(); err != nil {
 		return 0, 0, err
 	}
 	publisher := typedname.Matching(from.Publisher)

@@ -739,3 +739,182 @@ func TestANodeHoldingNoStatedNameIsRestatedOnlyWhereTheBuildDiffers(t *testing.T
 		}
 	})
 }
+
+// A qualifier naming an address keeps the address and loses any credential
+// in it, on the shared row and on the build's node, because both reach every
+// reader of the component.
+func TestAPackageIdentifierIsStoredWithoutACredentialInAQualifier(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		stated := graph.Described{
+			Purl: "pkg:golang/example.com/x@v1.2.0?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git" +
+				"&download_url=https://user:pass@example.com/x.zip&arch=amd64",
+			Name: "x", Version: "v1.2.0",
+		}
+		snap := graph.Snapshot{
+			Root:         root,
+			Components:   []graph.Described{stated},
+			Dependencies: []graph.Dependency{{Parent: root, Child: stated}},
+		}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		const want = "pkg:golang/example.com/x@v1.2.0?vcs_url=git%2Bhttps://gitlab.example.com/x.git" +
+			"&download_url=https://example.com/x.zip&arch=amd64"
+		held, err := f.store.CurrentComponents(ctx, f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(held) != 1 || held[0].Purl != want {
+			t.Errorf("the scanner is given %+v, want the identifier %s", held, want)
+		}
+		var row []string
+		if err := f.db.NewSelect().TableExpr(`"component" AS "c"`).ColumnExpr(`"c"."purl"`).
+			Where(`"c"."name" = ?`, "x").Scan(ctx, &row); err != nil {
+			t.Fatal(err)
+		}
+		if len(row) != 1 || row[0] != want {
+			t.Errorf("the component row holds %q, want %s", row, want)
+		}
+	})
+}
+
+// An identifier written with slashes after its scheme is stored as one
+// without, so a narrowing by its type reads it.
+func TestAPackageIdentifierIsStoredWithoutSlashesAfterItsScheme(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		slashed := graph.Described{Purl: "pkg://deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
+		plain := graph.Described{Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
+		ids, err := graph.NewComponents(f.db.DB).Intern(ctx, []graph.Described{slashed})
+		if err != nil {
+			t.Fatal(err)
+		}
+		again, err := graph.NewComponents(f.db.DB).Intern(ctx, []graph.Described{plain})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ids[slashed.Identity()] != again[plain.Identity()] {
+			t.Errorf("two spellings of one identifier were stored as components %d and %d",
+				ids[slashed.Identity()], again[plain.Identity()])
+		}
+		snap := graph.Snapshot{
+			Root:         root,
+			Components:   []graph.Described{slashed},
+			Dependencies: []graph.Dependency{{Parent: root, Child: slashed}},
+		}
+		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		id, err := graph.ComponentAsIn(ctx, f.db.DB, f.buildID, "curl", graph.Choice{Ecosystem: "deb"})
+		if err != nil || id != ids[slashed.Identity()] {
+			t.Errorf("chosen by its ecosystem the build answers component %d, %v; want %d",
+				id, err, ids[slashed.Identity()])
+		}
+	})
+}
+
+// The scheme is read in any case, so slashes after a scheme written in
+// capitals are dropped from identity too.
+func TestSlashesAfterASchemeInCapitalsLeaveOnePackage(t *testing.T) {
+	capitals := graph.Described{Purl: "PKG://deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
+	plain := graph.Described{Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
+	if capitals.Identity() != plain.Identity() {
+		t.Errorf("%s and %s are identified as two packages", capitals.Purl, plain.Purl)
+	}
+}
+
+// A qualifier's address loses its credential and its query however it is
+// written: escaped as the specification asks, or plain with its query running
+// on into the pairs after it.
+func TestAQualifierAddressIsStoredWithoutItsCredentialOrQuery(t *testing.T) {
+	//nolint:gosec // G101: the credentials this takes out
+	for _, c := range []struct{ stated, want string }{
+		{"pkg:golang/example.com/e@v1?vcs_url=git%2Bhttps%3A%2F%2Foauth2%3Aglpat-SECRET%40gitlab.example.com%2Fe.git",
+			"pkg:golang/example.com/e@v1?vcs_url=git%2Bhttps://gitlab.example.com/e.git"},
+		{"pkg:generic/fw@1?download_url=https%3A%2F%2Fexample.com%2Ffw.bin%3Fprivate_token%3DSECRET&arch=arm64",
+			"pkg:generic/fw@1?download_url=https://example.com/fw.bin&arch=arm64"},
+		{"pkg:generic/s3@1?download_url=https://bucket.example.com/s3.bin?X-Amz-Credential=A&X-Amz-Signature=SECRET",
+			"pkg:generic/s3@1?download_url=https://bucket.example.com/s3.bin"},
+		{"pkg:golang/example.com/p@v1?vcs_url=git%2Bhttps%3A//oauth2:glpat-SECRET@gitlab.example.com/p.git",
+			"pkg:golang/example.com/p@v1?vcs_url=git%2Bhttps://gitlab.example.com/p.git"},
+		{"pkg:generic/frag@1?download_url=https%3A%2F%2Fexample.com%2Ff.bin%23access_token%3DSECRET",
+			"pkg:generic/frag@1?download_url=https://example.com/f.bin"},
+		{"pkg:generic/f@1?download_url=https://example.com/f.bin#access_token=SECRET",
+			"pkg:generic/f@1?download_url=https://example.com/f.bin"},
+		{"pkg:golang/example.com/b@v1?vcs_url=git%2Bhttps%3A%2F%2Foauth2%3Aglpat-SECRET%40gitlab.example.com%2Fx%ZZ&arch=amd64",
+			"pkg:golang/example.com/b@v1"},
+		{"pkg:golang/example.com/s@v1?vcs_url=git%2Bhttps://github.com/s.git#sub/dir",
+			"pkg:golang/example.com/s@v1?vcs_url=git%2Bhttps://github.com/s.git#sub/dir"},
+		{"pkg:generic/q@1?download_url=https://b.example.com/q.bin%3FX-Amz-Credential=A&X-Amz-Signature=SECRET",
+			"pkg:generic/q@1?download_url=https://b.example.com/q.bin"},
+		{"pkg:golang/example.com/g@v1?vcs_url=git%2Bssh://git@github.com/org/g.git",
+			"pkg:golang/example.com/g@v1?vcs_url=git%2Bssh://git@github.com/org/g.git"},
+		{"pkg:golang/example.com/t@v1?vcs_url=git%2Bhttps://glpat-SECRET@gitlab.example.com/t.git",
+			"pkg:golang/example.com/t@v1?vcs_url=git%2Bhttps://gitlab.example.com/t.git"},
+		{"pkg:maven/org/x@1?repository_url=deploy:SECRET@repo.example.com/maven&type=jar",
+			"pkg:maven/org/x@1?repository_url=repo.example.com/maven&type=jar"},
+		{"pkg:maven/org/z@1?repository_url=deploy%3ASECRET%40repo.example.com%2Fmaven",
+			"pkg:maven/org/z@1?repository_url=repo.example.com/maven"},
+		{"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git",
+			"pkg:golang/example.com/p@v1?vcs_url=git@github.com:org/p.git"},
+		{"pkg:generic/c@1?checksum=sha256:abc123", "pkg:generic/c@1?checksum=sha256:abc123"},
+		{"pkg:generic/bu@1?arch=amd64&vcs_url=https://to&SECRET@host.example.com/x", "pkg:generic/bu@1?arch=amd64"},
+		{"pkg:generic/am@1?vcs_url=https://u:SEC&RET@host.example.com/x", "pkg:generic/am@1"},
+		{"pkg:generic/ae@1?vcs_url=https://u:SEC&x=RET@host.example.com/x", "pkg:generic/ae@1"},
+		{"pkg:generic/ah@1?vcs_url=https://u:SEC#a&RET@host.example.com/x", "pkg:generic/ah@1"},
+		{"pkg:maven/org/rh@1?repository_url=user:pa#SECRET@repo.example.com/maven",
+			"pkg:maven/org/rh@1?repository_url=repo.example.com/maven"},
+		{"pkg:golang/example.com/vh@v1?vcs_url=git%2Bhttps://user:pa#SECRET@github.com/x",
+			"pkg:golang/example.com/vh@v1"},
+		{"pkg:maven/org/hp@1?repository_url=deploy:pa%23SECRET@repo.example.com/maven&type=jar",
+			"pkg:maven/org/hp@1?repository_url=repo.example.com/maven&type=jar"},
+		{"pkg:maven/org/qp@1?repository_url=deploy:pa%3FSECRET@repo.example.com/maven&type=jar",
+			"pkg:maven/org/qp@1?repository_url=repo.example.com/maven&type=jar"},
+		{"pkg:golang/example.com/ls@v1?repository_url=user:SECRET@github.com/o/https://r",
+			"pkg:golang/example.com/ls@v1?repository_url=github.com/o/https://r"},
+		{"pkg:golang/example.com/pr@v1?vcs_url=//user:SECRET@host.example.com/x",
+			"pkg:golang/example.com/pr@v1?vcs_url=//host.example.com/x"},
+		{"pkg:generic/ux@1?download_url=https://h.example.com/a%zz?x=1&token=SECRET&arch=amd64",
+			"pkg:generic/ux@1"},
+		{"pkg:golang/example.com/sl@v1?repository_url=deploy:ab%2FSECRET@gitlab.example.com:grp/x.git&arch=amd64",
+			"pkg:golang/example.com/sl@v1"},
+		{"pkg:golang/example.com/fr@v1?repository_url=gitlab.example.com/x.git#private_token=SECRET",
+			"pkg:golang/example.com/fr@v1?repository_url=gitlab.example.com/x.git"},
+		{"pkg:generic/bp@1?download_url=https://b.example.com:abc/s3.bin?X-Amz-Credential=A&X-Amz-Signature=SECRET",
+			"pkg:generic/bp@1"},
+		{"pkg:maven/org/rq@1?repository_url=repo.example.com/maven?private_token=SECRET&type=jar",
+			"pkg:maven/org/rq@1?repository_url=repo.example.com/maven"},
+		{"pkg:maven/org/re@1?repository_url=repo.example.com/maven%3Fprivate_token%3DSECRET&type=jar",
+			"pkg:maven/org/re@1?repository_url=repo.example.com/maven&type=jar"},
+		{"pkg:generic/h@1?download_url=https://h.example.com/a=b/f.tgz%3Ftoken%3Dx&upstream=openssl%403.0",
+			"pkg:generic/h@1?download_url=https://h.example.com/a%3Db/f.tgz&upstream=openssl%403.0"},
+		{"pkg:generic/pk@1?download_url=https://h.example.com/a&b/c%3Ftoken=SECRET",
+			"pkg:generic/pk@1"},
+		{"pkg:generic/de@1?download_url=https%253A%252F%252Fuser%253ASECRET%2540h.example.com%252Ff.bin",
+			"pkg:generic/de@1?download_url=https://h.example.com/f.bin"},
+		{"pkg:generic/sx@1?download_url=https://h.example.com/a%zz#SECRETTOKEN", "pkg:generic/sx@1"},
+		{"pkg:generic/sf@1?download_url=https://h.example.com/f.bin#access_token%3DSECRET",
+			"pkg:generic/sf@1?download_url=https://h.example.com/f.bin"},
+		{"pkg:maven/org/nc@1?repository_url=repo.example.com/maven%23SECRET&type=jar",
+			"pkg:maven/org/nc@1?repository_url=repo.example.com/maven&type=jar"},
+		{"pkg:golang/example.com/tu@v1?vcs_url=//glpat-SECRET@host.example.com/x",
+			"pkg:golang/example.com/tu@v1?vcs_url=//host.example.com/x"},
+		{"pkg:maven/org/ru@1?repository_url=to&ken@repo.example.com/maven", "pkg:maven/org/ru@1"},
+		{"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git",
+			"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git"},
+		// Another scheme is not a package identifier, and its slashes are
+		// its own.
+		{"https://example.com/x", "https://example.com/x"},
+	} {
+		got := graph.StoredPurl(c.stated)
+		if got != c.want {
+			t.Errorf("%s is stored as %s, want %s", c.stated, got, c.want)
+		}
+		// A stored identifier read again is stored as it stands, which is
+		// what lets the upgrade leave a clean row alone.
+		if again := graph.StoredPurl(got); again != got {
+			t.Errorf("%s, stored again, is stored as %s", got, again)
+		}
+	}
+}

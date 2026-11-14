@@ -99,6 +99,10 @@ occurrences outermost, written `CROSS JOIN ... WHERE`. That is an inner join on
 every engine and fixes the order on SQLite, which otherwise reads every decision
 occurrence once per open finding: 331 s against 0.78 s.
 
+The release narrowing (branches or tags, in support or past end of life) is one
+condition shared with the per-product lists, over the catalog's own list of
+releases past their date, read once per page.
+
 ## Deadline rewrites
 
 Rewriting every deadline walks the identifier range once, with a batch of

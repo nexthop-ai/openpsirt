@@ -75,9 +75,26 @@ func TestAReportIsRecordedAnsweredAndThenSaidToBeAnIssue(t *testing.T) {
 			t.Errorf("somebody who triages only announced work was told: %v", told)
 		}
 
-		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			at+"/messages", `{"direction":"sent","body":"Thank you, we are looking."}`); got.Code != http.StatusCreated {
+		// The recorder has a display name, which the answer names them by, as
+		// the list does.
+		if _, err := r.DB.DB.NewUpdate().Table("person").Set(`"display_name" = ?`, "Pat Triage").
+			Where(`"identity" = ?`, "private-triage").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		got = httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			at+"/messages", `{"direction":"sent","body":"Thank you, we are looking."}`)
+		if got.Code != http.StatusCreated {
 			t.Fatalf("acknowledging answered %d: %s", got.Code, got.Body.String())
+		}
+		var logged struct {
+			LoggedBy     string `json:"logged_by"`
+			LoggedByName string `json:"logged_by_name"`
+		}
+		if err := json.Unmarshal(got.Body.Bytes(), &logged); err != nil {
+			t.Fatal(err)
+		}
+		if logged.LoggedBy != "private-triage" || logged.LoggedByName != "Pat Triage" {
+			t.Errorf("the recorded message names its recorder %+v, want their identity and display name", logged)
 		}
 		httpapitest.Read(t, r, "private-triage", at, &one)
 		if one.Acknowledged == "" || one.AcknowledgedBy != "private-triage" {

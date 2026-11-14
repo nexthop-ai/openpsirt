@@ -46,6 +46,12 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 		} else if n != 0 {
 			t.Errorf("out of support, with nothing out of support, kept %d rows", n)
 		}
+		if _, n, err := f.store.Anywhere(ctx, f.holding(t, access.PublicRead), 50, 0,
+			finding.Filter{Workable: finding.Working(nil, []string{finding.PastEndOfLife})}); err != nil {
+			t.Fatal(err)
+		} else if n != 0 {
+			t.Errorf("out of support across products, with nothing out of support, kept %d rows", n)
+		}
 		cat := catalog.NewStore(f.db.DB)
 		gone, err := cat.BranchOrTagByName(ctx, f.productID, "release-1.x")
 		if err != nil {
@@ -61,6 +67,18 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 			t.Helper()
 			rows, _, err := f.store.Groups(ctx, who, f.wholeProduct(), 50, 0,
 				finding.Filter{Workable: only})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(rows) == 0 {
+				return 0
+			}
+			return rows[0].Occurrences
+		}
+		// The list across products answers by the same rule.
+		across := func(only finding.Workable) int {
+			t.Helper()
+			rows, _, err := f.store.Anywhere(ctx, who, 50, 0, finding.Filter{Workable: only})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -93,6 +111,9 @@ func TestTheListKeepsToTheReleasesWorkCanLandIn(t *testing.T) {
 		} {
 			if got := occurrences(each.only); got != each.want {
 				t.Errorf("%s counts %d occurrences, want %d", each.what, got, each.want)
+			}
+			if got := across(each.only); got != each.want {
+				t.Errorf("%s across products counts %d occurrences, want %d", each.what, got, each.want)
 			}
 		}
 	})

@@ -924,3 +924,27 @@ func TestTheListCanAskWhatAProducerCalledSomethingAndNothingElseReadsIt(t *testi
 		}
 	})
 }
+
+// report records one scanner run on the fixture's build that reports rows.
+func (f *fixture) report(t *testing.T, rows ...finding.Reported) {
+	t.Helper()
+	findings := finding.NewStore(f.db.DB)
+	run, err := findings.Begin(t.Context(), finding.Run{
+		BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
+		DatabaseVersion: "2026-08-28", RanHere: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := findings.Apply(t.Context(), f.buildID, run.ID, rows); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// high is an issue rated high at a component, fixed upstream in 2.0.
+func high(id string, component graph.Described) finding.Reported {
+	return finding.Reported{
+		Issue:     finding.Named{Identifier: id, Severity: "high"},
+		Component: component, FixState: finding.FixedUpstream, FixedIn: "2.0",
+	}
+}

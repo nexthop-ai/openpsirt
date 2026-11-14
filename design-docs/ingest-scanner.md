@@ -56,7 +56,7 @@ generations (`design-docs/ingest-measurements.md` § Rating mixture).
 
 | Rule | Reason |
 |---|---|
-| One rating per generation is kept: the worst stated with both score and vector | The worst is independent of arrival order, and 3 and 4 are two judgments |
+| One rating per generation is kept: the worst stated with both score and vector, within one report and across reports | The worst is independent of arrival order and of the order a match lists them, and 3 and 4 are two judgments |
 | The issue's number is the newest generation's rating, copied whole; its findings re-rank when it moves | An older generation's higher rating is held beside it and moves nothing |
 | A rating's number, vector, version, publisher and rank come from one rating | |
 | A number with no vector is no rating, raising the number only on an issue with none | |

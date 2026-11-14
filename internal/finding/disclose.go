@@ -158,11 +158,8 @@ func (s *Store) DisclosureDeadlinesPage(ctx context.Context, subject access.Subj
 		// Whoever is dealing with it, and nobody where the occurrences disagree.
 		// A minimum named one of them: a partly assigned embargo read as one
 		// person's, which is a list of what is coming that names the wrong
-		// person to ask. The same reconciliation the deadline list does, in
-		// the statement rather than after it.
-		ColumnExpr(`CASE WHEN COUNT("f"."assigned_to") = COUNT(*)
-			AND MIN("f"."assigned_to") = MAX("f"."assigned_to")
-			THEN MIN("f"."assigned_to") END AS "assigned_to"`).
+		// person to ask.
+		ColumnExpr(soleHolderExpr + ` AS "assigned_to"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		GroupExpr(`"p"."id", "p"."name", "p"."display_name", "v"."id", "v"."identifier", "v"."description", ` +
 			rating.EffectiveExpr).

@@ -96,3 +96,49 @@ func TestAStatementSetRecordedAgainAfterALostCommitKeepsWhatItRepeats(t *testing
 			len(said), said[0].Vulnerability)
 	}
 }
+
+// Marking a finding asks the right to mark again on every attempt. A finding
+// made private between a lost commit and its retry is not marked by somebody
+// who triages public work alone.
+func TestALabelRetriedAfterALostCommitAsksTheRightAgain(t *testing.T) {
+	var between func()
+	db, race := dbtest.Racing(t, func() { between() })
+	ctx := t.Context()
+	w := world.New(t, db)
+	f := &fixture{
+		db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
+		build: w.Build.ID, productID: w.Product.ID, scans: ingest.NewStore(db.DB),
+		built: time.Now().UTC().Add(-72 * time.Hour),
+	}
+	f.shipped(t, twoConsumers())
+	if _, err := f.store.Apply(ctx, f.build, f.run(t),
+		[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+		t.Fatal(err)
+	}
+	who := f.someoneElse(t, access.PublicTriage)
+	issue := f.issueID(t, "CVE-2026-1")
+	component := f.componentID(t, libnl.Name)
+	between = func() {
+		if _, err := db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set(`"visibility" = ?`, access.Private).
+			Where(`"vulnerability_id" = ?`, issue).Exec(ctx); err != nil {
+			t.Error(err)
+		}
+	}
+
+	race.Arm(1)
+	err := f.store.LabelIt(ctx, who, f.productID, issue, component, "waiting on vendor")
+	if race.Unspent() != 0 {
+		t.Fatal("the label committed nothing, so no attempt was retried and this checks nothing")
+	}
+	if err == nil {
+		t.Error("a finding made private before the retry was marked by somebody triaging public work alone")
+	}
+	on, err := f.store.LabelsOn(ctx, f.productID, issue, component, access.Visibilities())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(on) != 0 {
+		t.Errorf("the private finding carries %q", on)
+	}
+}

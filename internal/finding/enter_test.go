@@ -4,6 +4,7 @@
 package finding_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -461,6 +463,215 @@ func TestWhichBuildsAFlawAffectsIsCorrectedAsResearchGoes(t *testing.T) {
 	})
 }
 
+func TestAFlawRecordedAgainstABuildWidensToAnotherVariantsBuild(t *testing.T) {
+	// A root is named per variant, so the flaw lands on the added build's own
+	// root, keyed with no name as recording it there would be.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		otherRoot := at("sonic-mellanox", "1.0")
+		f.shippedTo(t, other, graph.Snapshot{
+			Root: otherRoot, Components: []graph.Described{swss, libnl},
+			Dependencies: []graph.Dependency{{Parent: otherRoot, Child: swss}, {Parent: swss, Child: libnl}},
+		})
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Severity: "high",
+			Summary: "The image is assembled with a debug port open.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		changed, err := f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID,
+			[]int64{f.build, other}, "")
+		if err != nil {
+			t.Fatalf("widening to another variant's build: %v", err)
+		}
+		if changed.Added != 1 {
+			t.Errorf("widening added %d builds, want 1", changed.Added)
+		}
+		var opened finding.Finding
+		if err := f.db.DB.NewSelect().Model(&opened).
+			Where(`"vulnerability_id" = ?`, rows[0].VulnerabilityID).
+			Where(`"build_id" = ?`, other).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if opened.OccurrenceIdentity != rows[0].OccurrenceIdentity {
+			t.Errorf("the added build's finding sits at %q, want the root's %q",
+				opened.OccurrenceIdentity, rows[0].OccurrenceIdentity)
+		}
+	})
+}
+
+func TestAFlawWidensToTheVersionItWasRecordedAgainst(t *testing.T) {
+	// A build shipping the component at two versions is not a choice the
+	// request can make, and the row's own version makes it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		f.shippedTo(t, other, graph.Snapshot{
+			Root: root, Components: []graph.Described{swss, teamd, libnl, libnlNew},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: root, Child: teamd},
+				{Parent: swss, Child: libnl}, {Parent: teamd, Child: libnlNew}},
+		})
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID,
+			[]int64{f.build, other}, ""); err != nil {
+			t.Fatalf("widening to a build shipping two versions: %v", err)
+		}
+		var opened []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&opened).
+			Where(`"vulnerability_id" = ?`, rows[0].VulnerabilityID).
+			Where(`"build_id" = ?`, other).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(opened) != 1 || opened[0].ComponentID != rows[0].ComponentID {
+			t.Errorf("the added build holds %+v, want one finding on component %d", opened, rows[0].ComponentID)
+		}
+	})
+}
+
+func TestAFlawIsNotWidenedToABuildHoldingItsNameAsSeveralOtherComponents(t *testing.T) {
+	// Neither of the added build's two components by the name is the one
+	// recorded, so which the flaw affects is the caller's to say.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		libnlOld := at(libnl.Name, "3.5.0")
+		f.shippedTo(t, other, graph.Snapshot{
+			Root: root, Components: []graph.Described{swss, teamd, libnlOld, libnlNew},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: root, Child: teamd},
+				{Parent: swss, Child: libnlOld}, {Parent: teamd, Child: libnlNew}},
+		})
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID, []int64{f.build, other}, "")
+		if !errors.Is(err, finding.ErrSeveralLikeIt) {
+			t.Errorf("widening to a build holding the name twice answered %v, want ErrSeveralLikeIt", err)
+		}
+	})
+}
+
+func TestAFlawWidensToItsOwnEcosystemAtAnotherVersion(t *testing.T) {
+	// The added build ships the package at another version, and a Python
+	// package of the same name beside it: the row's ecosystem decides.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		python := graph.Described{Purl: "pkg:pypi/" + libnl.Name + "@3.9.0", Name: libnl.Name, Version: "3.9.0"}
+		f.shippedTo(t, other, graph.Snapshot{
+			Root: root, Components: []graph.Described{swss, teamd, libnlNew, python},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: root, Child: teamd},
+				{Parent: swss, Child: libnlNew}, {Parent: teamd, Child: python}},
+		})
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID,
+			[]int64{f.build, other}, ""); err != nil {
+			t.Fatalf("widening to a build shipping the package at another version: %v", err)
+		}
+		var opened []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&opened).
+			Where(`"vulnerability_id" = ?`, rows[0].VulnerabilityID).
+			Where(`"build_id" = ?`, other).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var want int64
+		if err := f.db.DB.NewSelect().TableExpr(`"component"`).Column("id").
+			Where(`"purl" = ?`, libnlNew.Purl).Scan(ctx, &want); err != nil {
+			t.Fatal(err)
+		}
+		if len(opened) != 1 || opened[0].ComponentID != want {
+			t.Errorf("the added build holds %+v, want one finding on the Debian package, component %d", opened, want)
+		}
+	})
+}
+
+func TestAFlawIsNotWidenedToAnotherEcosystemsPackageOfItsName(t *testing.T) {
+	// An npm package and a Python one of one name are different software, so
+	// a build shipping only the other ecosystem's holds no such component.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		python := graph.Described{Purl: "pkg:pypi/" + libnl.Name + "@" + libnl.Version, Name: libnl.Name,
+			Version: libnl.Version}
+		f.shippedTo(t, other, through(python))
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = f.store.Affects(ctx, who, f.productID, rows[0].VulnerabilityID, []int64{f.build, other}, "")
+		if !errors.Is(err, finding.ErrNoSuchComponent) {
+			t.Errorf("widening to a build shipping the name only as a Python package answered %v, "+
+				"want ErrNoSuchComponent", err)
+		}
+	})
+}
+
+func TestABuildAnotherEditTookOutFirstIsNotCountedAsClosedAgain(t *testing.T) {
+	// Two people taking one build out at once: the second's answer counts
+	// the builds it closed, and the first closed this one.
+	servers(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		other := f.anotherVariant(t, "mellanox")
+		f.shippedTo(t, other, through(libnl))
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build, other}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := rows[0].VulnerabilityID
+		hooked, rival := dbtest.RivalAfterRead(t, f.db, "finding", "finding", 2*time.Second, func() error {
+			_, err := f.store.Affects(context.Background(), who, f.productID, issue, []int64{other},
+				"not built on broadcom")
+			return err
+		})
+		changed, err := finding.NewStore(hooked).Affects(ctx, who, f.productID, issue, []int64{other},
+			"not built on broadcom")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rival(); err != nil {
+			t.Fatalf("the rival edit: %v", err)
+		}
+		if changed.Closed != 0 {
+			t.Errorf("the second edit says it closed %d builds, want none", changed.Closed)
+		}
+	})
+}
+
 func TestTakingABuildOutNeedsAReasonAndAddingOneDoesNot(t *testing.T) {
 	// Removing a build from an advisory's affected list with no explanation is
 	// the state a history exists to prevent. Adding one explains itself.
@@ -890,7 +1101,7 @@ func TestAMintedNameKeptOnlyAsAnAliasIsNotDrawnAgain(t *testing.T) {
 			t.Fatal(err)
 		}
 		issue := first[0].VulnerabilityID
-		if err := finding.NewVulnerabilities(f.db.DB).
+		if _, err := finding.NewVulnerabilities(f.db.DB).
 			AlsoKnownAs(ctx, who, issue, "CVE-2026-48190"); err != nil {
 			t.Fatal(err)
 		}

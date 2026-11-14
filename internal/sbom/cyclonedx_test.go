@@ -338,11 +338,13 @@ func TestAVersionStatedByTheSecondEntryTakesTheComponentOffTheCount(t *testing.T
 	// Two descriptions of one component are combined, so what the count is
 	// asked about is the combination. Counting as each entry was read answered
 	// about the first description alone, and reported a component as stating
-	// no version when the document did state one.
+	// no version when the document did state one. One identifier names both
+	// entries; a version stated beside an identifier naming none is part of
+	// what the component is, so the identifier carries it here.
 	doc := read(t, strings.Replace(minimal,
 		`{"bom-ref": "a", "name": "libc", "version": "2.41", "purl": "pkg:deb/debian/libc6@2.41"}`,
-		`{"bom-ref": "a", "name": "libc", "purl": "pkg:deb/debian/libc6"},
-		 {"bom-ref": "b", "name": "libc", "version": "2.41", "purl": "pkg:deb/debian/libc6"}`, 1))
+		`{"bom-ref": "a", "name": "libc", "purl": "pkg:deb/debian/libc6@2.41"},
+		 {"bom-ref": "b", "name": "libc", "version": "2.41", "purl": "pkg:deb/debian/libc6@2.41"}`, 1))
 	if doc.Unversioned != 0 {
 		t.Errorf("%d components state no version, want 0 — the document stated one", doc.Unversioned)
 	}

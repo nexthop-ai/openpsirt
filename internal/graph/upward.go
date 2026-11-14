@@ -112,7 +112,9 @@ func (s *Store) Ours(ctx context.Context, subject access.Subject, buildID int64)
 		Where(`"f"."assigned_to" IN (?)`, bun.List(mine)).
 		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."component_id"`).
-		OrderExpr(`issues DESC, "name"`).
+		// The component last, so which components the bound keeps is the same
+		// on every engine and every request.
+		OrderExpr(`"issues" DESC, "name", "f"."component_id"`).
 		Limit(int64(s.ours) + 1)
 	// An assignment carries a row that is not disclosed only to somebody who
 	// reads its visibility here — the rule the work list applies, for the same

@@ -369,6 +369,47 @@ func TestTheEndOfAnEmbargoIsReadFromTheOpenOccurrences(t *testing.T) {
 	})
 }
 
+func TestAnIssueWhoseOpenOccurrencesHaveNoDateNeedsASecondPersonToDisclose(t *testing.T) {
+	// A closed occurrence keeps the date it closed with. Where every open
+	// occurrence is undated the issue has no date, and that closed one's
+	// passing does not let one person disclose it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		issue := f.embargoed(t, who)
+		var occurrences []finding.Finding
+		if err := f.db.DB.NewSelect().Model(&occurrences).
+			Where(`"vulnerability_id" = ?`, issue).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		closed := occurrences[0]
+		closed.ID = 0
+		closed.OccurrenceIdentity = strings.Repeat("e", len(closed.OccurrenceIdentity))
+		now := time.Now().UTC()
+		passed := now.Add(-24 * time.Hour)
+		closed.DiscloseAt = &passed
+		closed.ClosedAt = &now
+		if _, err := f.db.DB.NewInsert().Model(&closed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set(`"disclose_at" = NULL`).
+			Where(`"vulnerability_id" = ?`, issue).
+			Where(`"closed_at" IS NULL`).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		done, err := f.store.Disclose(ctx, who, f.productID, issue, "Nobody set a date.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !done.NeedsApproval {
+			t.Error("a closed occurrence's passed date let one person disclose an issue with no date")
+		}
+	})
+}
+
 func TestADisclosedIssueCarriesNoDateAndItsHistoryIsPublic(t *testing.T) {
 	// A public finding carries no disclosure date, and the history of the
 	// embargo is part of the record disclosing opens.

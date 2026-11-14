@@ -460,7 +460,9 @@ func stateHaving(state DecisionStanding, g grain) string {
 	case StandingAgreed:
 		return approved + " >= " + g.occurrences()
 	case StandingWaiting:
-		return waiting + " > 0"
+		// A group every occurrence of which is answered reads agreed, whatever
+		// is waiting beside it, so the filter keeps it out here.
+		return waiting + " > 0 AND " + approved + " < " + g.occurrences()
 	case StandingLapsed:
 		// Lapsed means nothing replaced it: a decision made again at the
 		// occurrence after the old one lapsed is waiting, which is what the row

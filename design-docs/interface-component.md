@@ -137,7 +137,7 @@ as on it, worked out when read, never stored, because findings move.
 | Arriving from a finding opens on the component with every parent expanded; the chain travels in the link, and a step past a level's cap is kept | |
 | A version every component at a level shares is drawn once above the rows | A switch image's thirty containers carry one build stamp |
 | A node's number is shown as one bar of band widths, the component screen's control, in a fixed-width column, numbers on the title, rolled up in the counting statement so bands sum to the total, banded by the rating in force in this product | The list it opens groups by that rating |
-| A node count opens its list: `beneath`, every open finding at or under the component by the same walk; `under` stays the direct consumer | The figures need not match; the list is one row per issue and component |
+| A node count opens its list: `beneath`, every open finding at or under the component by the same walk; `under` stays the direct consumer | The figures need not match; the list is one row per issue and source package at a version |
 | A name the build does not hold answers not found | An empty list is a clean subtree |
 | The count is every open issue, answered or not | The screen answers "what is open here" |
 | A row with counts carries a link to the findings burndown at or under it on this build, beside the component's link | |

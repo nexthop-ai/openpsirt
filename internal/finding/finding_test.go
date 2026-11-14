@@ -424,3 +424,34 @@ func changedNothing(a finding.Applied) bool {
 	return a.Opened == 0 && a.Closed == 0 && a.Updated == 0 && a.Patched == 0 && a.Unaffected == 0 &&
 		a.Disclaimed == 0
 }
+
+// declaredFixture is a fixture over the declared world, for a test that runs on
+// one engine rather than on each one's seeded catalog.
+func declaredFixture(t *testing.T, db *database.DB) *fixture {
+	t.Helper()
+	w, err := world.Declare(t.Context(), db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &fixture{
+		db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),
+		build: w.Build.ID, productID: w.Product.ID, tag: w.Tag.ID, variant: w.Customer.ID,
+		scans: ingest.NewStore(db.DB),
+		scope: finding.Scope{
+			ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID,
+		},
+		built: time.Now().UTC().Add(-72 * time.Hour),
+	}
+}
+
+// issueNamed interns an issue rated high under an identifier and returns its
+// row.
+func (f *fixture) issueNamed(t *testing.T, identifier string) int64 {
+	t.Helper()
+	interned, err := finding.NewVulnerabilities(f.db.DB).Intern(t.Context(),
+		[]finding.Named{{Identifier: identifier, Severity: "high"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return interned[identifier]
+}

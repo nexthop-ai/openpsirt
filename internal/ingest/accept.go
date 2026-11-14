@@ -151,9 +151,9 @@ type Scan struct {
 	// why it is there. Nothing else on a receipt distinguishes the two.
 	Components *int `bun:"components"`
 	Placed     *int `bun:"placed"`
-	// RootIdentifier is what the document called the thing it is about, in
-	// the spelling the document used, and empty where it named no component
-	// of its own.
+	// RootIdentifier is what the document called the thing it is about, as
+	// graph.StoredPurl stores a package identifier, and empty where it named
+	// no component of its own.
 	//
 	// It is what a reader of a published advisory matches a release against:
 	// an identifier only helps if it appears on both sides, and this is the

@@ -231,6 +231,7 @@ customer-escalated or waiting on a vendor stay out of the reasoning.
 | Each package's word at its own visibility: writes reach packages whose findings the caller may triage; a word shows where its package carries a finding the reader may see, and the filter asks at the row's visibility | A word on an undisclosed package does not show through a disclosed one |
 | Matched regardless of capitals and shown as typed; labeling a labeled finding succeeds and keeps the first spelling | |
 | Labeling is triage; a reader sees labels without the control | |
+| Putting a word on or taking it off is one act: the right to mark is read and every package of the fold written in one transaction | A failure partway labels none of the fold, and a retry asks the right again |
 | Each list group carries its labels, read for the page in one statement, each a filter | |
 | Called a label in every register | |
 

@@ -46,7 +46,7 @@ address can set is a narrowing nobody uses.
 | Package | A package identifier, chosen at every version as the burndown chooses (`design-docs/data-model-components.md` § Package identifier prefixes). A chip of its own, kept across products and kept by a saved filter. A package row at several versions arrives this way |
 | Package kind | Read from the package identifier. Offered are the kinds present in the scope on screen, as the server reports them under the list's visibility, each with its row count, read when the panel opens and narrowed by no other filter. A kind chosen and absent is offered without a count, so it can be unticked. A kind whose word is not the reader's has a display name (`cargo` is Rust); others are their own word |
 | What holds it | The consumer an occurrence records; what the build holds directly is its own choice |
-| How far it has been decided | Undecided: no occurrence decided. Waiting: a decision standing proposed. Agreed: every occurrence answered. Lapsed: an occurrence's decision stopped applying with nothing replacing it. No partly answered value: the row says "12 occurrences · 3 answered" |
+| How far it has been decided | Undecided: no occurrence decided. Waiting: a decision standing proposed, where not every occurrence is answered. Agreed: every occurrence answered, whatever is waiting beside it. A group is in the one state its row reads. Lapsed: an occurrence's decision stopped applying with nothing replacing it. No partly answered value: the row says "12 occurrences · 3 answered" |
 
 ## Release filters
 

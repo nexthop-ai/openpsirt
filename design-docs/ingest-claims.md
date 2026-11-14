@@ -67,6 +67,7 @@ What each claim does to a finding is `design-docs/findings-closure.md`
 | The carried patches read shows the version: "acme-fw 4.2" | |
 | Reasoning given joins the identity, so a new explanation closes one claim and opens another; v0.9.0's upgrade rekeys every stored claim so none reopens | |
 | The subject's name is kept as spelled and folded beside it | |
+| A claim, a published statement and a supplier's statement keep the package identifiers their document wrote, any credential in a qualifier included, and are read only by readers of their build or product; no published document names one | A token is the uploader's or the supplier's, and identity reads the identifier as written. The published documents name components and builds by the identifiers inventories state, stored without a credential (`design-docs/data-model-components.md` § Component identity) |
 
 ## Administrator-supplied VEX
 

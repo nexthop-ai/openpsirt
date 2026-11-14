@@ -30,12 +30,7 @@ func TestAVexStatementIsStoredFoldedAndFoundOnEveryEngine(t *testing.T) {
 		// and matched by name in the query, because which name a publisher
 		// used is theirs to choose — but who may be told about it is a
 		// question about the issue, so the read takes its identifier.
-		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
-			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		issue := interned["CVE-2026-1"]
+		issue := f.issueNamed(t, "CVE-2026-1")
 
 		// A name with a letter outside ASCII, in capitals. This is the case
 		// the two folds disagree about.
@@ -109,11 +104,7 @@ func TestAVexStatementAboutALongNameIsFoldedToTheComponentsWidth(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
-			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
-		if err != nil {
-			t.Fatal(err)
-		}
+		issue := f.issueNamed(t, "CVE-2026-1")
 		long := "lib" + strings.Repeat("Ü", 250)
 		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
 			finding.Supplied{Source: finding.FromVex, Publisher: "Debian",
@@ -124,7 +115,7 @@ func TestAVexStatementAboutALongNameIsFoldedToTheComponentsWidth(t *testing.T) {
 			}}); err != nil {
 			t.Fatalf("a statement about a long name was refused: %v", err)
 		}
-		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
+		said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
 			[]string{"CVE-2026-1"}, strings.ToUpper(long), "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -145,12 +136,7 @@ func TestAStatementAboutOnePackageIsNotShownAgainstAnotherOfTheSameName(t *testi
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
-			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		issue := interned["CVE-2026-1"]
+		issue := f.issueNamed(t, "CVE-2026-1")
 
 		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
 			finding.Supplied{Source: finding.FromVex, Publisher: "Acme",
@@ -201,12 +187,7 @@ func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
-			[]finding.Named{{Identifier: "CVE-2026-2", Severity: "high"}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		issue := interned["CVE-2026-2"]
+		issue := f.issueNamed(t, "CVE-2026-2")
 
 		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
 			finding.Supplied{Source: finding.FromVex, Publisher: "Debian",
@@ -246,14 +227,7 @@ func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T)
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
-			[]finding.Named{
-				{Identifier: "CVE-2026-1", Severity: "high"},
-				{Identifier: "CVE-2026-2", Severity: "high"},
-			})
-		if err != nil {
-			t.Fatal(err)
-		}
+		one, two := f.issueNamed(t, "CVE-2026-1"), f.issueNamed(t, "CVE-2026-2")
 
 		first := finding.Supplied{
 			Source: finding.FromAdvisory, Identifier: "EXSA-2026:1",
@@ -280,7 +254,7 @@ func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T)
 		if setAside != 0 {
 			t.Errorf("a second advisory set aside %d claims of the first", setAside)
 		}
-		still, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
+		still, err := f.store.SaidAbout(ctx, who, f.productID, one,
 			[]string{"CVE-2026-1"}, "libnl", "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -303,7 +277,7 @@ func TestOneAdvisoryReplacesItselfAndNothingElseThePublisherIssued(t *testing.T)
 			t.Errorf("a revision of one advisory set aside %d claims, want its own one",
 				replaced)
 		}
-		other, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-2"],
+		other, err := f.store.SaidAbout(ctx, who, f.productID, two,
 			[]string{"CVE-2026-2"}, "zlib", "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -321,11 +295,7 @@ func TestAStatementSetAndAnAdvisoryDoNotReplaceEachOther(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
-			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
-		if err != nil {
-			t.Fatal(err)
-		}
+		issue := f.issueNamed(t, "CVE-2026-1")
 		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
 			finding.Supplied{
 				Source: finding.FromAdvisory, Identifier: "EXSA-2026:1",
@@ -348,7 +318,7 @@ func TestAStatementSetAndAnAdvisoryDoNotReplaceEachOther(t *testing.T) {
 		if setAside != 0 {
 			t.Errorf("a statement set put aside %d claims from an advisory", setAside)
 		}
-		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
+		said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
 			[]string{"CVE-2026-1"}, "libnl", "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -499,11 +469,7 @@ func TestTheSameDocumentReadDifferentlyReplacesWhatStands(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
-		interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
-			[]finding.Named{{Identifier: "CVE-2026-1", Severity: "high"}})
-		if err != nil {
-			t.Fatal(err)
-		}
+		issue := f.issueNamed(t, "CVE-2026-1")
 		from := finding.Supplied{Source: finding.FromVex, Publisher: "Example",
 			Document: "example.json", Digest: "sha256:one"}
 		read := func(component string) []finding.Statement {
@@ -535,7 +501,7 @@ func TestTheSameDocumentReadDifferentlyReplacesWhatStands(t *testing.T) {
 		if setAside != 1 {
 			t.Errorf("the same bytes read another way set aside %d statements, want 1", setAside)
 		}
-		said, err := f.store.SaidAbout(ctx, who, f.productID, interned["CVE-2026-1"],
+		said, err := f.store.SaidAbout(ctx, who, f.productID, issue,
 			[]string{"CVE-2026-1"}, "libstdc++6", "", f.build, 0)
 		if err != nil {
 			t.Fatal(err)

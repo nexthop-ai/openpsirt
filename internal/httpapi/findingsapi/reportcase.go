@@ -160,13 +160,10 @@ func registerReportCase(api huma.API, in core.Deps) {
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*core.ListOutput[ReportRevisionBody], error) {
 		in := core.Of(ctx, in)
-		subject, product, err := productForReports(ctx, in, input.Product)
+		_, _, rows, err := readReport(ctx, in, input.Product, input.Reference, "that report could not be read",
+			(*finding.Store).Revisions)
 		if err != nil {
 			return nil, err
-		}
-		rows, err := finding.NewStore(in.DB.DB).Revisions(ctx, subject, product.ID, input.Reference)
-		if err != nil {
-			return nil, refusedReport(in, err, "that report could not be read")
 		}
 		people := make([]int64, 0, len(rows))
 		for _, row := range rows {
@@ -207,13 +204,10 @@ func registerReportCase(api huma.API, in core.Deps) {
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*core.ListOutput[ReportEventBody], error) {
 		in := core.Of(ctx, in)
-		subject, product, err := productForReports(ctx, in, input.Product)
+		_, _, events, err := readReport(ctx, in, input.Product, input.Reference, "that report's history could not be read",
+			(*finding.Store).ReportHistory)
 		if err != nil {
 			return nil, err
-		}
-		events, err := finding.NewStore(in.DB.DB).ReportHistory(ctx, subject, product.ID, input.Reference)
-		if err != nil {
-			return nil, refusedReport(in, err, "that report's history could not be read")
 		}
 		var people, parties, issues []int64
 		for _, e := range events {
@@ -283,13 +277,10 @@ func registerReportMessages(api huma.API, in core.Deps, one string) {
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*core.ListOutput[MessageBody], error) {
 		in := core.Of(ctx, in)
-		subject, product, err := productForReports(ctx, in, input.Product)
+		_, _, rows, err := readReport(ctx, in, input.Product, input.Reference, "the correspondence could not be read",
+			(*finding.Store).Messages)
 		if err != nil {
 			return nil, err
-		}
-		rows, err := finding.NewStore(in.DB.DB).Messages(ctx, subject, product.ID, input.Reference)
-		if err != nil {
-			return nil, refusedReport(in, err, "the correspondence could not be read")
 		}
 		people := make([]int64, 0, len(rows))
 		for _, row := range rows {
@@ -354,7 +345,15 @@ func registerReportMessages(api huma.API, in core.Deps, one string) {
 		}); err != nil {
 			in.Log().ErrorContext(ctx, "could not say that a message was recorded", "error", err)
 		}
-		return &struct{ Body MessageBody }{Body: messageBody(*message, subject.Identity, "")}, nil
+		// Named as the list names it. The message is recorded, so a failure to
+		// read the name answers without it rather than as a failure.
+		name := ""
+		if who, err := core.WhoSigned(ctx, in.DB.DB, []int64{subject.ID}); err != nil {
+			in.Log().ErrorContext(ctx, "could not name who recorded a message", "error", err)
+		} else {
+			name = who.Label(subject.ID)
+		}
+		return &struct{ Body MessageBody }{Body: messageBody(*message, subject.Identity, name)}, nil
 	})
 }
 
@@ -381,13 +380,10 @@ func registerReportNotes(api huma.API, in core.Deps, one string) {
 		Reference string `path:"reference" maxLength:"593"`
 	}) (*core.ListOutput[core.WrittenBody], error) {
 		in := core.Of(ctx, in)
-		subject, product, err := productForReports(ctx, in, input.Product)
+		_, _, notes, err := readReport(ctx, in, input.Product, input.Reference, "the notes could not be read",
+			(*finding.Store).ReportNotes)
 		if err != nil {
 			return nil, err
-		}
-		notes, err := finding.NewStore(in.DB.DB).ReportNotes(ctx, subject, product.ID, input.Reference)
-		if err != nil {
-			return nil, refusedReport(in, err, "the notes could not be read")
 		}
 		rows := make([]core.Writing, 0, len(notes))
 		for _, n := range notes {
@@ -492,14 +488,13 @@ func registerReportNotes(api huma.API, in core.Deps, one string) {
 		Note      int64  `path:"note"`
 	}) (*core.ListOutput[core.WasSaidBody], error) {
 		in := core.Of(ctx, in)
-		subject, product, err := productForReports(ctx, in, input.Product)
+		_, _, rows, err := readReport(ctx, in, input.Product, input.Reference, "that note could not be read",
+			func(s *finding.Store, ctx context.Context, subject access.Subject, productID int64,
+				reference string) ([]finding.WasReportNoted, error) {
+				return s.EarlierReportNote(ctx, subject, productID, reference, input.Note)
+			})
 		if err != nil {
 			return nil, err
-		}
-		rows, err := finding.NewStore(in.DB.DB).EarlierReportNote(ctx, subject, product.ID,
-			input.Reference, input.Note)
-		if err != nil {
-			return nil, refusedReport(in, err, "that note could not be read")
 		}
 		out := &core.ListOutput[core.WasSaidBody]{}
 		out.Body.Items = make([]core.WasSaidBody, 0, len(rows))

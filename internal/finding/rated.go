@@ -215,9 +215,7 @@ func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]
 // Written as a condition on the build rather than as a join, because the
 // statements that need it are updates and no engine here spells a joined
 // update the same way.
-const inThisProduct = `"build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
-	JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
-	WHERE "st"."product_id" = ?)`
+var inThisProduct = inThisProductAs(`"build_id"`)
 
 // inThisProductAs is the same condition over a qualified column, for the reads
 // that alias the table they narrow.

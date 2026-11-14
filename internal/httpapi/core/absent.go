@@ -364,6 +364,28 @@ func Undeclared(logger *slog.Logger, err error, reading string) error {
 	return Absent(logger, err, reading, NoSuchProduct)
 }
 
+// BodyBuilds resolves the builds a request body names in a product, refusing
+// an undeclared one by naming it, as every route taking builds in its body
+// does. Asked only after the caller is authorized on the product (REQ-42).
+func BodyBuilds(ctx context.Context, in Deps, subject access.Subject, product string,
+	builds []BuildNamed) ([]int64, error) {
+
+	names := catalog.NewStore(in.DB.DB)
+	out := make([]int64, 0, len(builds))
+	for _, b := range builds {
+		at, err := names.LocateVisible(ctx, subject, product, b.BranchOrTag, b.Variant)
+		if err != nil {
+			return nil, Undeclared(in.Logger, err, "that build could not be looked up")
+		}
+		build, err := BuildRow(ctx, in, at.BranchOrTagID, at.VariantID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, build.ID)
+	}
+	return out, nil
+}
+
 // ProductNamedVisibly resolves a product this subject may know exists.
 //
 // Paired with LocatedVisibly rather than folded into it: catalog.VisibleProduct

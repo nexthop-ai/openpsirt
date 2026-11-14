@@ -277,12 +277,7 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		queue, err := analysis.CodeFindingsOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
-			input.Limit, input.Offset)
-		if err != nil {
-			return nil, core.Refused(in.Logger, err, "cannot read the code findings")
-		}
-		return queueOutput(ctx, in, queue)
+		return codeFindingsListed(ctx, in, subject, scope, input.State, input.Paging)
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -310,28 +305,46 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			What:   "code findings",
 			About:  []core.Stated{{Label: "lists", Value: listedAs(input.State, input.Assigned == finding.HeldByNobody, scope, input.Beneath)}},
 			Header: codeFindingColumns(),
-			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
-				page, err := analysis.CodeFindingPageOf(ctx, db, subject, scope, analysis.State(input.State),
-					moment, limit, offset)
-				if err != nil {
-					return nil, err
-				}
-				listed, err := codeFindingRows(ctx, db, page)
-				if err != nil {
-					return nil, err
-				}
-				rows := make([][]string, 0, len(listed))
-				for _, row := range listed {
-					rows = append(rows, codeFindingCells(row))
-				}
-				return rows, nil
-			},
+			Rows:   codeFindingFileRows(in, subject, scope, input.State),
 		}
 		name := "code findings-" + strings.ToLower(input.Product)
 		return core.Export(in, input.Format, name, out)
 	})
 
 	registerCodeFindingQueueAcross(api, in)
+}
+
+// codeFindingsListed answers one page of a code finding list.
+func codeFindingsListed(ctx context.Context, in core.Deps, subject access.Subject, scope analysis.Scope,
+	state CodeFindingState, paging core.Paging) (*CodeFindingsOutput, error) {
+	queue, err := analysis.CodeFindingsOf(ctx, in.DB.DB, subject, scope, analysis.State(state),
+		paging.Limit, paging.Offset)
+	if err != nil {
+		return nil, core.Refused(in.Logger, err, "cannot read the code findings")
+	}
+	return queueOutput(ctx, in, queue)
+}
+
+// codeFindingFileRows reads a code finding export a page at a time, as the
+// list it is a file of orders it.
+func codeFindingFileRows(in core.Deps, subject access.Subject, scope analysis.Scope,
+	state CodeFindingState) func(context.Context, bun.IDB, time.Time, int, int) ([][]string, error) {
+	return func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+		page, err := analysis.CodeFindingPageOf(ctx, db, subject, scope, analysis.State(state),
+			moment, limit, offset)
+		if err != nil {
+			return nil, err
+		}
+		listed, err := codeFindingRows(ctx, db, page)
+		if err != nil {
+			return nil, err
+		}
+		rows := make([][]string, 0, len(listed))
+		for _, row := range listed {
+			rows = append(rows, codeFindingCells(row))
+		}
+		return rows, nil
+	}
 }
 
 // queueOutput is a page of the code finding queue as the lists answer it.
@@ -395,12 +408,7 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		queue, err := analysis.CodeFindingsOf(ctx, in.DB.DB, subject, scope, analysis.State(input.State),
-			input.Limit, input.Offset)
-		if err != nil {
-			return nil, core.Refused(in.Logger, err, "cannot read the code findings")
-		}
-		return queueOutput(ctx, in, queue)
+		return codeFindingsListed(ctx, in, subject, scope, input.State, input.Paging)
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -428,22 +436,7 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 				{Label: "products", Value: "every product you read security testing work in"},
 			},
 			Header: codeFindingColumns(),
-			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
-				page, err := analysis.CodeFindingPageOf(ctx, db, subject, scope, analysis.State(input.State),
-					moment, limit, offset)
-				if err != nil {
-					return nil, err
-				}
-				listed, err := codeFindingRows(ctx, db, page)
-				if err != nil {
-					return nil, err
-				}
-				rows := make([][]string, 0, len(listed))
-				for _, row := range listed {
-					rows = append(rows, codeFindingCells(row))
-				}
-				return rows, nil
-			},
+			Rows:   codeFindingFileRows(in, subject, scope, input.State),
 		}
 		return core.Export(in, input.Format, "code findings", out)
 	})

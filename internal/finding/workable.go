@@ -95,34 +95,49 @@ func (w Workable) asks() bool {
 }
 
 // narrow applies it to a query that joins build AS tg and branch_or_tag AS st.
+func (w Workable) narrow(ctx context.Context, db bun.IDB, now time.Time,
+	q *bun.SelectQuery) (*bun.SelectQuery, error) {
+
+	past, err := w.pastEOL(ctx, db, now)
+	if err != nil {
+		return nil, err
+	}
+	return w.where(q, past), nil
+}
+
+// pastEOL is the releases past their end of life where the support narrowing
+// asks about it, and nothing where it does not.
 //
 // The end-of-life rule is the catalog's own, read as the set of releases it
 // says are past their date rather than restated as a condition here: it
 // inherits the product's date where a release has none, and two copies of that
 // disagree the first time one of them is changed.
-func (w Workable) narrow(ctx context.Context, db bun.IDB, now time.Time,
-	q *bun.SelectQuery) (*bun.SelectQuery, error) {
+func (w Workable) pastEOL(ctx context.Context, db bun.IDB, now time.Time) ([]int64, error) {
+	if len(w.Support) != 1 {
+		return nil, nil
+	}
+	return catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, now)
+}
 
+// where applies the narrowing to a query that joins build AS tg and
+// branch_or_tag AS st, given the releases pastEOL read.
+func (w Workable) where(q *bun.SelectQuery, past []int64) *bun.SelectQuery {
 	if len(w.Kinds) == 1 {
 		q = q.Where(`"st"."kind" = ?`, w.Kinds[0])
 	}
 	if len(w.Support) != 1 {
-		return q, nil
-	}
-	past, err := catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, now)
-	if err != nil {
-		return nil, err
+		return q
 	}
 	if w.Support[0] == PastEndOfLife {
 		if len(past) == 0 {
 			// Nothing is out of support, so asking for what is out of support
 			// is an empty answer rather than an unnarrowed one.
-			return q.Where("1 = 0"), nil
+			return q.Where("1 = 0")
 		}
-		return q.Where(`"st"."id" IN (?)`, bun.List(past)), nil
+		return q.Where(`"st"."id" IN (?)`, bun.List(past))
 	}
 	if len(past) > 0 {
 		q = q.Where(`"st"."id" NOT IN (?)`, bun.List(past))
 	}
-	return q, nil
+	return q
 }

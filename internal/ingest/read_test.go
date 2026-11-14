@@ -789,6 +789,12 @@ func TestAScanKeepsWhatItsDocumentCalledTheThingItIsAbout(t *testing.T) {
 		// than the producer's, and offering it would send a reader looking for
 		// a name their inventory does not carry.
 		{"a document naming nothing", anInventoryNamingNothing, ""},
+		// The published documents name the build by it, so a credential in
+		// a qualifier's address is not kept.
+		{"a root naming an address with a credential", strings.Replace(anInventoryNamingItself,
+			`"purl": "pkg:generic/sonic-broadcom.bin@1.0"}`,
+			`"purl": "pkg:generic/sonic-broadcom.bin@1.0?download_url=https://ci:SECRET@example.com/sonic.bin"}`, 1),
+			"pkg:generic/sonic-broadcom.bin@1.0?download_url=https://example.com/sonic.bin"},
 	} {
 		t.Run(one.what, func(t *testing.T) {
 			eachReader(t, func(t *testing.T, f *readerFixture) {

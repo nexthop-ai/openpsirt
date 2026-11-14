@@ -743,3 +743,95 @@ func TestAnAssignmentRulePlacesNoRecordedCodeFinding(t *testing.T) {
 		}
 	})
 }
+
+func TestASweepPlacesNothingByARuleRetiredAsItReachesIt(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(ctx, f.build, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage, access.Assigner)
+		report := f.aReport(t, who, "Recorded before any rule.")
+		where := f.team(t, "platform")
+		findings, err := f.store.AddRule(ctx, who, f.productID, where, "kernel and friends", "", "libnl-3-*")
+		if err != nil {
+			t.Fatal(err)
+		}
+		reports, err := f.store.AddReportRule(ctx, who, f.productID, where, "every report")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Each rule is retired as the sweep reaches it, after the sweep read
+		// the product's rules.
+		pending := []int64{findings.ID, reports.ID}
+		f.store.PlacingAfter(func() {
+			if len(pending) == 0 {
+				return
+			}
+			if err := f.store.RetireRule(ctx, who, f.productID, pending[0]); err != nil {
+				t.Error(err)
+			}
+			pending = pending[1:]
+		})
+		placed, _, _, err := f.store.ApplyRules(ctx, f.productID, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if placed != 0 {
+			t.Errorf("rules retired as the sweep reached them placed %d", placed)
+		}
+		for _, row := range f.open(t) {
+			if row.AssignedTo != nil {
+				t.Errorf("a finding was placed with %d by a retired rule", *row.AssignedTo)
+			}
+		}
+		row, err := f.store.ReportBy(ctx, who, f.productID, report.Reference)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row.AssignedTo != nil {
+			t.Errorf("a report was placed with %d by a retired rule", *row.AssignedTo)
+		}
+	})
+}
+
+// A code finding is one piece of work whatever component its builds name, in
+// the preview as in every work list.
+func TestARulePreviewCountsACodeFindingOnceAcrossTheComponentsItsBuildsName(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, through(libnl))
+		if _, err := f.store.Apply(ctx, f.build, f.run(t), []finding.Reported{found("CVE-2026-2", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		other := f.anotherBranch(t, "release-2.x")
+		f.shippedTo(t, other, through(libnlNew))
+		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{found("CVE-2026-2", libnlNew)}); err != nil {
+			t.Fatal(err)
+		}
+		// One code finding, seen in both builds at one occurrence, at the
+		// component each build names.
+		if _, err := f.db.DB.NewUpdate().Table("finding").
+			Set(`"kind" = ?`, "analysis").Set(`"visibility" = ?`, access.SecurityTesting).
+			Set(`"occurrence_identity" = ?`, "one-code-finding").
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`, "CVE-2026-2").
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		components, err := f.db.DB.NewSelect().Model((*finding.Finding)(nil)).
+			ColumnExpr(`DISTINCT "component_id"`).Where(`"kind" = ?`, "analysis").Count(ctx)
+		if err != nil || components != 2 {
+			t.Fatalf("the code finding names %d components (%v), want two", components, err)
+		}
+		who := f.planner(t, access.PublicTriage, access.SecurityTestingRead)
+		caught, err := f.store.WouldMatch(ctx, who, f.productID, "", "libnl-3-*", 20)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if caught.Work != 1 || caught.Unheld != 1 {
+			t.Errorf("the preview counts %d pieces, %d unheld; want the one code finding", caught.Work, caught.Unheld)
+		}
+	})
+}

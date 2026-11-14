@@ -412,6 +412,19 @@ func TestAnUnreadableModeReadsAsTheOneThatDerivesNothing(t *testing.T) {
 	}
 }
 
+func TestEveryModeReadsBackAsItself(t *testing.T) {
+	// One reading for every reader of the stored mode, so a mode added to the
+	// list is read as itself everywhere rather than as direct somewhere.
+	if len(access.Modes()) == 0 {
+		t.Fatal("no modes were found, so this checked nothing")
+	}
+	for _, mode := range access.Modes() {
+		if got := access.AsMode(string(mode)); got != mode {
+			t.Errorf("%q read back as %q", mode, got)
+		}
+	}
+}
+
 func TestAProxyCanReportMembershipToo(t *testing.T) {
 	// This extends no trust that was not already extended: anybody able to
 	// forge the group header could forge the username header and claim to be

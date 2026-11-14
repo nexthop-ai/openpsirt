@@ -5,9 +5,7 @@ package ingest
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +13,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/chunked"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -33,15 +32,6 @@ const (
 
 // Kinds is every kind of document a build sends.
 func Kinds() []Kind { return []Kind{InventoryKind, SuppressionsKind} }
-
-// chunkSize is how much of a document one row holds.
-//
-// Two engines cap how large a single statement may be, the cap is server
-// configuration rather than anything a client can discover, and the lowest
-// default in circulation is sixteen megabytes. A bounded row stays far inside
-// every default and lets a document be read as a stream rather than held
-// whole.
-const chunkSize = 512 << 10
 
 // Document is one of the files a build sent, as we hold it.
 type Document struct {
@@ -63,16 +53,6 @@ type Document struct {
 	// DiscardedAt says the contents are gone and when they went. Nil is a
 	// document still held whole.
 	DiscardedAt *time.Time `bun:"discarded_at"`
-}
-
-// chunk is a bounded piece of a document.
-type chunk struct {
-	bun.BaseModel `bun:"table:scan_document_chunk,alias:sdc"`
-
-	ID         int64  `bun:"id,pk,autoincrement"`
-	DocumentID int64  `bun:"document_id,notnull"`
-	Seq        int    `bun:"seq,notnull"`
-	Body       []byte `bun:"body,notnull"`
 }
 
 // Documents holds what a build sent, from arrival until it has been read.
@@ -103,28 +83,11 @@ func (d *Documents) Write(ctx context.Context, scanID int64, kind Kind, ordinal 
 		return nil, fmt.Errorf("record document: %w", err)
 	}
 
-	digest := sha256.New()
-	buf := make([]byte, chunkSize)
-	for seq := 0; ; seq++ {
-		n, err := io.ReadFull(r, buf)
-		if n > 0 {
-			body := buf[:n]
-			digest.Write(body)
-			doc.SizeBytes += int64(n)
-			row := &chunk{DocumentID: doc.ID, Seq: seq, Body: body}
-			if _, err := d.db.NewInsert().Model(row).Exec(ctx); err != nil {
-				return nil, fmt.Errorf("store part %d of document: %w", seq, err)
-			}
-		}
-		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-			break
-		}
-		if err != nil {
-			return nil, fmt.Errorf("read document: %w", err)
-		}
+	size, hash, err := chunked.Write(ctx, d.db, chunked.ScanParts, doc.ID, r)
+	if err != nil {
+		return nil, err
 	}
-
-	doc.ContentHash = hex.EncodeToString(digest.Sum(nil))
+	doc.SizeBytes, doc.ContentHash = size, hash
 	if _, err := d.db.NewUpdate().Model(doc).
 		Column("content_hash", "size_bytes").WherePK().Exec(ctx); err != nil {
 		return nil, fmt.Errorf("record document size and hash: %w", err)
@@ -191,12 +154,9 @@ func (d *Documents) Sent(ctx context.Context, scanIDs []int64) (map[int64][]Docu
 // A document is tens of megabytes and there is no reason to hold one in memory
 // to hand it to a reader that only ever moves forwards.
 //
-// Its parts are read one at a time and not in one snapshot, so a document let
-// go while it is read runs out of parts before its size. That ends the stream
-// with ErrReleased: ended cleanly, a reader takes the bytes it got for the
-// whole document.
+// A document let go while it is read ends with chunked.ErrReleased.
 func (d *Documents) Open(ctx context.Context, doc *Document) io.Reader {
-	return &chunkReader{ctx: ctx, db: d.db, documentID: doc.ID, size: doc.SizeBytes}
+	return chunked.Open(ctx, d.db, chunked.ScanParts, doc.ID, doc.SizeBytes)
 }
 
 // Discard lets go of a scan's contents, keeping the record of what arrived.
@@ -255,63 +215,6 @@ func (d *Documents) heldBefore(ctx context.Context, buildID, scanID int64) ([]in
 		return nil, fmt.Errorf("read which older scans still hold documents: %w", err)
 	}
 	return ids, nil
-}
-
-// ErrReleased ends a document's stream when the document was let go while it
-// was read.
-//
-// A fault rather than a refusal, and not the unexpected end of file a JSON
-// decoder reports for a file ending inside a value: the bytes that arrived
-// were whole, and stating it as a truncated file blames whoever sent them.
-var ErrReleased = errors.New("the document was let go while it was read")
-
-// chunkReader walks a document's rows in order.
-type chunkReader struct {
-	ctx        context.Context
-	db         bun.IDB
-	documentID int64
-	// size is how many bytes the document holds, and read how many have been
-	// handed over.
-	size int64
-	read int64
-	next int
-	held []byte
-	done bool
-	err  error
-}
-
-func (c *chunkReader) Read(p []byte) (int, error) {
-	for len(c.held) == 0 {
-		if c.err != nil {
-			return 0, c.err
-		}
-		if c.done {
-			return 0, io.EOF
-		}
-		var row chunk
-		err := c.db.NewSelect().Model(&row).
-			Where(`"document_id" = ?`, c.documentID).
-			Where(`"seq" = ?`, c.next).
-			Limit(1).Scan(c.ctx)
-		switch {
-		case errors.Is(err, sql.ErrNoRows) && c.read < c.size:
-			// Its parts ran out before its size: let go while it was read.
-			c.err = ErrReleased
-			return 0, c.err
-		case errors.Is(err, sql.ErrNoRows):
-			c.done = true
-			return 0, io.EOF
-		case err != nil:
-			c.err = fmt.Errorf("read part %d of document: %w", c.next, err)
-			return 0, c.err
-		}
-		c.held = row.Body
-		c.next++
-	}
-	n := copy(p, c.held)
-	c.held = c.held[n:]
-	c.read += int64(n)
-	return n, nil
 }
 
 // sameInventory says whether the inventory a scan arrived with hashed to this.
@@ -376,11 +279,7 @@ func deleteChunks(ctx context.Context, db bun.IDB, scanID int64, heldOnly bool,
 	if len(ids) == 0 {
 		return false, nil
 	}
-	if err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		_, err := db.NewDelete().Model((*chunk)(nil)).
-			Where(`"document_id" IN (?)`, bun.List(batch)).Exec(ctx)
-		return err
-	}); err != nil {
+	if err := chunked.Delete(ctx, db, chunked.ScanParts, ids); err != nil {
 		return false, fmt.Errorf("%s: %w", removing, err)
 	}
 	return true, nil
