@@ -522,8 +522,8 @@ var errSignInFault = errors.New("the sign-in key could not be read")
 // about it to whoever asked.
 //
 // Beginning and completing a sign-in are pages a browser is sent to, so the
-// answer is a page too. A fault is said apart from a refusal: trying again can
-// help with one and never with the other.
+// answer is a page too. A fault is said apart from a refusal because a fault
+// can clear on a retry.
 func wentWrongHere(w http.ResponseWriter, r *http.Request, in core.Deps, what string, err error) {
 	if in.Logger != nil {
 		in.Log().Error(what, "error", err)
