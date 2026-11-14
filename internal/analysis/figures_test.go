@@ -19,10 +19,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// figuresIn is every exported function in these Go sources that asks whether
-// a subject may count code findings: single is each one calling MayCount or a
-// scope's mayCount, across each one calling a scope's mayCount, which is the
-// form a scope across products is checked through.
+// figuresIn is every exported function in these Go sources that reads with
+// a subject: single is each one taking an access.Subject, across each of
+// those also taking a Scope, which a caller may set across products. What
+// makes a function one is its parameters, never the check it is held to, so
+// a new one that forgets the check is still found.
 func figuresIn(sources map[string][]byte) (single, across []string, err error) {
 	fset := token.NewFileSet()
 	for name, source := range sources {
@@ -32,27 +33,24 @@ func figuresIn(sources map[string][]byte) (single, across []string, err error) {
 		}
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Recv != nil || fn.Body == nil || !fn.Name.IsExported() {
+			if !ok || fn.Recv != nil || !fn.Name.IsExported() {
 				continue
 			}
-			direct, scoped := false, false
-			ast.Inspect(fn.Body, func(n ast.Node) bool {
-				call, ok := n.(*ast.CallExpr)
-				if !ok {
-					return true
-				}
-				switch callee := call.Fun.(type) {
-				case *ast.Ident:
-					direct = direct || callee.Name == "MayCount"
+			subject, scoped := false, false
+			for _, field := range fn.Type.Params.List {
+				switch typ := field.Type.(type) {
 				case *ast.SelectorExpr:
-					scoped = scoped || callee.Sel.Name == "mayCount"
+					if pkg, ok := typ.X.(*ast.Ident); ok && pkg.Name == "access" && typ.Sel.Name == "Subject" {
+						subject = true
+					}
+				case *ast.Ident:
+					scoped = scoped || typ.Name == "Scope"
 				}
-				return true
-			})
-			if direct || scoped {
+			}
+			if subject {
 				single = append(single, fn.Name.Name)
 			}
-			if scoped {
+			if subject && scoped {
 				across = append(across, fn.Name.Name)
 			}
 		}
@@ -62,7 +60,7 @@ func figuresIn(sources map[string][]byte) (single, across []string, err error) {
 	return single, across, nil
 }
 
-// figures is every figure this package's source asks MayCount of.
+// figures is every function this package's source reads with a subject.
 func figures(t *testing.T) (single, across []string) {
 	t.Helper()
 	names, err := filepath.Glob("*.go")
@@ -85,39 +83,89 @@ func figures(t *testing.T) (single, across []string) {
 		t.Fatal(err)
 	}
 	if len(single) == 0 || len(across) == 0 {
-		t.Fatal("no figure asks whether it may count, so this checked nothing")
+		t.Fatal("no function reads with a subject, so this checked nothing")
 	}
 	return single, across
 }
 
-// checkedAre fails for every figure the source holds and the test does not
-// ask, and every one the test asks that the source no longer holds.
-func checkedAre(t *testing.T, what string, found []string, asked map[string]func() error) {
+// checkedAre fails for every function the source holds that is neither asked
+// nor exempt, every one asked or exempt that the source no longer holds, and
+// every one both asked and exempt.
+func checkedAre(t interface {
+	Helper()
+	Errorf(format string, args ...any)
+}, what string, found []string, asked map[string]func() error, exempt map[string]string) {
 	t.Helper()
 	for _, name := range found {
-		if _, ok := asked[name]; !ok {
-			t.Errorf("%s asks whether it may count and is not asked here%s", name, what)
+		_, isAsked := asked[name]
+		_, isExempt := exempt[name]
+		switch {
+		case !isAsked && !isExempt:
+			t.Errorf("%s reads with a subject%s and is neither asked here nor exempt", name, what)
+		case isAsked && isExempt:
+			t.Errorf("%s is both asked here%s and exempt", name, what)
 		}
 	}
 	for name := range asked {
 		if !slices.Contains(found, name) {
-			t.Errorf("%s is asked here%s and no longer asks whether it may count", name, what)
+			t.Errorf("%s is asked here%s and no longer reads with a subject", name, what)
+		}
+	}
+	for name := range exempt {
+		if !slices.Contains(found, name) {
+			t.Errorf("%s is exempt%s and no longer reads with a subject", name, what)
 		}
 	}
 }
 
-func TestAFigureAskingWhetherItMayCountIsFound(t *testing.T) {
+func TestAFigureIsAnExportedFunctionTakingASubject(t *testing.T) {
 	single, across, err := figuresIn(map[string][]byte{"a.go": []byte(`package analysis
-func Direct(s Subject) error { return MayCount(s, 1, "x") }
-func Scoped(scope Scope, s Subject) error { return scope.mayCount(s, "x") }
-func Plain() error { return nil }
-func unexported(s Subject) error { return MayCount(s, 1, "x") }
+func Direct(s access.Subject) error { return MayCount(s, 1, "x") }
+func Forgotten(s access.Subject, id int64) error { return nil }
+func Scoped(scope Scope, s access.Subject) error { return scope.mayCount(s, "x") }
+func ScopedForgotten(s access.Subject, scope Scope) error { return nil }
+func Plain(scope Scope) error { return nil }
+func unexported(s access.Subject) error { return MayCount(s, 1, "x") }
+func (r Reader) Method(s access.Subject) error { return nil }
 `)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(single, []string{"Direct", "Scoped"}) || !slices.Equal(across, []string{"Scoped"}) {
-		t.Errorf("found %v and %v across, want [Direct Scoped] and [Scoped]", single, across)
+	if !slices.Equal(single, []string{"Direct", "Forgotten", "Scoped", "ScopedForgotten"}) ||
+		!slices.Equal(across, []string{"Scoped", "ScopedForgotten"}) {
+		t.Errorf("found %v and %v across, want [Direct Forgotten Scoped ScopedForgotten] and [Scoped ScopedForgotten]",
+			single, across)
+	}
+}
+
+// recorder counts what checkedAre reports.
+type recorder struct{ reported int }
+
+func (r *recorder) Helper() {}
+
+func (r *recorder) Errorf(string, ...any) { r.reported++ }
+
+func TestAFunctionNeitherAskedNorExemptIsReported(t *testing.T) {
+	none := func() error { return nil }
+	for _, c := range []struct {
+		what   string
+		found  []string
+		asked  map[string]func() error
+		exempt map[string]string
+		want   bool
+	}{
+		{"asked", []string{"A"}, map[string]func() error{"A": none}, nil, false},
+		{"exempt", []string{"A"}, nil, map[string]string{"A": "why"}, false},
+		{"neither", []string{"A"}, nil, nil, true},
+		{"both", []string{"A"}, map[string]func() error{"A": none}, map[string]string{"A": "why"}, true},
+		{"asked and gone", nil, map[string]func() error{"A": none}, nil, true},
+		{"exempt and gone", nil, nil, map[string]string{"A": "why"}, true},
+	} {
+		r := &recorder{}
+		checkedAre(r, "", c.found, c.asked, c.exempt)
+		if got := r.reported > 0; got != c.want {
+			t.Errorf("%s: reported=%v, want %v", c.what, got, c.want)
+		}
 	}
 }
 
@@ -183,7 +231,27 @@ func TestEverySecurityTestingFigureRefusesAReaderOfDependencyWorkAlone(t *testin
 			return err
 		},
 	}
-	checkedAre(t, "", single, asked)
+	checkedAre(t, "", single, asked, map[string]string{
+		"MayCount":              "the check itself",
+		"MayRecordAsFlaw":       "the check for recording a flaw, which asks triage",
+		"Propose":               "a flaw's proposal, behind recording a flaw",
+		"RecordAsFlaw":          "records a flaw, behind recording a flaw",
+		"UndoRecordAsFlaw":      "undoes a flaw, behind recording a flaw",
+		"IncludeInDisclosure":   "edits a flaw, behind recording a flaw",
+		"ExcludeFromDisclosure": "edits a flaw, behind recording a flaw",
+		"Answerable":            "one code finding, behind its reach",
+		"KinOf":                 "one code finding's kin, behind code finding visibility",
+		"Unanswered":            "one code finding's group, behind code finding visibility",
+		"EvidenceOf":            "one code finding's evidence, behind its reach",
+		"OriginOf":              "one flaw's origin, behind code finding visibility",
+		"ProposeRule":           "a suppression rule, behind triage of security testing",
+		"ApproveRule":           "a suppression rule, behind approval and reading security testing",
+		"RetireRule":            "a suppression rule, behind triage of security testing",
+		"SuppressionRules":      "the suppression rules, behind reading security testing",
+		"CodeFindingsOf":        "the queue's list, behind code finding visibility",
+		"CodeFindingPageOf":     "the queue's list, behind code finding visibility",
+		"OpenCodeFindingsOf":    "the queue's list, behind code finding visibility",
+	})
 	for name, figure := range asked {
 		if err := refusedOrReached(figure); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("%s answered %v to a reader of dependency work alone; want a refusal", name, err)
@@ -231,8 +299,30 @@ func TestEverySecurityTestingFigureAcrossProductsRefusesAProductNotReadAtSecurit
 			_, err := CoverageOf(t.Context(), nil, reader, scope, now, now, now)
 			return err
 		},
+		// A figure of one product counts no scope across products.
+		"TimeToFix": func() error {
+			_, err := TimeToFix(t.Context(), nil, reader, scope, now, now)
+			return err
+		},
+		"PrecisionOf": func() error {
+			_, err := PrecisionOf(t.Context(), nil, reader, scope)
+			return err
+		},
+		"ByRelease": func() error {
+			_, err := ByRelease(t.Context(), nil, reader, scope, 1)
+			return err
+		},
+		"CountsOfComponent": func() error {
+			_, err := CountsOfComponent(t.Context(), nil, reader, scope)
+			return err
+		},
 	}
-	checkedAre(t, " across products", across, asked)
+	checkedAre(t, " across products", across, asked, map[string]string{
+		"CodeFindingsOf": "the queue keeps the products read at security testing; " +
+			"TestTheQueueAcrossProductsKeepsOnlyProductsReadAtSecurityTesting",
+		"CodeFindingPageOf":  "the queue, as CodeFindingsOf",
+		"OpenCodeFindingsOf": "the queue, as CodeFindingsOf",
+	})
 	for name, figure := range asked {
 		if err := refusedOrReached(figure); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("%s across products answered %v with a product read for dependency work alone; want a refusal", name, err)
