@@ -40,6 +40,7 @@ is a copy.
 | An empty directory is not written | It would have to state when it was last updated |
 | A store of its own | Every file is public, and every attachment is authorized first (REQ-70) |
 | The store is a type of the writing package, and a test checks nothing in the application reaches that package | Handed the storage beneath, a handler could serve the files |
+| The program composing the server holds the store only to carry it from where it is opened to the writer, which a test reads from the program's source | The program imports the writing package to build the writer, so the import check cannot list it |
 | The address is required, `https`, refused at startup otherwise | Every self address is built from it, and the standard requires `https` |
 
 ## The files
@@ -55,7 +56,7 @@ is a copy.
 
 | Rule | Reason |
 |---|---|
-| The supplier reader follows this directory, which a test checks, reading only the fields it uses | A misshaped unused field leaves the listing readable |
+| The supplier reader follows this directory, reading only the fields it uses; a test walks its shape from the provider metadata and the feed into every struct beneath, against the written shape | A misshaped unused field leaves the listing readable |
 | A document's stated address and its path come from one rule: the tracking identifier names it, the initial release date folders it | |
 | A hash file sits beside each document and nothing else | The feed names it in the document's entry |
 | The description and the feed are built by the rule the served surface (`design-docs/publishing.md`) builds its own by; only the addresses, the files beside each document and the keys differ | One deployment describes itself one way |

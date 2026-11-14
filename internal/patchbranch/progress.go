@@ -218,7 +218,7 @@ func Progress(ctx context.Context, db bun.IDB, excluded outward.Excluded) ([]Rep
 			}
 		case Failed:
 			if one.FetchedAt != nil {
-				retry := one.FetchedAt.Add(RetryAfter).UTC()
+				retry := one.FetchedAt.Add(retryAfter).UTC()
 				one.RetryAt = &retry
 			}
 		}

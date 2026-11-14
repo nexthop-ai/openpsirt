@@ -18,6 +18,9 @@ SHELL       := /usr/bin/env bash
 -include local.mk
 
 GO           ?= go
+# Exported so a program or test that runs the go command itself, such as the
+# test-lane division and its test, runs the same toolchain as the recipe.
+export GO
 # The engines the suite runs against. Set in local.mk or in the environment;
 # exported so they reach the test process either way, since a make variable is
 # not an environment variable and the suite reads the environment.

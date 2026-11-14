@@ -47,6 +47,7 @@ writes their URLs to the git-ignored `local.mk`, which the makefile includes.
 | Each data directory is in memory under a cap: 1 GB PostgreSQL, 3 GB MySQL and MariaDB, 256 MB the floor server | Past it a write fails as a full disk on that server; unbounded, the four grow into the memory the tests run in. Two weeks of a workstation's runs left 349 MB, 1.6 GB, 1.6 GB and 47 MB, and the caps leave a 16 GB runner over 8 GB |
 | One server is below the supported version floor | The old-server refusal is exercised |
 | The URLs are read when make starts | The run writing `local.mk` is not the run using it |
+| A harness session on MySQL or MariaDB waits 60 seconds for a metadata lock, unless its URL sets `lock_wait_timeout` | The servers default to a year on MySQL and a day on MariaDB, so a server wedged on a lock it never grants hangs every statement needing it to the test binary's timeout; bounded, the waiting statement fails and is named |
 
 `design-docs/build-measurements.md` § Server processor time has the timings.
 
@@ -81,7 +82,7 @@ need, such as an identifier or a secret shown once.
 | Engine | The seed runs | A later test gets |
 |---|---|---|
 | SQLite | Once per binary, into the template | A copy of the template |
-| The three servers | Once per binary, in its first test, after emptying | The rows the seed wrote, read back after it ran. What the test before changed is undone, in one transaction (§ Undoing a test) |
+| The three servers | Once per binary, in its first test, after emptying | The rows the seed wrote, read back after it ran. What the test before changed is undone, in one transaction (§ Reset between tests) |
 
 | Rule | Reason |
 |---|---|
@@ -114,7 +115,7 @@ other test.
 | The API authorization tests | Their products and people are the matrix |
 | A migration test | It seeds the older schema it migrates from |
 
-### Undoing a test
+### Reset between tests
 
 A later test on a server starts by undoing what the test before it did to the
 kept rows, in one transaction. Emptying the seeded tables costs most of a start
@@ -236,7 +237,7 @@ the detector's cost is in-process work. The detector is per binary, so
 | Rule | Reason |
 |---|---|
 | The server run takes only the packages whose test binaries reach `database/sql`; the race run takes every package | A binary holding no SQL connects to no engine, so the server run repeats it without the detector: 3.2 s and 10.8 s of processor time on a cold build cache |
-| A program reads the division from `go list -test`, never a list | Its tests report a package importing a database package that the server run lacks, a listed package outside the module, a recipe handing either run the other's list, and a listing that examined nothing or picked nothing |
+| A program reads the division from `go list -test`, never a list. It and its test run the go command `GO` names, which make exports | A listing by another toolchain is one the recipe never sees. Its tests report a package importing a database package that the server run lacks, a listed package outside the module, a recipe handing either run the other's list, and a listing that examined nothing or picked nothing |
 | The two runs go at once on half the cores each | One is in-process, the other waits on sockets: 100 s and 1.5 GB against 119 s and 3.4 GB in sequence |
 | Each run labels its lines as it prints | Held, a slow run looks stopped; unlabeled, nobody knows which failed |
 | Each run ends on a line giving when it finished and how long after the start | CI reads it to measure the cores one run leaves idle |

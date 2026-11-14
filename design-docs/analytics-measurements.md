@@ -4,14 +4,14 @@ Benchmark runs behind the analytics rules.
 
 ## Contents
 
-- [Grouping before the join](#grouping-before-the-join)
+- [Early grouping](#early-grouping)
 - [Planned upgrades page cost](#planned-upgrades-page-cost)
 - [Trend beneath a replaced version](#trend-beneath-a-replaced-version)
 - [Daily trend](#daily-trend)
 - [Burndown and component groups](#burndown-and-component-groups)
 - [Export snapshots](#export-snapshots)
 
-## Grouping before the join
+## Early grouping
 
 The rule is in `design-docs/analytics.md` § Computed on demand. Measured on
 367,577 open occurrences, PostgreSQL on one CPU, across 1 ms and 100 Mbit:

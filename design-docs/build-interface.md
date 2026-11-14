@@ -55,6 +55,7 @@ Satisfies REQ-75.
 | A class this project defines that Tailwind also defines | Tailwind, imported wholesale, emits a utility for any recognized name, and wins for the properties it sets: `class="col fixed"` takes `position: fixed`. Every class the stylesheet defines is put to Tailwind's compiler, so a new utility is caught |
 | A rule that styles nothing | Matched against the whole source, since `col ${kind}` builds a modifier; it reports a name mentioned nowhere. Charting library names and the `language-` prefix are excluded |
 | A class on an element nothing styles | A label with no fill is invisible on a dark canvas. Names Tailwind emits are excluded by asking its compiler |
+| A rule nested inside another rule | Refused, wherever in its parent it sits: the reader takes innermost blocks, so the outer rule would go unread by every check here. A rule inside an at-rule's block is read |
 | A modifier whose bare rule draws a box | A modifier such as `.state.warn` whose own rule sets display, margin, padding, border or background, longhands included, styles every element carrying it, so a table chip draws as a callout. A web test reads every stylesheet |
 
 ## Whole-interface checks
@@ -63,7 +64,8 @@ Satisfies REQ-75.
 |---|---|
 | An export nothing else names | Fails, the interface's half of `make unreachable`; a test counts as a caller |
 | An address no route answers, or one built outside the route module | Fails, and every query parameter the route table lists is held to a read on its screen. A Go test holds server links to the same table. `design-docs/interface.md` § The route table |
-| An invalidation whose key no read's key starts with | Fails: the cache matches by prefix, so it refreshes nothing. Compared as far as each key is literal |
+| An invalidation whose key no read's key starts with | Fails: the cache matches by prefix, so it refreshes nothing. Compared as far as each key is literal; a key opening on a name is read through the constant or the literal list the name is bound to, one key per word |
+| An invalidation or read whose key opens on something unreadable | Fails: an invalidation nobody can check passes unseen, and such a read would reach every invalidation |
 
 ## Limits
 
@@ -73,3 +75,4 @@ Satisfies REQ-75.
 | A name that is also a Tailwind utility passes the collision and unstyled checks | Both ask the same compiler |
 | The unused-export check matches names, never imports | A name that is an ordinary word elsewhere passes |
 | A bare `eslint-disable` switches off the reason rule with the rest | A disable naming no rule switches every rule off, and the reason rule is one of them |
+| The route-parameter check reads names, never types | A `.get`, `.has` or `.getAll` on any value sharing a query-parameter name in the same file counts as reading the parameter, and so does one on a property of a name any file sets from the query parameters |

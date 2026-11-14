@@ -130,21 +130,21 @@ tools (REQ-75). The Go package pattern is `go list` minus `node_modules`, never
 | `make openapi-current` | The committed API document against the code |
 | `make sbom` | This project's CycloneDX inventory |
 | `make web-check` | Interface install, type check, formatting, linters, tests with coverage, class-name checks, generated client against the API document. Refuses without npm |
-| `make unreachable` | Exported code nothing reaches. Functions, types, constants and variables by package and name through imports; methods by name alone. A test counts as a caller |
+| `make unreachable` | Exported code nothing reaches. Functions, types, constants and variables by package and name through imports; methods by name alone, and by a call alone where a struct field shares the name. A declaration naming itself is not a use: a type named by its own methods or fields, a recursive call. A test counts as a caller; the database library's query hook methods count as called |
 | `make negatives` | A 404 built from or detailed with an error's text, in any spelling the parsed Go allows: the error's method, a value named like an error, or a name bound earlier in the declaration |
-| `make granted` | A function reaching one grant table reaches the other, through the table name, a model's struct tag, a type built from the model, or a package-level name's value. Exempt functions are named with reasons; an exemption matching nothing fails |
-| `make narrowed` | A build resolved for a case-only participant is read with a subject or refused first. Bound resolutions and values derived from them are followed; inline uses are not |
-| `make subjected` | An exported store method or package function under `internal/` that queries without a subject, unless exempt with a reason. A store is a type with a method building a query or calling a function of its package that does; programs and test harnesses, packages importing testing that no program under `cmd/` links, are not read; a tree with no program is refused. Queries are followed within the package by name; another package's are not seen |
+| `make granted` | A function reaching one grant table reaches the other, through the table name, a model's struct tag, a type built from the model, a package-level name's value, another package's exported constant or variable, or a call to an exempt reader listing half of what somebody holds. Exempt functions are named by file, receiver and name, with reasons; an exemption matching nothing fails. A reader is followed into its callers by the name called, whatever the receiver |
+| `make narrowed` | A build resolved for a case-only participant is read with a subject or refused first. A refusal covers the resolutions its question names, directly or through a value derived from one; a value built from two resolutions is covered once both are refused. Bound resolutions and values derived from them are followed; inline uses are not |
+| `make subjected` | An exported store method or package function under `internal/` that queries without a subject, unless exempt with a reason. An exemption naming one that no longer queries without a subject fails, and so does a run examining none. A store is a type with a method building a query or calling a function of its package that does; programs and test harnesses, packages importing testing that no program under `cmd/` links, are not read; a tree with no program is refused. Queries are followed within the package by name; another package's are not seen |
 | `make attached` | A doc comment describing a different declaration |
-| `make confined` | Engine-specific code outside its two allowed places |
-| `make readable` | Source files a text tool will not read |
-| `make unclaimed` | Every requirement named by a design document |
+| `make confined` | Engine-specific code outside the paths `design-docs/database.md` § Engine-specific code allows |
+| `make readable` | Source files a text tool will not read. Every file git does not ignore is read, except a named binary kind, `vendor/`, and the directories every walk skips, so a new text kind is read from its first commit and build output is not |
+| `make unclaimed` | Every requirement named by a design document. A range names every number in it, matched by number whatever width it is written at |
 | `make vendored` | Copied files accounted for. See `design-docs/build-dependencies.md` § Copied files |
 | `make spdx` | License headers; `make spdx-fix` writes missing ones. See `design-docs/build-dependencies.md` § License headers |
 | `make pins-check` | Versions pinned in two files agree |
 | `make go-version` | The image's Go release, which every workflow installs |
 | `make check` | Everything above except `make build`. Needs npm |
-| `make check-engines` | All four engines ran as claimed, and the reserved-word list matches them |
+| `make check-engines` | All four engines ran as claimed, and the reserved-word list matches them. Which engines each test must have reached is read from the application's enumeration of engines, never a list in the makefile |
 | `make reserved-words` | Rewrites the asked half of the reserved-word list from the engines |
 | `make weakness-names` | Rewrites weakness names and primary parents from the catalog. In no gate, since the catalog is unpinned |
 | `make cppcheck-weaknesses` | Rewrites cppcheck's check-to-weakness table from `cppcheck --errorlist`. In no gate; `CPPCHECK` names the binary |
@@ -172,7 +172,7 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | the interface's manifest, lockfile or source | `licenses` too |
 | the interface's route table | the Go tier too, since a Go test holds server links to it |
 | Go reaching no SQL | `lint`, `vet-other-os`, `unreachable`, `readable`, `negatives`, `confined`, `granted`, `narrowed`, `subjected`, `attached`, `vendored`, `spdx`, `pins-check`, `sbom-shape`, `secrets`, `test` |
-| a query, the schema, a migration, or the shared test harness | `reserved`, `test-all`, `check-engines` |
+| a query, the schema, a migration, the shared test harness, or Go importing `database/sql`, the query builder or the harness | `reserved`, `test-all`, `check-engines` |
 | Go the API document is generated from: the registering package, or a field with a description | `openapi-current`, `web-api` |
 | `go.mod` or `go.sum` | `govulncheck`, `licenses`, `sbom`, and the engines tier |
 | a tool's module under `tools/` | the whole gate |
@@ -184,6 +184,8 @@ run for a prose edit teaches people to skip it (REQ-75). Tiers accumulate.
 | A program chooses the tier | |
 | An unclassified path takes the whole gate | The makefile, container, chart, assets and fixtures |
 | A Go file is classified by its whole content | An edit anywhere in a file of queries can move a query |
+| SQL keywords match in upper case alone | In lower case they are Go's `select`, `strings.Join` and prose |
+| Importing `database/sql`, the query builder or the harness takes the engines tier | A builder predicate holds no keyword, and a test of a query in another file holds no SQL |
 | A file takes every tier it lands in | |
 | Every tier reachable alone scans for secrets | A pushed credential is in the remote's history |
 | Every target `check` runs is in some narrow tier, held by a test, the checks it runs beside the tests included; a target one of them depends on is made inside it | |
@@ -263,6 +265,7 @@ directory and reads the interface.
 | The count is of what the caller kept, never what it was shown | |
 | Every gate prints how much it read | |
 | A skipped directory is matched by name at any depth | Nested dependency directories are covered |
+| A gate reading what is committed, the license-header and copied-file gates, lists the tree through the same reader: what git tracks, less the skipped directories. `make readable` lists it through the same reader with untracked files git does not ignore added | One place decides what the tree is |
 | A change to the reader takes the whole gate | It decides what every check reads |
 
 ## Static analysis

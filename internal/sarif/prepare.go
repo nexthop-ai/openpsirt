@@ -235,13 +235,6 @@ func (pl *Placer) Place(run *Run, root string) []Placed {
 	return out
 }
 
-// Prepare places one run's results on their own, and says what it left out.
-func Prepare(run *Run, root string) ([]Placed, Dropped) {
-	pl := NewPlacer(nil)
-	placed := pl.Place(run, root)
-	return placed, pl.Dropped()
-}
-
 // web is whether an address is a web address, as a web scanner places a
 // result at the page it requested.
 func web(uri string) bool {

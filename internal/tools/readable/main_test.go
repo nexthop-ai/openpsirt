@@ -3,11 +3,17 @@
 
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+)
 
 // A byte that makes a text tool skip a file is invisible in review and breaks
-// whoever greps for the line beside it. This gate had no test, and an exit
-// code cannot tell a check that found nothing from one that looked at nothing.
+// whoever greps for the line beside it, and an exit code cannot tell a check
+// that found nothing from one that looked at nothing.
 
 func TestWhatCountsAsAnUnreadableByte(t *testing.T) {
 	for _, c := range []struct {
@@ -40,44 +46,107 @@ func TestWhatCountsAsAnUnreadableByte(t *testing.T) {
 }
 
 func TestWhichFilesAreReadAsText(t *testing.T) {
-	// By extension, because sniffing the content is the thing that was fooled.
-	// Both directions: a source file that stopped being read is a file this
-	// gate no longer looks at, and a binary that started being read is a gate
-	// that fails on every build output.
+	// Everything but a named binary kind. Both directions: a text file left
+	// unread is a file this gate no longer looks at, and a binary read is a
+	// gate that fails on every build output.
 	for _, c := range []struct {
 		path string
 		want bool
 	}{
 		{"internal/access/store.go", true},
 		{"web/src/app/App.tsx", true},
-		{"web/scripts/tokens.mjs", true},
-		{"web/src/styles/tokens.css", true},
 		{"design-docs/access.md", true},
-		{"deploy/helm/openpsirt/values.yaml", true},
-		{"go.mod", true},
-		{"go.sum", true},
 		{"Makefile", true},
 		{"Dockerfile", true},
-		{"Makefile.demo", true},
-		{"mk/gates.mk", true},
-		{"deploy/helm/openpsirt/templates/_helpers.tpl", true},
-		{"docs/hooks/release.py", true},
-		{"docs/requirements.in", true},
-		{"assets/logo.svg", true},
-		{".gitignore", true},
-		{"web/.prettierignore", true},
-		{".dockerignore", true},
-		{"Makefiles", false},
-		{"internal/access/STORE.GO", true},
-		{"web/public/logo.png", false},
-		{"dist/openpsirt", false},
-		{"assets/font.woff2", false},
 		{"LICENSE", true},
-		{"NOTICE", true},
-		{"LICENSES", false},
+		{"internal/sarif/testdata/run.sarif", true},
+		{"internal/sbom/testdata/image.cdx.xml", true},
+		{"internal/tools/clangcheckers/testdata/leak.c", true},
+		{"internal/tools/clangcheckers/testdata/leak.h", true},
+		{"internal/uploadclient/testdata/app.plist", true},
+		{".gitattributes", true},
+		{"web/.prettierignore", true},
+		{"a kind nobody has written yet.new", true},
+		{"web/public/logo.png", false},
+		{"assets/font.woff2", false},
+		{"internal/cverecord/testdata/records.json.xz", false},
+		{"ASSETS/LOGO.PNG", false},
 	} {
-		if got := text(c.path); got != c.want {
+		if got := !binary(c.path); got != c.want {
 			t.Errorf("%s read as text = %v, want %v", c.path, got, c.want)
 		}
 	}
+}
+
+// commandsIn is the name "go build" gives each command under the directories
+// given, which is the directory holding a file of package main.
+func commandsIn(dirs ...string) ([]string, error) {
+	var names []string
+	for _, dir := range dirs {
+		sources, err := filepath.Glob(filepath.Join(dir, "*", "*.go"))
+		if err != nil {
+			return nil, err
+		}
+		for _, source := range sources {
+			body, err := os.ReadFile(source) //nolint:gosec // the repository's own source
+			if err != nil {
+				return nil, err
+			}
+			name := filepath.Base(filepath.Dir(source))
+			if strings.Contains(string(body), "\npackage main\n") && !slices.Contains(names, name) {
+				names = append(names, name)
+			}
+		}
+	}
+	return names, nil
+}
+
+// Every file git does not ignore is read, so a command built at the root of
+// the checkout is read too unless the ignore list names it.
+func TestEveryCommandBuiltAtTheRootIsIgnored(t *testing.T) {
+	root := filepath.Join("..", "..", "..")
+	names, err := commandsIn(filepath.Join(root, "cmd"), filepath.Join(root, "internal", "tools"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) == 0 {
+		t.Fatal("no command was found, so this checked nothing")
+	}
+	ignore, err := os.ReadFile(filepath.Join(root, ".gitignore")) //nolint:gosec // the repository's own ignore list
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := builtIn(string(ignore))
+	if len(listed) == 0 {
+		t.Fatal(".gitignore lists no build output, so this checked nothing")
+	}
+	for _, name := range names {
+		if !slices.Contains(listed, name) {
+			t.Errorf("%s is built at the root as %s, which .gitignore does not name, so make readable reads it", name, name)
+		}
+	}
+	for _, name := range listed {
+		if !slices.Contains(names, name) {
+			t.Errorf(".gitignore lists %s as build output, and no command is built under that name", name)
+		}
+	}
+}
+
+// builtIn is the names the ignore list's build-output block holds: the run
+// of root paths after its heading and the comment beneath it.
+func builtIn(ignore string) []string {
+	var names []string
+	in := false
+	for _, line := range strings.Split(ignore, "\n") {
+		switch {
+		case line == "# Build output":
+			in = true
+		case !in || strings.HasPrefix(line, "#"):
+		case strings.HasPrefix(line, "/"):
+			names = append(names, strings.TrimPrefix(line, "/"))
+		default:
+			in = false
+		}
+	}
+	return names
 }

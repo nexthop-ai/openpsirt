@@ -87,14 +87,15 @@ type index struct {
 // redundant reports whether a wider index answers every lookup a narrower one
 // does and leaves nothing it enforces unenforced.
 //
-// A narrower index that refuses duplicates enforces something a wider one that
-// does not cannot, so dropping it loses a rule rather than a cost. A partial
+// A narrower index that refuses duplicates enforces something only a unique
+// index on the same columns also enforces: uniqueness of (a, b) admits two rows
+// sharing a. Dropping it for any other loses a rule rather than a cost. A partial
 // index holds only some rows, so neither of a pair answers for the other.
 func redundant(narrow, wide index) bool {
 	if narrow.partial || wide.partial {
 		return false
 	}
-	if narrow.unique && !wide.unique {
+	if narrow.unique && (!wide.unique || len(wide.columns) != len(narrow.columns)) {
 		return false
 	}
 	return leads(narrow.columns, wide.columns)
@@ -169,7 +170,8 @@ func TestAnIndexIsRedundantOnlyWhereNothingItEnforcesIsLost(t *testing.T) {
 		redundant    bool
 	}{
 		{"a plain prefix", index{columns: ab[:1]}, index{columns: ab}, true},
-		{"a unique prefix of a unique index", index{columns: ab[:1], unique: true}, index{columns: ab, unique: true}, true},
+		{"a unique prefix of a unique index", index{columns: ab[:1], unique: true}, index{columns: ab, unique: true}, false},
+		{"a unique index repeating a unique one", index{columns: ab, unique: true}, index{columns: ab, unique: true}, true},
 		{"a unique prefix of a plain index", index{columns: ab[:1], unique: true}, index{columns: ab}, false},
 		{"a plain index repeating a unique one", index{columns: ab}, index{columns: ab, unique: true}, true},
 		{"a partial prefix", index{columns: ab[:1], partial: true}, index{columns: ab}, false},

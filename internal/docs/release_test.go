@@ -45,9 +45,8 @@ var notReleases = map[string][]string{
 }
 
 // releaseLiterals returns every version-shaped literal in a page that is not
-// exempt from naming a release.
-func releaseLiterals(name, text string) []string {
-	var found []string
+// among exempt, and the exemptions that matched one.
+func releaseLiterals(name, text string, exempt []string) (found, exempted []string) {
 	inNote := false
 	for line := range strings.SplitSeq(text, "\n") {
 		if name == "docs/configuration.md" {
@@ -74,13 +73,37 @@ func releaseLiterals(name, text string) []string {
 				}
 			}
 			literal := line[at[0]:at[1]]
-			if slices.Contains(notReleases[name], literal) {
+			if slices.Contains(exempt, literal) {
+				if !slices.Contains(exempted, literal) {
+					exempted = append(exempted, literal)
+				}
 				continue
 			}
 			found = append(found, literal)
 		}
 	}
-	return found
+	return found, exempted
+}
+
+// staleExemptions is every exemption that names a page no longer published,
+// or a literal its page no longer shows.
+func staleExemptions(pages map[string]string, exempt map[string][]string) []string {
+	var stale []string
+	for name, literals := range exempt {
+		text, ok := pages[name]
+		if !ok {
+			stale = append(stale, name+" has exemptions and is not a published page")
+			continue
+		}
+		_, matched := releaseLiterals(name, text, literals)
+		for _, literal := range literals {
+			if !slices.Contains(matched, literal) {
+				stale = append(stale, name+" is exempt for "+literal+", which it no longer shows")
+			}
+		}
+	}
+	slices.Sort(stale)
+	return stale
 }
 
 func isDigit(b byte) bool  { return b >= '0' && b <= '9' }
@@ -132,15 +155,32 @@ func TestPublishedPagesNameNoReleaseByHand(t *testing.T) {
 		t.Fatal("no page under docs/ was found, so this checked nothing")
 	}
 	for name, text := range pages {
-		for _, literal := range releaseLiterals(name, text) {
+		found, _ := releaseLiterals(name, text, notReleases[name])
+		for _, literal := range found {
 			t.Errorf("%s names %s by hand: write {{ release }} for the release a reader deploys, "+
 				"or say what holds without naming one", name, literal)
 		}
 	}
-	for name := range notReleases {
-		if _, ok := pages[name]; !ok {
-			t.Errorf("%s has exemptions and is not a published page", name)
-		}
+	for _, stale := range staleExemptions(pages, notReleases) {
+		t.Error(stale)
+	}
+}
+
+func TestAReleaseExemptionNoPageUsesIsReported(t *testing.T) {
+	pages := map[string]string{"docs/a.md": "curl 8.4.0 in an example"}
+	stale := staleExemptions(pages, map[string][]string{
+		"docs/a.md":    {"8.4.0", "1.3.1"},
+		"docs/gone.md": {"2.0.0"},
+	})
+	want := []string{
+		"docs/a.md is exempt for 1.3.1, which it no longer shows",
+		"docs/gone.md has exemptions and is not a published page",
+	}
+	if !slices.Equal(stale, want) {
+		t.Errorf("reported %q, want %q", stale, want)
+	}
+	if stale := staleExemptions(pages, map[string][]string{"docs/a.md": {"8.4.0"}}); len(stale) != 0 {
+		t.Errorf("an exemption its page uses was reported: %q", stale)
 	}
 }
 
@@ -267,7 +307,7 @@ func TestReleaseLiteralsAreToldFromWhatIsNotARelease(t *testing.T) {
 		{"docs/index.md", "curl 8.4.0 in an example", "8.4.0"},
 	}
 	for _, c := range reported {
-		if got := releaseLiterals(c.name, c.text); !slices.Equal(got, []string{c.want}) {
+		if got, _ := releaseLiterals(c.name, c.text, notReleases[c.name]); !slices.Equal(got, []string{c.want}) {
 			t.Errorf("%s %q: reported %q, want [%s]", c.name, c.text, got, c.want)
 		}
 	}
@@ -282,7 +322,7 @@ func TestReleaseLiteralsAreToldFromWhatIsNotARelease(t *testing.T) {
 		{"README.md", "CycloneDX 1.7 and SPDX 2.3, below 1.0"},
 	}
 	for _, c := range exempt {
-		if got := releaseLiterals(c.name, c.text); len(got) != 0 {
+		if got, _ := releaseLiterals(c.name, c.text, notReleases[c.name]); len(got) != 0 {
 			t.Errorf("%s %q: reported %q, which is not a release named by hand", c.name, c.text, got)
 		}
 	}

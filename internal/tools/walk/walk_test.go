@@ -5,6 +5,7 @@ package walk
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -185,5 +186,45 @@ func TestAPathCarriesNoLeadingDotSlash(t *testing.T) {
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestATrackedListingKeepsEachFileOnceOutsideSkippedDirectories(t *testing.T) {
+	listed := []byte("go.mod\x00internal/webui/dist/.gitkeep\x00web/node_modules/x/a.js\x00internal/dist.go\x00\x00" +
+		"nested/\x00internal/dist.go\x00")
+	got := trackedIn(listed, Skipped())
+	if want := []string{"go.mod", "internal/dist.go"}; !slices.Equal(got, want) {
+		t.Errorf("tracked %v, want %v", got, want)
+	}
+}
+
+func TestATrackedListingOfNothingRefuses(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if out, err := exec.Command("git", "init", "-q").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	if _, err := Tracked(); err == nil {
+		t.Error("a checkout tracking nothing read as one with nothing wrong")
+	}
+}
+
+func TestAnUnignoredListingHoldsANewFileAndNotBuildOutput(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, step := range [][]string{{"init", "-q"}} {
+		if out, err := exec.Command("git", step...).CombinedOutput(); err != nil { //nolint:gosec // G204: a step this test names
+			t.Fatalf("git %v: %v\n%s", step, err, out)
+		}
+	}
+	for name, body := range map[string]string{".gitignore": "/tool\n", "new.go": "package p\n", "tool": "\x7fELF"} {
+		if err := os.WriteFile(name, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := Unignored()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{".gitignore", "new.go"}; !slices.Equal(got, want) {
+		t.Errorf("listed %v, want %v: a file not yet added, and no ignored build output", got, want)
 	}
 }

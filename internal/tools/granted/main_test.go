@@ -4,28 +4,30 @@
 package main
 
 import (
-	"go/parser"
-	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
-const accessPath = "github.com/nexthop-ai/openpsirt/internal/access"
+const module = "github.com/nexthop-ai/openpsirt"
 
-// accessModels is the types the access package declares, read from its source
-// the way the walk reads them, so the models are found by their tags.
-func accessModels(t *testing.T) models {
+const accessPath = module + "/internal/access"
+
+// accessSources is the access package's source, tests aside, by its path from
+// the repository root, so the models are found by their tags the way the
+// program finds them.
+func accessSources(t *testing.T) map[string][]byte {
 	t.Helper()
 	source := os.DirFS(filepath.Join("..", "..", "access"))
 	paths, err := fs.Glob(source, "*.go")
 	if err != nil || len(paths) == 0 {
 		t.Fatalf("the access package's source was not found: %v", err)
 	}
-	types := map[string]reach{}
+	sources := map[string][]byte{}
 	for _, path := range paths {
 		if strings.HasSuffix(path, "_test.go") {
 			continue
@@ -34,19 +36,40 @@ func accessModels(t *testing.T) models {
 		if err != nil {
 			t.Fatal(err)
 		}
-		file, err := parser.ParseFile(token.NewFileSet(), path, text, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		types = merged(types, typesIn(file, scope{}))
+		sources[filepath.Join("internal", "access", path)] = text
 	}
-	return models{accessPath: types}
+	return sources
+}
+
+// judged is what the gate reports in the files given, beside the access
+// package's own source, keyed by path and name, the way the program judges the
+// tree. The access package's own exemptions are left out of the answer.
+func judged(t *testing.T, files map[string]string) map[string]string {
+	t.Helper()
+	sources := accessSources(t)
+	for path, src := range files {
+		sources[path] = []byte(src)
+	}
+	found, err := check(module, sources, halves)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for key := range found {
+		if _, exempt := inside[key]; exempt {
+			delete(found, key)
+		}
+	}
+	return found
 }
 
 // The two models are found from their struct tags rather than from a list of
 // their names.
 func TestTheAccessModelsAreFoundByTheirTags(t *testing.T) {
-	types := accessModels(t)[accessPath]
+	known, err := learn(module, accessSources(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	types := known.types[accessPath]
 	if r := types["Grant"]; !r.perProduct || r.estate {
 		t.Errorf("Grant reaches %+v, want the per-product table alone", r)
 	}
@@ -218,6 +241,47 @@ func TestReachingOneGrantTableAndNotTheOther(t *testing.T) {
 			map[string]string{},
 		},
 		{
+			// A reader listing one table is half of what somebody holds, and a
+			// caller deciding from that half alone answers no for somebody
+			// holding the role across the estate.
+			"a call to the per-product reader alone",
+			`package p
+			func f() { held, _ := store.Grants(ctx, id); _ = held }`,
+			map[string]string{"f": "role_grant_all"},
+		},
+		{
+			"a call to each half",
+			`package p
+			func f() {
+				held, _ := store.Grants(ctx, id)
+				estate, _ := store.EstateGrants(ctx, id)
+				_, _ = held, estate
+			}`,
+			map[string]string{},
+		},
+		{
+			"a call to the estate-wide list alone",
+			`package p
+			func f() { everywhere, _ := store.EveryEstateGrant(ctx); _ = everywhere }`,
+			map[string]string{"f": "role_grant"},
+		},
+		{
+			// Recording one row decides nothing about what somebody holds.
+			"a call to a writer of one table",
+			`package p
+			func f() { _ = store.GrantRole(ctx, person, product, role) }`,
+			map[string]string{},
+		},
+		{
+			// Two methods of one name are two functions, so neither is
+			// answered for by the other.
+			"two methods of one name on different types",
+			`package p
+			func (s *Store) Withdraw() { q.Join("role_grant").Join("role_grant_all") }
+			func (t *Team) Withdraw() { q.Join("role_grant") }`,
+			map[string]string{"Team.Withdraw": "role_grant_all"},
+		},
+		{
 			// A field of the same name on something else is not the model.
 			"a field that shares the model's name",
 			`package p
@@ -225,12 +289,106 @@ func TestReachingOneGrantTableAndNotTheOther(t *testing.T) {
 			map[string]string{},
 		},
 	} {
-		got, err := oneAlone("x.go", []byte(c.src), nil, accessModels(t), nil)
-		if err != nil {
-			t.Fatalf("%s: %v", c.what, err)
+		got := map[string]string{}
+		for key, table := range judged(t, map[string]string{"internal/p/x.go": c.src}) {
+			got[strings.TrimPrefix(key, "internal/p/x.go:")] = table
 		}
 		if !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s: reported %v, want %v", c.what, got, c.want)
+		}
+	}
+}
+
+// What another package declares is learned from that package and followed into
+// the one importing it: a type built from a model there, and a constant naming
+// a table there. A twin asking both tables is not reported, and a file where a
+// table may be named alone is not judged.
+func TestWhatAnotherPackageDeclaresIsFollowed(t *testing.T) {
+	got := judged(t, map[string]string{
+		"internal/x/row.go": `package x
+			import "github.com/nexthop-ai/openpsirt/internal/access"
+			type Row struct {
+				access.Grant ` + "`bun:\",extend\"`" + `
+				Name string
+			}`,
+		"internal/tables/tables.go": `package tables
+			const PerProduct = "role_grant"`,
+		"internal/y/q.go": `package y
+			import (
+				"github.com/nexthop-ai/openpsirt/internal/access"
+				"github.com/nexthop-ai/openpsirt/internal/tables"
+				"github.com/nexthop-ai/openpsirt/internal/x"
+			)
+			func alone() { var rows []x.Row; db.NewSelect().Model(&rows).Scan(ctx) }
+			func both() {
+				var rows []x.Row
+				db.NewSelect().Model(&rows).Scan(ctx)
+				db.NewSelect().Model((*access.EstateGrant)(nil)).Scan(ctx)
+			}
+			func named() { q.Join("? AS rg", bun.Ident(tables.PerProduct)) }
+			func namedBoth() { q.Join("? AS rg", bun.Ident(tables.PerProduct)).Join("role_grant_all") }`,
+		// A chain across packages, read in no particular order, is followed
+		// to its end.
+		"internal/c1/c.go": `package c1
+			import "github.com/nexthop-ai/openpsirt/internal/x"
+			type Row struct{ x.Row }`,
+		"internal/c2/c.go": `package c2
+			import "github.com/nexthop-ai/openpsirt/internal/c1"
+			type Row = c1.Row`,
+		"internal/c3/c.go": `package c3
+			import "github.com/nexthop-ai/openpsirt/internal/c2"
+			type Row struct{ *c2.Row }`,
+		"internal/c4/c.go": `package c4
+			import "github.com/nexthop-ai/openpsirt/internal/c3"
+			type Row = c3.Row`,
+		"internal/c5/c.go": `package c5
+			import "github.com/nexthop-ai/openpsirt/internal/c4"
+			type Row struct{ c4.Row }
+			func far() { var rows []Row; db.NewSelect().Model(&rows).Scan(ctx) }`,
+		"internal/y/q_test.go": `package y
+			func TestRow() { q.Join("role_grant") }`,
+		"internal/dbtest/clean.go": `package dbtest
+			func f() { q.Join("role_grant") }`,
+	})
+	want := map[string]string{
+		"internal/c5/c.go:far":                 "role_grant_all",
+		"internal/tables/tables.go:PerProduct": "role_grant_all",
+		"internal/y/q.go:alone":                "role_grant_all",
+		"internal/y/q.go:named":                "role_grant_all",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("reported %v, want %v", got, want)
+	}
+}
+
+// A reader passes what it reaches to its callers, and a caller that is itself
+// such a reader passes on what it reached through its calls. Reading both
+// halves through the exempt readers is reaching both tables.
+func TestAReaderCallingBothHalvesReachesBoth(t *testing.T) {
+	got := judged(t, map[string]string{
+		"internal/p/x.go": `package p
+			func everybody() { people, held, _ := store.People(ctx); _, _ = people, held }
+			func reaching() {
+				people, held, _ := store.People(ctx)
+				everywhere, _ := store.EveryEstateGrant(ctx)
+				_, _, _ = people, held, everywhere
+			}`,
+	})
+	want := map[string]string{"internal/p/x.go:everybody": "role_grant_all"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("reported %v, want %v", got, want)
+	}
+}
+
+// A half is an exemption, since only a reader the gate otherwise reports is
+// one whose reach callers take on.
+func TestEveryHalfIsAnExemption(t *testing.T) {
+	if len(halves) == 0 {
+		t.Fatal("no reader is a half, so no call is followed")
+	}
+	for _, key := range halves {
+		if _, exempt := inside[key]; !exempt {
+			t.Errorf("%s is a half and not an exemption", key)
 		}
 	}
 }
@@ -259,5 +417,32 @@ func TestEveryExemptionSaysWhy(t *testing.T) {
 		if why == "" {
 			t.Errorf("%s is exempt and says nothing about why", key)
 		}
+	}
+}
+
+// Two readers calling each other each take on what the other reaches, and the
+// repetition settles on one answer.
+func TestReadersCallingEachOtherSettle(t *testing.T) {
+	sources := accessSources(t)
+	sources["internal/q/q.go"] = []byte(`package q
+		func a() { db.NewSelect().Join("role_grant"); s.b() }
+		func b() { db.NewSelect().Join("role_grant_all"); s.a() }`)
+	done := make(chan map[string]string, 1)
+	go func() {
+		found, err := check(module, sources, []string{"internal/q/q.go:a", "internal/q/q.go:b"})
+		if err != nil {
+			t.Error(err)
+		}
+		done <- found
+	}()
+	select {
+	case found := <-done:
+		for _, key := range []string{"internal/q/q.go:a", "internal/q/q.go:b"} {
+			if table, reported := found[key]; reported {
+				t.Errorf("%s reported as reaching %s alone, though it calls the other half", key, table)
+			}
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the readers' reach never settled")
 	}
 }

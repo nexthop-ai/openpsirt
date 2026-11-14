@@ -731,7 +731,7 @@ func TestACopyLargerThanTheCacheIsNotKeptAndWaitsADay(t *testing.T) {
 		if visited, err := pass.Once(ctx); err != nil || visited != "" {
 			t.Errorf("a repository that just failed was visited again: %q, %v", visited, err)
 		}
-		pass.Now = func() time.Time { return time.Now().Add(patchbranch.RetryAfter + time.Minute) }
+		pass.At(func() time.Time { return time.Now().Add(patchbranch.RetryAfter + time.Minute) })
 		if visited, err := pass.Once(ctx); err != nil || visited != repositoryOf("project") {
 			t.Errorf("a day later it was not tried again: %q, %v", visited, err)
 		}
@@ -806,7 +806,7 @@ func TestAVisitStoppedPartwayLeavesAnEarlierFailureStanding(t *testing.T) {
 				stop()
 				return made.dir
 			})
-		retry.Now = func() time.Time { return time.Now().Add(patchbranch.RetryAfter + time.Minute) }
+		retry.At(func() time.Time { return time.Now().Add(patchbranch.RetryAfter + time.Minute) })
 		if visited, err := retry.Once(ctx); err != nil || visited == "" {
 			t.Fatalf("the retry did not begin: %q, %v", visited, err)
 		}

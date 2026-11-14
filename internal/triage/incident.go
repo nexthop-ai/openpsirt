@@ -236,7 +236,7 @@ func (s *Store) RecordIncident(ctx context.Context, subject access.Subject,
 			return fmt.Errorf("record that this product was exploited: %w", err)
 		}
 		if err := within.noteIncident(ctx, tx, subject, productID, vulnerabilityID,
-			nil, trail.Said(recorded.KnownAt.Format(time.RFC3339), true)); err != nil {
+			nil, trail.Said(recorded.KnownAt.UTC().Format(time.RFC3339), true)); err != nil {
 			return err
 		}
 		if undone, err = within.unsayWhatARecordContradicts(ctx, subject, productID,

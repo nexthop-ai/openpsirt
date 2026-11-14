@@ -97,7 +97,7 @@ func TestClangOutputIsReadWithItsRulesAndPath(t *testing.T) {
 
 func TestAnAbsolutePathIsPlacedOnlyUnderTheStatedRoot(t *testing.T) {
 	log := readFile(t, "clang18-a.sarif")
-	placed, dropped := Prepare(&log.Runs[0], "/home/builder/sonic")
+	placed, dropped := prepare(&log.Runs[0], "/home/builder/sonic")
 	if dropped.Outside != 0 || len(placed) != 3 {
 		t.Fatalf("placed %d, dropped %+v", len(placed), dropped)
 	}
@@ -110,12 +110,12 @@ func TestAnAbsolutePathIsPlacedOnlyUnderTheStatedRoot(t *testing.T) {
 	}
 
 	// With no root, the build host's own layout is never kept.
-	placed, dropped = Prepare(&log.Runs[0], "")
+	placed, dropped = prepare(&log.Runs[0], "")
 	if len(placed) != 0 || dropped.Outside != 3 {
 		t.Errorf("placed %d with no root, dropped %+v", len(placed), dropped)
 	}
 	// Nor under a root the paths are not beneath.
-	placed, _ = Prepare(&log.Runs[0], "/home/builder/other")
+	placed, _ = prepare(&log.Runs[0], "/home/builder/other")
 	if len(placed) != 0 {
 		t.Errorf("placed %d under another root", len(placed))
 	}
@@ -125,7 +125,7 @@ func TestAHeaderResultRepeatedPerUnitIsKeptOnce(t *testing.T) {
 	a, b := readFile(t, "clang18-a.sarif"), readFile(t, "clang18-b.sarif")
 	merged := a.Runs[0]
 	merged.Results = append(append([]Result{}, a.Runs[0].Results...), b.Runs[0].Results...)
-	placed, dropped := Prepare(&merged, "/home/builder/sonic")
+	placed, dropped := prepare(&merged, "/home/builder/sonic")
 	if dropped.Repeats != 1 {
 		t.Errorf("collapsed %d; want the header's one repeat", dropped.Repeats)
 	}
@@ -146,7 +146,7 @@ func TestCppcheckRelativePathsAreRelativeToTheRoot(t *testing.T) {
 	if r.Tool.Name != "Cppcheck" || r.Tool.Version != "2.22.0" {
 		t.Errorf("tool %q %q", r.Tool.Name, r.Tool.Version)
 	}
-	placed, dropped := Prepare(&r, "")
+	placed, dropped := prepare(&r, "")
 	if len(placed) != 4 || dropped != (Dropped{}) {
 		t.Fatalf("placed %d, dropped %+v", len(placed), dropped)
 	}
@@ -286,7 +286,7 @@ func TestAddressesResolveThroughTheirStartingPoints(t *testing.T) {
 		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"y.c","uriBaseId":"UNDEFINED"}}}]},
 		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"https://example.com/z.c"}}}]}]`)
 	r := read(t, doc).Runs[0]
-	placed, dropped := Prepare(&r, "")
+	placed, dropped := prepare(&r, "")
 	if dropped.Outside != 2 || dropped.Web != 1 {
 		t.Errorf("dropped %+v; want the escape and the undefined name outside, and the web address", dropped)
 	}
@@ -307,7 +307,11 @@ func TestAddressesResolveThroughTheirStartingPoints(t *testing.T) {
 			t.Errorf("result %d at %q in module %d; want %q in %d", i, placed[i].Path, placed[i].Module, w.path, w.module)
 			continue
 		}
-		if got := paths.Within(placed[i].Module, placed[i].Path); got != w.within {
+		got := placed[i].Path
+		if module, ok := paths.ModulePath(placed[i].Module); ok && module != "" {
+			got = strings.TrimPrefix(got, module+"/")
+		}
+		if got != w.within {
 			t.Errorf("result %d is %q within its repository; want %q", i, got, w.within)
 		}
 	}
@@ -318,7 +322,7 @@ func TestAWindowsPathIsPlacedLikeAnyOther(t *testing.T) {
 		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"file:///C:/build/sonic/src/a.c"}}}]},
 		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"c:\\build\\sonic\\src\\b.c"}}}]},
 		{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src\\c.c"}}}]}]`)).Runs[0]
-	placed, dropped := Prepare(&r, `C:\build\sonic`)
+	placed, dropped := prepare(&r, `C:\build\sonic`)
 	if dropped.Outside != 0 || len(placed) != 3 {
 		t.Fatalf("placed %d, dropped %+v", len(placed), dropped)
 	}
@@ -344,7 +348,7 @@ func TestAnAdvisoryIdentifierAsARuleIsADependencyFinding(t *testing.T) {
 		}
 	}
 	r := read(t, run(`,"results":[{"ruleId":"CVE-2024-3094","locations":[{"physicalLocation":{"artifactLocation":{"uri":"a.c"}}}]}]`)).Runs[0]
-	if placed, dropped := Prepare(&r, ""); len(placed) != 0 || dropped.Advisory != 1 {
+	if placed, dropped := prepare(&r, ""); len(placed) != 0 || dropped.Advisory != 1 {
 		t.Errorf("placed %d, dropped %+v", len(placed), dropped)
 	}
 }
@@ -432,7 +436,7 @@ func TestSourceIsKeptOnlyUnderAPathItIsKeptFor(t *testing.T) {
 	if pl.Snippets() != 2 {
 		t.Errorf("%d discarded; want the private and the outside location's", pl.Snippets())
 	}
-	if placed, _ := Prepare(&r, ""); placed[0].Snippet != "" {
+	if placed, _ := prepare(&r, ""); placed[0].Snippet != "" {
 		t.Errorf("a placer keeping nothing kept %q", placed[0].Snippet)
 	}
 }
@@ -492,7 +496,7 @@ func TestTheFunctionAndCallDepthTheClientWritesAreKept(t *testing.T) {
 			{"nestingLevel":0,"location":{"physicalLocation":{"artifactLocation":{"uri":"a.c"},"region":{"startLine":5}}}},
 			{"nestingLevel":1,"location":{"physicalLocation":{"artifactLocation":{"uri":"/elsewhere/b.c"},"region":{"startLine":9}}}}]}]}]}]`)
 	r := read(t, doc).Runs[0]
-	placed, _ := Prepare(&r, "")
+	placed, _ := prepare(&r, "")
 	if len(placed) != 1 {
 		t.Fatalf("placed %d; an undefined root's name is relative to the root", len(placed))
 	}
@@ -611,7 +615,7 @@ func TestAResultReportingNoProblemIsLeftOut(t *testing.T) {
 		{"ruleId":"i","suppressions":[{"status":"underReview"},{"status":"accepted"}],`+at+`},
 		{"ruleId":"j","baselineState":"absent",`+at+`},
 		{"ruleId":"k","baselineState":"unchanged",`+at+`}]`)).Runs[0]
-	placed, dropped := Prepare(&r, "")
+	placed, dropped := prepare(&r, "")
 	var kept []string
 	for _, p := range placed {
 		kept = append(kept, p.RuleID)
@@ -628,7 +632,7 @@ func TestAFailureSignalOutsideTheCheckoutIsStillAFailure(t *testing.T) {
 	r := read(t, run(`,"results":[
 		{"ruleId":"clang-diagnostic-error","locations":[{"physicalLocation":{"artifactLocation":{"uri":"file:///tmp/build/gen.h"}}}]},
 		{"ruleId":"syntaxError"}]`)).Runs[0]
-	placed, dropped := Prepare(&r, "/src")
+	placed, dropped := prepare(&r, "/src")
 	if len(placed) != 0 || dropped != (Dropped{Failure: 2}) {
 		t.Errorf("placed %d, dropped %+v", len(placed), dropped)
 	}
@@ -679,7 +683,7 @@ func TestClangTidyOutputIsReadWithNoFingerprintAndNoFunction(t *testing.T) {
 	if len(res.Fingerprints) != 0 || res.Locations[0].Function != "" || len(res.Steps) != 0 {
 		t.Errorf("fingerprints %v, function %q, %d steps", res.Fingerprints, res.Locations[0].Function, len(res.Steps))
 	}
-	placed, dropped := Prepare(&log.Runs[0], "/var/tmp/testing-dir/assignment")
+	placed, dropped := prepare(&log.Runs[0], "/var/tmp/testing-dir/assignment")
 	if len(placed) != 1 || dropped.Outside != 0 || placed[0].Path != "src/main.cpp" {
 		t.Errorf("placed %+v, dropped %+v", placed, dropped)
 	}
@@ -703,7 +707,7 @@ func TestCodeQLOutputIsReadWithItsRuleSetFingerprintsAndCoverage(t *testing.T) {
 	if inv.Successful == nil || !*inv.Successful || inv.Expected != 13 || inv.Extracted != 13 || inv.Signals() != 0 {
 		t.Errorf("invocation %+v, %d signals", inv, inv.Signals())
 	}
-	placed, dropped := Prepare(&log.Runs[0], "/src")
+	placed, dropped := prepare(&log.Runs[0], "/src")
 	if len(placed) != 22 || dropped.Outside != 0 {
 		t.Errorf("placed %d, dropped %+v", len(placed), dropped)
 	}
@@ -754,7 +758,7 @@ func TestARelativeAddressIsRelativeToWhereTheToolRan(t *testing.T) {
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			log := read(t, run(results+c.invocations))
-			placed, _ := Prepare(&log.Runs[0], "/home/builder/sonic")
+			placed, _ := prepare(&log.Runs[0], "/home/builder/sonic")
 			if len(placed) != 2 || placed[0].Path != c.first || placed[1].Path != "b.c" {
 				t.Errorf("placed %+v; want %s, then b.c under the root's own name", placed, c.first)
 			}
@@ -829,4 +833,11 @@ func TestTheBoundsLeftUnsetFollowTheUploadsBound(t *testing.T) {
 		t.Errorf("a document bound of 1 MiB left the upload as sent at %d and one document as sent at %d; want 1 GiB and 1 MiB",
 			part.MaxCompressed, part.MaxPartCompressed)
 	}
+}
+
+// prepare places one run's results on their own, and says what it left out.
+func prepare(run *Run, root string) ([]Placed, Dropped) {
+	pl := NewPlacer(nil)
+	placed := pl.Place(run, root)
+	return placed, pl.Dropped()
 }

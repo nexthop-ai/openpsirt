@@ -131,4 +131,52 @@ describe("an invalidation whose key is a name", () => {
       [],
     );
   });
+
+  it("is reported per word of a literal list its key's first element loops over", () => {
+    const list = `const handedBack = ["kept", "gone"];`;
+    const loop = `for (const key of handedBack) q.invalidateQueries({ queryKey: [key] });`;
+    expect(found(`useQuery({ queryKey: ["kept", id], queryFn });`, `${list} ${loop}`)).toEqual([
+      ["gone"],
+    ]);
+    expect(
+      found(
+        `useQuery({ queryKey: ["kept", id], queryFn }); useQuery({ queryKey: ["gone"], queryFn });`,
+        `for (const key of ["kept", "gone"]) q.invalidateQueries({ queryKey: [key, "x"] });`,
+      ),
+    ).toEqual([["gone", "x"]]);
+  });
+
+  it("is resolved through a constant its key's first element names", () => {
+    const write = `const word = "kept"; q.invalidateQueries({ queryKey: [word] });`;
+    expect(found(`useQuery({ queryKey: ["kept"], queryFn });`, write)).toEqual([]);
+  });
+
+  it("is reported as unread where its key's first element is bound to nothing literal", () => {
+    expect(
+      found(
+        `useQuery({ queryKey: ["kept"], queryFn });`,
+        `for (const key of keys) q.invalidateQueries({ queryKey: [key] });`,
+      ),
+    ).toEqual([null]);
+  });
+});
+
+describe("a read whose key opens on a name", () => {
+  it("is reported as unread where the name is bound to nothing literal", () => {
+    expect(
+      found(
+        `useQuery({ queryKey: [kind, id], queryFn });`,
+        `q.invalidateQueries({ queryKey: ["gone"] });`,
+      ),
+    ).toEqual([null, ["gone"]]);
+  });
+
+  it("is read through a constant the name is bound to", () => {
+    expect(
+      found(
+        `const kind = "kept"; useQuery({ queryKey: [kind, id], queryFn });`,
+        `q.invalidateQueries({ queryKey: ["kept"] });`,
+      ),
+    ).toEqual([]);
+  });
 });

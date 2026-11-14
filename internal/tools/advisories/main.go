@@ -38,6 +38,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -327,13 +328,17 @@ func npmFindings(data []byte, locked map[string]string) ([]advisory, error) {
 				Name     string `json:"name"`
 				Title    string `json:"title"`
 				URL      string `json:"url"`
+				Source   int64  `json:"source"`
 				Severity string `json:"severity"`
 			}
 			// A string names the package beneath that carries the advisory.
 			if json.Unmarshal(raw, &via) != nil || via.Name != name {
 				continue
 			}
-			id := via.URL[strings.LastIndex(via.URL, "/")+1:]
+			id, err := npmID(via.URL, via.Source)
+			if err != nil {
+				return nil, fmt.Errorf("npm's advisory against %s: %w", name, err)
+			}
 			for _, place := range vuln.Nodes {
 				found = append(found, advisory{
 					ID: id, Name: name, Where: place, Version: locked[place],
@@ -343,6 +348,20 @@ func npmFindings(data []byte, locked map[string]string) ([]advisory, error) {
 		}
 	}
 	return found, nil
+}
+
+// npmID names an npm advisory by the tail of its address, or by npm's own
+// number where it has none. An advisory named by neither is refused, because
+// every such advisory against one package would share one empty name and the
+// base's would hide a new one.
+func npmID(address string, source int64) (string, error) {
+	if id := address[strings.LastIndex(address, "/")+1:]; id != "" {
+		return id, nil
+	}
+	if source != 0 {
+		return fmt.Sprintf("npm-%d", source), nil
+	}
+	return "", errors.New("it has neither an address nor a number, so nothing tells it from another")
 }
 
 // npmAffectedBefore reports whether the base's audit named the same advisory
@@ -477,8 +496,14 @@ func checkGo(root string, command []string, commit string) ([]advisory, func(adv
 	if err != nil {
 		return nil, nil, err
 	}
+	// A Dockerfile whose release this cannot read is refused: go.mod's floor
+	// in its place would judge a toolchain moved back past a fix as already
+	// affected. Only a standard-library finding asks it.
 	if image := imageGo(dockerfile); image != "" {
 		held[stdlib] = image
+	} else if len(dockerfile) > 0 && slices.ContainsFunc(found.found,
+		func(a advisory) bool { return a.Name == stdlib }) {
+		return nil, nil, fmt.Errorf("the Dockerfile at %s names no golang release this reads", commit)
 	}
 	return found.found, goAffectedBefore(found, held), nil
 }

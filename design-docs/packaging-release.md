@@ -56,7 +56,9 @@ after, the root has ten and every module sits under its binary.
 | A component is identified by its package identifier minus the per-scan package identity, other qualifiers in a fixed order | A module two binaries link is one component with two parents. Other qualifiers, such as an architecture, name which package it is |
 | Each input is named once, and every placement names an input | A file read twice doubles everything; a placement naming an unread file is refused |
 | Everything else a producer recorded passes untouched: licenses, hashes, location properties | Composing rewrites references and adds one edge |
-| A part can be placed inside a component another part describes | The interface sits inside the server; a component no input describes is refused |
+| Two inputs describing one component are merged: licenses, hashes and references by value, properties by name and value | A catalog writes every CPE it guessed under one property name, so a name repeats with a value each, and each value either producer gave is kept |
+| A property each input gives exactly one, differing, value is kept from the first and the second recorded as an `openpsirt:compose:disagreement:` property | Neither producer is preferred, and a reader sees they disagree |
+| A part can be placed inside a component another part describes | The interface sits inside the server; a component no input describes is refused. The component a part sits inside hangs from the image even when that part described it first, never from itself |
 | The root can be one part's own root | The binary's inventory stays rooted at its application |
 | The generator is pinned by version and checksum | |
 | The demo uploads both files as the `binary` and `container` variants of this deployment | An evaluator sees written against shipped |

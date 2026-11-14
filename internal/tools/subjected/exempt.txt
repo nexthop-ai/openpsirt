@@ -1,6 +1,6 @@
 # Store methods and functions that query with no subject, each with the reason it
 # takes none. One per line: package.Type.Method or package.Function, the package
-# named by its directory under internal/, a space, and the reason.
+# named by its directory under internal/, spaces or tabs, and the reason.
 # design-docs/access-enforcement.md § Store methods with no subject holds the
 # kinds of reason there are.
 
@@ -215,7 +215,6 @@ graph.Store.DeclaredScopes A helper over a narrowed read: the finding detail rea
 graph.Store.Moved A background pass: the inventory watch reads what one scan changed before deciding who hears of it.
 graph.Store.Movements A helper over a narrowed read: the trend works out the uploads behind returns it read with the reader's subject, and the inventory watch reaches it through Moved.
 graph.Store.Stated A background pass: applying a scan matches the build's claims against what the build states for its components.
-graph.Within Not varying by reader: a walk of one build's graph, built as a subquery its caller narrows.
 graph.WithinAnd Not varying by reader: a walk of one build's graph with named components beside it, built as a subquery the finding reads narrow with a subject.
 graph.WithinAny Not varying by reader: a walk of one build's graph, built as a subquery that the finding reads narrow with a subject.
 ingest.Documents.Discard A background pass: the ingest reader lets a scan's contents go once it has read them.
@@ -258,7 +257,6 @@ notify.Watch.DataInForce Not varying by reader: what the scans run against and w
 notify.Watch.Once A background pass: the watch derives every condition for the people it reaches and reconciles each.
 notify.Watch.Run A background pass: the watch derives standing conditions on a schedule.
 patchbranch.Labels Not varying by reader: what is known of commits named by links on findings the caller already read with a subject.
-patchbranch.Pass.Once A background pass: one visit of the patch branch pass.
 patchbranch.Pass.Run A background pass: the patch branch pass looks up the commits patch links name, on a schedule.
 patchbranch.Progress Not varying by reader: how far the patch branch lookups have got, for a screen only an administrator reaches.
 publish.AnyPublishedForBranchOrTag Not varying by reader: whether any served document names a release. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
@@ -327,7 +325,6 @@ triage.LapseCodeFindings A background pass: an analyzer run lapses the decisions
 triage.Restamp A helper over a narrowed read: it moves the stamp of a decision the caller's write already authorized, inside its transaction.
 triage.Store.AgreedSince A background pass: the health report counts agreements for the deployment.
 triage.Store.Applying Not varying by reader: whether a decision stands at a place. Its route resolves the place for the caller first.
-triage.Store.DeferredSoFar A helper over a narrowed read: the second-person rule asks it of a place the write already authorized.
 triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds dismissals standing with nobody agreeing.
 triage.Store.Lapse A background pass: it lapses decisions whose versions moved.
 triage.Store.LapseRatedWorse A background pass: it lapses claims whose issue was rated worse.

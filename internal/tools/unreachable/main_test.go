@@ -6,6 +6,7 @@ package main
 import (
 	"go/parser"
 	"go/token"
+	"reflect"
 	"sort"
 	"testing"
 )
@@ -38,6 +39,8 @@ func TestTheNamesTheRuntimeCallsAreNotOrphans(t *testing.T) {
 		{"Len", true},
 		{"Less", true},
 		{"Swap", true},
+		{"BeforeQuery", true},
+		{"AfterQuery", true},
 
 		// And the other direction, which is the half that matters: an
 		// exemption that grew to cover ordinary names would make the gate
@@ -129,8 +132,7 @@ func TestAnOrphanIsReportedAndReadingNothingIsRefused(t *testing.T) {
 func orphansIn(t *testing.T, sources map[string]string) []decl {
 	t.Helper()
 	fset := token.NewFileSet()
-	var declared []decl
-	seen := newCounts()
+	walked := newTally()
 	paths := make([]string, 0, len(sources))
 	for path := range sources {
 		paths = append(paths, path)
@@ -141,14 +143,123 @@ func orphansIn(t *testing.T, sources map[string]string) []decl {
 		if err != nil {
 			t.Fatalf("%s: %v", path, err)
 		}
-		declared = append(declared, declaredIn(fset, path, file)...)
-		seen.add(path, file)
+		walked.read(fset, path, file)
 	}
-	got, err := orphansOf(declared, seen)
+	got, err := orphansOf(walked.declared, walked.seen)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return got
+}
+
+// namesOf is the names of what was reported, in order.
+func namesOf(found []decl) []string {
+	var names []string
+	for _, d := range found {
+		names = append(names, d.name)
+	}
+	return names
+}
+
+// A declaration naming itself is not a use of it: a type's own methods and
+// fields, a function calling itself, and a method calling
+// itself on its receiver. Each is reported where nothing else names it, and
+// not where something does.
+func TestADeclarationNamingItselfIsNotAUse(t *testing.T) {
+	for _, c := range []struct {
+		what   string
+		source string
+		caller string
+		want   []string
+	}{
+		{
+			"a type named only by its methods' receivers",
+			"package b\n\ntype Dead struct{}\n\nfunc (d *Dead) do() {}\n",
+			"",
+			[]string{"Dead"},
+		},
+		{
+			"a type named only by its own methods' signatures and bodies",
+			"package b\n\ntype Dead struct{}\n\nfunc (d *Dead) clone() *Dead { return &Dead{} }\n",
+			"",
+			[]string{"Dead"},
+		},
+		{
+			"a type named by its receivers and by a caller",
+			"package b\n\ntype Live struct{}\n\nfunc (d *Live) do() {}\n",
+			"var x b.Live",
+			nil,
+		},
+		{
+			"a type naming itself in a field",
+			"package b\n\ntype Node struct{ next *Node }\n",
+			"",
+			[]string{"Node"},
+		},
+		{
+			"a function that only calls itself",
+			"package b\n\nfunc Spin(n int) {\n\tif n > 0 {\n\t\tSpin(n - 1)\n\t}\n}\n",
+			"",
+			[]string{"Spin"},
+		},
+		{
+			"a function calling itself and called from outside",
+			"package b\n\nfunc Spin(n int) {\n\tif n > 0 {\n\t\tSpin(n - 1)\n\t}\n}\n",
+			"func init() { b.Spin(1) }",
+			nil,
+		},
+		{
+			"a method that only calls itself on its receiver",
+			"package b\n\ntype T struct{}\n\nvar V T\n\nfunc (t T) Loop() { t.Loop() }\n",
+			"var _ = b.V",
+			[]string{"Loop"},
+		},
+	} {
+		sources := map[string]string{"internal/b/b.go": c.source}
+		if c.caller != "" {
+			sources["internal/c/c.go"] = "package c\n\nimport \"" + module + "/internal/b\"\n\n" + c.caller + "\n"
+		}
+		if got := namesOf(orphansIn(t, sources)); !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: reported %v, want %v", c.what, got, c.want)
+		}
+	}
+}
+
+// A method is matched by name, so a struct field of the same name would stand
+// in for it. Where a field shares the name, only a call counts; a struct
+// literal's key and a field's declaration never do.
+func TestAFieldSharingAMethodsNameDoesNotHideIt(t *testing.T) {
+	for _, c := range []struct {
+		what   string
+		caller string
+		want   []string
+	}{
+		{"a read of the field alone", "func use(w b.Waiting, _ b.Store) int { return w.Sum }", []string{"Sum"}},
+		{"a call of the method", "func use(_ b.Waiting, s b.Store) int { return s.Sum() }", nil},
+		{"a struct literal keyed by the name", "var _, _ = b.Waiting{Sum: 1}, b.Store{}", []string{"Sum"}},
+	} {
+		got := namesOf(orphansIn(t, map[string]string{
+			"internal/b/b.go": "package b\n\ntype Waiting struct{ Sum int }\n\ntype Store struct{}\n\n" +
+				"func (s Store) Sum() int { return 0 }\n",
+			"internal/c/c.go": "package c\n\nimport \"" + module + "/internal/b\"\n\n" + c.caller + "\n",
+		}))
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: reported %v, want %v", c.what, got, c.want)
+		}
+	}
+}
+
+// A method declared on two types is still a method nothing calls: the second
+// declaration is not a use of the first.
+func TestAMethodDeclaredTwiceIsNotItsOwnCaller(t *testing.T) {
+	got := namesOf(orphansIn(t, map[string]string{
+		"internal/b/b.go": "package b\n\ntype A struct{}\n\ntype B struct{}\n\nvar X, Y = A{}, B{}\n\n" +
+			"func (A) Find() {}\n\nfunc (B) Find() {}\n",
+		"internal/c/c.go": "package c\n\nimport \"" + module + "/internal/b\"\n\nvar _, _ = b.X, b.Y\n",
+	}))
+	if !reflect.DeepEqual(got, []string{"Find", "Find"}) {
+		t.Errorf("reported %v, want both declarations of the method nothing calls", got)
+	}
 }
 
 func TestANameAnotherPackageSharesDoesNotHideAnOrphan(t *testing.T) {

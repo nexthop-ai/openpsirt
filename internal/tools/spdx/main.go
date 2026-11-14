@@ -16,15 +16,14 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
 
 	"github.com/nexthop-ai/openpsirt/internal/tools/provenance"
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
 // owner is who holds the copyright in what this project wrote.
@@ -182,26 +181,33 @@ func stamped(content []byte, s style, license string) []byte {
 	return []byte(strings.Join(out, "\n"))
 }
 
-func main() {
-	fix := flag.Bool("fix", false, "write the header into every file missing one")
-	flag.Parse()
-
-	listed, err := exec.Command("git", "ls-files", "-z").Output()
+// isRegular reports whether path is a regular file itself, never what a
+// symbolic link at it points to.
+func isRegular(path string) (bool, error) {
+	info, err := os.Lstat(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "spdx: listing the tree:", err)
-		os.Exit(2)
+		return false, err
 	}
-	var faults []string
-	examined, written := 0, 0
-	for _, each := range bytes.Split(listed, []byte{0}) {
-		file := string(each)
-		if file == "" {
-			continue
-		}
+	return info.Mode().IsRegular(), nil
+}
+
+// check reads every covered regular file of files, reporting each whose
+// header is wrong or missing and, with fix, writing one into a file missing
+// it.
+func check(files []string, fix bool) (faults []string, examined, written int) {
+	for _, file := range files {
 		if !covered(file) {
 			continue
 		}
-		content, err := os.ReadFile(file) //nolint:gosec // G304: a path git lists in this checkout
+		// A tracked symbolic link is followed by a read and a write alike,
+		// to wherever it points, which may be outside the checkout.
+		if regular, err := isRegular(file); err != nil {
+			faults = append(faults, fmt.Sprintf("%s: %v", file, err))
+			continue
+		} else if !regular {
+			continue
+		}
+		content, err := os.ReadFile(file) //nolint:gosec // G304: a regular file git lists in this checkout
 		if err != nil {
 			faults = append(faults, fmt.Sprintf("%s: %v", file, err))
 			continue
@@ -212,10 +218,10 @@ func main() {
 		wrong, missing := fault(content, s, license)
 		switch {
 		case wrong == "":
-		case missing && *fix:
+		case missing && fix:
 			// The file exists, so its mode is kept; the one given here applies
 			// only to a file being created.
-			//nolint:gosec // G703: a path git lists in this checkout, read just above
+			//nolint:gosec // G703: a regular file git lists in this checkout, read just above
 			if err := os.WriteFile(file, stamped(content, s, license), 0o600); err != nil {
 				faults = append(faults, fmt.Sprintf("%s: %v", file, err))
 				continue
@@ -228,6 +234,19 @@ func main() {
 	if examined == 0 {
 		faults = append(faults, "no source file was found, so this checked nothing")
 	}
+	return faults, examined, written
+}
+
+func main() {
+	fix := flag.Bool("fix", false, "write the header into every file missing one")
+	flag.Parse()
+
+	tracked, err := walk.Tracked()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "spdx:", err)
+		os.Exit(2)
+	}
+	faults, examined, written := check(tracked, *fix)
 	for _, fault := range faults {
 		fmt.Fprintln(os.Stderr, fault)
 	}

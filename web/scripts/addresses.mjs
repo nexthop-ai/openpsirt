@@ -16,7 +16,9 @@
 //   else, because a part left unescaped or a segment spelled wrong is exactly
 //   what a hand-built address gets wrong and what reading one cannot see.
 // - Every query parameter the table lists for a route is one the screen there
-//   reads, so the table cannot promise a parameter nothing acts on.
+//   reads, so the table cannot promise a parameter nothing acts on. A read is
+//   asked of query parameters, never of a map or a set that happens to hold
+//   the same word.
 //
 // An API address opens on /v1, or is joined onto a call that builds one, and
 // is not an address into this application.
@@ -216,17 +218,161 @@ export function addressesIn(routes, text, file = "x.tsx", source = parse(text, f
   return { found, examined };
 }
 
-// The query parameters one source file reads: the first argument of every
-// get, getAll or has that is written as a string.
-export function readsIn(text, file = "x.tsx", source = parse(text, file)) {
+const named = (node, name) => ts.isIdentifier(node) && node.text === name;
+
+const typedSearch = (type) =>
+  type && ts.isTypeReferenceNode(type) && named(type.typeName, "URLSearchParams");
+
+// What the interface hands query parameters out through, across every file:
+// the properties an object literal sets from them, as a hook returning the
+// router's parameters does, and the functions declared to return them.
+const nothingHanded = { properties: new Set(), returners: new Set() };
+
+// Whether an expression yields query parameters: a new URLSearchParams, the
+// router's useSearchParams(), a call to a function declared to return them, or
+// a memo of any of those.
+function isSearchSource(node, handed) {
+  node = bareOf(node);
+  if (ts.isNewExpression(node)) return named(node.expression, "URLSearchParams");
+  if (!ts.isCallExpression(node)) return false;
+  if (named(node.expression, "useSearchParams")) return true;
+  if (ts.isIdentifier(node.expression) && handed.returners.has(node.expression.text)) return true;
+  const [made] = node.arguments;
+  return (
+    named(node.expression, "useMemo") &&
+    made !== undefined &&
+    ts.isArrowFunction(made) &&
+    !ts.isBlock(made.body) &&
+    isSearchSource(made.body, handed)
+  );
+}
+
+// searchNames is the names one source file gives query parameters, matched by
+// name across the file since the parse holds no types: a variable holding
+// them, the first element taken from useSearchParams(), a property destructured
+// from one the interface hands them out through, and anything declared with
+// the URLSearchParams type, parameters and properties included.
+//
+// Beside them, what this file hands them out through: an object literal's
+// property set from one of those names, and a function declared to return
+// them.
+function searchNames(source, handed = nothingHanded) {
+  const names = new Set();
+  const properties = new Set();
+  const returners = new Set();
+  const visit = (node) => {
+    if (
+      (ts.isVariableDeclaration(node) ||
+        ts.isParameter(node) ||
+        ts.isPropertySignature(node) ||
+        ts.isPropertyDeclaration(node)) &&
+      ts.isIdentifier(node.name) &&
+      (typedSearch(node.type) ||
+        (ts.isVariableDeclaration(node) &&
+          node.initializer &&
+          isSearchSource(node.initializer, handed)))
+    ) {
+      names.add(node.name.text);
+    }
+    if (ts.isVariableDeclaration(node) && ts.isArrayBindingPattern(node.name)) {
+      const [first] = node.name.elements;
+      const made = node.initializer && bareOf(node.initializer);
+      if (
+        made &&
+        ts.isCallExpression(made) &&
+        named(made.expression, "useSearchParams") &&
+        first &&
+        ts.isBindingElement(first) &&
+        ts.isIdentifier(first.name)
+      ) {
+        names.add(first.name.text);
+      }
+    }
+    if (ts.isBindingElement(node) && ts.isObjectBindingPattern(node.parent)) {
+      const property = node.propertyName ?? node.name;
+      if (ts.isIdentifier(property) && handed.properties.has(property.text)) {
+        if (ts.isIdentifier(node.name)) names.add(node.name.text);
+      }
+    }
+    if (ts.isFunctionDeclaration(node) && node.name && typedSearch(node.type)) {
+      returners.add(node.name.text);
+    }
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer)) &&
+      typedSearch(node.initializer.type)
+    ) {
+      returners.add(node.name.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  const hands = (node) => {
+    if (ts.isShorthandPropertyAssignment(node) && names.has(node.name.text)) {
+      properties.add(node.name.text);
+    }
+    if (
+      ts.isPropertyAssignment(node) &&
+      ts.isIdentifier(node.name) &&
+      ts.isIdentifier(bareOf(node.initializer)) &&
+      names.has(bareOf(node.initializer).text)
+    ) {
+      properties.add(node.name.text);
+    }
+    ts.forEachChild(node, hands);
+  };
+  hands(source);
+  return { names, properties, returners };
+}
+
+// handedThrough is what a set of parsed files hands query parameters out
+// through, read until nothing new is found, since a hook may hand on what
+// another hook handed it.
+export function handedThrough(sources) {
+  const handed = { properties: new Set(), returners: new Set() };
+  for (;;) {
+    const before = handed.properties.size + handed.returners.size;
+    for (const source of sources) {
+      const found = searchNames(source, handed);
+      for (const name of found.properties) handed.properties.add(name);
+      for (const name of found.returners) handed.returners.add(name);
+    }
+    if (handed.properties.size + handed.returners.size === before) return handed;
+  }
+}
+
+// The query parameters one source file reads: the first argument, written as
+// a string, of every get, getAll or has asked of query parameters. Query
+// parameters are anything `isSearchSource` accepts, a name `searchNames` finds
+// in this file, or a property the interface hands them out through; a get on a
+// map, a set or headers is not one.
+export function readsIn(
+  text,
+  file = "x.tsx",
+  source = parse(text, file),
+  handed = handedThrough([source]),
+) {
   const reads = new Set();
+  const { names } = searchNames(source, handed);
+  const isSearch = (node) => {
+    const receiver = bareOf(node);
+    if (isSearchSource(receiver, handed)) return true;
+    if (ts.isIdentifier(receiver)) return names.has(receiver.text);
+    return (
+      ts.isPropertyAccessExpression(receiver) &&
+      (names.has(receiver.name.text) || handed.properties.has(receiver.name.text))
+    );
+  };
   const walk = (node) => {
     if (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
       ["get", "getAll", "has"].includes(node.expression.name.text) &&
       node.arguments[0] &&
-      ts.isStringLiteral(node.arguments[0])
+      ts.isStringLiteral(node.arguments[0]) &&
+      isSearch(node.expression.expression)
     ) {
       reads.add(node.arguments[0].text);
     }
@@ -234,6 +380,18 @@ export function readsIn(text, file = "x.tsx", source = parse(text, file)) {
   };
   walk(source);
   return reads;
+}
+
+// An expression with parentheses, `as` and a non-null assertion taken off.
+function bareOf(node) {
+  while (
+    ts.isParenthesizedExpression(node) ||
+    ts.isAsExpression(node) ||
+    ts.isNonNullExpression(node)
+  ) {
+    node = node.expression;
+  }
+  return node;
 }
 
 function isFile(at) {
@@ -327,9 +485,11 @@ export function sweep() {
   // Each file is read and parsed once, and every rule reads that one tree.
   const imports = new Map();
   const reads = new Map();
-  for (const { file, text, source } of interfaceSources()) {
+  const sources = interfaceSources();
+  const handed = handedThrough(sources.map(({ source }) => source));
+  for (const { file, text, source } of sources) {
     imports.set(file, importsOf(file, text));
-    reads.set(file, readsIn(text, file, source));
+    reads.set(file, readsIn(text, file, source, handed));
     const relative = path.relative(src, file);
     if (relative === BUILDER) continue;
     const { found: here, examined } = addressesIn(routes, text, file, source);

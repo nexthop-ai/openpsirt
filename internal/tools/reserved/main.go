@@ -56,6 +56,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -178,6 +179,78 @@ type found struct {
 	column string
 }
 
+// source is one Go file of the tree.
+type source struct {
+	path string
+	body []byte
+}
+
+// counts is how much of the tree one scan read.
+type counts struct {
+	files, tables, columns, queries, qualified int
+}
+
+// scan reads the tree's Go files in two passes and reports every name written
+// wrongly. The first pass reads the tables and columns the migrations declare
+// and the names the code that runs invents, because the second tells a schema
+// name from a keyword by asking whether the schema has one, and a derived
+// table built in one file is read in another. A pass that read nothing is an
+// error, since it checked nothing.
+func scan(sources []source, reserved map[string]bool) ([]found, counts, error) {
+	schema := map[string]bool{}
+	columns := map[string]bool{}
+	invented := map[string]bool{}
+	fset := token.NewFileSet()
+	parsed := make([]*ast.File, len(sources))
+	for i, src := range sources {
+		file, err := parser.ParseFile(fset, src.path, src.body, 0)
+		if err != nil {
+			return nil, counts{}, fmt.Errorf("%s: %w", src.path, err)
+		}
+		parsed[i] = file
+		tablesDeclared(src.path, src.body, schema)
+		if strings.Contains(src.path, "database/migrate/migrations/") {
+			columnsDeclared(src.path, file, columns)
+			continue
+		}
+		if strings.HasSuffix(src.path, "_test.go") || strings.Contains(src.path, "internal/tools/reserved") {
+			continue
+		}
+		for word := range inventedNames(file, nil) {
+			invented[word] = true
+		}
+	}
+	if len(schema) == 0 {
+		return nil, counts{}, errors.New("the migrations declare no tables, so the table pass would check nothing")
+	}
+	if len(columns) == 0 {
+		return nil, counts{}, errors.New("the migrations declare no columns, so the column pass would check nothing")
+	}
+
+	var bad []found
+	counted := counts{tables: len(schema), columns: len(columns)}
+	for i, src := range sources {
+		// This checker's own tests are written out of what it reports: a bare
+		// table in a fixture is the input, not a defect. One directory rather
+		// than a pattern, so nothing else inherits the exemption.
+		if strings.Contains(src.path, "internal/tools/reserved") {
+			continue
+		}
+		counted.files++
+		hits, examined, read := checkFile(fset, src.path, parsed[i], schema, columns, reserved, invented)
+		bad = append(bad, hits...)
+		counted.queries += examined
+		counted.qualified += read
+	}
+	if counted.queries == 0 {
+		return nil, counts{}, errors.New("no query was read, so the column pass checked nothing")
+	}
+	if counted.qualified == 0 {
+		return nil, counts{}, errors.New("no literal of the code that runs was read, so the qualified pass checked nothing")
+	}
+	return bad, counted, nil
+}
+
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "generate" {
 		if err := generate(); err != nil {
@@ -192,89 +265,29 @@ func main() {
 		reserved[word] = true
 	}
 
-	// The tables and columns the migrations made, read first, because the
-	// check below tells a schema name from a keyword by asking whether this
-	// schema has one of that name.
-	schema := map[string]bool{}
-	columns := map[string]bool{}
-	// The names the code that runs invents with AS, read before any file is
-	// checked, because a derived table built in one file is read in another.
-	invented := map[string]bool{}
-	fset := token.NewFileSet()
-	_, err := walk.Only(".go", []string{"web"}, func(path string, body []byte) error {
-		tablesDeclared(path, body, schema)
-		if !strings.Contains(path, "database/migrate/migrations/") {
-			if strings.HasSuffix(path, "_test.go") || strings.Contains(path, "internal/tools/reserved") {
-				return nil
-			}
-			file, err := parser.ParseFile(fset, path, body, 0)
-			if err != nil {
-				return fmt.Errorf("%s: %w", path, err)
-			}
-			for word := range inventedNames(file, nil) {
-				invented[word] = true
-			}
-			return nil
-		}
-		file, err := parser.ParseFile(fset, path, body, 0)
-		if err != nil {
-			return fmt.Errorf("%s: %w", path, err)
-		}
-		columnsDeclared(path, file, columns)
-		return nil
-	})
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
-	}
-	if len(schema) == 0 {
-		fmt.Fprintln(os.Stderr, "the migrations declare no tables, so the table pass would check nothing")
-		os.Exit(2)
-	}
-	if len(columns) == 0 {
-		fmt.Fprintln(os.Stderr, "the migrations declare no columns, so the column pass would check nothing")
-		os.Exit(2)
-	}
-
-	var bad []found
-	queries, qualified := 0, 0
+	var sources []source
 	// web holds the interface, which writes no SQL: it asks this server.
-	read, err := walk.Only(".go", []string{"web"}, func(path string, _ []byte) error {
-		// This checker's own tests are written out of what it reports: a bare
-		// table in a fixture is the input, not a defect. One directory rather
-		// than a pattern, so nothing else inherits the exemption.
-		if strings.Contains(path, "internal/tools/reserved") {
-			return nil
-		}
-		file, err := parser.ParseFile(fset, path, nil, 0)
-		if err != nil {
-			return fmt.Errorf("%s: %w", path, err)
-		}
-		hits, examined, read := checkFile(fset, path, file, schema, columns, reserved, invented)
-		bad = append(bad, hits...)
-		queries += examined
-		qualified += read
+	_, err := walk.Only(".go", []string{"web"}, func(path string, body []byte) error {
+		sources = append(sources, source{path: path, body: body})
 		return nil
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if queries == 0 {
-		fmt.Fprintln(os.Stderr, "no query was read, so the column pass checked nothing")
+	bad, counted, err := scan(sources, reserved)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if qualified == 0 {
-		fmt.Fprintln(os.Stderr, "no literal of the code that runs was read, so the qualified pass checked nothing")
-		os.Exit(2)
-	}
+	read, schema, columns, queries := counted.files, counted.tables, counted.columns, counted.queries
 
 	if len(bad) == 0 {
 		fmt.Printf("every name a query invents in a literal is quoted, every table "+
 			"and declared column one names is quoted, and no name a migration "+
 			"declares collides with a word any of the four engines reserves (%d words "+
 			"checked over %d files, %d tables, %d columns, %d queries)\n",
-			len(reservedWords()), read, len(schema), len(columns), queries)
+			len(reservedWords()), read, schema, columns, queries)
 		return
 	}
 	for _, one := range ordered(bad) {

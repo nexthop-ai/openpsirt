@@ -440,3 +440,67 @@ func TestAnInventedNameALikeAndAListAreReadForTheQualifiedForm(t *testing.T) {
 		t.Error("the qualified pass counted nothing it read")
 	}
 }
+
+// migration is a migration declaring one table with one column.
+const migration = "package migrations\n\nvar up = `CREATE TABLE \"widget\" (\n\t\"size_bytes\" BIGINT\n)`\n"
+
+func TestAScanReportsABareTableAndCountsWhatItRead(t *testing.T) {
+	sources := []source{
+		{"internal/database/migrate/migrations/widget.go", []byte(migration)},
+		{"internal/widget/store.go", []byte("package widget\n\nfunc f() { db.NewRaw(`SELECT \"size_bytes\" FROM widget`) }\n")},
+	}
+	bad, counted, err := scan(sources, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bad) != 1 || bad[0].word != "widget" {
+		t.Errorf("reported %v, want the bare table alone", bad)
+	}
+	if counted.tables != 1 || counted.columns != 1 || counted.queries == 0 || counted.files != 2 {
+		t.Errorf("counted %+v", counted)
+	}
+}
+
+func TestAFixtureTableInAMigrationTestIsNoSchemaTable(t *testing.T) {
+	sources := []source{
+		{"internal/database/migrate/migrations/widget.go", []byte(migration)},
+		{"internal/database/migrate/migrations/apply_test.go",
+			[]byte("package migrations\n\nvar fixture = `CREATE TABLE \"parent\" (\"id\" BIGINT)`\n")},
+		{"internal/widget/store.go", []byte("package widget\n\nfunc f() { db.NewRaw(`SELECT \"size_bytes\" FROM parent`) }\n")},
+	}
+	bad, counted, err := scan(sources, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bad) != 0 || counted.tables != 1 {
+		t.Errorf("a test's fixture table was read as declared: reported %v, %d tables", bad, counted.tables)
+	}
+}
+
+func TestAPassThatReadNothingIsRefused(t *testing.T) {
+	query := source{"internal/widget/store.go", []byte("package widget\n\nfunc f() { db.NewRaw(`SELECT \"size_bytes\" FROM \"widget\"`) }\n")}
+	for _, c := range []struct {
+		what    string
+		sources []source
+		says    string
+	}{
+		{"no migration", []source{query}, "no tables"},
+		{"a migration declaring no column", []source{
+			{"internal/database/migrate/migrations/widget.go", []byte("package migrations\n\nvar up = `CREATE TABLE \"widget\" ()`\n")},
+			query,
+		}, "no columns"},
+		{"no query", []source{
+			{"internal/database/migrate/migrations/widget.go", []byte(migration)},
+			{"internal/widget/plain.go", []byte("package widget\n\nfunc f() int { return 1 }\n")},
+		}, "no query was read"},
+		{"queries in tests alone", []source{
+			{"internal/database/migrate/migrations/widget.go", []byte(migration)},
+			{"internal/widget/store_test.go", query.body},
+		}, "no literal of the code that runs"},
+	} {
+		_, _, err := scan(c.sources, map[string]bool{})
+		if err == nil || !strings.Contains(err.Error(), c.says) {
+			t.Errorf("%s: %v, want a refusal saying %q", c.what, err, c.says)
+		}
+	}
+}

@@ -5,11 +5,20 @@ package httpapi_test
 
 import (
 	"encoding/json"
+	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
+
+// strangerAnswers are the statuses an operation refuses somebody holding none
+// of its roles with: the role refused, the product hidden, or a request with
+// no body refused for its shape before the role is asked.
+var strangerAnswers = []int{
+	http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusUnprocessableEntity,
+}
 
 // asked is what an operation declares it needs, read back off the document the
 // server builds from its own registrations.
@@ -122,10 +131,12 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 						"for, so it is not being checked", method, path)
 					continue
 				}
-				if got := r.As(t, who, method, asking); got >= 200 && got < 300 {
+				// The sweep sends no body, and an operation taking one
+				// refuses its shape before the role is asked.
+				if got := r.As(t, who, method, asking); !slices.Contains(strangerAnswers, got) {
 					t.Errorf("%s %s answered %q with %d, and %q satisfies none of "+
-						"what it declares (%s)", method, asking, who, got, who,
-						describe(needs))
+						"what it declares (%s), so it is refused",
+						method, asking, who, got, who, describe(needs))
 				}
 			}
 		}

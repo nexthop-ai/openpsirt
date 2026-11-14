@@ -40,27 +40,30 @@ __pycache__/
 # somebody typing "go build" instead. Named one by one rather than by a
 # pattern: these are the names "go build" gives each command at the root of the
 # checkout, and a pattern matching them would also match a directory somebody
-# means to keep. A command added under internal/tools is added here too.
+# means to keep. A test holds every command under cmd and internal/tools to it.
 /openpsirt
 /advisories
 /attached
+/clangcheckers
 /compose
 /confined
+/cppcheckweakness
 /dbclean
 /engines
 /gate
 /granted
+/lanes
 /narrowed
-/otheros
 /negatives
-/provenance
+/openpsirt-upload
+/otheros
 /readable
 /rehearsal
 /release
 /reserved
 /spdx
+/subjected
 /unclaimed
 /unreachable
 /vendored
-/walk
 /weakness

@@ -58,6 +58,7 @@ func everyDocument(t *testing.T) map[string]string {
 	docs := map[string]string{}
 	for _, pattern := range []string{
 		filepath.Join("..", "..", "*.md"),
+		filepath.Join("..", "..", "design-docs", "*.md"),
 		filepath.Join("..", "..", "docs", "*.md"),
 		filepath.Join("..", "..", "docs", "*", "*.md"),
 		filepath.Join("..", "..", "internal", "*", "testdata", "*.md"),
@@ -201,10 +202,13 @@ func headingProblems(name, heading string) []string {
 		}
 		// A bare gerund is a noun — "Parsing", "Scanning" — and one taking an
 		// object is a verb with its object: "Asking upstream what is current".
+		// A gerund an article follows takes an object whatever the word:
+		// "Publishing the advisory".
 		coordinated := len(first) > 1 &&
 			(strings.EqualFold(first[1], "and") || strings.EqualFold(first[1], "or"))
+		article := len(first) > 1 && articles[strings.ToLower(first[1])]
 		if len(first) > 1 && strings.HasSuffix(strings.ToLower(first[0]), "ing") &&
-			!adjectival[strings.ToLower(first[0])] && !coordinated {
+			(article || !adjectival[strings.ToLower(first[0])]) && !coordinated {
 			problems = append(problems, fmt.Sprintf("%s: heading is a gerund taking an object: %q", name, heading))
 		}
 	}
@@ -240,12 +244,13 @@ func TestAHeadingThatIsASentenceIsReported(t *testing.T) {
 		"Ends.",
 		"Is it current?",
 		"A bump that did not reach the fix",
+		"Publishing the advisory",
 	} {
 		if len(headingProblems("x", bad)) == 0 {
 			t.Errorf("%q was not reported", bad)
 		}
 	}
-	for _, good := range []string{"Parsing", "Upstream currency", "Routing rules", "Reading and writing"} {
+	for _, good := range []string{"Parsing", "Upstream currency", "Routing rules", "Reading and writing", "Publishing measurements"} {
 		if problems := headingProblems("x", good); len(problems) != 0 {
 			t.Errorf("%q was reported: %v", good, problems)
 		}
@@ -259,6 +264,9 @@ var interrogative = map[string]bool{
 	"when": true, "where": true, "how": true, "which": true,
 }
 
+// articles open an object, so a gerund before one takes it.
+var articles = map[string]bool{"the": true, "a": true, "an": true}
+
 // adjectival are the gerunds that qualify the noun beside them rather than
 // taking it as an object: "Routing rules", "Pending upgrades". A gerund
 // followed by "and" or "or" is a coordination and needs no entry.
@@ -268,4 +276,5 @@ var interrogative = map[string]bool{
 // had to add deliberately, which is the point.
 var adjectival = map[string]bool{
 	"routing": true, "pending": true, "sending": true,
+	"finding": true, "standing": true, "rating": true, "publishing": true,
 }
