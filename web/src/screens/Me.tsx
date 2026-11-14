@@ -54,7 +54,7 @@ export function Me() {
         {(me.reach ?? []).length === 0 ? (
           <p className="reading">
             {me.everywhere
-              ? "Every product, once one is declared."
+              ? "Every product, as each is declared."
               : "Nothing yet. An administrator grants access."}
           </p>
         ) : (
