@@ -112,7 +112,7 @@ One standing grant, covering products declared afterwards (REQ-42).
 | Holding one in force is access whatever the catalog holds: before any product is declared its holder signs in and reaches no product | Spread over an empty catalog it adds no per-product grant, and counting only those refuses its holder at every request |
 | A grant set aside or naming no role admits nobody, and through a token neither does one derived longer ago than the token window | Each reaches no product |
 | Asked whether somebody holds a role on any product, it answers yes before any product exists | A token's mint refuses roles its owner holds nowhere |
-| A triage role across every product opens starting an advisory, and editing one covering no product, before any product exists | Both ask whether the role is held on any product |
+| A triage role across every product opens starting an advisory, and editing one covering no product, before any product exists | Both ask whether the role is held on any product; the interface offers starting one once a product is open, since an advisory names a flaw in a product |
 | A token narrowed to roles keeps only those of the roles held across every product | It carries only what it was minted for |
 | The answer about yourself says a role across every product that reads findings is held; a token pinned to one product holds none | A screen tells a catalog with nothing in it from nothing granted; a role reading nothing, such as approving alone, reaches no product a screen lists |
 | A token pinned to one product drops the roles across every product | They were already spread over its product |

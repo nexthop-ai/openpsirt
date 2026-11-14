@@ -40,9 +40,9 @@ export function Advisories() {
   // next attempt.
   const [minted, setMinted] = useState("");
   const who = useWho();
-  // Whoever may record a flaw in a product may write an advisory about one,
-  // which is the server's own gate. Drawn to somebody holding no triage
-  // anywhere, the control is one that always fails.
+  // Offered to whoever may record a flaw in an open product, since starting
+  // one names a flaw in a product. The server's gate is wider, a triage role
+  // held anywhere, and differs only where no product is open.
   const mayStart = !!who.data?.reach?.some((each) => each.may_triage);
 
   if (rows.isPending) return <Loading />;
