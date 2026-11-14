@@ -12,9 +12,8 @@ import (
 )
 
 // Four engines are supported and engine-specific code lives in one package
-// (REQ-71). This gate reads text rather than queries, so a sixth site arrives
-// announced rather than discovered — and it had no test, which makes its exit
-// code the only evidence that it still recognizes anything.
+// (REQ-71). This gate reads text, so a new site arrives announced. These tests
+// are the evidence that it still recognizes each spelling.
 
 func TestWhatCountsAsAskingAnEngineDirectly(t *testing.T) {
 	for _, c := range []struct {
@@ -29,10 +28,8 @@ func TestWhatCountsAsAskingAnEngineDirectly(t *testing.T) {
 		{"bun's name for an engine", "\tif db.Dialect().Name() == dialect.PG {", true},
 		{"bun's name for an engine, alone", "\tcase dialect.SQLite:", true},
 		{
-			// Written without naming a constant, which is how the one live
-			// branch in the tree spells it — and it was not looked for at all,
-			// so those three lines pasted into a store package would have
-			// passed.
+			// Written without naming a constant, which is how a branch on
+			// the handle is spelled.
 			"asking the handle what it is", "\tswitch db.Dialect().Name() {", true,
 		},
 		{"bun's spelling of an upsert", "\t\tq = q.On(\"CONFLICT\").Ignore()", true},
@@ -50,6 +47,8 @@ func TestWhatCountsAsAskingAnEngineDirectly(t *testing.T) {
 		{"an engine's name compared the other way round", "\tif \"postgres\" == engine {", true},
 		{"a switch on an engine's name", "\tcase \"mariadb\":", true},
 		{"a switch on an engine's name second in its list", "\tcase other, \"mysql\":", true},
+		{"an engine's name compared through another name", "\tif r.kind == \"mysql\" {", true},
+		{"an engine's name first, compared through another name", "\tif \"mariadb\" != r.kind {", true},
 		{"a local engine compared", "\tif engine == want {", true},
 		{"a switch on another name", "\tcase \"postgresql-ish\", \"x\":", false},
 		{"a row handed back, which MySQL cannot", "\t`INSERT INTO t (a) VALUES (?) RETURNING \"id\"`", true},
@@ -63,6 +62,18 @@ func TestWhatCountsAsAskingAnEngineDirectly(t *testing.T) {
 		{"PostgreSQL's catalog", "\t`SELECT 1 FROM pg_catalog.pg_class`", true},
 		{"SQLite's catalog", "\t`SELECT name FROM sqlite_master`", true},
 		{"PostgreSQL's cast", "\t`SELECT ?::timestamptz`", true},
+		{"PostgreSQL's cast to a float", "\t`SELECT a::float`", true},
+		{"PostgreSQL's catalog, unqualified", "\t`SELECT reltuples FROM pg_class`", true},
+		{"PostgreSQL's statistics", "\t`SELECT * FROM pg_stats`", true},
+		{"PostgreSQL's lock, tried", "\t`SELECT pg_try_advisory_lock(1)`", true},
+		{"MySQL's performance schema", "\t`SELECT * FROM performance_schema.threads`", true},
+		{"InnoDB's statistics", "\t`SELECT n_rows FROM mysql.innodb_table_stats`", true},
+		{"a session variable", "\t`SELECT @@SESSION.sql_mode`", true},
+		{"SQLite's pragma", "\t`PRAGMA foreign_keys = ON`", true},
+		{"SQLite's pragma as a table", "\t`SELECT name FROM pragma_index_list(?)`", true},
+		{"SQLite's statistics table", "\t`SELECT stat FROM sqlite_stat1`", true},
+		{"bun's conflict clause", "\tq = q.On(\"CONFLICT DO NOTHING\")", true},
+		{"bun's duplicate-key clause", "\tq = q.On(\"DUPLICATE KEY UPDATE\")", true},
 
 		{"ordinary go", "\tfor _, row := range rows {", false},
 		{"a portable query", "\tdb.NewSelect().Model(&x).Where(\"id = ?\", id)", false},
@@ -71,6 +82,8 @@ func TestWhatCountsAsAskingAnEngineDirectly(t *testing.T) {
 		{"an engine's role asked of the database package", "\tif db.Server.Engine.IsProduction() {", false},
 		{"an address with a double colon", "\taddr := \"[::1]:80\"", false},
 		{"a name that merely holds an engine's", "\tname := \"postgres-data\"", false},
+		{"a join on a portable condition", "\tq.Join(\"JOIN b\").On(\"a.id = b.id\")", false},
+		{"a word ending in pg_", "\tjpg_count := 1", false},
 	} {
 		if got := asks(c.line, engineConstant("database")) != ""; got != c.want {
 			t.Errorf("%s: reported=%v, want %v: %q", c.what, got, c.want, c.line)
@@ -169,5 +182,59 @@ func TestAOneEngineClosureIsLetPastAndSQLBesideASelectingCallIsRead(t *testing.T
 	got := violations("internal/schema/x_test.go", beside)
 	if len(got) != 1 || !strings.HasSuffix(got[0], "ON CONFLICT") {
 		t.Errorf("SQL beside a harness call outside its closure: got %q, want it reported", got)
+	}
+}
+
+func TestAHelperRunOnlyInsideAOneEngineClosureIsLetPast(t *testing.T) {
+	text := []byte("package schema\n\nfunc TestX(t *testing.T) {\n" +
+		"\tnamed := func(t *testing.T, db *database.DB) {\n" +
+		"\t\t_ = db.QueryRowContext(ctx, `SELECT @@SESSION.sql_mode`)\n" +
+		"\t}\n" +
+		"\tdbtest.Only(t, database.MySQL, named)\n" +
+		"\tdbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {\n" +
+		"\t\t_ = listed(db)\n" +
+		"\t})\n}\n\n" +
+		// inner is declared first, so it settles only once listed has.
+		"func inner(db *database.DB) error {\n" +
+		"\t_, err := db.QueryContext(ctx, `SELECT name FROM pragma_index_list(?)`)\n\treturn err\n}\n\n" +
+		"func listed(db *database.DB) error {\n\treturn inner(db)\n}\n")
+	if got := violations("internal/schema/x_test.go", text); got != nil {
+		t.Errorf("a closure handed by name, and helpers reached only from one: got %q, want nothing", got)
+	}
+}
+
+func TestAHelperAlsoRunOutsideAOneEngineClosureIsRead(t *testing.T) {
+	text := []byte("package schema\n\nfunc TestX(t *testing.T) {\n" +
+		"\tdbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {\n" +
+		"\t\t_ = listed(db)\n" +
+		"\t})\n" +
+		"\tdbtest.Each(t, func(t *testing.T, db *database.DB) {\n" +
+		"\t\t_ = listed(db)\n" +
+		"\t})\n}\n\n" +
+		"func listed(db *database.DB) error {\n" +
+		"\t_, err := db.QueryContext(ctx, `SELECT name FROM pragma_index_list(?)`)\n\treturn err\n}\n")
+	got := violations("internal/schema/x_test.go", text)
+	if len(got) != 1 || !strings.HasSuffix(got[0], "pragma_index_list") {
+		t.Errorf("a helper every engine runs: got %q, want its pragma reported", got)
+	}
+	unused := []byte("package schema\n\nfunc listed(db *database.DB) error {\n" +
+		"\t_, err := db.QueryContext(ctx, `PRAGMA foreign_keys`)\n\treturn err\n}\n")
+	if got := violations("internal/schema/x_test.go", unused); len(got) != 1 {
+		t.Errorf("a helper nothing calls: got %q, want its pragma reported", got)
+	}
+}
+
+func TestAHelperIsFollowedAcrossThePackagesFiles(t *testing.T) {
+	caller := parse("internal/schema/a_test.go", []byte("package schema\n\nfunc TestX(t *testing.T) {\n"+
+		"\tdbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {\n"+
+		"\t\t_ = listed(db)\n\t})\n}\n"))
+	helper := parse("internal/schema/b_test.go", []byte("package schema\n\nfunc listed(db *database.DB) error {\n"+
+		"\t_, err := db.QueryContext(ctx, `PRAGMA foreign_keys`)\n\treturn err\n}\n"))
+	if got := packageViolations([]parsed{caller, helper}); got != nil {
+		t.Errorf("a helper in another file called only from a one-engine closure: got %q, want nothing", got)
+	}
+	elsewhere := parse("internal/schema/c_test.go", []byte("package schema\n\nfunc f() { _ = listed(nil) }\n"))
+	if got := packageViolations([]parsed{caller, helper, elsewhere}); len(got) != 1 {
+		t.Errorf("the same helper also called from a third file: got %q, want its pragma reported", got)
 	}
 }
