@@ -28,6 +28,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
+	"github.com/nexthop-ai/openpsirt/internal/signing"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 	"github.com/nexthop-ai/openpsirt/internal/upstream"
 	"github.com/nexthop-ai/openpsirt/internal/version"
@@ -102,6 +103,9 @@ type passes struct {
 	// documents writes the security documents this deployment serves to
 	// anybody. Nil where it publishes none.
 	documents *publish.Pass
+	// key says when the key published documents are signed with expires
+	// soon. Nil where they go unsigned or the key never expires.
+	key *signing.Watch
 }
 
 // background starts every pass that has something to work on, and answers
@@ -159,8 +163,9 @@ func (p passes) loops() []loop {
 	// And the ones a deployment may not have, each nil where what it works
 	// on is not configured: NewPost where no mail channel is, the chat sender
 	// where no platform is, NewKeeper where no attachment store is,
-	// directory.New where no address or no store for it is, and the CVE
-	// record fetcher where the deployment keeps the snapshot itself. These
+	// directory.New where no address or no store for it is, the CVE record
+	// fetcher where the deployment keeps the snapshot itself, and the key's
+	// watch where documents go unsigned or the key never expires. These
 	// guards are the ones that say something.
 	if p.post != nil {
 		all = append(all, loop{"send mail", p.post.Run, 0})
@@ -179,6 +184,9 @@ func (p passes) loops() []loop {
 	}
 	if p.documents != nil {
 		all = append(all, loop{"write the published documents", p.documents.Run, 0})
+	}
+	if p.key != nil {
+		all = append(all, loop{"watch the signing key's expiry", p.key.Run, 0})
 	}
 	return all
 }

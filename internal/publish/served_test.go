@@ -131,7 +131,7 @@ func TestWithdrawingAProductLeavesTheOthers(t *testing.T) {
 				publish.OpenVEXPath+"sonic/master.json", false),
 		}
 		theirs := row(t, db, other.ID, publish.OpenVEX, "main", publish.OpenVEXPath+"other-os/main.json", false)
-		if err := publish.NewStore(db).WithdrawProduct(ctx, f.Product.ID); err != nil {
+		if err := publish.NewStore(db).TurnOff(ctx, f.Product.ID); err != nil {
 			t.Fatal(err)
 		}
 		for _, one := range append(mine, theirs) {
@@ -144,44 +144,6 @@ func TestWithdrawingAProductLeavesTheOthers(t *testing.T) {
 				t.Errorf("%s is still served after its product was withdrawn", one.Path)
 			case one.ProductID == other.ID && held.WithdrawnAt != nil:
 				t.Errorf("%s of another product was withdrawn", one.Path)
-			}
-		}
-	})
-}
-
-// A product whose name folds like another's under the standard's filename
-// rule would publish at that product's paths. The other counts while it
-// publishes and once it has published anything, since a withdrawn document
-// keeps its path, and a product never folds against itself.
-func TestANameFoldedLikeAnotherProductsIsFound(t *testing.T) {
-	fixture.Each(t, func(t *testing.T, f *fixture.World) {
-		ctx := t.Context()
-		db := f.DB.DB
-		publishing := f.DeclareProduct("edge.os", "Edge OS")
-		if err := f.Catalog.SetPublishes(ctx, publishing.ID, true); err != nil {
-			t.Fatal(err)
-		}
-		published := f.DeclareProduct("core.os", "Core OS")
-		row(t, db, published.ID, publish.OpenVEX, "main", publish.OpenVEXPath+"core.os/main.json", true)
-		f.DeclareProduct("lab.os", "Lab OS")
-
-		for _, c := range []struct {
-			what, name string
-			self       int64
-			want       string
-		}{
-			{"a product that publishes", "edge os", f.Product.ID, "Edge OS"},
-			{"a product whose documents were withdrawn", "CORE_OS", f.Product.ID, "Core OS"},
-			{"a product that never published", "lab os", f.Product.ID, ""},
-			{"a name that folds apart", "edge-os", f.Product.ID, ""},
-			{"the product itself", "edge os", publishing.ID, ""},
-		} {
-			got, err := publish.FoldsLike(ctx, db, c.self, c.name)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != c.want {
-				t.Errorf("%s: %q folds like %q, want %q", c.what, c.name, got, c.want)
 			}
 		}
 	})

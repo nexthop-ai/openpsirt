@@ -5,8 +5,11 @@ package advisoryapi_test
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -50,6 +53,22 @@ func TestAReleaseIsMarkedAffectedBySomebodyWhoTriagesIt(t *testing.T) {
 		if len(after.Items) == 0 || !after.Items[0].Marked {
 			t.Errorf("the marked release reads %+v", after.Items)
 		}
+
+		// The releases and the document each name the edition they were read
+		// at, the one the advisory names, so a screen agrees to what it shows.
+		var it struct {
+			Edition int `json:"edition"`
+		}
+		httpapitest.Read(t, r, "private-triage", "/v1/advisories/"+named, &it)
+		for _, path := range []string{releases, "/v1/advisories/" + named + "/document"} {
+			got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, path, "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("%s answered %d: %s", path, got.Code, got.Body.String())
+			}
+			if edition := got.Header().Get("Advisory-Edition"); edition != strconv.Itoa(it.Edition) || it.Edition < 2 {
+				t.Errorf("%s names edition %q after the mark, want %d", path, edition, it.Edition)
+			}
+		}
 	})
 }
 
@@ -72,10 +91,18 @@ func TestAnAdvisoryIsListedByWhatItCoversAndAgreedToBySomebodyElse(t *testing.T)
 		}
 
 		approval := "/v1/advisories/" + named + "/approval"
+		read := httpapitest.AgreeingTo(t, r, "private-dispatcher", "/v1/advisories/"+named)
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			approval, ""), http.StatusConflict)
+			approval, read), http.StatusConflict)
+		// An edition other than the one it says now was not what was read.
+		moved := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
+			approval, `{"edition":99}`)
+		httpapitest.RefusedWith(t, moved, http.StatusConflict)
+		if !strings.Contains(moved.Body.String(), `"detail":"`+advisory.ErrEditionMoved.Error()+`"`) {
+			t.Errorf("an edition moved is refused in words other than its own: %s", moved.Body.String())
+		}
 		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost,
-			approval, ""); got.Code != http.StatusCreated {
+			approval, read); got.Code != http.StatusCreated {
 			t.Fatalf("somebody else agreeing answered %d: %s", got.Code, got.Body.String())
 		}
 		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodDelete,

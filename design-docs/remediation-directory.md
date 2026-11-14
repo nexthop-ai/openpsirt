@@ -3,7 +3,7 @@
 Every advisory that has gone out, written as the CSAF provider directory into a
 store an operator configured for their own web server.
 
-Satisfies REQ-39, REQ-70.
+Satisfies REQ-03, REQ-39, REQ-70.
 
 Nothing here answers a request, and nothing in the application reaches the
 package that writes it. Where the deployment also serves its documents
@@ -34,7 +34,8 @@ is a copy.
 | Held back is counted per advisory | Per revision overcounts |
 | A pass with nothing that may travel logs how many it held back, once per change of the count | An all-embargoed directory is otherwise silently empty |
 | A document that no longer reads back is skipped, counted and logged each pass; its advisory leaves the directory, with no older revision in its place | Issued bytes outlive their shape below 1.0; revisions share a path, so an older one would overwrite one already out |
-| A pass fails only where nothing it was given could be read | |
+| A pass fails only where no advisory it was given could be read, counted in advisories | The first revision not known to be held back, unreadable, leaves out its advisory and every revision before it |
+| One replica writes (REQ-03), under a lease taken for two cycles as the pass starts and again before every document, handed back at shutdown; a pass losing it stops, and its replica forgets what it last wrote | Revisions share a path, so a replica with an older read writes its revision over a newer one |
 | The files are readable by whoever serves them | Another user serves them |
 | An empty directory is not written | It would have to state when it was last updated |
 | A store of its own | Every file is public, and every attachment is authorized first (REQ-70) |
@@ -57,6 +58,7 @@ is a copy.
 | The supplier reader follows this directory, which a test checks, reading only the fields it uses | A misshaped unused field leaves the listing readable |
 | A document's stated address and its path come from one rule: the tracking identifier names it, the initial release date folders it | |
 | A hash file sits beside each document and nothing else | The feed names it in the document's entry |
+| The description and the feed are built by the rule the served surface (`design-docs/publishing.md`) builds its own by; only the addresses, the files beside each document and the keys differ | One deployment describes itself one way |
 | The feed names itself by a token, never its address | The feed shape allows letters, digits, a plus, a hyphen, an underscore and a dot |
 | The list of changes and the feed are how outsiders follow publication: no subscriber list, no per-CVE notice | Configured destinations are this deployment's notifications (`design-docs/notifications-delivery.md`) |
 

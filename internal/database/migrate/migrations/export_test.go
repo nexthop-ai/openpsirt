@@ -233,6 +233,7 @@ func StatementsV0130(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
 		"advisory_issue":         advisoryIssueV0130(t),
+		"advisory_override":      advisoryOverrideV0130(t),
 		"graph_node":             graphNodeV0130(t),
 		"received_vex_statement": receivedStatementV0130(t),
 	}
@@ -264,6 +265,41 @@ func StopV0130AfterLiveRule(ctx context.Context, db *database.DB) error {
 		}
 		return u.change(advisoryIssueV0130(u.t), change{table: "advisory_issue",
 			add: []added{{column: "live"}}, constraints: []string{"advisory_issue_live_once"}})
+	})
+}
+
+// StopV0130AfterOverrideLiveColumn adds the column marking a release an
+// advisory marks affected and nothing else: a start of the v0.13.0 upgrade on
+// MySQL or MariaDB that stopped after the column committed.
+func StopV0130AfterOverrideLiveColumn(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return u.change(advisoryOverrideV0130(u.t), change{table: "advisory_override",
+			add: []added{{column: "live"}}})
+	})
+}
+
+// StopV0130AfterOverrideLiveRule runs the v0.13.0 upgrade of the release
+// marks up to the uniqueness rule holding the mark, and stops before the rule
+// it replaces is dropped.
+func StopV0130AfterOverrideLiveRule(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		mark := func() error {
+			_, err := tx.NewUpdate().TableExpr(`"advisory_override"`).Set(`"live" = ?`, true).
+				Where(`"removed_at" IS NULL`).Where(`"live" IS NULL`).Exec(ctx)
+			return err
+		}
+		return u.change(advisoryOverrideV0130(u.t), change{table: "advisory_override",
+			add: []added{{column: "live"}}, then: mark, constraints: []string{"advisory_override_live_once"}})
 	})
 }
 

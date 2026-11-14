@@ -81,6 +81,115 @@ describe("one advisory", () => {
     ]);
   });
 
+  it("agrees to the edition the screen shows", async () => {
+    serving({ title: "", covers: [covered], agreed: 0, status: "draft", edition: 3 });
+    const posted = answer("POST", () => ({ data: {} }));
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    await press(mount.host(), "Agree to what it says");
+    await settle();
+    expect(posted()).toEqual([
+      [
+        "/v1/advisories/{advisory}/approval",
+        { params: { path: { advisory: "SONIC-2026-1" } }, body: { edition: 3 } },
+      ],
+    ]);
+  });
+
+  it("offers no agreement until the releases are read", async () => {
+    serve((path) => {
+      if (path === "/v1/advisories/{advisory}") {
+        return { data: { title: "", covers: [covered], agreed: 0, status: "draft", edition: 4 } };
+      }
+      if (path === "/v1/advisories/{advisory}/releases") return { status: 500 };
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    expect(button(mount.host(), "Agree to what it says").disabled).toBe(true);
+  });
+
+  it("offers no agreement while the document is being read", async () => {
+    const reading = serve((path) => {
+      if (path === "/v1/advisories/{advisory}") {
+        return { data: { title: "", covers: [covered], agreed: 0, status: "draft", edition: 4 } };
+      }
+      if (path === "/v1/advisories/{advisory}/releases") {
+        return { data: { items: [] }, headers: { "Advisory-Edition": "4" } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    const served = reading.getMockImplementation() as unknown as (
+      path: string,
+      init: unknown,
+    ) => unknown;
+    reading.mockImplementation(((path: string, init: unknown) =>
+      path === "/v1/advisories/{advisory}/document"
+        ? new Promise(() => {})
+        : served(path, init)) as never);
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    expect(button(mount.host(), "Agree to what it says").disabled).toBe(true);
+  });
+
+  it("agrees beside a document that was refused", async () => {
+    serve((path) => {
+      if (path === "/v1/advisories/{advisory}") {
+        return { data: { title: "", covers: [covered], agreed: 0, status: "draft", edition: 4 } };
+      }
+      if (path === "/v1/advisories/{advisory}/releases") {
+        return { data: { items: [] }, headers: { "Advisory-Edition": "4" } };
+      }
+      if (path === "/v1/advisories/{advisory}/document") return { status: 500 };
+      return { data: { items: [], total: 0 } };
+    });
+    const posted = answer("POST", () => ({ data: {} }));
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    await press(mount.host(), "Agree to what it says");
+    await settle();
+    expect(posted().map(bodyOf)).toEqual([{ edition: 4 }]);
+  });
+
+  it("agrees to the oldest edition any panel was read at", async () => {
+    serve((path) => {
+      if (path === "/v1/advisories/{advisory}") {
+        return { data: { title: "", covers: [covered], agreed: 0, status: "draft", edition: 4 } };
+      }
+      if (path === "/v1/advisories/{advisory}/releases") {
+        return { data: { items: [] }, headers: { "Advisory-Edition": "3" } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    const posted = answer("POST", () => ({ data: {} }));
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    await press(mount.host(), "Agree to what it says");
+    await settle();
+    expect(posted().map(bodyOf)).toEqual([{ edition: 3 }]);
+  });
+
+  it("reads the advisory again when its edition moved, and agrees to the new one", async () => {
+    let edition = 3;
+    serve((path) => {
+      if (path === "/v1/advisories/{advisory}") {
+        return { data: { title: "", covers: [covered], agreed: 0, status: "draft", edition } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    const posted = answer("POST", () => {
+      edition = 4;
+      return posted().length === 1 ? { status: 409 } : { data: {} };
+    });
+    mount.render(screen(<Advisory />, ADDRESS, PATTERN));
+    await settle();
+    await press(mount.host(), "Agree to what it says");
+    await settle();
+    await press(mount.host(), "Agree to what it says");
+    await settle();
+    expect(posted().map(bodyOf)).toEqual([{ edition: 3 }, { edition: 4 }]);
+  });
+
   it("takes off the flaw on the row pressed", async () => {
     serving({ title: "", covers: [covered], agreed: 1, status: "draft" });
     const removed = answer("DELETE", () => ({ data: {} }));

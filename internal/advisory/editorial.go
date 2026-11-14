@@ -30,6 +30,10 @@ var ErrNotAgreed = refusal.New(
 var ErrSamePerson = refusal.New(
 	"whoever wrote what an advisory says may not be the person who agrees to it")
 
+// ErrEditionMoved says what the advisory says changed since the person
+// agreeing read it: the edition they named is no longer the one it points at.
+var ErrEditionMoved = refusal.New("what this advisory says changed since you read it; read it again before agreeing")
+
 // ErrAlreadyAgreed says this person has already agreed to this edition.
 var ErrAlreadyAgreed = refusal.New("you have already agreed to what this advisory says")
 
@@ -222,12 +226,16 @@ type Agreement struct {
 // approval it is modelled on names: an agreement that floats free of the words
 // would still be standing after somebody rewrote them.
 //
+// The person names the edition they read, and an agreement to any other is
+// refused: an edit landing just before the agreement would otherwise be agreed
+// to unread.
+//
 // The approver is neither the person who wrote the current edition nor the
 // person who started the advisory, with no override. Both, because the second
 // pair of eyes has to be the second pair: whoever minted an advisory chose the
 // name a reader cites it by and, in the ordinary case, the flaws it covers.
 func (s *Store) Approve(ctx context.Context, subject access.Subject,
-	identifier string) (*Agreement, error) {
+	identifier string, read int) (*Agreement, error) {
 
 	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
@@ -272,6 +280,9 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 		if err := tx.NewSelect().Model(&edition).
 			Where(`"id" = ?`, *at.EditionID).Limit(1).Scan(ctx); err != nil {
 			return err
+		}
+		if edition.Ordinal != read {
+			return ErrEditionMoved
 		}
 		// Whoever wrote the words standing: the title, and every change to
 		// what the advisory covers since it was set. A change to the covers
@@ -325,7 +336,7 @@ func (s *Store) Approve(ctx context.Context, subject access.Subject,
 	})
 	switch {
 	case errors.Is(err, ErrSamePerson), errors.Is(err, ErrAlreadyAgreed),
-		errors.Is(err, ErrNothingToSay):
+		errors.Is(err, ErrNothingToSay), errors.Is(err, ErrEditionMoved):
 		return nil, err
 	case err != nil:
 		return nil, fmt.Errorf("agree to an advisory: %w", err)
@@ -378,6 +389,9 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject,
 type Standing struct {
 	// Status is the word the document's tracking carries.
 	Status string
+	// Edition is the edition the advisory says now, counting from one, which
+	// an agreement names. Zero before anything was said.
+	Edition int
 	// Agreed is the agreements on the edition the advisory currently points
 	// at, oldest first. None is what a document that may not go out looks
 	// like.
@@ -387,19 +401,35 @@ type Standing struct {
 	AgreedBy []string
 }
 
-// Where reports where the advisory stands, without generating its document.
+// Read is an advisory, what it covers, and where it stands, for a screen
+// showing all three: the standing names the edition the row read points at,
+// so the number is never newer than the title and covers beside it.
+func (s *Store) Read(ctx context.Context, subject access.Subject,
+	identifier string) (*Advisory, []Covered, *Standing, error) {
+
+	row, held, err := s.Covers(ctx, subject, identifier)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	standing, err := s.standingOf(ctx, subject, row)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return row, held, standing, nil
+}
+
+// standingOf reports where an advisory already read stands, without
+// generating its document, naming the edition that read pointed at.
 //
 // Somebody deciding whether to read it, agree to it or publish it is asking
 // before anything is assembled, and assembling a document to find out whether
 // it may go out reads every flaw it covers to answer a question about two
-// rows.
-func (s *Store) Where(ctx context.Context, subject access.Subject,
-	identifier string) (*Standing, error) {
-
-	row, err := s.byName(ctx, subject, identifier)
-	if err != nil {
-		return nil, err
-	}
+// rows. A screen showing what it read names that edition, so an edit
+// committing after the read leaves the number behind the words, which an
+// agreement to it is refused for, never ahead of them.
+//
+// row is one byName answered, which has already narrowed it to the subject.
+func (s *Store) standingOf(ctx context.Context, subject access.Subject, row *Advisory) (*Standing, error) {
 	agreed, err := s.agreed(ctx, row)
 	if err != nil {
 		return nil, err
@@ -412,9 +442,28 @@ func (s *Store) Where(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
+	edition, err := s.editionOf(ctx, row)
+	if err != nil {
+		return nil, err
+	}
 	return &Standing{
 		Status: statusOf(len(gone) > 0, len(agreed) > 0), Agreed: agreed, AgreedBy: by,
+		Edition: edition,
 	}, nil
+}
+
+// editionOf is the ordinal of the edition an advisory read points at, and
+// zero for one with none.
+func (s *Store) editionOf(ctx context.Context, row *Advisory) (int, error) {
+	var edition int
+	if row.EditionID == nil {
+		return 0, nil
+	}
+	if err := s.db.NewSelect().Model((*Edition)(nil)).Column("ordinal").
+		Where(`"id" = ?`, *row.EditionID).Scan(ctx, &edition); err != nil {
+		return 0, fmt.Errorf("read which edition it says: %w", err)
+	}
+	return edition, nil
 }
 
 // agreers is who gave each agreement, by sign-in identity, in the order given.

@@ -19,8 +19,6 @@ import (
 	"time"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/ProtonMail/go-crypto/openpgp/armor"
-	"github.com/ProtonMail/go-crypto/openpgp/packet"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
@@ -33,6 +31,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/published"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/signing"
+	"github.com/nexthop-ai/openpsirt/internal/signing/signingtest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
@@ -192,11 +191,13 @@ func TestAReaderKeepingACopyFetchesOnlyWhatChanged(t *testing.T) {
 		s := surfaceOver(w, 1000, signer)
 		document := publish.OpenVEXPath + w.Product.Name + "/" + w.Branch.Name + ".json"
 		for _, one := range []struct {
-			path  string
-			dated bool
+			path   string
+			dated  bool
+			salted bool
 		}{
-			{publish.MetadataPath, false}, {publish.FeedPath, false}, {publish.IndexPath, false},
-			{publish.OpenVEXIndex, false}, {document, true}, {document + publish.SignatureSuffix, true},
+			{publish.MetadataPath, false, false}, {publish.FeedPath, false, false},
+			{publish.IndexPath, false, false}, {publish.OpenVEXIndex, false, false},
+			{document, true, false}, {document + publish.SignatureSuffix, false, true},
 		} {
 			first := s.get(http.MethodGet, one.path, nil)
 			tag, modified := first.Header().Get("ETag"), first.Header().Get("Last-Modified")
@@ -207,11 +208,15 @@ func TestAReaderKeepingACopyFetchesOnlyWhatChanged(t *testing.T) {
 				t.Errorf("GET %s with its tag = %d, want 304", one.path, rec.Code)
 			}
 			if !one.dated {
-				// A list that shrank is newer than its newest document, so it
-				// is revalidated by its tag alone.
+				// A list that shrank is newer than its newest document, and a
+				// signature's key may be replaced by one valid before it, so
+				// each is revalidated by its tag alone.
 				if modified != "" {
-					t.Errorf("GET %s carries the date %q, which a list that shrank would not move",
+					t.Errorf("GET %s carries the date %q, which would not move with what it answers",
 						one.path, modified)
+				}
+				if one.salted {
+					continue
 				}
 				if again := s.get(http.MethodGet, one.path, nil); !bytes.Equal(again.Body.Bytes(), first.Body.Bytes()) {
 					t.Errorf("GET %s twice over nothing that moved answered two different bodies", one.path)
@@ -413,24 +418,90 @@ func TestASignedProviderSignsEveryDocument(t *testing.T) {
 // testKey is a signing key made for one test, never committed.
 func testKey(t *testing.T) string {
 	t.Helper()
-	created := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	cfg := &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA, Time: func() time.Time { return created }}
-	entity, err := openpgp.NewEntity("Example PSIRT", "", "psirt@example.test", cfg)
+	return signingtest.Key(t, signingtest.Made, 0)
+}
+
+// A reader holding a signature made by a key since replaced is sent the new
+// key's signature, whether it asks by tag or by date, and whether the new key
+// became valid before or after the document was released: the provider
+// description names only the new key, so the old signature no longer verifies
+// against anything the provider lists. A key re-signed, its fingerprint kept,
+// is sent again too, since a signature dated before its newest self-signature
+// is refused.
+func TestASignatureByAReplacedKeyIsSentAgain(t *testing.T) {
+	two(t, func(t *testing.T, f *fixture.World) {
+		w, _ := publishedWorld(t, f)
+		// Released a day ago, between the two replacement keys.
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"published_document"`).
+			Set(`"current_at" = ?`, time.Now().UTC().Add(-24*time.Hour)).
+			Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		held, resigned := signingtest.Resigned(t, signingtest.Made, time.Now().UTC().Add(-time.Minute))
+		for name, keys := range map[string][2]string{
+			"newer than the document": {testKey(t), signingtest.Key(t, time.Now().UTC().Add(-time.Minute), 0)},
+			"older than the document": {testKey(t), signingtest.Key(t, signingtest.Made.Add(24*time.Hour), 0)},
+			"re-signed":               {held, resigned},
+		} {
+			t.Run(name, func(t *testing.T) { replacedKey(t, w, keys[0], keys[1]) })
+		}
+	})
+}
+
+func replacedKey(t *testing.T, w *world, holding, replacing string) {
+	before, err := signing.Read(holding, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var out bytes.Buffer
-	writer, err := armor.Encode(&out, openpgp.PrivateKeyType, nil)
+	after, err := signing.Read(replacing, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := entity.SerializePrivate(writer, cfg); err != nil {
-		t.Fatal(err)
+	old, replaced := surfaceOver(w, 1000, before), surfaceOver(w, 1000, after)
+	var path string
+	for _, one := range strings.Fields(string(old.body(publish.IndexPath))) {
+		if strings.Contains(one, "/vex-") {
+			path = publish.DirectoryPath + one + publish.SignatureSuffix
+		}
 	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
+	if path == "" {
+		t.Fatal("the index lists no CSAF VEX document")
 	}
-	return out.String()
+	held := old.get(http.MethodGet, path, nil)
+	if held.Code != http.StatusOK {
+		t.Fatalf("GET %s = %d", path, held.Code)
+	}
+	if rec := old.get(http.MethodGet, path,
+		map[string]string{"If-None-Match": held.Header().Get("ETag")}); rec.Code != http.StatusNotModified {
+		t.Fatalf("the same key asked again by tag = %d, want 304", rec.Code)
+	}
+	// The date a reader holds is the document's, since the signature
+	// carries none.
+	dated := old.get(http.MethodGet, strings.TrimSuffix(path, publish.SignatureSuffix), nil).
+		Header().Get("Last-Modified")
+	if dated == "" {
+		t.Fatal("the document carries no date to ask by")
+	}
+	for name, value := range map[string]string{
+		"If-None-Match":     held.Header().Get("ETag"),
+		"If-Modified-Since": dated,
+	} {
+		rec := replaced.get(http.MethodGet, path, map[string]string{name: value})
+		if rec.Code != http.StatusOK {
+			t.Errorf("a signature by the replaced key asked again by %s = %d, want 200",
+				name, rec.Code)
+			continue
+		}
+		keyring, err := openpgp.ReadArmoredKeyRing(bytes.NewReader(after.PublicKey()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		doc := replaced.body(strings.TrimSuffix(path, publish.SignatureSuffix))
+		if _, err := openpgp.CheckArmoredDetachedSignature(keyring, bytes.NewReader(doc),
+			bytes.NewReader(rec.Body.Bytes()), nil); err != nil {
+			t.Errorf("the signature sent again does not verify against the new key: %v", err)
+		}
+	}
 }
 
 // An advisory is served only where it may travel and every product it covers
@@ -551,6 +622,68 @@ func TestTheSurfaceReadsOnlyTheProductsThatPublishNow(t *testing.T) {
 				rec.Body.String() != nothing {
 				t.Errorf("%s answers %d %q, want the answer for nothing", path, rec.Code, rec.Body.String())
 			}
+		}
+	})
+}
+
+// An advisory whose stored document no longer reads is logged once by the
+// surface, however many requests reach the lists or miss in the folder: the
+// surface takes no credential, so a line per request is one anybody can
+// multiply.
+func TestAnUnreadableAdvisoryIsLoggedOnceNotPerRequest(t *testing.T) {
+	two(t, func(t *testing.T, f *fixture.World) {
+		w, _ := publishedWorld(t, f)
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"advisory_issuance"`).
+			Set(`"document" = ?`, "not a document any longer").
+			Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		var logged bytes.Buffer
+		s := &surface{t: t, h: published.Handler(published.Config{
+			DB: w.DB.DB, Who: who, Base: base, Rate: 1000, List: true,
+			Logger: slog.New(slog.NewTextHandler(&logged, nil)),
+		})}
+		for range 3 {
+			for _, path := range []string{publish.IndexPath, publish.FeedPath,
+				publish.DirectoryPath + "2026/nothing-here.json"} {
+				s.get(http.MethodGet, path, nil)
+			}
+		}
+		if n := strings.Count(logged.String(), "could not be read back"); n != 1 {
+			t.Errorf("an unreadable advisory was logged %d times, want once: %s", n, logged.String())
+		}
+	})
+}
+
+// A signature the key has expired before is logged once by the surface,
+// however many requests ask for one: the surface takes no credential, so a
+// line per request is one anybody can multiply.
+func TestAnExpiredKeyIsLoggedOnceNotPerRequest(t *testing.T) {
+	two(t, func(t *testing.T, f *fixture.World) {
+		w, _ := publishedWorld(t, f)
+		// Released after the key expires.
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"published_document"`).
+			Set(`"current_at" = ?`, time.Now().UTC().Add(48*time.Hour)).
+			Where("1 = 1").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		signer, err := signing.Read(signingtest.Key(t, time.Now().UTC().Add(-time.Hour), 24*3600), "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var logged bytes.Buffer
+		s := &surface{t: t, h: published.Handler(published.Config{
+			DB: w.DB.DB, Who: who, Base: base, Rate: 1000, List: true, Signer: signer,
+			Logger: slog.New(slog.NewTextHandler(&logged, nil)),
+		})}
+		path := publish.OpenVEXPath + w.Product.Name + "/" + w.Branch.Name + ".json" + publish.SignatureSuffix
+		for range 3 {
+			if rec := s.get(http.MethodGet, path, nil); rec.Code != http.StatusInternalServerError {
+				t.Fatalf("GET %s past the key's expiry = %d, want 500", path, rec.Code)
+			}
+		}
+		if n := strings.Count(logged.String(), "expired at"); n != 1 {
+			t.Errorf("an expired key was logged %d times, want once: %s", n, logged.String())
 		}
 	})
 }

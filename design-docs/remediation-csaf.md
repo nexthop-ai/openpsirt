@@ -59,7 +59,8 @@ Everything is already held. A field the record cannot answer is left out.
 
 | Element | Filled by | Reason |
 |---|---|---|
-| References | The issue's write-up and every other address a report points at, once each, then this document's own address | On the document, which the profile requires. The own address only where the deployment says where documents are reachable, built by the directory's naming rule |
+| References | The issue's write-up and every other address a report points at, once each, where it parses as an absolute URI on `http`, `https` or `mailto` with no space or control character, then this document's own address | On the document, which the profile requires. The own address only where the deployment says where documents are reachable, built by the directory's naming rule |
+| CVE | The issue's name, or failing that its first other name, in the CVE program's form; every other name in the identifiers | The standard holds the field to that form, so a name merely starting `CVE-` fails the whole document |
 | Scores | The version 3 rating, scored from its vector, for every release the flaw is or was in; none for known not affected | The score object holds versions 2 and 3, so a flaw rated under 4 alone states none |
 | Score order | The ratings a report stated, newest first, then the vector of a flaw assessed here | |
 | Vector | The base vector inside the one held | Other metrics are accepted unchecked; a validator refuses a metric name or value the specification does not define |

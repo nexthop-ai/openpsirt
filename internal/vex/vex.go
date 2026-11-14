@@ -31,6 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -108,9 +109,8 @@ type Statement struct {
 	// not_affected. It is the same vocabulary a dismissal already records.
 	Justification string `json:"justification,omitempty"`
 	// ActionStatement is what a holder can do about a flaw that is not going
-	// to be fixed. The format requires one on an affected statement, which is
-	// why silence is not an option there and why only a decision carrying a
-	// mitigation is published as one.
+	// to be fixed, or that no fix is planned where the decision named
+	// nothing. The format requires one on an affected statement.
 	ActionStatement string `json:"action_statement,omitempty"`
 	// ImpactStatement is what stops the flaw, where somebody named it.
 	//
@@ -328,67 +328,18 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		return nil, refusal.Errorf("%q is not a kind of document this writes", kind)
 	}
 
-	// One statement per issue and component, from the decisions that stand and
-	// have been agreed to. Read from the findings this build actually holds:
-	// a decision is about a product's code and reaches every build whose
-	// versions match it, so what belongs in this document is what this build
-	// ships rather than everything the product has ever decided.
-	//
-	// Grouped by the issue and the component and nothing about the decision,
-	// because a statement is about a product and a component and the format has
-	// no finer grain to say it at. Two occurrences decided in separate sittings
-	// differ in when and in what was written, and grouping on those emits the
-	// same decision twice, or, where the outcomes differ, two statements
-	// contradicting each other about one component. Where a component's
-	// occurrences disagree, each occurrence a decision covers is stated on its
-	// own, naming what pulls the component in as the product.
-	rows, placed, err := finding.CoveredInBuild(ctx, s.idb(), named.ProductID, build.ID, visible,
-		s.carrying())
+	// An issue's other names are withheld by the reach of the reader the
+	// document reaches. A preview's reader may read undisclosed work in this
+	// product, which says nothing of a flaw recorded in another product or at
+	// security testing visibility.
+	got, err := s.gather(ctx, named, build.ID, gathering{
+		visible: visible, reach: reader, suppliers: kind == WithSuppliers,
+	})
 	if err != nil {
 		return nil, err
 	}
-	fixed, err := s.patched(ctx, build.ID, visible)
-	if err != nil {
-		return nil, err
-	}
-	var stated []statedBySupplier
-	if kind == WithSuppliers {
-		if stated, err = s.disclaimed(ctx, build.ID, visible); err != nil {
-			return nil, err
-		}
-	}
-	// Refused rather than truncated. There is no second request for the rest
-	// of a document, and one that stopped at a ceiling would say "nothing is
-	// claimed about this" by omission about everything past it — to every
-	// customer running a scanner, which is the one thing a document of
-	// dismissals must never say.
-	//
-	// Named, so the caller can answer it as something to narrow rather than as
-	// this being broken. Returned bare it fell through to "the document could
-	// not be generated" with a 500, and the sentence saying which build and
-	// what the limit is went to the log instead of to the person who can act
-	// on it.
-	if len(rows)+len(placed)+len(fixed)+len(stated) > s.carrying() {
-		return nil, fmt.Errorf("%w: %s %s %s stands on more than %d agreed decisions: a "+
-			"document that stopped at the limit would say nothing is claimed about "+
-			"everything past it",
-			ErrTooLarge, named.Product, named.BranchOrTag, named.Variant, s.carrying())
-	}
-
-	// The words each of those decisions rests on, read off the decision the
-	// statement is about. One statement for the document rather than one per
-	// component.
-	decided := make([]int64, 0, len(rows)+len(placed))
-	for _, row := range rows {
-		decided = append(decided, row.DecidedBy)
-	}
-	for _, row := range placed {
-		decided = append(decided, row.DecidedBy)
-	}
-	said, err := finding.StatedBy(ctx, s.idb(), decided)
-	if err != nil {
-		return nil, err
-	}
+	rows, placed, fixed, stated := got.rows, got.placed, got.fixed, got.stated
+	said, alsoCalled := got.said, got.alsoCalled
 
 	// Which revision this is, read from what has gone out for this build.
 	// A document generated twice with nothing published in between is the
@@ -403,47 +354,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 		Timestamp: s.now().UTC(), Version: revision,
 		Statements: make([]Statement, 0, len(rows)),
 	}
-	// The other names each issue goes by. The whole point of the field is that
-	// a customer's scanner matched under the name *its* database uses,
-	// which is often not the one we filed under — a later CVE for a flaw
-	// first reported under a vendor identifier, or the reverse. A document
-	// declaring the field and never filling it answers nobody searching by
-	// the name they have, which is the one search this document exists to
-	// satisfy.
-	issues := make([]int64, 0, len(rows)+len(fixed))
-	for _, row := range rows {
-		issues = append(issues, row.VulnerabilityID)
-	}
-	for _, row := range placed {
-		issues = append(issues, row.VulnerabilityID)
-	}
-	for _, row := range fixed {
-		issues = append(issues, row.VulnerabilityID)
-	}
-	for _, row := range stated {
-		issues = append(issues, row.VulnerabilityID)
-	}
-	alsoCalled, err := s.namesOf(ctx, issues)
-	if err != nil {
-		return nil, err
-	}
-	// A document publishes no other name of an issue that a flaw of ours
-	// recorded out of its reader's reach wrote onto it: one of them is the
-	// name minted for it. A preview's reader may read undisclosed work in this
-	// product, which says nothing of a flaw recorded in another product or at
-	// security testing visibility.
-	withheld, err := finding.RecordedOutOfReach(ctx, s.idb(), reader, issues)
-	if err != nil {
-		return nil, err
-	}
-	for issue := range withheld {
-		delete(alsoCalled, issue)
-	}
-
-	shipped, err := s.rootOf(ctx, named, build.ID)
-	if err != nil {
-		return nil, err
-	}
+	shipped := got.root
 	for _, row := range rows {
 		statement, err := claimed(Issue{Name: row.Identifier, Aliases: alsoCalled[row.VulnerabilityID]},
 			shipped, subject(row.Purl, row.Component), row.Outcome, said[row.DecidedBy])
@@ -505,6 +416,130 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 	return doc, nil
 }
 
+// gathering is what one build's statements are read at: the visibilities,
+// the reader whose reach withholds an issue's other names, and which further
+// kinds of statement are read.
+type gathering struct {
+	visible   []access.Visibility
+	reach     access.Subject
+	suppliers bool
+	affected  bool
+}
+
+// gathered is what one build's statements are made from.
+type gathered struct {
+	rows     []finding.CoveredGroup
+	placed   []finding.OccurrenceCovered
+	affected []finding.AffectedGroup
+	fixed    []fixedByPatch
+	stated   []statedBySupplier
+	// said is the words of each decision a statement rests on, by the
+	// occurrence it decided.
+	said map[int64]finding.Stated
+	// alsoCalled is each issue's other names, less those withheld.
+	alsoCalled map[int64][]string
+	// root is what the build's statements name as the product.
+	root string
+}
+
+// gather reads what one build's statements are made from, the per-build
+// document and the published facts alike, so a rule about what a statement
+// rests on or withholds holds for both.
+//
+// One statement per issue and component, from the decisions that stand and
+// have been agreed to. Read from the findings this build actually holds: a
+// decision is about a product's code and reaches every build whose versions
+// match it, so what belongs is what this build ships rather than everything
+// the product has ever decided.
+//
+// Grouped by the issue and the component and nothing about the decision,
+// because a statement is about a product and a component and the format has
+// no finer grain to say it at. Two occurrences decided in separate sittings
+// differ in when and in what was written, and grouping on those emits the same
+// decision twice, or, where the outcomes differ, two statements contradicting
+// each other about one component. Where a component's occurrences disagree,
+// each occurrence a decision covers is stated on its own, naming what pulls the
+// component in as the product.
+func (s *Store) gather(ctx context.Context, named *catalog.Named, buildID int64,
+	at gathering) (*gathered, error) {
+
+	got := &gathered{}
+	var err error
+	if got.rows, got.placed, err = finding.CoveredInBuild(ctx, s.idb(), named.ProductID, buildID,
+		at.visible, s.carrying()); err != nil {
+		return nil, err
+	}
+	if at.affected {
+		if got.affected, err = finding.AffectedInBuild(ctx, s.idb(), named.ProductID, buildID,
+			at.visible, s.carrying()); err != nil {
+			return nil, err
+		}
+	}
+	if got.fixed, err = s.patched(ctx, buildID, at.visible); err != nil {
+		return nil, err
+	}
+	if at.suppliers {
+		if got.stated, err = s.disclaimed(ctx, buildID, at.visible); err != nil {
+			return nil, err
+		}
+	}
+	// Refused rather than truncated. There is no second request for the rest
+	// of a document, and one that stopped at a ceiling would say "nothing is
+	// claimed about this" by omission about everything past it, to every
+	// customer running a scanner. Named, so the caller answers it as something
+	// to narrow and the sentence saying which build and what the limit is
+	// reaches the person who can act on it.
+	if len(got.rows)+len(got.placed)+len(got.affected)+len(got.fixed)+len(got.stated) > s.carrying() {
+		return nil, fmt.Errorf("%w: %s %s %s states more than %d statements: a "+
+			"document that stopped at the limit would say nothing is claimed about "+
+			"everything past it",
+			ErrTooLarge, named.Product, named.BranchOrTag, named.Variant, s.carrying())
+	}
+
+	// The words each decision rests on, read off the decision the statement
+	// is about.
+	decided := make([]int64, 0, len(got.rows)+len(got.placed)+len(got.affected))
+	issues := make([]int64, 0, len(got.rows)+len(got.placed)+len(got.affected)+
+		len(got.fixed)+len(got.stated))
+	for _, row := range got.rows {
+		decided, issues = append(decided, row.DecidedBy), append(issues, row.VulnerabilityID)
+	}
+	for _, row := range got.placed {
+		decided, issues = append(decided, row.DecidedBy), append(issues, row.VulnerabilityID)
+	}
+	for _, row := range got.affected {
+		decided, issues = append(decided, row.DecidedBy), append(issues, row.VulnerabilityID)
+	}
+	for _, row := range got.fixed {
+		issues = append(issues, row.VulnerabilityID)
+	}
+	for _, row := range got.stated {
+		issues = append(issues, row.VulnerabilityID)
+	}
+	if got.said, err = finding.StatedBy(ctx, s.idb(), decided); err != nil {
+		return nil, err
+	}
+	// The other names each issue goes by: a customer's scanner matches under
+	// the name its database uses, which is often not the one filed under here.
+	if got.alsoCalled, err = s.namesOf(ctx, issues); err != nil {
+		return nil, err
+	}
+	// No other name of an issue that a flaw of ours recorded out of the
+	// reader's reach wrote onto it is published: one of them is the name
+	// minted for it.
+	withheld, err := finding.RecordedOutOfReach(ctx, s.idb(), at.reach, issues)
+	if err != nil {
+		return nil, err
+	}
+	for issue := range withheld {
+		delete(got.alsoCalled, issue)
+	}
+	if got.root, err = s.rootOf(ctx, named, buildID); err != nil {
+		return nil, err
+	}
+	return got, nil
+}
+
 // fixedByPatch is an issue a patch the build declares has fixed in one
 // component.
 type fixedByPatch struct {
@@ -561,14 +596,25 @@ func (s *Store) patched(ctx context.Context, buildID int64,
 		when[row.ID] = row.ClosedAt
 	}
 
+	return datedFixes(rows, when), nil
+}
+
+// datedFixes states each group fixed as of the moment its first finding
+// closed. A group whose finding the second read missed is left out, as a
+// supplier's statement is: a fix dated the zero moment is a claim nobody made.
+func datedFixes(rows []closedGroup, when map[int64]time.Time) []fixedByPatch {
 	fixed := make([]fixedByPatch, 0, len(rows))
 	for _, row := range rows {
+		at, found := when[row.First]
+		if !found {
+			continue
+		}
 		fixed = append(fixed, fixedByPatch{
 			VulnerabilityID: row.VulnerabilityID, Identifier: row.Identifier,
-			Component: row.Component, Purl: row.Purl, PatchedAt: when[row.First],
+			Component: row.Component, Purl: row.Purl, PatchedAt: at,
 		})
 	}
-	return fixed, nil
+	return fixed
 }
 
 // known is a supplier's justification where it is one the format defines, and
@@ -645,16 +691,7 @@ func (s *Store) disclaimed(ctx context.Context, buildID int64,
 	for _, row := range rows {
 		ids = append(ids, row.First)
 	}
-	var read []struct {
-		ID            int64     `bun:"id"`
-		ClosedAt      time.Time `bun:"closed_at"`
-		Publisher     string    `bun:"publisher"`
-		Product       string    `bun:"product"`
-		Version       string    `bun:"version"`
-		Justification string    `bun:"justification"`
-		Statement     string    `bun:"statement"`
-		Document      string    `bun:"document"`
-	}
+	var read []supplierWords
 	where, args := database.InAnyOf(`"f"."id"`, ids)
 	if err := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
@@ -672,14 +709,38 @@ func (s *Store) disclaimed(ctx context.Context, buildID int64,
 		Scan(ctx, &read); err != nil {
 		return nil, fmt.Errorf("read the statements that closed them: %w", err)
 	}
+	return attributedTo(rows, read), nil
+}
+
+// supplierWords is the statement that closed one finding, and when it did.
+type supplierWords struct {
+	ID            int64     `bun:"id"`
+	ClosedAt      time.Time `bun:"closed_at"`
+	Publisher     string    `bun:"publisher"`
+	Product       string    `bun:"product"`
+	Version       string    `bun:"version"`
+	Justification string    `bun:"justification"`
+	Statement     string    `bun:"statement"`
+	Document      string    `bun:"document"`
+}
+
+// attributedTo states each group in the words of the statement that closed
+// its first finding. A group whose finding the second read did not find is
+// left out: the two reads are separate, and stating it in the words of
+// whichever statement came first would put one supplier's name on another's
+// product.
+func attributedTo(rows []closedGroup, read []supplierWords) []statedBySupplier {
 	byID := make(map[int64]int, len(read))
 	for i, row := range read {
 		byID[row.ID] = i
 	}
-
 	stated := make([]statedBySupplier, 0, len(rows))
 	for _, row := range rows {
-		one := read[byID[row.First]]
+		at, found := byID[row.First]
+		if !found {
+			continue
+		}
+		one := read[at]
 		stated = append(stated, statedBySupplier{
 			VulnerabilityID: row.VulnerabilityID, Identifier: row.Identifier,
 			Component: row.Component, Purl: row.Purl,
@@ -688,7 +749,7 @@ func (s *Store) disclaimed(ctx context.Context, buildID int64,
 			Document: one.Document, ClosedAt: one.ClosedAt,
 		})
 	}
-	return stated, nil
+	return stated
 }
 
 // statusOf turns an outcome into what the format calls it, and is empty for
@@ -718,10 +779,10 @@ func statusOf(outcome string) string {
 
 // statuses is the format's status for each outcome a document states.
 var statuses = map[string]string{
-	finding.OutcomeNotApplicable: "not_affected",
-	finding.OutcomeMismatched:    "not_affected",
-	finding.OutcomeAlreadyFixed:  "fixed",
-	finding.OutcomeWontFix:       "affected",
+	finding.OutcomeNotApplicable: NotAffected,
+	finding.OutcomeMismatched:    NotAffected,
+	finding.OutcomeAlreadyFixed:  Fixed,
+	finding.OutcomeWontFix:       Affected,
 }
 
 // subject is what a statement names the component by: its package
@@ -737,31 +798,55 @@ func subject(purl, component string) string {
 	return purl
 }
 
-// claimed is the statement an agreed decision makes about one component beneath
-// one product, in the words the decision it rests on states.
+// fields is what an agreed decision states, field by field: its status, and
+// the words that go with that status.
+type fields struct {
+	status, justification, impact, action string
+}
+
+// fieldsOf is what an agreed decision states, by its outcome and the words it
+// rests on.
 //
 // The same sentence goes in a different field depending on what is being said
 // about it. On a decision that something does not apply it is why, beside the
 // category a machine reads; on one that will not be fixed it is what to do
-// instead, which is the field the format asks for and the reason such a decision
-// is published at all.
+// instead, which is the field the format asks for.
+//
+// A decision that will not be fixed and names nothing to do instead says that
+// no fix is planned: both formats require an action on an affected statement,
+// and the reasoning behind the decision is a triager's argument to a second
+// person, never published.
+func fieldsOf(outcome string, words finding.Stated) (fields, error) {
+	out := fields{status: statusOf(outcome)}
+	switch out.status {
+	case "":
+		return fields{}, fmt.Errorf("outcome %q has no VEX status", outcome)
+	case NotAffected:
+		out.justification = words.Justification
+		out.impact = words.Mitigation
+	case Affected:
+		out.action = words.Mitigation
+		if strings.TrimSpace(out.action) == "" {
+			out.action = NoFixPlanned
+		}
+	}
+	return out, nil
+}
+
+// claimed is the statement an agreed decision makes about one component beneath
+// one product, in the words the decision it rests on states.
 func claimed(issue Issue, product, about, outcome string, words finding.Stated) (Statement, error) {
-	statement := Statement{
+	stated, err := fieldsOf(outcome, words)
+	if err != nil {
+		return Statement{}, err
+	}
+	return Statement{
 		Vulnerability: issue,
 		Timestamp:     words.ProposedAt.UTC(),
 		Products:      []Shipped{{ID: product, Subcomponents: []Inside{{ID: about}}}},
-		Status:        statusOf(outcome),
-	}
-	switch statement.Status {
-	case "":
-		return Statement{}, fmt.Errorf("outcome %q has no VEX status", outcome)
-	case "not_affected":
-		statement.Justification = words.Justification
-		statement.ImpactStatement = words.Mitigation
-	case "affected":
-		statement.ActionStatement = words.Mitigation
-	}
-	return statement, nil
+		Status:        stated.status, Justification: stated.justification,
+		ImpactStatement: stated.impact, ActionStatement: stated.action,
+	}, nil
 }
 
 // identify is what the document calls itself, which is the same string every

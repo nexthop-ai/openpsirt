@@ -103,7 +103,7 @@ Two outcomes carry a mitigation, and no other may.
 | Rule | Reason |
 |---|---|
 | Removing a mitigation expires nothing | It is configuration, which moves no version and which nothing here watches; named, the control is checkable |
-| A will-not-fix is published only where it fills the mitigation | No scan or advisory ever closes such a flaw, and the mitigation is what makes the published status worth reading |
+| A will-not-fix is published as affected, its action the mitigation where filled, else that no fix is planned; its reasoning is never published | No scan or advisory ever closes such a flaw, so the published statement is the one place a customer learns it stays; `design-docs/remediation-vex.md` § Statements owns the mapping |
 
 ### Outcomes on a tag
 

@@ -228,21 +228,23 @@ databases saves.
 
 ## The v0.13.0 upgrade
 
-Migration 47. One column is filled. Each piece is stepped over where a stopped
-upgrade made it already. One set of rows moves: of a publisher's statements
-standing about one subject in documents of one kind, the older are set aside as
-overtaken by the newest, by upload order, which a stopped upgrade run again
-finds done.
+Migration 47. One column is filled in each of `advisory_issue` and
+`advisory_override`. Each piece is stepped over where a stopped upgrade made it
+already. One set of rows moves: of a publisher's statements standing about one
+subject in documents of one kind, the older are set aside as overtaken by the
+newest, by upload order, which a stopped upgrade run again finds done.
 
 | Table | Gains |
 |---|---|
 | `advisory_issue` | A mark held while the issue is on the advisory: true on every row not taken off, null on the rest; and the issue unique on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § The advisory) |
+| `advisory_override` | A mark held while the release is marked affected: true on every row not cleared, null on the rest; and the release marked once on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § Editions and agreement) |
 | `graph_node` | The name and the version the build stated, the name's fold and the stated source's fold, all empty, and an index of each build's nodes by each fold (`design-docs/data-model-graph.md` § The dependency graph) |
 | `received_vex_statement` | When each statement was made and which newer statement of its publisher set it aside, both empty, so a statement held before the upgrade is ordered by its upload (`design-docs/ingest-claims.md` § Administrator-supplied VEX); the older of two standing about one subject, such as two supplier advisories, set aside as overtaken by the newer |
 
 | Table | Loses |
 |---|---|
 | `advisory_issue` | The issue unique on the advisory over every row, dropped once the rule holding the mark stands. MySQL and MariaDB hold the advisory's foreign key on an index led by its column and refuse to drop the last one |
+| `advisory_override` | The release marked once over every row, dropped once the rule holding the mark stands. MySQL and MariaDB hold the advisory's foreign key on an index led by its column and refuse to drop the last one |
 
 | Upgrade note | Detail |
 |---|---|
@@ -253,6 +255,7 @@ finds done.
 | Check, on each engine | What it holds |
 |---|---|
 | A v0.12.0 database holding an issue on an advisory and one taken off | Upgraded, the table built as declared, the first marked, the second not, the second may be put back and the first may not be put on twice |
+| A v0.12.0 database holding a release marked affected and one cleared | Upgraded, the table built as declared, the first marked, the second not, the second may be marked again and the first may not be marked twice |
 | The same stopped after the column, or after the rule holding the mark, on the servers | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database holding a node | Upgraded, the table built as declared, the node holding no name or version |
 | The same stopped after the name, or after every node column and before the index, on the servers | Upgraded the same, nothing already made replaced |
@@ -265,3 +268,4 @@ finds done.
 |---|---|
 | A database a release before v0.9.0 built is not upgraded | The baseline makes v0.9.0's schema and no migration here reads an earlier one. v0.10.2 upgrades it first (`design-docs/database-migrations.md` § The baseline) |
 | An upgraded database keeps only the last stretch v0.12.0 recorded for an issue on an advisory | v0.12.0 revived the row on putting an issue back and overwrote when it was first added, and nothing else recorded it. An issue taken off, put back and taken off again before the upgrade reads as not named by an issuance from an earlier stretch |
+| An upgraded database keeps only the last stretch v0.12.0 recorded for a release marked affected | v0.12.0 revived the row on marking a release again and overwrote who marked and cleared it before |

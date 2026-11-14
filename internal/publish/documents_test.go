@@ -4,16 +4,23 @@
 package publish_test
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
@@ -250,7 +257,7 @@ func TestEveryStatusIsPublishedUnlessLimited(t *testing.T) {
 		var issues []string
 		for _, one := range w.listed(setting.SettledStatuses) {
 			if one.Kind == publish.CSAFVEX {
-				issues = append(issues, strings.TrimPrefix(one.TrackingID, "VEX-"+w.Product.Name+"-"))
+				issues = append(issues, strings.TrimPrefix(one.TrackingID, "VEX-"+strconv.FormatInt(w.Product.ID, 10)+"-"+w.Product.Name+"-"))
 			}
 		}
 		if !slices.Equal(issues, []string{"CVE-2026-1001"}) {
@@ -362,37 +369,143 @@ func TestADocumentWithNothingToSayIsWithdrawn(t *testing.T) {
 	})
 }
 
-// Two products whose names the standard's filename rule folds alike cannot
-// both publish a CSAF document about one issue. Both turned on at once, past
-// the refusal an administrator's write meets, the second is refused in words
-// naming the first, and everything else it publishes is still written.
-func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
+// Two products publish a CSAF VEX document each at a path of its own, whether
+// their names fold alike under the standard's filename rule or one product's
+// name and issue fold like the other's across the boundary between them: a
+// tracking identifier opens on its product's identifier.
+func TestTwoProductsNeverShareACSAFPath(t *testing.T) {
+	for _, pair := range [][2][2]string{
+		{{"edge.os", "CVE-2026-1001"}, {"edge os", "CVE-2026-1001"}},
+		{{"acme", "GHSA-x-y"}, {"acme-ghsa", "x-y"}},
+	} {
+		t.Run(pair[0][0]+" beside "+pair[1][0], func(t *testing.T) {
+			fixture.Each(t, func(t *testing.T, f *fixture.World) {
+				w := newWorld(t, f)
+				for i, one := range pair {
+					product := w.DeclareProduct(one[0], one[0])
+					w.hold(product)
+					build := w.BuildFor(w.DeclareBranchOrTag(product, "main", catalog.Branch, nil),
+						w.DeclareVariant(product, "x86", true))
+					root := graph.Described{Purl: "pkg:generic/edge@1." + fmt.Sprint(i), Name: "edge",
+						Version: "1." + fmt.Sprint(i)}
+					w.ship(build, root, edge{root, openssl})
+					w.report(build, reported{one[1], openssl})
+					w.decide(build, one[1], openssl,
+						decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+					w.publishes(product, true)
+				}
+				wrote, err := w.pass.Once(t.Context())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if wrote.Skipped != 0 {
+					t.Errorf("%d products were not worked out, want none", wrote.Skipped)
+				}
+				paths := map[string]bool{}
+				for _, one := range w.listed("all") {
+					if one.Kind == publish.CSAFVEX {
+						paths[one.Path] = true
+					}
+				}
+				if len(paths) != 2 {
+					t.Errorf("the two products published CSAF VEX documents at %v, want two paths", paths)
+				}
+			})
+		})
+	}
+}
+
+// A CSAF VEX document held at a path its tracking identifier no longer gives
+// is published at the new one as a new document, its first version, and the
+// old path serves nothing.
+func TestADocumentWhosePathMovedStartsAgainAtTheNewOne(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, f *fixture.World) {
 		w := newWorld(t, f)
-		var buildIDs []*catalog.Build
-		for _, name := range []string{"edge.os", "edge os"} {
-			product := w.DeclareProduct(name, name)
-			w.hold(product)
-			build := w.BuildFor(w.DeclareBranchOrTag(product, "main", catalog.Branch, nil),
-				w.DeclareVariant(product, "x86", true))
-			root := graph.Described{Purl: "pkg:generic/edge@1." + fmt.Sprint(len(buildIDs)), Name: "edge",
-				Version: "1." + fmt.Sprint(len(buildIDs))}
-			w.ship(build, root, edge{root, openssl})
-			w.report(build, reported{"CVE-2026-1001", openssl})
-			w.decide(build, "CVE-2026-1001", openssl,
-				decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
-			w.publishes(product, true)
-			buildIDs = append(buildIDs, build)
+		ctx := t.Context()
+		root := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}
+		w.ship(w.Build, root, edge{root, openssl})
+		w.report(w.Build, reported{"CVE-2026-1001", openssl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(w.Product, true)
+		if _, err := w.pass.Once(ctx); err != nil {
+			t.Fatal(err)
 		}
+		var now publish.Document
+		if err := w.DB.DB.NewSelect().Model(&now).ExcludeColumn("document").
+			Where(`"pub"."kind" = ?`, publish.CSAFVEX).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// Held where an earlier shape of the tracking identifier put it.
+		old := publish.DirectoryPath + "2025/vex-sonic-cve-2026-1001.json"
+		sum := sha256.Sum256([]byte(old))
+		if _, err := w.DB.DB.NewUpdate().TableExpr(`"published_document"`).
+			Set(`"path" = ?`, old).Set(`"path_digest" = ?`, hex.EncodeToString(sum[:])).
+			Set(`"tracking_id" = ?`, "VEX-sonic-CVE-2026-1001").Set(`"version" = ?`, 3).
+			Set(`"first_at" = ?`, now.FirstAt.AddDate(-1, 0, 0)).
+			Where(`"id" = ?`, now.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.documents.At(ctx, w.anybody(), old, "all"); err != nil {
+			t.Fatalf("the old path serves nothing before the pass: %v", err)
+		}
+		wrote, err := w.pass.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wrote.Revised != 1 {
+			t.Errorf("the pass revised %d documents, want the one that moved", wrote.Revised)
+		}
+		var moved publish.Document
+		if err := w.DB.DB.NewSelect().Model(&moved).ExcludeColumn("document").
+			Where(`"pub"."id" = ?`, now.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if moved.Path != now.Path || moved.TrackingID != now.TrackingID || moved.Version != 1 {
+			t.Errorf("the moved document is at %s as %s version %d, want %s as %s version 1",
+				moved.Path, moved.TrackingID, moved.Version, now.Path, now.TrackingID)
+		}
+		if moved.FirstAt.Year() != now.FirstAt.Year() {
+			t.Errorf("the moved document was first released in %d, want %d",
+				moved.FirstAt.Year(), now.FirstAt.Year())
+		}
+		if _, err := w.documents.At(ctx, w.anybody(), old, "all"); !errors.Is(err, publish.ErrNotPublished) {
+			t.Errorf("the old path answered %v, want nothing published there", err)
+		}
+		// Settled where it moved to, rather than moving again every pass.
+		again, err := w.pass.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.Revised != 0 {
+			t.Errorf("the pass after the move revised %d documents, want none", again.Revised)
+		}
+	})
+}
+
+// Two issues of one product whose names fold alike under the standard's
+// filename rule cannot both be published at the one path they fold to. The
+// second is refused in words naming the first, and everything else the
+// product publishes is still written.
+func TestTwoIssuesFoldedAlikeDoNotStopEachOther(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		root := graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"}
+		w.ship(w.Build, root, edge{root, openssl})
+		w.report(w.Build, reported{"GHSA-a.b", openssl}, reported{"GHSA-a_b", openssl})
+		for _, issue := range []string{"GHSA-a.b", "GHSA-a_b"} {
+			w.decide(w.Build, issue, openssl,
+				decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		}
+		w.publishes(w.Product, true)
 		wrote, err := w.pass.Once(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
 		if wrote.Skipped != 1 {
-			t.Errorf("%d products were not worked out, want the second", wrote.Skipped)
+			t.Errorf("%d products were not worked out, want this one", wrote.Skipped)
 		}
-		openvex := 0
-		csafCount := 0
+		openvex, csafCount := 0, 0
 		for _, one := range w.listed("all") {
 			switch one.Kind {
 			case publish.OpenVEX:
@@ -401,34 +514,14 @@ func TestTwoProductsFoldedAlikeDoNotStopEachOther(t *testing.T) {
 				csafCount++
 			}
 		}
-		if openvex != 2 || csafCount != 1 {
-			t.Errorf("published %d OpenVEX and %d CSAF documents, want both OpenVEX and one CSAF",
-				openvex, csafCount)
+		if openvex != 1 || csafCount != 1 {
+			t.Errorf("published %d OpenVEX and %d CSAF documents, want one of each", openvex, csafCount)
 		}
-		// And it stays that way rather than going round again.
-		again, err := w.pass.Once(t.Context())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if again.Skipped != 1 || again.Revised != 0 {
-			t.Errorf("the next pass skipped %d and revised %d", again.Skipped, again.Revised)
-		}
-		_, err = w.pass.Product(t.Context(), w.anybody(), mustProduct(t, w, "edge os"), "all")
-		if !errors.Is(err, publish.ErrPathTaken) || !strings.Contains(err.Error(), "of edge.os,") ||
-			!strings.Contains(err.Error(), "turn publishing off for this product") {
-			t.Errorf("the second product's document was refused as %v, want the path taken by edge.os", err)
+		_, err = w.pass.Product(t.Context(), w.anybody(), w.Product, "all")
+		if !errors.Is(err, publish.ErrPathTaken) || !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(w.Product.DisplayName)+"'s document about ghsa-a") {
+			t.Errorf("the second issue's document was refused as %v, want the path taken by the first", err)
 		}
 	})
-}
-
-// mustProduct is a product by name.
-func mustProduct(t *testing.T, w *world, name string) *catalog.Product {
-	t.Helper()
-	product, err := w.Catalog.ProductByName(t.Context(), name)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return product
 }
 
 // A document names the address it is served at and its publisher, so moving
@@ -451,6 +544,159 @@ func TestMovingTheAddressRevisesEveryDocument(t *testing.T) {
 		}
 		if wrote.Revised != 2 {
 			t.Errorf("moving the address revised %d documents, want both", wrote.Revised)
+		}
+	})
+}
+
+// A decision that it will not be fixed is stated affected with what to do
+// instead where the decision named it, and that no fix is planned where it
+// named nothing: both formats require an action on an affected statement, and
+// an empty one fails a reader's validator for the whole document.
+func TestAWontFixNamingNothingToDoStatesThatNoFixIsPlanned(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.decide(w.Build, "CVE-2026-1001", openssl, decision{outcome: triage.WontFix})
+		w.decide(w.Build, "CVE-2026-1002", libnl,
+			decision{outcome: triage.WontFix, mitigation: "Turn the netlink listener off."})
+		w.publishes(w.Product, true)
+		w.write()
+
+		type said struct{ category, details string }
+		for issue, want := range map[string][]said{
+			"CVE-2026-1001": {{"no_fix_planned", vex.NoFixPlanned}},
+			"CVE-2026-1002": {{"mitigation", "Turn the netlink listener off."},
+				{"no_fix_planned", vex.NoFixPlanned}},
+		} {
+			doc := w.csafAbout(w.Product, issue)
+			if doc == nil {
+				t.Fatalf("no CSAF document about %s", issue)
+			}
+			var got []said
+			for _, one := range doc.Vulnerabilities[0].Remediations {
+				if one.Details == "" {
+					t.Errorf("%s: a %s remediation has no details", issue, one.Category)
+				}
+				got = append(got, said{one.Category, one.Details})
+			}
+			if !slices.Equal(got, want) {
+				t.Errorf("%s: remediations %v, want %v", issue, got, want)
+			}
+		}
+
+		branchOrTag := w.openVEXAbout(w.Product, fixture.BranchName)
+		if branchOrTag == nil {
+			t.Fatal("no OpenVEX document about the branch")
+		}
+		want := map[string]string{
+			"CVE-2026-1001": vex.NoFixPlanned, "CVE-2026-1002": "Turn the netlink listener off.",
+		}
+		for _, statement := range branchOrTag.Statements {
+			if statement.Status != vex.Affected {
+				t.Errorf("%s is stated %s", statement.Vulnerability.Name, statement.Status)
+			}
+			if statement.ActionStatement != want[statement.Vulnerability.Name] {
+				t.Errorf("%s: action %q, want %q", statement.Vulnerability.Name,
+					statement.ActionStatement, want[statement.Vulnerability.Name])
+			}
+			delete(want, statement.Vulnerability.Name)
+		}
+		if len(want) != 0 {
+			t.Errorf("no OpenVEX statement about %v", want)
+		}
+	})
+}
+
+// A pass that generated a product's documents before publishing was turned
+// off writes none of them after it: neither the document stating again what
+// it stated, nor a revision, nor a new one. Turned on again, the product
+// serves nothing until a pass works its documents out again.
+func TestAPassRacingATurnOffServesNothingWhenTurnedOnAgain(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(w.Product, true)
+		w.write()
+		// Who the pass generates for, read as the pass reads it before
+		// publishing is turned off.
+		subject := w.anybody()
+		statuses, err := publish.Statuses(t.Context(), w.DB.DB)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Something new to say, so the late write would be a new document
+		// and a revision as well as one stated again.
+		w.decide(w.Build, "CVE-2026-1002", libnl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
+		// Turned off as an administrator turns it off.
+		if err := w.documents.TurnOff(t.Context(), w.Product.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		wrote, err := w.pass.Product(t.Context(), subject, w.Product, statuses)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if wrote.Revised != 0 {
+			t.Errorf("a pass generated before the turn-off wrote %d documents after it", wrote.Revised)
+		}
+		w.publishes(w.Product, true)
+		if listed := w.listed("all"); len(listed) != 0 {
+			t.Errorf("turned on again, the product serves %d documents no pass worked out since: %+v",
+				len(listed), listed)
+		}
+	})
+}
+
+// A pass landing while a turn-off is open writes nothing the turn-off leaves
+// served. The turn-off takes the product's row before it withdraws, so a pass
+// either waits for it and matches nothing, or lands first and is withdrawn.
+// The pass lands just before the turn-off's write to the product's row, which
+// is after the withdrawal where the two are the other way round. SQLite holds
+// one connection, so nothing lands inside the turn-off there.
+func TestAPassLandingInsideATurnOffServesNothingWhenTurnedOnAgain(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(w.Product, true)
+		w.write()
+		subject := w.anybody()
+		statuses, err := publish.Statuses(t.Context(), w.DB.DB)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.decide(w.Build, "CVE-2026-1002", libnl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
+
+		hooked, rival := dbtest.RivalAfterRead(t, w.DB, "product", "product", 5*time.Second, func() error {
+			_, err := w.pass.Product(context.Background(), subject, w.Product, statuses)
+			return err
+		})
+		if err := hooked.RunInTx(t.Context(), nil, func(ctx context.Context, tx bun.Tx) error {
+			var on bool
+			if err := tx.NewSelect().TableExpr(`"product"`).ColumnExpr(`"publishes"`).
+				Where(`"id" = ?`, w.Product.ID).Scan(ctx, &on); err != nil {
+				return err
+			}
+			return publish.NewStore(tx).TurnOff(ctx, w.Product.ID)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := rival(); err != nil {
+			t.Fatal(err)
+		}
+		w.publishes(w.Product, true)
+		if listed := w.listed("all"); len(listed) != 0 {
+			t.Errorf("turned on again, the product serves %d documents a pass inside the turn-off wrote: %+v",
+				len(listed), listed)
 		}
 	})
 }

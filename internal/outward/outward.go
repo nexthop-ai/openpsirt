@@ -211,6 +211,26 @@ func Loopback(host string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// Host is the host an address names without its port, or nothing for an
+// address that does not parse.
+func Host(address string) string {
+	parsed, err := url.Parse(address)
+	if err != nil {
+		return ""
+	}
+	return parsed.Hostname()
+}
+
+// Normalized is an address as it parses, trimmed of the space around it; one
+// that does not parse is returned trimmed, for the check refusing it to name.
+func Normalized(address string) string {
+	address = strings.TrimSpace(address)
+	if parsed, err := url.Parse(address); err == nil {
+		return parsed.String()
+	}
+	return address
+}
+
 // anywhere is the address check of a client whose address an administrator
 // configured: none.
 func anywhere(string) error { return nil }
@@ -251,10 +271,26 @@ func client(within time.Duration, reachable func(string) error,
 		},
 		Transport: &guard{
 			permits: permits,
-			inner:   &http.Transport{DialContext: dialer.DialContext},
+			// The pool bounded and its idle connections expired: a client
+			// built per call and dropped would otherwise strand each idle
+			// connection, its descriptor and its two goroutines for as long
+			// as the far end keeps it open.
+			inner: &http.Transport{
+				DialContext:         dialer.DialContext,
+				MaxIdleConns:        maxIdle,
+				IdleConnTimeout:     idleFor,
+				TLSHandshakeTimeout: within,
+			},
 		},
 	}
 }
+
+// maxIdle and idleFor bound the connections a client keeps open between
+// requests, across every host it reaches.
+const (
+	maxIdle = 100
+	idleFor = 90 * time.Second
+)
 
 // ErrRefused says the guarded client turned a request away itself: a redirect,
 // a scheme other than https, a host nobody configured, or a host an
@@ -285,6 +321,14 @@ func (r resolvedInto) Is(target error) bool { return target == ErrInside }
 type guard struct {
 	permits func(to *url.URL) error
 	inner   http.RoundTripper
+}
+
+// CloseIdleConnections closes the connections the client holds open between
+// requests, which a client built for one call does once it is done.
+func (g *guard) CloseIdleConnections() {
+	if closer, ok := g.inner.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
 }
 
 func (g *guard) RoundTrip(req *http.Request) (*http.Response, error) {

@@ -57,10 +57,12 @@ func advisoryRefused(in core.Deps, err error, what string) error {
 		// into 403. Left to the sentence at the end it answers 500, and
 		// spelled again here it is the same rule in two places.
 		return core.Asked(in.Logger, err)
-	case errors.Is(err, advisory.ErrSamePerson), errors.Is(err, advisory.ErrNotAgreed):
+	case errors.Is(err, advisory.ErrSamePerson), errors.Is(err, advisory.ErrNotAgreed),
+		errors.Is(err, advisory.ErrEditionMoved):
 		// The state the advisory is in refuses this, rather than the request
 		// being malformed. What a caller does about it is an act somewhere
-		// else — a second person agreeing, or the flaw being disclosed.
+		// else, a second person agreeing or the flaw being disclosed, or, for
+		// an edition moved, reading the advisory again.
 		return huma.Error409Conflict(err.Error())
 	case errors.Is(err, advisory.ErrNoSuchAdvisory):
 		return huma.Error404NotFound(advisory.ErrNoSuchAdvisory.Error())
@@ -73,6 +75,13 @@ func advisoryRefused(in core.Deps, err error, what string) error {
 		return core.NoSuchIssue()
 	}
 	return core.WentWrong(in.Logger, what, err)
+}
+
+// AdvisoryDocumentOutput is an advisory's generated document, and the
+// edition it was generated from.
+type AdvisoryDocumentOutput struct {
+	Edition int `header:"Advisory-Edition" doc:"The edition the advisory pointed at before the document was generated, never newer than what it states"`
+	Body    *advisory.Document
 }
 
 func registerAdvisory(api huma.API, in core.Deps) {
@@ -182,11 +191,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		store := advisory.NewStore(in.DB.DB)
-		row, held, err := store.Covers(ctx, subject, input.Advisory)
-		if err != nil {
-			return nil, advisoryRefused(in, err, "the advisory could not be read")
-		}
-		where, err := store.Where(ctx, subject, input.Advisory)
+		row, held, where, err := store.Read(ctx, subject, input.Advisory)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the advisory could not be read")
 		}
@@ -196,6 +201,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		}
 		body := bodyFor(row, held)
 		body.Status, body.Agreed = core.AdvisoryStatus(where.Status), len(where.Agreed)
+		body.Edition = where.Edition
 		body.Changed = changed
 		body.AgreedBy = make([]AgreerBody, 0, len(where.Agreed))
 		for i, one := range where.Agreed {
@@ -328,6 +334,9 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"that it was issued is a separate request, and what it keeps is a digest of " +
 			"what was generated, so that whether what you published is still what this " +
 			"would generate can be answered.\n\n" +
+			"The `Advisory-Edition` header names the edition the advisory pointed at before " +
+			"the document was generated, never newer than what it states; agreeing names " +
+			"the oldest edition read, as the approval says.\n\n" +
 			"How far the document may travel is its distribution label, red while " +
 			"anything it covers is still held back. `tracking.status` says where the " +
 			"document is in its life. Reaching a disclosure date discloses nothing, so " +
@@ -338,18 +347,18 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
-	}) (*struct{ Body *advisory.Document }, error) {
+	}) (*AdvisoryDocumentOutput, error) {
 		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		doc, err := advisory.NewStore(in.DB.DB).ForAdvisory(ctx, subject, in.Publisher,
+		doc, edition, err := advisory.NewStore(in.DB.DB).ForAdvisoryAt(ctx, subject, in.Publisher,
 			input.Advisory)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "the advisory could not be generated")
 		}
-		return &struct{ Body *advisory.Document }{Body: doc}, nil
+		return &AdvisoryDocumentOutput{Edition: edition, Body: doc}, nil
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -426,9 +435,14 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Path:    "/v1/advisories/{advisory}/approval",
 		Summary: "Approve an advisory",
 		Description: "Records that you have read what this advisory says and agree to it.\n\n" +
-			"The agreement names the edition it was given against rather than the " +
-			"advisory. Retitling it, naming another flaw on it or taking one off opens a " +
-			"new edition and takes the agreement back, so what stands is always an " +
+			"Send the `edition` the advisory reported when you read it. Where you also " +
+			"read its releases or its document, send the oldest of the editions the three " +
+			"named: each names the edition the advisory pointed at before it was read, " +
+			"never newer than what it shows. The agreement names that edition rather than " +
+			"the advisory, and answers 409 where the advisory has moved to another since: " +
+			"read it again and agree to what it says now. Retitling it, naming another flaw " +
+			"on it or taking one off, and marking a release affected or clearing the mark, " +
+			"open a new edition and take the agreement back, so what stands is always an " +
 			"agreement to the document as it reads now.\n\n" +
 			"You may not agree to an advisory you started or whose current edition you " +
 			"wrote. Both answer 409, and there is no override, so a deployment with one " +
@@ -437,6 +451,9 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
+		Body     struct {
+			Edition int `json:"edition" minimum:"1" doc:"The edition agreed to: the oldest one the advisory, its releases and its document named when read"`
+		}
 	}) (*struct {
 		Status int
 		Body   AgreementBody
@@ -446,7 +463,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		given, err := advisory.NewStore(in.DB.DB).Approve(ctx, subject, input.Advisory)
+		given, err := advisory.NewStore(in.DB.DB).Approve(ctx, subject, input.Advisory, input.Body.Edition)
 		if err != nil {
 			return nil, advisoryRefused(in, err, "that could not be agreed to")
 		}
@@ -557,6 +574,7 @@ type AdvisoryBody struct {
 	// where the advisory stands.
 	Status   core.AdvisoryStatus `json:"status,omitempty" doc:"Where the document is in its life. Final where somebody agrees to what it says now, interim where it has gone out and nobody does, draft before either"`
 	Agreed   int                 `json:"agreed,omitempty" doc:"How many people agree to what it says now. None means it cannot go out"`
+	Edition  int                 `json:"edition,omitempty" doc:"The edition the advisory pointed at when read, never newer than the title and covers beside it"`
 	AgreedBy []AgreerBody        `json:"agreed_by,omitempty" doc:"Who agrees to what it says now, oldest first"`
 	Changed  *bool               `json:"changed,omitempty" doc:"Whether the document generated now says something different from the last one that went out"`
 	MintedAt string              `json:"minted_at"`

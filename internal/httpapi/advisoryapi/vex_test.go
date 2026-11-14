@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
 
 func TestAVEXDocumentSaysWhatStandsAboutWhatWeShip(t *testing.T) {
@@ -561,17 +562,16 @@ func TestAVEXStatementPublishesTheMitigationAndNeverTheReasoning(t *testing.T) {
 	})
 }
 
-func TestAFlawThatWillNotBeFixedReachesCustomersOnlyWithSomethingToDo(t *testing.T) {
+func TestAFlawThatWillNotBeFixedStatesWhatToDoOrThatNoFixIsPlanned(t *testing.T) {
 	// A standing property of a shipped feature — a protocol that cannot change
 	// without breaking what it is compatible with. No scan closes it, no
 	// advisory is issued about it, and under silence it reaches a customer
-	// never. The format has a status for exactly this and a field for what to
-	// do instead, and the second is why the first is publishable at all.
+	// never. The format has a status for exactly this and requires an action
+	// beside it: what to do instead where the decision named it, and that no
+	// fix is planned where it named nothing.
 	//
-	// On every engine. The new arm of the join — a decision that it will not be
-	// fixed, joined only where it says what to do instead — is what decides
-	// whether such a flaw is published at all, and it is the half a comparison
-	// against an empty string is most likely to answer differently on.
+	// On every engine: the covering read's join decides whether such a flaw
+	// is published.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
@@ -599,27 +599,31 @@ func TestAFlawThatWillNotBeFixedReachesCustomersOnlyWithSomethingToDo(t *testing
 			} `json:"statements"`
 		}
 		httpapitest.Read(t, r, "triager", at, &doc)
-		if len(doc.Statements) != 1 {
-			t.Fatalf("the document carries %d statements, want only the one with an "+
-				"action: %+v", len(doc.Statements), doc.Statements)
+		want := map[string]string{"CVE-2026-9999": instead, "CVE-2026-1000": vex.NoFixPlanned}
+		if len(doc.Statements) != len(want) {
+			t.Fatalf("the document carries %d statements, want %d: %+v",
+				len(doc.Statements), len(want), doc.Statements)
 		}
-		one := doc.Statements[0]
-		if one.Vulnerability.Name != "CVE-2026-9999" {
-			t.Fatalf("the statement is about %q", one.Vulnerability.Name)
-		}
-		// Affected rather than dismissed, which is what the decision says: the
-		// flaw is there and it is staying.
-		if one.Status != "affected" {
-			t.Errorf("a flaw that will not be fixed reads as %q", one.Status)
-		}
-		if one.ActionStatement != instead {
-			t.Errorf("the statement offers %q, want what to do instead", one.ActionStatement)
-		}
-		// The fields that belong to the other status stay empty. An affected
-		// statement carrying a not-affected justification is a document saying
-		// both things at once.
-		if one.ImpactStatement != "" || one.Justification != "" {
-			t.Errorf("an affected statement also reads as not affected: %+v", one)
+		for _, one := range doc.Statements {
+			// Affected rather than dismissed, which is what the decision says:
+			// the flaw is there and it is staying.
+			if one.Status != "affected" {
+				t.Errorf("%s: a flaw that will not be fixed reads as %q", one.Vulnerability.Name, one.Status)
+			}
+			if one.ActionStatement != want[one.Vulnerability.Name] {
+				t.Errorf("%s: the statement offers %q, want %q", one.Vulnerability.Name,
+					one.ActionStatement, want[one.Vulnerability.Name])
+			}
+			// The fields that belong to the other status stay empty. An
+			// affected statement carrying a not-affected justification is a
+			// document saying both things at once.
+			if one.ImpactStatement != "" || one.Justification != "" {
+				t.Errorf("an affected statement also reads as not affected: %+v", one)
+			}
+			// The reasoning is a triager's argument to a second person.
+			if strings.Contains(one.ActionStatement, "Nothing can be done") {
+				t.Errorf("%s publishes the reasoning: %q", one.Vulnerability.Name, one.ActionStatement)
+			}
 		}
 	})
 }

@@ -122,7 +122,7 @@ func TestWhoeverWroteWhatAnAdvisorySaysMayNotAgreeToIt(t *testing.T) {
 		named := f.covering(t, [2]string{"sonic", identifier})
 
 		// Whoever minted it, which is also who named the flaw on it.
-		if _, err := f.store.Approve(ctx, f.who, named); !errors.Is(err, advisory.ErrSamePerson) {
+		if _, err := f.store.Approve(ctx, f.who, named, readEdition(t, f.store, f.who, named)); !errors.Is(err, advisory.ErrSamePerson) {
 			t.Errorf("the person who started it agreeing to it answered %v", err)
 		}
 
@@ -133,14 +133,14 @@ func TestWhoeverWroteWhatAnAdvisorySaysMayNotAgreeToIt(t *testing.T) {
 			"Authentication bypass in the recovery console"); err != nil {
 			t.Fatalf("retitling as the second person: %v", err)
 		}
-		if _, err := f.store.Approve(ctx, f.approver, named); !errors.Is(err, advisory.ErrSamePerson) {
+		if _, err := f.store.Approve(ctx, f.approver, named, readEdition(t, f.store, f.who, named)); !errors.Is(err, advisory.ErrSamePerson) {
 			t.Errorf("the person who wrote the words agreeing to them answered %v", err)
 		}
 		// And the person who started it, now that somebody else wrote the
 		// words standing. This is the only input that reaches that arm: while
 		// the minter wrote the edition too, the check on the author answers
 		// first and either one alone would look like the rule.
-		if _, err := f.store.Approve(ctx, f.who, named); !errors.Is(err, advisory.ErrSamePerson) {
+		if _, err := f.store.Approve(ctx, f.who, named, readEdition(t, f.store, f.who, named)); !errors.Is(err, advisory.ErrSamePerson) {
 			t.Errorf("the person who started it agreeing to somebody else's words answered %v", err)
 		}
 		// Whoever wrote neither the advisory nor the words standing may, which
@@ -151,7 +151,7 @@ func TestWhoeverWroteWhatAnAdvisorySaysMayNotAgreeToIt(t *testing.T) {
 			"Authentication bypass in the recovery console, on every release"); err != nil {
 			t.Fatalf("retitling as the person who started it: %v", err)
 		}
-		if _, err := f.store.Approve(ctx, f.approver, named); err != nil {
+		if _, err := f.store.Approve(ctx, f.approver, named, readEdition(t, f.store, f.who, named)); err != nil {
 			t.Errorf("somebody who wrote neither could not agree: %v", err)
 		}
 	})
@@ -174,7 +174,7 @@ func TestTheAuthorOfACarriedTitleMayNotAgreeToIt(t *testing.T) {
 		if _, err := f.store.Add(ctx, f.who, named, "sonic", f.recorded(t, f.tagged)); err != nil {
 			t.Fatalf("naming a second flaw: %v", err)
 		}
-		if _, err := f.store.Approve(ctx, f.approver, named); !errors.Is(err, advisory.ErrSamePerson) {
+		if _, err := f.store.Approve(ctx, f.approver, named, readEdition(t, f.store, f.who, named)); !errors.Is(err, advisory.ErrSamePerson) {
 			t.Errorf("the author of a carried title agreeing to it answered %v", err)
 		}
 	})
@@ -192,7 +192,7 @@ func TestAgreeingTwiceIsRefusedAndTakingItBackIsNot(t *testing.T) {
 			t.Errorf("taking back an agreement nobody gave answered %v", err)
 		}
 		f.agreed(t, named)
-		if _, err := f.store.Approve(ctx, f.approver, named); !errors.Is(err, advisory.ErrAlreadyAgreed) {
+		if _, err := f.store.Approve(ctx, f.approver, named, readEdition(t, f.store, f.who, named)); !errors.Is(err, advisory.ErrAlreadyAgreed) {
 			t.Errorf("agreeing twice answered %v", err)
 		}
 		if err := f.store.Withdraw(ctx, f.approver, named); err != nil {
@@ -207,7 +207,7 @@ func TestAgreeingTwiceIsRefusedAndTakingItBackIsNot(t *testing.T) {
 		}
 		// And the same person may agree again, because what they took back
 		// was the agreement rather than their standing to give one.
-		if _, err := f.store.Approve(ctx, f.approver, named); err != nil {
+		if _, err := f.store.Approve(ctx, f.approver, named, readEdition(t, f.store, f.who, named)); err != nil {
 			t.Errorf("agreeing again after taking it back: %v", err)
 		}
 	})
@@ -398,7 +398,7 @@ func TestChangingWhatAnAdvisorySaysNeedsTheRoleOnEveryProductItCovers(t *testing
 		if _, _, err := f.store.Covers(ctx, partly, named); err != nil {
 			t.Fatalf("reading an advisory they hold both products on: %v", err)
 		}
-		if _, err := f.store.Approve(ctx, partly, named); !errors.Is(err, access.ErrDenied) {
+		if _, err := f.store.Approve(ctx, partly, named, readEdition(t, f.store, f.who, named)); !errors.Is(err, access.ErrDenied) {
 			t.Errorf("agreeing with triage on one of two products answered %v", err)
 		}
 		if _, _, err := f.store.Retitle(ctx, partly, named, "Something else"); !errors.Is(
@@ -425,7 +425,7 @@ func TestChangingWhatAnAdvisorySaysNeedsTheRoleOnEveryProductItCovers(t *testing
 
 		// And somebody holding it on both may, which says the refusals are
 		// the missing role rather than the path being shut.
-		if _, err := f.store.Approve(ctx, f.approver, named); err != nil {
+		if _, err := f.store.Approve(ctx, f.approver, named, readEdition(t, f.store, f.who, named)); err != nil {
 			t.Errorf("somebody triaging both products could not agree: %v", err)
 		}
 
@@ -672,6 +672,62 @@ func TestTwoEditsAtOnceTakeTheNextTwoNumbers(t *testing.T) {
 		}
 		if len(minted) != 2 || minted[0].MintedAt.Before(minted[1].MintedAt) {
 			t.Errorf("the advisory minted again is dated before the one it follows: %+v", minted)
+		}
+	})
+}
+
+// The standing of an advisory already read names the edition that read
+// pointed at, so an edit committing after it leaves the number behind the
+// words shown, never ahead of them.
+func TestTheStandingOfAReadNamesTheEditionItRead(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		row, _, err := f.store.Covers(ctx, f.approver, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		read := readEdition(t, f.store, f.approver, named)
+		if _, _, err := f.store.Retitle(ctx, f.who, named, "Retitled after it was read"); err != nil {
+			t.Fatal(err)
+		}
+		standing, err := f.store.StandingOf(ctx, f.approver, row)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if standing.Edition != read {
+			t.Errorf("the standing of a read names edition %d, want %d, the one read", standing.Edition, read)
+		}
+	})
+}
+
+// An agreement names the edition its giver read. A retitle landing between the
+// reading and the agreement leaves that edition behind, and the agreement is
+// refused rather than given to words the person never saw.
+func TestAnAgreementToAnEditionNoLongerStandingIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		read := readEdition(t, f.store, f.approver, named)
+		if _, _, err := f.store.Retitle(ctx, f.who, named, "Retitled after it was read"); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.store.Approve(ctx, f.approver, named, read); !errors.Is(err, advisory.ErrEditionMoved) {
+			t.Fatalf("agreeing to the edition read before the retitle answered %v, want %v",
+				err, advisory.ErrEditionMoved)
+		}
+		where, err := f.store.Where(ctx, f.who, named)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(where.Agreed) != 0 {
+			t.Errorf("an agreement stands on words nobody agreeing read: %+v", where.Agreed)
+		}
+		given, err := f.store.Approve(ctx, f.approver, named, where.Edition)
+		if err != nil || given.Edition != read+1 {
+			t.Errorf("agreeing to the edition read now gave %+v: %v, want edition %d", given, err, read+1)
 		}
 	})
 }

@@ -13,11 +13,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/csaf"
 )
 
-// role is what this deployment claims to be. A provider writes the documents,
-// the lists and the feed; a trusted provider signs them, and nothing written
-// here is signed.
-const role = csaf.Provider
-
 // listings writes the three files that say what the directory holds and the
 // one that says what the directory is.
 func (w *Writer) listings(ctx context.Context, published []entry) error {
@@ -60,32 +55,18 @@ func (w *Writer) listings(ctx context.Context, published []entry) error {
 // document is named in its entry, which the standard requires wherever one
 // exists.
 func (w *Writer) feed(listed []csaf.Listed) csaf.Feed {
-	return csaf.FeedOf(csaf.FeedName(w.who.Prefix), w.who.Name+" CSAF advisories (TLP:"+travels+")",
+	return csaf.FeedOf(csaf.FeedName(w.who.Prefix), csaf.FeedTitle(w.who.Name, travels),
 		w.who.At(feedFile), w.who.At, []csaf.Beside{{Rel: "hash", Suffix: hashSuffix}}, listed)
 }
 
-// described is the provider's description of itself.
-//
-// One distribution rather than two. The directory is both of the standard's
-// shapes at once — year folders with a list and a list of changes, and a feed
-// naming the same documents — and they describe one set of files.
+// described is the provider's description of itself. Nothing here is
+// signed, so it names no key and claims the provider role alone.
 func (w *Writer) described(newest time.Time) csaf.ProviderMetadata {
-	return csaf.ProviderMetadata{
-		CanonicalURL: w.who.At(metadataFile),
-		Distributions: []csaf.Distribution{{
-			DirectoryURL: w.who.Published,
-			ROLIE: &csaf.ROLIE{Feeds: []csaf.FeedDescription{{
-				Summary:  "Advisories " + w.who.Name + " has published, TLP:" + travels + ".",
-				TLPLabel: travels,
-				URL:      w.who.At(feedFile),
-			}}},
-		}},
-		LastUpdated: csaf.Stamp(newest),
-		Listed:      w.settings.List,
-		Mirrored:    w.settings.Mirror,
-		Version:     csaf.MetadataVersion,
+	return csaf.Describe(csaf.Description{
+		Metadata: w.who.At(metadataFile), Directory: w.who.Published, Feed: w.who.At(feedFile),
+		Name: w.who.Name, TLP: travels,
 		// The publisher every document it lists names, built the same way.
 		Publisher: advisory.IssuerOf(w.who),
-		Role:      role,
-	}
+		Listed:    w.settings.List, Mirrored: w.settings.Mirror, Newest: newest,
+	})
 }

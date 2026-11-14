@@ -38,6 +38,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
 // betweenWrites is how often the directory is written again.
@@ -47,6 +48,9 @@ import (
 // and a deployment issues single or low double digits of them a year. The pass
 // is a read that finds nothing new nearly every time it runs.
 const betweenWrites = time.Hour
+
+// lease is the name of the work the directory writer holds while it writes.
+const lease = "advisory.directory"
 
 // travels is the one label this directory carries.
 const travels = advisory.Travelable
@@ -101,6 +105,12 @@ type Writer struct {
 	who        publisher.Named
 	settings   Config
 	logger     *slog.Logger
+	// leases and replica are how one replica writes the directory at a time.
+	// Revisions share a path, so a replica whose read was older writes its
+	// revision over a newer one another replica already wrote.
+	leases   *queue.Leases
+	replica  string
+	interval time.Duration
 	// wrote is the set this process last wrote, so that a pass finding it
 	// unmoved leaves the store alone, and held how many advisories the last
 	// pass with nothing to publish held back, so that the count is said once
@@ -127,14 +137,14 @@ type Writer struct {
 // where the setting is read, because a document states it too and reaches that
 // without passing through here.
 func New(db *bun.DB, published *Store, who publisher.Named, settings Config,
-	logger *slog.Logger) *Writer {
+	replica string, logger *slog.Logger) *Writer {
 
 	if published == nil || !who.Publishes() || !who.Stated() {
 		return nil
 	}
 	return &Writer{
 		advisories: advisory.NewStore(db), files: published.files, who: who,
-		settings: settings, logger: logger,
+		settings: settings, logger: logger, leases: queue.NewLeases(db), replica: replica,
 	}
 }
 
@@ -145,19 +155,24 @@ type Written struct {
 	// Both count advisories.
 	Documents int
 	Held      int
-	// Skipped is how many issued documents could not be read back, each
-	// logged as the pass met it. Counted in issuances: an advisory whose
-	// newest revision cannot be read is carried under the one before it
-	// where that one may travel.
+	// Skipped is how many advisories were left out because the first issued
+	// document not known to be held back could not be read back, each logged
+	// as the pass met it. No older revision is carried in its place, since revisions share a
+	// path.
 	Skipped int
 	// Unchanged says the pass found the directory already holding what it
 	// would have written, and wrote nothing.
 	Unchanged bool
+	// Elsewhere says another replica holds the lease, and this one wrote
+	// nothing.
+	Elsewhere bool
 }
 
 // Run writes the directory until the context ends.
 func (w *Writer) Run(ctx context.Context, interval time.Duration) {
+	defer w.leases.Handback(ctx, lease, w.replica, w.logger)
 	background.Every(ctx, interval, betweenWrites, func(ctx context.Context) {
+		w.interval = interval
 		// Logged and carried on, like every other background pass here. A
 		// store that cannot be reached is not a reason to stop serving, and
 		// what could not be written is written by the next pass.
@@ -178,7 +193,7 @@ func (w *Writer) report(ctx context.Context, written Written, err error) {
 		w.logger.ErrorContext(ctx, "wrote the published advisory directory past documents "+
 			"that could not be read", "documents", written.Documents,
 			"held back", written.Held, "skipped", written.Skipped)
-	case written.Unchanged:
+	case written.Unchanged, written.Elsewhere:
 	case written.Documents == 0 && written.Held > 0:
 		w.logger.InfoContext(ctx, "nothing in the published advisory directory may travel",
 			"held back", written.Held)
@@ -202,6 +217,13 @@ func (w *Writer) report(ctx context.Context, written Written, err error) {
 // file that is not there yet is a reader fetching a 404; a file nothing names
 // yet is a reader who has not heard of it, and the next line fixes it.
 func (w *Writer) Write(ctx context.Context) (Written, error) {
+	// Held across the whole pass, read and writes alike: taken for two cycles
+	// as the pass starts and asked for again before every document and before
+	// the listings, so a pass longer than its lease stops rather than writes
+	// beside another replica.
+	if mine, err := w.keep(ctx); err != nil || !mine {
+		return Written{Elsewhere: err == nil}, err
+	}
 	// The deployment looking at itself. It holds no role, so it decides
 	// nothing and may only read — and what it reads is what has already been
 	// published, narrowed by the same clauses every other read of an
@@ -215,9 +237,11 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 	// A document that cannot be read back is skipped rather than stopping
 	// the pass. Issued bytes are kept for ever, and one that no longer reads
 	// would otherwise keep every advisory issued after it out of the
-	// directory for good. Failed only where nothing at all could be read.
+	// directory for good. Failed only where nothing at all could be read:
+	// counted in advisories, since the first revision not known to be held
+	// back, unreadable, leaves out its advisory and every revision before it.
 	published, held, unread := publishable(sent)
-	if len(unread) > 0 && len(unread) == len(sent) {
+	if len(unread) > 0 && len(published) == 0 && held == 0 {
 		return Written{}, fmt.Errorf("no published document could be read back: %w",
 			errors.Join(unread...))
 	}
@@ -254,15 +278,38 @@ func (w *Writer) Write(ctx context.Context) (Written, error) {
 	}
 
 	for _, one := range published {
+		if mine, err := w.keep(ctx); err != nil || !mine {
+			return Written{Elsewhere: err == nil}, err
+		}
 		if err := w.document(ctx, one); err != nil {
 			return Written{}, err
 		}
+	}
+	if mine, err := w.keep(ctx); err != nil || !mine {
+		return Written{Elsewhere: err == nil}, err
 	}
 	if err := w.listings(ctx, published); err != nil {
 		return Written{}, err
 	}
 	w.wrote = fingerprinted
 	return Written{Documents: len(published), Held: held, Skipped: skipped}, nil
+}
+
+// keep takes the directory's lease, or renews it, for two cycles.
+//
+// Losing it forgets what this process last wrote: another replica may write
+// the store before it is taken back, and a pass then finding its own last set
+// unmoved would leave the other's files served.
+func (w *Writer) keep(ctx context.Context) (bool, error) {
+	cycle := w.interval
+	if cycle <= 0 {
+		cycle = betweenWrites
+	}
+	mine, err := w.leases.Take(ctx, lease, w.replica, 2*cycle)
+	if err != nil || !mine {
+		w.wrote, w.held = "", 0
+	}
+	return mine, err
 }
 
 // fingerprint is the set of files a pass would write, as one value.

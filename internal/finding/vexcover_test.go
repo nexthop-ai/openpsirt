@@ -117,7 +117,7 @@ func TestTheVEXDocumentCountsAGroupAsCoveredAsAnAdvisoryDoes(t *testing.T) {
 		{name: "one decision undisclosed", said: []recorded{{under: s}, {under: d, visibility: "private"}}},
 		{name: "one in another product", said: []recorded{{under: s}, {under: d, elsewhere: true}}},
 		{name: "two at one occurrence", covered: true, said: []recorded{{under: d}, {under: s}, {under: s}}},
-		{name: "not fixed with nothing to do", said: []recorded{
+		{name: "not fixed with nothing to do", covered: true, said: []recorded{
 			{under: s, outcome: finding.OutcomeWontFix}, {under: d, outcome: finding.OutcomeWontFix}}},
 		{name: "not fixed naming what to do", covered: true, said: []recorded{
 			{under: s, outcome: finding.OutcomeWontFix, mitigation: "Turn it off."},
@@ -170,7 +170,7 @@ func TestTheVEXDocumentCountsAGroupAsCoveredAsAnAdvisoryDoes(t *testing.T) {
 					Where(`"f"."visibility" IN (?)`, "public").
 					Where(kinds, kindArgs...).
 					GroupExpr(`"f"."vulnerability_id", "c"."name"`)
-				if err := finding.WhollyCovered(q, f.productID, visible, finding.ForStatements).
+				if err := finding.WhollyCovered(q, f.productID, visible).
 					Scan(ctx, &asked); err != nil {
 					t.Fatal(err)
 				}
@@ -405,7 +405,7 @@ func TestAVersionStatedWithSpacesIsCoveredByItsDecisionOnEveryEngine(t *testing.
 					ColumnExpr(`"c"."name" AS "component"`).
 					Where(`"f"."build_id" = ?`, f.build).
 					GroupExpr(`"f"."vulnerability_id", "c"."name"`)
-				if err := finding.WhollyCovered(q, f.productID, visible, finding.ForStatements).
+				if err := finding.WhollyCovered(q, f.productID, visible).
 					Scan(ctx, &asked); err != nil {
 					t.Fatal(err)
 				}

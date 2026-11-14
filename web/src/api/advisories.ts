@@ -3,7 +3,7 @@
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { api, type Body } from "./client";
-import { unwrap } from "./queries";
+import { statusOf, unwrap } from "./queries";
 
 // An advisory as the screens read and change it: the list, the one, what it
 // covers, and what has gone out.
@@ -72,26 +72,37 @@ export function useAdvisoryDocument(advisory: string, covers: number) {
   return useQuery({
     enabled: covers > 0,
     queryKey: ["advisory-document", advisory],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/advisories/{advisory}/document", { params: { path: { advisory } } }),
-      ),
+    queryFn: async () => {
+      const answer = await api.GET("/v1/advisories/{advisory}/document", {
+        params: { path: { advisory } },
+      });
+      return { body: unwrap(answer), edition: editionOf(answer.response) };
+    },
     retry: false,
   });
+}
+
+// The edition of the advisory a response was read at, which agreeing to what
+// it shows names. Nothing where the response names none.
+function editionOf(response: Response): number | undefined {
+  const said = Number(response.headers.get("Advisory-Edition"));
+  return Number.isInteger(said) && said > 0 ? said : undefined;
 }
 
 // What the document states about each release, and the decision behind it.
 export function useAdvisoryReleases(
   advisory: string,
   covers: number,
-): UseQueryResult<{ items: AdvisoryRelease[] | null }> {
+): UseQueryResult<{ body: { items: AdvisoryRelease[] | null }; edition?: number }> {
   return useQuery({
     enabled: covers > 0,
     queryKey: ["advisory-releases", advisory],
-    queryFn: async () =>
-      unwrap(
-        await api.GET("/v1/advisories/{advisory}/releases", { params: { path: { advisory } } }),
-      ),
+    queryFn: async () => {
+      const answer = await api.GET("/v1/advisories/{advisory}/releases", {
+        params: { path: { advisory } },
+      });
+      return { body: unwrap(answer), edition: editionOf(answer.response) };
+    },
   });
 }
 
@@ -195,14 +206,25 @@ export function useTakeAFlawOff() {
 // rule — neither the person who started it nor the author of the edition
 // standing — and it is enforced there against the record rather than here
 // against what a page happens to know, which is a count and not a name.
+//
+// It names the edition the screen showed, so an edit landing since is refused
+// rather than agreed to unread.
 export function useAgree() {
   const done = useAfterAdvisory();
   return useMutation({
-    mutationFn: async ({ advisory }: { advisory: string }) =>
+    mutationFn: async ({ advisory, edition }: { advisory: string; edition: number }) =>
       unwrap(
-        await api.POST("/v1/advisories/{advisory}/approval", { params: { path: { advisory } } }),
+        await api.POST("/v1/advisories/{advisory}/approval", {
+          params: { path: { advisory } },
+          body: { edition },
+        }),
       ),
     onSuccess: done,
+    // Refused for an edition moved, the screen reads every panel again, so
+    // the next press names the edition they then show.
+    onError: (error) => {
+      if (statusOf(error) === 409) done();
+    },
   });
 }
 

@@ -5,6 +5,7 @@ package vex
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -49,5 +50,34 @@ func TestEveryOutcomeACoveringReadSelectsHasAStatus(t *testing.T) {
 		if statusOf(outcome) == "" {
 			t.Errorf("%s covers an occurrence and has no VEX status", outcome)
 		}
+	}
+}
+
+// A supplier's statement is stated in its own words or not at all: a group
+// whose closing finding the second read missed is left out, never given the
+// words of whichever statement was read first.
+func TestASupplierStatementIsNeverStatedInAnothersWords(t *testing.T) {
+	rows := []closedGroup{
+		{VulnerabilityID: 1, Identifier: "CVE-2026-1", Component: "libnl", First: 5},
+		{VulnerabilityID: 2, Identifier: "CVE-2026-2", Component: "zlib", First: 7},
+	}
+	read := []supplierWords{{ID: 7, Publisher: "Zlib Project", Product: "zlib"}}
+	stated := attributedTo(rows, read)
+	if len(stated) != 1 || stated[0].Component != "zlib" || stated[0].Publisher != "Zlib Project" {
+		t.Errorf("stated %+v, want zlib alone in the Zlib Project's words", stated)
+	}
+}
+
+// A fix is stated as of when it was seen or not at all: a group whose closing
+// finding the second read missed is never stated fixed at the zero moment.
+func TestAFixIsNeverStatedWithoutTheMomentItWasSeen(t *testing.T) {
+	seen := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	rows := []closedGroup{
+		{VulnerabilityID: 1, Identifier: "CVE-2026-1", Component: "libnl", First: 5},
+		{VulnerabilityID: 2, Identifier: "CVE-2026-2", Component: "zlib", First: 7},
+	}
+	fixed := datedFixes(rows, map[int64]time.Time{7: seen})
+	if len(fixed) != 1 || fixed[0].Component != "zlib" || !fixed[0].PatchedAt.Equal(seen) {
+		t.Errorf("stated %+v fixed, want zlib alone, as of %v", fixed, seen)
 	}
 }

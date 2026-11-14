@@ -39,6 +39,13 @@ var (
 	ghsaName = regexp.MustCompile(`^GHSA-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4}-[23456789cfghjmpqrvwx]{4}$`)
 )
 
+// IsCVE says an identifier is a CVE in the form the CVE program issues and the
+// CSAF standard's cve field requires. An identifier merely starting with the
+// prefix, such as one a scan file supplied while a CVE was pending, is not.
+func IsCVE(identifier string) bool {
+	return cveName.MatchString(identifier)
+}
+
 // links is everywhere this finding can be read about, in the order somebody
 // works through them: the issue's own record first, then what the distribution
 // says about the issue, then the package itself, then the other names the same

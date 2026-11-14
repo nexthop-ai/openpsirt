@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -953,6 +955,23 @@ func TestAStatementUnderANameMergedIntoAnotherIssueIsOfferedAgainstThatIssuesFin
 		if held != 2 {
 			t.Errorf("%d offers of the statement under the merged name, want one beside each of the fork's two findings",
 				held)
+		}
+	})
+}
+
+// A read builds its own client for the upstream it reads, so it closes that
+// client's connections when it is done: a pass reading every upstream daily
+// would otherwise leave one open per read for as long as each far end keeps it.
+func TestAReadLeavesNoConnectionToItsUpstreamOpen(t *testing.T) {
+	dbtest.Two(t, func(t *testing.T, db *database.DB) {
+		w := newWorld(t, fixture.New(t, db))
+		w.trust()
+		if open := w.server.connections(); open != 0 {
+			t.Fatalf("%d connections were open before the read", open)
+		}
+		w.read()
+		if open := w.server.connections(); open != 0 {
+			t.Errorf("%d connections to the upstream were left open by a read", open)
 		}
 	})
 }

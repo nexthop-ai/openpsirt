@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/version"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
 )
@@ -63,19 +65,22 @@ func (g *Generator) vexDocuments(product *catalog.Product, builds []*built,
 // relationship.
 func (g *Generator) vexDocument(product *catalog.Product, facts []placed, described string) Generated {
 	issue := facts[0].fact
-	tracking := "VEX-" + product.Name + "-" + issue.Issue
+	// The product's identifier first: a run of digits ends at the first
+	// hyphen, so no two products share a filename however their names and
+	// issues fold.
+	tracking := "VEX-" + strconv.FormatInt(product.ID, 10) + "-" + product.Name + "-" + issue.Issue
 	title := issue.Issue + " in " + product.DisplayName
 
 	tree, statuses := g.treeFor(product, facts)
 	vulnerability := advisory.Vulnerability{Status: statuses.status}
-	if advisory.IsCVE(issue.Issue) {
+	if finding.IsCVE(issue.Issue) {
 		vulnerability.CVE = issue.Issue
 	} else {
 		vulnerability.IDs = append(vulnerability.IDs,
 			advisory.Issued{SystemName: systemOf(issue.Issue), Text: issue.Issue})
 	}
 	for _, alias := range issue.Aliases {
-		if vulnerability.CVE == "" && advisory.IsCVE(alias) {
+		if vulnerability.CVE == "" && finding.IsCVE(alias) {
 			vulnerability.CVE = alias
 			continue
 		}

@@ -80,6 +80,10 @@ type Store struct {
 	// this transaction's window, which one engine will not let another
 	// connection do.
 	beforeWrite func() error
+	// afterRead runs between an advisory being read and what is shown beside
+	// its edition being read. Set by a test that has an edit land there; nil
+	// everywhere else.
+	afterRead func()
 }
 
 // NewStore returns a store over db.
@@ -87,17 +91,26 @@ func NewStore(db *bun.DB) *Store {
 	return &Store{db: db, now: func() time.Time { return time.Now().UTC() }}
 }
 
-// ForAdvisory assembles the document for one advisory.
+// ForAdvisoryAt assembles the document for one advisory, with the edition the
+// advisory pointed at before the document was assembled, for a screen agreeing
+// to what it shows: never newer than what the document states.
 //
 // One entry per issue the advisory covers, and one product branch per product
 // those issues are covered in. The standard carries vulnerabilities as an
 // array, which is what lets several embargoed flaws be released together as
 // one document on one date.
-func (s *Store) ForAdvisory(ctx context.Context, subject access.Subject, who publisher.Named,
-	identifier string) (*Document, error) {
+func (s *Store) ForAdvisoryAt(ctx context.Context, subject access.Subject, who publisher.Named,
+	identifier string) (*Document, int, error) {
 
-	doc, _, err := s.forAdvisory(ctx, subject, who, identifier)
-	return doc, err
+	doc, row, err := s.forAdvisory(ctx, subject, who, identifier)
+	if err != nil {
+		return nil, 0, err
+	}
+	edition, err := s.editionOf(ctx, row)
+	if err != nil {
+		return nil, 0, err
+	}
+	return doc, edition, nil
 }
 
 // forAdvisory is the same, answering with the advisory it resolved on the way.
@@ -119,6 +132,9 @@ func (s *Store) forAdvisory(ctx context.Context, subject access.Subject, who pub
 	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
 		return nil, nil, err
+	}
+	if s.afterRead != nil {
+		s.afterRead()
 	}
 	held, err := s.covers(ctx, subject, row)
 	if err != nil {
@@ -367,12 +383,6 @@ func summaryOf(issue *finding.Vulnerability, identifier string) string {
 		return issue.Description
 	}
 	return identifier
-}
-
-// IsCVE says the issue is filed under a CVE rather than under an identifier
-// this deployment minted.
-func IsCVE(identifier string) bool {
-	return len(identifier) > 4 && identifier[:4] == "CVE-"
 }
 
 // namesOf is every identifier an issue answers to.

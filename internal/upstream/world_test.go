@@ -4,13 +4,13 @@
 package upstream_test
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
 	"io"
 	"log/slog"
 	"maps"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -19,21 +19,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp"
-	"github.com/ProtonMail/go-crypto/openpgp/armor"
-	"github.com/ProtonMail/go-crypto/openpgp/packet"
-
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/published"
-	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/signing"
+	"github.com/nexthop-ai/openpsirt/internal/signing/signingtest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/upstream"
 )
@@ -132,44 +128,18 @@ func bare(t *testing.T, f *fixture.World) *world {
 // parent and child in turn.
 func (w *world) ship(build *catalog.Build, root graph.Described, edges ...graph.Described) {
 	w.t.Helper()
-	ctx := w.t.Context()
 	w.built = w.built.Add(time.Minute)
-	scan, outcome, err := ingest.NewStore(w.DB.DB).Record(ctx, ingest.Arriving{
-		BuildID: build.ID, ContentHash: "hash-" + w.built.Format(time.RFC3339Nano),
-		BuiltAt: w.built, ParserVersion: "test",
-	})
-	if err != nil || outcome != ingest.Accept {
-		w.t.Fatalf("record a scan: %v %v", outcome, err)
-	}
-	snap := graph.Snapshot{Root: root}
-	seen := map[string]bool{}
+	var deps []graph.Dependency
 	for i := 0; i+1 < len(edges); i += 2 {
-		for _, part := range edges[i : i+2] {
-			if part != root && !seen[part.Purl] {
-				seen[part.Purl] = true
-				snap.Components = append(snap.Components, part)
-			}
-		}
-		snap.Dependencies = append(snap.Dependencies, graph.Dependency{Parent: edges[i], Child: edges[i+1]})
+		deps = append(deps, graph.Dependency{Parent: edges[i], Child: edges[i+1]})
 	}
-	if _, err := fixture.ApplyGraph(ctx, w.DB.DB, build.ID, scan.ID, snap); err != nil {
-		w.t.Fatal(err)
-	}
-	if _, err := w.DB.DB.NewUpdate().TableExpr(`"scan"`).Set(`"root_identifier" = ?`, root.Purl).
-		Where(`"id" = ?`, scan.ID).Exec(ctx); err != nil {
-		w.t.Fatal(err)
-	}
+	w.Ship(build, w.built, root, deps...)
 }
 
 // report runs a scanner over a build, reporting these issues at these
 // components, given as issue and component in turn.
 func (w *world) report(build *catalog.Build, found ...any) {
 	w.t.Helper()
-	ctx := w.t.Context()
-	run, err := w.findings.Begin(ctx, finding.Run{BuildID: build.ID, Scanner: "grype", RanHere: true})
-	if err != nil {
-		w.t.Fatal(err)
-	}
 	var rows []finding.Reported
 	for i := 0; i+1 < len(found); i += 2 {
 		rows = append(rows, finding.Reported{
@@ -177,9 +147,7 @@ func (w *world) report(build *catalog.Build, found ...any) {
 			Component: found[i+1].(graph.Described),
 		})
 	}
-	if _, err := w.findings.Apply(ctx, build.ID, run.ID, rows); err != nil {
-		w.t.Fatal(err)
-	}
+	w.Report(build, rows...)
 }
 
 // rescan runs the scanner over both of the fork's builds, reporting both
@@ -211,53 +179,9 @@ func (w *world) decisionCiting(build *catalog.Build, issue, component string, ou
 	why triage.Justification, cited *int64) {
 
 	w.t.Helper()
-	ctx := w.t.Context()
-	vulnerability, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, issue)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	var open []finding.Finding
-	if err := w.DB.DB.NewSelect().Model(&open).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Where(`"f"."build_id" = ?`, build.ID).
-		Where(`"f"."vulnerability_id" = ?`, vulnerability).
-		Where(`"c"."name" = ?`, component).
-		Where(`"f"."closed_at" IS NULL`).
-		Scan(ctx); err != nil || len(open) == 0 {
-		w.t.Fatalf("%s is open at %d occurrences of %s: %v", issue, len(open), component, err)
-	}
-	var proposals []triage.Proposal
-	placed := map[string]bool{}
-	for _, one := range open {
-		if placed[one.OccurrenceIdentity] {
-			continue
-		}
-		placed[one.OccurrenceIdentity] = true
-		at, err := w.findings.OccurrenceFor(ctx, w.proposer, build.ID, vulnerability, one.OccurrenceIdentity)
-		if err != nil {
-			w.t.Fatal(err)
-		}
-		proposals = append(proposals, triage.Proposal{
-			Occurrence: triage.Occurrence{
-				ProductID: at.ProductID, VulnerabilityID: at.VulnerabilityID,
-				OccurrenceIdentity: at.OccurrenceIdentity, Visibility: at.Visibility,
-				ComponentUpstream: at.ComponentUpstream, ConsumerUpstream: at.ConsumerUpstream,
-				OnTag: at.OnTag,
-			},
-			Outcome: outcome, Justification: why, FromStatement: cited,
-			Reasoning: "Read the code.", By: w.proposer.ID, MadeOn: []int64{build.ID},
-			BindingAcross: []int64{build.ID},
-		})
-	}
-	recorded, err := w.decisions.ProposeMany(ctx, w.proposer, proposals)
-	if err != nil {
-		w.t.Fatal(err)
-	}
-	if recorded[0].NeedsApproval {
-		if _, err := w.decisions.ApproveDecision(ctx, w.approver, recorded[0].DecisionID, "", nil, ""); err != nil {
-			w.t.Fatal(err)
-		}
-	}
+	w.Decide(build, issue, component, triage.Proposal{
+		Outcome: outcome, Justification: why, FromStatement: cited,
+	}, w.proposer, &w.approver)
 }
 
 // write runs the upstream's publishing pass once.
@@ -278,7 +202,9 @@ func (w *world) trust() *upstream.Upstream {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	described, err := upstream.Inspect(w.t.Context(), upstream.Client(parsed, w.server.roots), address)
+	client := upstream.Client(parsed, w.server.roots)
+	defer client.CloseIdleConnections()
+	described, err := upstream.Inspect(w.t.Context(), client, address)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -378,6 +304,8 @@ type served struct {
 	tamper  map[string]func([]byte) []byte
 	missing map[string]bool
 	asked   []string
+	// open is how many connections to the surface are open.
+	open int
 	// answered is each path asked for and the status it was answered with.
 	answered map[string]int
 }
@@ -419,6 +347,16 @@ func serve(t *testing.T, w *world) *served {
 		rw.WriteHeader(rec.Code)
 		_, _ = rw.Write(body)
 	}))
+	s.server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		switch state {
+		case http.StateNew:
+			s.open++
+		case http.StateClosed, http.StateHijacked:
+			s.open--
+		}
+	}
 	s.server.StartTLS()
 	t.Cleanup(s.server.Close)
 	s.base = s.server.URL
@@ -433,6 +371,21 @@ func serve(t *testing.T, w *world) *served {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	return s
+}
+
+// connections is how many connections to the surface are open once those
+// being closed have closed.
+func (s *served) connections() int {
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		s.mu.Lock()
+		open := s.open
+		s.mu.Unlock()
+		if open == 0 || time.Now().After(deadline) {
+			return open
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 // change has the surface answer one path with what alter makes of it.
@@ -485,24 +438,7 @@ func (s *served) pathOf(t *testing.T, issue string) string {
 // testKey is a signing key made for one test, never committed.
 func testKey(t *testing.T) string {
 	t.Helper()
-	created := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	cfg := &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA, Time: func() time.Time { return created }}
-	entity, err := openpgp.NewEntity("SONiC PSIRT", "", "psirt@sonic.example.test", cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var out bytes.Buffer
-	writer, err := armor.Encode(&out, openpgp.PrivateKeyType, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := entity.SerializePrivate(writer, cfg); err != nil {
-		t.Fatal(err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return out.String()
+	return signingtest.Key(t, signingtest.Made, 0)
 }
 
 // otherSignature is a detached signature another key made, over nothing in

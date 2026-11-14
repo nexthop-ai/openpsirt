@@ -410,10 +410,10 @@ func (s *Store) issuances(ctx context.Context, subject access.Subject,
 // A copy rather than the document in hand. The transaction this is called in
 // may run again, and a retry has to find what it was given as it was.
 //
-// Everything volatile is dated at the moment it left. The document was
-// assembled a little earlier, and a file whose date says when it was generated
-// is one a reader re-fetches because the bytes moved while the advisory did
-// not.
+// Everything volatile is dated at the moment it left, and the status is what
+// the transaction confirmed. The document is assembled a little earlier, and a
+// file whose date says when it was generated is one a reader re-fetches
+// because the bytes moved while the advisory did not.
 //
 // The history is rebuilt from what has gone out rather than taken from the
 // document, for the reason the ordinal is read inside the transaction: the
@@ -426,6 +426,10 @@ func issuedDocument(doc *Document, gone []Issuance, ordinal int,
 	out := *doc
 	version := strconv.Itoa(ordinal + 1)
 	out.Document.Tracking.Version = version
+	// Final, because the transaction this is called in confirms an
+	// agreement stands on this edition; the document is assembled before the
+	// transaction opens, so its status is set here.
+	out.Document.Tracking.Status = StatusFinal
 	out.Document.Tracking.CurrentReleaseDate = at
 	if doc.Document.Tracking.Generator != nil {
 		generator := *doc.Document.Tracking.Generator

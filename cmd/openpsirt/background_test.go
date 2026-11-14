@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/directory"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/signing"
 )
 
 // The passes a deployment runs beside the server, and the ones it does not.
@@ -48,6 +49,7 @@ var optional = []string{
 	"sweep unattached files",
 	"write the published advisory directory",
 	"fetch the CVE records",
+	"watch the signing key's expiry",
 }
 
 func TestWhatADeploymentWithNothingConfiguredStillRuns(t *testing.T) {
@@ -77,6 +79,7 @@ func everythingConfigured() passes {
 		keeper:  &attach.Keeper{},
 		publish: &directory.Writer{},
 		records: &cverecord.Fetcher{},
+		key:     &signing.Watch{},
 	}
 }
 

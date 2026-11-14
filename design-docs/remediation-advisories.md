@@ -72,7 +72,7 @@ inherited issues reach the release note and the disposition register.
 
 | Rule | Reason |
 |---|---|
-| The agreement is asked before the issuance | The bytes sent must say what they are |
+| The agreement is asked before the issuance, inside its transaction, and the bytes stored say `final` | The bytes sent must say what they are; an agreement landing while the document was assembled leaves it saying draft |
 | How far a document travels is its distribution label, from whether anything it covers is held back; the editorial state is independent | A disclosed document can be unfinished, and an embargoed one ready |
 
 ## Editions and agreement
@@ -83,7 +83,10 @@ covered then is recovered from when each flaw was named and taken off.
 | Rule | Reason |
 |---|---|
 | An agreement names an edition | Naming the advisory, it would survive a rewrite (REQ-24, REQ-28) |
+| Agreeing names the edition its giver read, and is refused where the advisory says another now | An edit landing just before would be agreed to unread |
+| An advisory read, its releases and its document each name the edition the advisory pointed at when read, never one read after what they show; the screen agrees to the oldest of the three, offers nothing until the releases are read and the document is read or refused, and refused an agreement, reads them again | A number newer than what a panel shows would be agreed to unread |
 | Retitling, naming or removing a flaw, and marking a release affected or clearing the mark each open an edition; asking for a mark already standing opens nothing | Each changes what the document says |
+| A cleared mark keeps its record, and marking the release again writes another; a release is marked once among the marks standing | Who marked and cleared it each time stays answerable |
 | An agreement records what each release stood at when given | A decision approved or lapsing later moves a status and the agreement stands; the screen says "changed since approval" against it, and difference from what went out is asked of the settled digest |
 | Opening an edition takes back every agreement on the one replaced | The record keeps which edition was agreed |
 | Every change to what an advisory says, agreeing, taking agreement back, and recording that it went out need a triage role on every product it covers | It is one document about all of them |

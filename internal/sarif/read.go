@@ -150,7 +150,7 @@ func (u *Upload) Read(r io.Reader) (Log, error) {
 	if err != nil {
 		return Log{}, err
 	}
-	counted := &counting{r: plain}
+	counted := &docread.Counting{R: plain}
 	b := docread.NewJSON(counted, left, u.lim.MaxDepth)
 	b.BoundMembers("properties", u.lim.MaxProperties, func() error {
 		return over("members in a property bag", u.lim.MaxProperties)
@@ -160,7 +160,7 @@ func (u *Upload) Read(r io.Reader) (Log, error) {
 	if err == nil {
 		err = b.End()
 	}
-	u.bytes += counted.n
+	u.bytes += counted.N
 	switch {
 	case errors.Is(err, docread.ErrTooLarge) && part:
 		return Log{}, over(partBytes, int(u.lim.MaxPart))
@@ -186,23 +186,11 @@ const (
 	partBytes   = "bytes in one document once decompressed"
 )
 
-// counting counts what passes through it.
-type counting struct {
-	r io.Reader
-	n int64
-}
-
-func (c *counting) Read(p []byte) (int, error) {
-	n, err := c.r.Read(p)
-	c.n += int64(n)
-	return n, err
-}
-
 type reader struct {
 	b    *docread.JSON
 	lim  Limits
 	up   *Upload
-	read *counting
+	read *docread.Counting
 }
 
 // hold counts one more thing held, refusing the upload past the bound.
@@ -218,7 +206,7 @@ func (rd *reader) hold() error {
 // costs as much as text the document carried.
 func (rd *reader) spend(n int) error {
 	rd.up.bytes += int64(n)
-	if rd.up.bytes+rd.read.n > rd.lim.MaxBytes {
+	if rd.up.bytes+rd.read.N > rd.lim.MaxBytes {
 		return over(uploadBytes, int(rd.lim.MaxBytes))
 	}
 	return nil

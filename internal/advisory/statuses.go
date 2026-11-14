@@ -72,16 +72,33 @@ func placed(ctx context.Context, db bun.IDB, subject access.Subject,
 	return out, nil
 }
 
-// Releases is every release of every issue the advisory covers, with what the
-// document states about it, the decision it stands under, and whether that
-// moved since an agreement standing on what the advisory says now.
-func (s *Store) Releases(ctx context.Context, subject access.Subject,
-	identifier string) ([]Placed, error) {
+// ReleasesAt is every release of every issue the advisory covers, with what
+// the document states about it, the decision it stands under, and whether that
+// moved since an agreement standing on what the advisory says now; and the
+// edition the advisory read pointed at, for a screen agreeing to what it
+// shows. The marks are read after it, so they are never older than the
+// edition named.
+func (s *Store) ReleasesAt(ctx context.Context, subject access.Subject,
+	identifier string) ([]Placed, int, error) {
 
 	row, err := s.byName(ctx, subject, identifier)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
+	edition, err := s.editionOf(ctx, row)
+	if err != nil {
+		return nil, 0, err
+	}
+	if s.afterRead != nil {
+		s.afterRead()
+	}
+	out, err := s.releasesOf(ctx, subject, row)
+	return out, edition, err
+}
+
+// releasesOf is what ReleasesAt reads about the releases of an advisory
+// already read.
+func (s *Store) releasesOf(ctx context.Context, subject access.Subject, row *Advisory) ([]Placed, error) {
 	out, err := placed(ctx, s.db, subject, row.ID)
 	if err != nil {
 		return nil, err
@@ -230,39 +247,23 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 			return err
 		}
 		standing := false
-		var revive *Override
 		for i := range held {
 			if held[i].RemovedAt == nil {
 				standing = true
-			} else if revive == nil {
-				revive = &held[i]
 			}
 		}
 		switch {
 		case standing == affected:
 			return nil
-		case affected && revive != nil:
-			// Matched on still being cleared, and counted: two people
-			// marking at once both read it cleared, and the second must not
-			// open an edition for a change the first already made.
-			result, err := tx.NewUpdate().Model((*Override)(nil)).
-				Set(`"removed_at" = NULL`).Set(`"removed_by" = NULL`).
-				Set(`"set_at" = ?`, now).Set(`"set_by" = ?`, subject.ID).
-				Where(`"id" = ?`, revive.ID).
-				Where(`"removed_at" IS NOT NULL`).Exec(ctx)
-			if err != nil {
-				return err
-			}
-			if n, err := database.Affected(result); err != nil || n == 0 {
-				return err
-			}
 		case affected:
+			// A new row each time, so who marked the release and who cleared
+			// it each time stays on the record.
 			if _, err := tx.NewInsert().Model(&Override{
 				AdvisoryID: row.ID, ProductID: named.ID, VulnerabilityID: issue.ID,
 				BranchOrTagID: at.BranchOrTagID, VariantID: at.VariantID,
-				SetAt: now, SetBy: subject.ID,
+				SetAt: now, SetBy: subject.ID, Live: new(true),
 			}).Exec(ctx); err != nil {
-				// Two people marking one release at once both read nothing,
+				// Two people marking one release at once both read it unmarked,
 				// and the constraint is what refuses the second. Run again,
 				// it finds the first one's mark standing and changes nothing.
 				if database.IsDuplicate(err) {
@@ -271,9 +272,12 @@ func (s *Store) MarkAffected(ctx context.Context, subject access.Subject,
 				return err
 			}
 		default:
-			// Counted for the reason reviving one is.
+			// Matched on still standing, and counted: two people clearing at
+			// once both read it marked, and the second must not open an
+			// edition for a change the first already made.
 			result, err := tx.NewUpdate().Model((*Override)(nil)).
 				Set(`"removed_at" = ?`, now).Set(`"removed_by" = ?`, subject.ID).
+				Set(`"live" = NULL`).
 				Where(marks, on...).
 				Where(`"removed_at" IS NULL`).Exec(ctx)
 			if err != nil {

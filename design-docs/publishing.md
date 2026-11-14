@@ -69,9 +69,9 @@ document is about disclosed work in it (REQ-63, REQ-37).
 | One 404 for nothing: publishing off, no product publishing, a product that stopped, a document withdrawn, never written, or written under wider statuses than now, a path naming no document, an `index.txt` with nothing to list | Nothing tells a reader what exists |
 | The description and the feed are not served where there is no CSAF document | Each states the newest release |
 | Nothing names a row: paths and identifiers are built from names | |
-| Every answer carries an entity tag; a document and its files also the moment it last moved; a request repeating either answers 304 | A list carries no date, since one that shrank is newer than its newest document |
+| Every answer carries an entity tag; a document and its digests also the moment it last moved; a request repeating either answers 304 | A list carries no date, since one that shrank is newer than its newest document |
 | `Cache-Control: public, no-cache` | A reader asks every time and fetches only what changed |
-| A signature is tagged by the document it signs | Its bytes carry a random salt, so an unchanged document's signature is confirmed without signing again |
+| A signature is tagged by the document it signs and the public key as published, and served with no `Last-Modified` | Its bytes carry a random salt, so an unchanged document's signature is confirmed without signing again; a reader holding one by a replaced or re-signed key is sent the new one, whenever that key became valid |
 | A list reads every document's name and dates; a VEX document is read alone. Advisories' bytes are read only for the CSAF lists and for a CSAF path holding no VEX document | A whole-provider reader asks for each document and its files, and none of those lists the rest |
 | A VEX document is looked for before an advisory | Where an advisory's tracking identifier folds to a VEX document's path, the VEX document is served |
 | The feed and the description state the newest document's release, never the clock | An unchanged provider answers the same bytes |
@@ -90,6 +90,7 @@ directory reads them by: the newest revision whose label lets it travel
 |---|---|
 | Read as anybody at all: every issue covered, now and when it went out, at a disclosed occurrence in a product the reader reads | Anybody at all reads only publishing products, so an advisory covering one that does not is not served |
 | A revision labeled RED is never served, whatever followed it | |
+| An advisory whose stored bytes no longer read is left out and logged once per process | The surface takes no credential, so a line per request is one anybody multiplies |
 | An advisory generated where the deployment and every product it covers publish, and are in use, states this surface's address; otherwise the directory's where one is written, else none | Issued bytes never change, so earlier advisories keep the address they went out with |
 
 ## Statements and statuses
@@ -110,7 +111,8 @@ stated outright. A component nobody judged gets no statement.
 | An issue open and undecided, a deferral, and a decision awaiting its second person state nothing; a document left with no statement is not served | |
 | Under investigation is never stated | No decision records somebody looking |
 | Disclosed findings only, in a product anybody at all reads | An undisclosed flaw of ours is in no statement, document, list or count (REQ-37) |
-| Where a flaw of ours about an issue is out of anybody's reach, the issue's other names and description are left out | The flaw wrote its minted name and summary onto the shared issue row |
+| Where a flaw of ours about an issue is out of anybody's reach, the issue's other names and description are left out, whoever reads the facts | The flaw wrote its minted name and summary onto the shared issue row |
+| The facts and the document of one build are read by one pipeline | A rule about what a statement rests on or withholds holds for both |
 | A decision in force states affected without a second person | Saying an issue applies hides nothing |
 | A supplier's statement about its own product is not passed on | That is the suppliers kind of the build document, chosen on purpose |
 | Each branch, tag and variant in use is read at its last scan, once scanned; one out of support is still published (REQ-15) | A reader still runs it |
@@ -145,14 +147,14 @@ One document per issue per product, across every branch, tag and variant.
 | Element | Filled by |
 |---|---|
 | Category and version | `csaf_vex`, CSAF 2.0 |
-| Tracking identifier | `VEX-<product>-<issue>`, fixed while the issue keeps its name |
+| Tracking identifier | `VEX-<product id>-<product>-<issue>`, such as `VEX-12-sonic-GHSA-x-y` at `vex-12-sonic-ghsa-x-y.json`; fixed while the issue keeps its name |
 | Title | The issue and the product's display name |
 | Product tree | The publisher, the product, a leaf per named build with the package identifier its inventory gave itself; every component and every component pulling one in, by package identifier; relationships placing each component in a build or beneath its consumer |
 | Status | A component holding for anybody by its own identifier, anything else by the relationship; a product under two statuses keeps the more cautious |
 | Flags | One per reason for products not affected |
 | Threats | What stops the flaw, where named, for a product not affected |
 | Remediations | For an affected product, no fix planned or none available, and what to do where named |
-| Identifiers | The CVE where the issue has one, and every other name by its prefix |
+| Identifiers | The CVE where the issue has one in the CVE program's form, and every other name by its prefix |
 | Notes | What the issue is, in the reporter's words, else its name |
 | References | The document's served address |
 | Distribution | TLP WHITE, the standard's word for TLP 2.0's CLEAR |
@@ -185,11 +187,12 @@ A revision is a fact about a moment: recorded, and read by requests.
 | Rule | Reason |
 |---|---|
 | A revision is written only where its digest moved: the stated address, the publisher, the title, the product tree and the statements | Moving the deployment's address or publisher revises everything |
-| Turning publishing on for a product, or renaming a publishing one, is refused, naming the other, where a product that publishes or has published folds alike | The filename rule folds `edge.os` and `edge os` to one path; a withdrawn document keeps its path |
-| The pass refuses a path another product holds, naming the first and saying to turn the second off, and carries on with the rest | Reached only by turning both on at once |
+| Two products' CSAF VEX documents never share a path | The tracking identifier opens on the product's identifier, a run of digits the first hyphen ends, so the filename rule folding `edge.os` and `edge os` alike, or `acme` with `GHSA-x-y` and `acme-ghsa` with `x-y`, gives two paths |
+| The pass refuses a path another document holds, naming the path and the product and issue holding it, and carries on with the rest | Two issues of one product whose names fold alike under the filename rule |
+| A document held at a path its tracking identifier no longer gives is published at the new path as a new document, its first version and a new year folder, and the old path serves nothing | A tracking identifier stays the same across a document's versions; a reader following the provider index or feed finds the new path |
 | A rename is refused once a document that may name the part was served, withdrawn ones included | Readers hold documents by names |
 | Naming a part: a product, any document about it; a release, its OpenVEX document and, once it has a scanned build, every CSAF VEX document of its product; a variant, every document of its product once it has a scanned build | Which builds a revision named is in its bytes alone. Unscanned, a release or variant may be renamed |
-| The next revision is one past the last, with every earlier one in its history; its first release, and so its year folder, never moves | |
+| The next revision is one past the last, with every earlier one in its history; its first release, and so its year folder, never moves except for a document whose path moved | |
 | A revision is written in a transaction reading what it replaces | Of two replicas, the second matches nothing and goes again |
 | A document with nothing left to say is withdrawn, kept and not served; it continues as its next revision if the issue returns, or as the revision it was if it states the same again | |
 | A document written under every status stops being served as soon as the statuses narrow; the next pass rewrites or withdraws it | |
@@ -208,6 +211,8 @@ A revision is a fact about a moment: recorded, and read by requests.
 | Each signature carries a random salt, and each verifies | |
 | A signature is dated no earlier than the key's newest self-signature | Extending expiry or adding a name leaves older documents signable |
 | Digests are worked out on request | |
+| A key expiring is logged as a warning from 30 days before, at start and daily, and as an error once expired | A key past expiry signs nothing dated after it, and the next start is refused |
+| A signature refused for an expired key names the key, the expiry and the document's date, and is logged once per process | The watch reports the expiry itself; a line per request is one anybody multiplies |
 
 ## The publishing pass
 
@@ -221,6 +226,7 @@ what moved.
 | One replica writes, under a lease | The conditional write stops a double revision when a lease is lost mid-pass |
 | A product that cannot be worked out is logged and skipped; its documents stay as they were | |
 | What has not moved is stepped over on a digest read; what has is decided again in its own transaction | |
+| That transaction writes a fresh value into the product's row, matched on its publishing, and re-reads the statuses published; either moved since generation, it writes nothing | Turning a product off writes that row before it withdraws the documents, in one transaction, so a late write either matches nothing or is withdrawn by it |
 | Documents grow with decisions, never with scanner output | A document is an issue somebody decided |
 | A pass reads every build's decisions whatever is published, most of its cost (`design-docs/publishing-measurements.md`) | |
 
@@ -240,3 +246,4 @@ what moved.
 |---|---|
 | A document is up to five minutes behind a decision agreed or a scan landing | Turning a product off and narrowing the statuses act at once, being asked on every request |
 | Every document of a product is worked out every pass | 3.3 s on a full-size image (`design-docs/publishing-measurements.md`); a record of what moved would copy the findings (REQ-74) |
+| A path an earlier tracking identifier shape gave is held until that document is published again at its new path; a withdrawn one keeps it, and a document whose new path it holds stays served at its old path | Only a product named as another's identifier and a hyphen, such as `12-sonic` beside product 12 `sonic`, can reach it, and the pass names the path and the product holding it |

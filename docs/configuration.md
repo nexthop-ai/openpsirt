@@ -852,7 +852,7 @@ not its identifier, not that there is one.
 |---|---|---|---|
 | `OPENPSIRT_PUBLISH` | `publishing.enabled` | Serve the published documents. Needs `OPENPSIRT_BASE_URL` to be the `https` address this deployment is reached at, and a publisher's name and namespace; refused at startup without them. Read at startup | `false` |
 | `OPENPSIRT_PUBLISH_RATE` | `publishing.rate` | How many requests a minute one client address may make of the published documents, on each replica. Past it, a client is answered 429 with when to ask again. Refused where publishing is off | `600` |
-| `OPENPSIRT_PUBLISH_KEY` | `publishing.key` | An armored OpenPGP private key to sign every published document with. With one, each document carries an `.asc` signature beside it, the public key is served and named in the provider description, and the provider claims the trusted provider role. Without one, documents carry digests only. Refused at startup if it is not one signing key that can sign now, or where publishing is off | unset |
+| `OPENPSIRT_PUBLISH_KEY` | `publishing.key` | An armored OpenPGP private key to sign every published document with. With one, each document carries an `.asc` signature beside it, the public key is served and named in the provider description, and the provider claims the trusted provider role. Without one, documents carry digests only. Refused at startup if it is not one signing key that can sign now, or where publishing is off. A key expiring is logged as a warning from 30 days before, at startup and daily | unset |
 | `OPENPSIRT_PUBLISH_KEY_PASSPHRASE` | `publishing.key_passphrase` | What unlocks the key, where it is locked. Refused where the key is not locked, and without a key | unset |
 
 Two things are set inside the application, by an administrator:
@@ -902,11 +902,11 @@ or variant keeps its name once it has a scanned build and a document of its
 product has been served, and a release also once its own OpenVEX document has
 been. A release or variant nothing was scanned for may be renamed.
 
-A document's filename is built from its product's name, lower-cased, with
-every run of characters other than letters, digits, a plus and a hyphen made
-one underscore. Turning publishing on for a product, or renaming one that
-publishes, is refused where another product that publishes or has published
-gets the same filename this way.
+A CSAF VEX document's tracking identifier is `VEX-`, the product's numeric
+identifier, its name and the issue, such as `VEX-12-sonic-GHSA-x-y`. Its
+filename is that identifier lower-cased, with every run of characters other
+than letters, digits, a plus and a hyphen made one underscore, so two products'
+documents never share one.
 
 ## Upstream currency
 
@@ -1647,6 +1647,7 @@ v0.10.2 named `reaffirm-claim`.
 | Change | What to do |
 |---|---|
 | An issue taken off an advisory and put back keeps every stretch it was on, so an advisory issued during any of them is read as naming it. v0.12.0 kept only the last stretch, and the upgrade cannot recover an earlier one | Nothing the upgrade can do. Where v0.12.0 saw an issue taken off, put back and taken off again, an advisory issued during an earlier stretch is read as not naming it: what went out is shown to readers who may not see that issue, and a rename that issuance should refuse is allowed |
+| A release marked affected on an advisory, cleared and marked again keeps every stretch it was marked for, each with who marked and who cleared it. v0.12.0 kept one row and overwrote who marked and cleared it before, and the upgrade cannot recover an earlier stretch | Nothing the upgrade can do. Where v0.12.0 saw a release marked, cleared and marked again, only the last marking and who made it are shown |
 | A variable starting `OPENPSIRT_` that names no setting stops the process at startup, naming it. v0.12.0 ignored it, so a misspelled setting kept its default | Correct or unset each variable the refusal names. Kubernetes service links are not refused |
 | A database URL with a port, no user name and no database, whose query holds an unescaped `@` followed by a host, such as `postgres://u:12?a=b@db`, is refused at startup as a password cut short. An `@` in a parameter naming a user or a credential, such as `user` or `password`, is not. v0.12.0 handed the driver the host `u` | Percent-encode each `/`, `?`, `#` and `@` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
 | An object store endpoint, `OPENPSIRT_DIRECTORY_URL`, `OPENPSIRT_OIDC_ISSUER` or `openpsirt-upload --url` with an `@` in its path is refused, since a password holding an unescaped `/`, `?` or `#`, such as `https://key:12/ab@minio:9000`, reads that way. v0.12.0 read the host as `key` | Percent-encode each `/`, `?`, `#` and `@` in the user name and password, and an `@` in a path as `%40` |
@@ -1659,6 +1660,11 @@ v0.10.2 named `reaffirm-claim`.
 | A VEX document uploaded without `publisher` is filed under the publisher it names: an OpenVEX author or a CSAF publisher name. One naming neither is refused with 422. v0.12.0 filed it under its file name | Clear what v0.12.0 filed under a file name, as [VEX statements from v0.12.0](#vex-statements-from-v0120) says. Left alone, those statements stay in force beside the ones later uploads file under the document's own publisher |
 | A VEX document replaces only an earlier revision of itself: the same publisher and the same OpenVEX `@id` or CSAF tracking identifier. v0.12.0 replaced every earlier document from that publisher | Clear what v0.12.0 recorded under each publisher, as [VEX statements from v0.12.0](#vex-statements-from-v0120) says. Left alone, a revision stating an identifier replaces none of it, and what v0.12.0 recorded stays in force beside the revision |
 | A build's components are shown, searched and given to the scanner by the name and version that build stated. v0.12.0 used those of whichever build described the package first, in any product | Nothing. A build shows its own once its inventory is sent again; until then it keeps the names and versions v0.12.0 showed |
+| A CSAF VEX document's tracking identifier opens on its product's numeric identifier, `VEX-12-sonic-GHSA-x-y` where v0.12.0 wrote `VEX-sonic-GHSA-x-y`, so every CSAF VEX document's identifier and path change once. The first publishing pass after the upgrade writes each at its new path as a new document, version 1 in the current year's folder, and its old path answers 404, unless the pass refuses its new path as held, which it logs. Nothing is written to or left in [the published advisory directory](#the-published-advisory-directory), which holds advisories alone, so no file is orphaned | Nothing for a reader that follows the provider index or the feed. Point a link or bookmark kept to a single CSAF VEX document at its new path |
+| A reader keeping CSAF VEX documents by tracking identifier, another OpenPSIRT reading this deployment as an upstream among them, sees every old document withdrawn and a new one about each issue, with nothing linking the two | On another OpenPSIRT, review each statement again: one accepted from an old document is set aside, and decisions started from it carry the set-aside notice; one declined comes back to the review queue |
+| Turning publishing on for a product, and renaming one that publishes, are no longer refused for a name that folds like another product's | Nothing |
+| `POST /v1/advisories/{advisory}/approval` takes `{"edition": n}`, the edition agreed to, and answers 409 where the advisory has moved to another edition since. v0.12.0 took no body | Send the `edition` the advisory reported, or the oldest of the `Advisory-Edition` values its releases and its document named where those were read too. A request without it is refused |
+| A build's OpenVEX document states a decision not to fix that names no mitigation as affected, its action saying no fix is planned. v0.12.0 left such a decision out | Nothing, unless one should not be stated: the first publishing pass after the upgrade states every one |
 
 #### VEX statements from v0.12.0
 

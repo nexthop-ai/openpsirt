@@ -267,7 +267,7 @@ func standingIn(ctx context.Context, db bun.IDB, productID, issueID int64,
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
 		GroupExpr(`"t"."branch_or_tag_id", "t"."variant_id"`)
-	if err := finding.WhollyCovered(q, productID, visible, finding.ForReleases).Scan(ctx, &rows); err != nil {
+	if err := finding.WhollyCovered(q, productID, visible).Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read which releases a decision covers: %w", err)
 	}
 	out := make(map[[2]int64]*Grounds, len(rows))
@@ -350,8 +350,8 @@ func madeOn(ctx context.Context, db bun.IDB, occurrences []int64) (map[int64][]B
 //
 // Part of what the advisory says, so setting one and clearing one each open an
 // edition and take back every agreement standing. The row stays once cleared,
-// as a cover does, so who marked a release and who cleared it are both on the
-// record; marking it again revives the row.
+// as a cover does, and marking the release again writes another, so who
+// marked and cleared it each time is on the record.
 type Override struct {
 	bun.BaseModel `bun:"table:advisory_override,alias:ao"`
 
@@ -365,6 +365,9 @@ type Override struct {
 	SetBy           int64      `bun:"set_by,notnull"`
 	RemovedAt       *time.Time `bun:"removed_at"`
 	RemovedBy       *int64     `bun:"removed_by"`
+	// Live is true while the mark stands and null once cleared, so the
+	// release is marked once among the rows standing alone.
+	Live *bool `bun:"live"`
 }
 
 // overridesOf is the releases this advisory marks affected for one issue in

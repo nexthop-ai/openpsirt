@@ -262,8 +262,7 @@ patchbranch.Progress Not varying by reader: how far the patch branch lookups hav
 publish.AnyPublishedForBranchOrTag Not varying by reader: whether any served document names a release. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 publish.AnyPublishedForProduct Not varying by reader: whether any served document names a product. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 publish.AnyPublishedForVariant Not varying by reader: whether any served document names a variant. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
-publish.FoldsLike Not varying by reader: which other product publishes at the same paths, asked by catalog changes only an administrator makes.
-publish.Store.WithdrawProduct Who is asking: an administrator turning publishing off for a product withdraws its documents, on a route only an administrator reaches.
+publish.Store.TurnOff Who is asking: an administrator turning publishing off for a product records it and withdraws its documents, on a route only an administrator reaches.
 queue.Leases.Await A background pass: a replica waits its turn to rewrite deadlines after a policy change.
 queue.Leases.Handback A background pass: a replica hands back a lease as a pass ends.
 queue.Leases.Release A background pass: a replica hands back a lease it holds.

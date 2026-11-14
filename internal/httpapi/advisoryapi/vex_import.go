@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -39,22 +40,6 @@ type StatementsTakenBody struct {
 	Recorded   int    `json:"recorded" doc:"Statements taken from it"`
 	Superseded int    `json:"superseded" doc:"Statements set aside rather than deleted: those the earlier revision of this document made and this one does not, and the publisher's older statements about a product and issue this document states newer"`
 	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
-}
-
-// counting is a reader that says how much has gone past it.
-//
-// The length a size refusal needs, which a stream does not otherwise carry:
-// the document is never held, so its length is only knowable by counting it on
-// the way through.
-type counting struct {
-	r io.Reader
-	n int64
-}
-
-func (c *counting) Read(p []byte) (int, error) {
-	n, err := c.r.Read(p)
-	c.n += int64(n)
-	return n, err
 }
 
 // uploaded streams one third party's document past a digest, parses it with
@@ -78,11 +63,11 @@ func (c *counting) Read(p []byte) (int, error) {
 func uploaded(in core.Deps, file huma.FormFile, read func(io.Reader) error) (string, error) {
 	most := in.Limits.OrDefault().MaxBytes
 	digest := sha256.New()
-	counted := &counting{r: io.TeeReader(io.LimitReader(file, most+1), digest)}
+	counted := &docread.Counting{R: io.TeeReader(io.LimitReader(file, most+1), digest)}
 	err := read(counted)
 	// Asked before the parse error, because a document cut off at the limit
 	// fails as malformed and the honest answer is its size.
-	if counted.n > most {
+	if counted.N > most {
 		return "", huma.Error413RequestEntityTooLarge(fmt.Sprintf(
 			"that document is larger than the %d bytes this deployment reads", most))
 	}

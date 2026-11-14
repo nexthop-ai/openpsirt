@@ -2,8 +2,7 @@
 
 The OpenVEX document of one build (a product, branch or tag, and variant):
 approved `not-applicable`, `mismatched` and `already-fixed` decisions (REQ-39),
-`wont-fix` decisions saying what a holder can do instead, and the patches the
-build declares.
+`wont-fix` decisions, and the patches the build declares.
 
 Satisfies REQ-11, REQ-18, REQ-31, REQ-37, REQ-39.
 
@@ -50,7 +49,8 @@ a document is generated.
 | The impact statement carries what stops the flaw, never the reasoning, and is absent where no mitigation was named | The reasoning is a triager's argument to a second person |
 | An outcome with no status of its own fails the document as a fault | Each outcome maps to one status by name, and a test holds the covering read's outcomes to them; the safe default is silence |
 | A deferral is absent | Silence already reads as affected |
-| A decision not to fix is stated affected, only where it names what to do instead | Nothing else tells a customer, and the format requires an action |
+| A decision not to fix is stated affected, its action what to do instead where named, else that no fix is planned | Nothing else tells a customer, and the format requires an action |
+| A decision not to fix carries reasoning, which is never published | Every decision is refused without reasoning and needs a second person; the reasoning is what they agreed to |
 | The mitigation's field follows the status: why on not affected, what to do on affected | |
 | Public findings only; undisclosed ones are a preview for a reader who may see them | |
 | A statement is about the build with the component beneath, or about the consumer when stated by occurrence | What somebody has is the image |

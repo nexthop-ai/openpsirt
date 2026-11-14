@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -82,7 +83,18 @@ func Handler(c Config) http.Handler {
 type server struct {
 	Config
 	limits *limiter
+	// unread is every stored advisory this process has reported it could not
+	// read back, so each is logged once rather than once per request. The
+	// surface takes no credential, so a per-request log line is one anybody
+	// can multiply.
+	unread sync.Map
+	// expired logs, once per process, that the key has expired before a
+	// document it was asked to sign; the key is the same for every request.
+	expired sync.Once
 }
+
+// errReported is a failure already logged, answered without another line.
+var errReported = errors.New("already reported")
 
 // serve answers one request.
 func (s *server) serve(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +112,9 @@ func (s *server) serve(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, publish.ErrNotPublished):
 		notFound(w)
+		return
+	case errors.Is(err, errReported):
+		problem(w, http.StatusInternalServerError, "this could not be answered just now; try again shortly")
 		return
 	case err != nil:
 		s.Logger.ErrorContext(r.Context(), "a published document could not be served",
@@ -244,7 +259,9 @@ func (s *server) travelling(ctx context.Context, v *view) error {
 	}
 	travels, _, unread := advisory.Travelling(sent)
 	for _, one := range unread {
-		s.Logger.ErrorContext(ctx, "a published advisory could not be read back", "error", one)
+		if _, said := s.unread.LoadOrStore(one.Error(), true); !said {
+			s.Logger.ErrorContext(ctx, "a published advisory could not be read back", "error", one)
+		}
 	}
 	for _, one := range travels {
 		v.advisories[one.Path] = one
@@ -299,32 +316,17 @@ func (s *server) described(v *view) (*file, error) {
 	if len(v.csaf) == 0 {
 		return nil, publish.ErrNotPublished
 	}
-	newest := csaf.Newest(v.csaf)
-	role := csaf.Provider
 	var keys []csaf.PublicKey
 	if s.Signer != nil {
-		role = csaf.TrustedProvider
 		keys = []csaf.PublicKey{{Fingerprint: s.Signer.Fingerprint(),
 			URL: s.Base + publish.KeysPath + s.Signer.Fingerprint() + ".asc"}}
 	}
-	return jsonFile(csaf.ProviderMetadata{
-		CanonicalURL: s.Base + publish.MetadataPath,
-		Distributions: []csaf.Distribution{{
-			DirectoryURL: s.Base + publish.DirectoryPath,
-			ROLIE: &csaf.ROLIE{Feeds: []csaf.FeedDescription{{
-				Summary:  "Security documents " + s.Who.Name + " publishes, TLP:" + advisory.Travelable + ".",
-				TLPLabel: advisory.Travelable,
-				URL:      s.Base + publish.FeedPath,
-			}}},
-		}},
-		LastUpdated: csaf.Stamp(newest),
-		Listed:      s.List,
-		Mirrored:    s.Mirror,
-		Version:     csaf.MetadataVersion,
-		Publisher:   advisory.IssuerOf(s.Who),
-		PublicKeys:  keys,
-		Role:        role,
-	}, time.Time{})
+	return jsonFile(csaf.Describe(csaf.Description{
+		Metadata: s.Base + publish.MetadataPath, Directory: s.Base + publish.DirectoryPath,
+		Feed: s.Base + publish.FeedPath, Name: s.Who.Name, TLP: advisory.Travelable,
+		Publisher: advisory.IssuerOf(s.Who), Listed: s.List, Mirrored: s.Mirror,
+		Keys: keys, Newest: csaf.Newest(v.csaf),
+	}), time.Time{})
 }
 
 // feed is every CSAF document as one ROLIE feed, each entry naming the files
@@ -341,7 +343,7 @@ func (s *server) feed(v *view) (*file, error) {
 	}
 	at := func(path string) string { return s.Base + publish.DirectoryPath + path }
 	return jsonFile(csaf.FeedOf(csaf.FeedName(s.Who.Prefix),
-		s.Who.Name+" CSAF documents (TLP:"+advisory.Travelable+")",
+		csaf.FeedTitle(s.Who.Name, advisory.Travelable),
 		s.Base+publish.FeedPath, at, beside, v.csaf), time.Time{})
 }
 
@@ -376,25 +378,39 @@ func (s *server) document(ctx context.Context, v *view, path string) (*file, err
 	return nil, publish.ErrNotPublished
 }
 
-// signature is the detached signature over one document, dated when the
-// document was released.
+// signature is the detached signature over one document, served with no
+// Last-Modified.
 //
-// Tagged by the document it signs rather than by its own bytes, which carry a
-// random salt and differ every time: a reader holding the signature of an
-// unchanged document is told so, without the key being used again.
+// Tagged by the document it signs and the public key as published rather than
+// by its own bytes, which carry a random salt and differ every time: a reader
+// holding the signature of an unchanged document is told so, without the key
+// being used again, and one holding a signature by a key replaced or re-signed
+// is sent the new one, since a signature dated before the key's newest
+// self-signature is refused by a reader's tooling. Served with no
+// Last-Modified because a replacement key may have become valid before the
+// document was released, and a date that does not move with the key would
+// confirm the old signature to a reader asking by date. The signature itself
+// is dated at the document's release.
 func (s *server) signature(document *file, asked string) (*file, error) {
 	if s.Signer == nil {
 		return nil, publish.ErrNotPublished
 	}
-	tag := strings.TrimSuffix(tagOf(document.body), `"`) + `.asc"`
+	tag := strings.TrimSuffix(tagOf(document.body), `"`) + "." +
+		strings.Trim(tagOf(s.Signer.PublicKey()), `"`) + `.asc"`
 	if asked == tag {
-		return &file{tag: tag, kind: signatureKind, modified: document.modified}, nil
+		return &file{tag: tag, kind: signatureKind}, nil
 	}
 	signed, err := s.Signer.Sign(document.body, document.modified)
+	if errors.Is(err, signing.ErrExpired) {
+		s.expired.Do(func() {
+			s.Logger.Error("a signature could not be made", "error", err)
+		})
+		return nil, errReported
+	}
 	if err != nil {
 		return nil, err
 	}
-	return &file{tag: tag, body: signed, kind: signatureKind, modified: document.modified}, nil
+	return &file{tag: tag, body: signed, kind: signatureKind}, nil
 }
 
 // digestFile is the file holding a document's digest: the value and then the

@@ -52,6 +52,7 @@ copy of the upstream ordinarily sits.
 | Only that host, at its port: a description, feed or list of changes naming another host is refused before anything is resolved | |
 | https only, no redirect followed, no user in an address | |
 | Two minutes for one request, in which a listing or document is read whole | |
+| A read, and the inspection before trusting an upstream, build a client of their own and close its connections when done | A client dropped with connections open strands them until the far end closes them |
 
 | Bound | Size |
 |---|---|

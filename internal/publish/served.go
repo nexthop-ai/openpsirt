@@ -12,7 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
@@ -179,39 +179,6 @@ func scanned(db bun.IDB, column, alias string) *bun.SelectQuery {
 		Where(`"tg"."last_scan_id" IS NOT NULL`)
 }
 
-// FoldsLike is the displayed name of another product whose documents would be
-// published at this product's paths, or empty where there is none.
-//
-// A CSAF VEX document's filename is built from its product's name under the
-// standard's filename rule, so two names that fold alike under it are given
-// one path per issue. The other product counts while it publishes, and once
-// it has published anything, because a withdrawn document keeps its path.
-func FoldsLike(ctx context.Context, db bun.IDB, productID int64, name string) (string, error) {
-	var others []struct {
-		Name        string `bun:"name"`
-		DisplayName string `bun:"display_name"`
-	}
-	held := db.NewSelect().Model((*Document)(nil)).ColumnExpr("1").
-		Where(`"pub"."product_id" = "p"."id"`)
-	if err := db.NewSelect().TableExpr(`"product" AS "p"`).
-		Column("p.name", "p.display_name").
-		Where(`"p"."id" <> ?`, productID).
-		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-			return q.Where(`"p"."publishes" = ?`, true).WhereOr("EXISTS (?)", held)
-		}).
-		OrderExpr(`"p"."id"`).
-		Scan(ctx, &others); err != nil {
-		return "", fmt.Errorf("read which products publish: %w", err)
-	}
-	folded := advisory.Filename(name)
-	for _, other := range others {
-		if advisory.Filename(other.Name) == folded {
-			return other.DisplayName, nil
-		}
-	}
-	return "", nil
-}
-
 // anyPublished reports whether the read finds a row.
 func anyPublished(ctx context.Context, q *bun.SelectQuery) (bool, error) {
 	found, err := q.Limit(1).Exists(ctx)
@@ -221,14 +188,27 @@ func anyPublished(ctx context.Context, q *bun.SelectQuery) (bool, error) {
 	return found, nil
 }
 
-// WithdrawProduct stops every document of a product being served, in the
-// transaction that turns the product's publishing off.
+// TurnOff records that a product does not publish and stops every document
+// of it being served, in the caller's transaction.
+//
+// The product's row is written before its documents are withdrawn. A pass
+// confirms publishing by writing that row in the transaction writing its
+// document, so it either waits for the turn-off and matches nothing, or
+// commits first and has its document withdrawn here. Withdrawn first, a pass
+// committing between the two statements is missed, because a statement reads
+// only what was committed before it began.
 //
 // Turned on again, a product serves nothing until the next pass has worked
 // its documents out again: what it said when it was turned off may since have
 // stopped being true. A document stating again what it stated then comes back
 // as the revision it was.
-func (s *Store) WithdrawProduct(ctx context.Context, productID int64) error {
+func (s *Store) TurnOff(ctx context.Context, productID int64) error {
+	if _, err := s.db.NewUpdate().Model((*catalog.Product)(nil)).
+		Set(`"publishes" = ?`, false).
+		Where(`"id" = ?`, productID).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("record that product %d does not publish: %w", productID, err)
+	}
 	if _, err := s.db.NewUpdate().Model((*Document)(nil)).
 		Set(`"withdrawn_at" = ?`, s.now().UTC().Truncate(time.Microsecond)).
 		Where(`"product_id" = ?`, productID).

@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -17,6 +16,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
@@ -75,7 +75,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 		out.Body.Items = make([]OutboundBody, 0, len(rows))
 		for _, row := range rows {
 			out.Body.Items = append(out.Body.Items, OutboundBody{
-				Name: row.Name, Kind: core.DestinationKind(row.Kind), Platform: core.Platform(row.Platform), Host: hostOf(row.URL),
+				Name: row.Name, Kind: core.DestinationKind(row.Kind), Platform: core.Platform(row.Platform), Host: outward.Host(row.URL),
 				Channel: row.Channel, Topic: row.Topic, Product: row.Product, Team: row.Team,
 				Sent: row.Sent, Failing: row.Failing, Because: row.Because,
 			})
@@ -141,11 +141,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 		// Normalized here so the stored value is the address as it parses. The
 		// rule for what may be stored is the store's, where the rest of this
 		// table's rules live.
-		parsed, err := url.Parse(strings.TrimSpace(input.Body.URL))
-		address := strings.TrimSpace(input.Body.URL)
-		if err == nil {
-			address = parsed.String()
-		}
+		address := outward.Normalized(input.Body.URL)
 		var row *notify.Outbound
 		// The names the product and the team resolved to, which is what the
 		// listing answers with.
@@ -194,7 +190,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			// secret somewhere retiring the destination cannot take it out of.
 			// The host is what an administrator reading the trail needs: which
 			// service this deployment started talking to.
-			where := parsed.Hostname()
+			where := outward.Host(address)
 			if row.Platform != notify.Webhook {
 				where = row.Platform + " · " + deref(row.Channel)
 			}
@@ -210,7 +206,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 			Status int
 			Body   OutboundBody
 		}{Status: http.StatusCreated, Body: OutboundBody{
-			Name: row.DisplayName, Kind: core.DestinationKind(row.Kind), Platform: core.Platform(row.Platform), Host: hostOf(row.URL),
+			Name: row.DisplayName, Kind: core.DestinationKind(row.Kind), Platform: core.Platform(row.Platform), Host: outward.Host(row.URL),
 			Channel: deref(row.Channel), Topic: deref(row.Topic),
 			Product: productName, Team: teamName,
 		}}, nil

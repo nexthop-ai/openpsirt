@@ -27,7 +27,11 @@ type Signer struct {
 	entity *openpgp.Entity
 	// from is when the key that signs became valid. A signature dated before
 	// it is one a reader's tooling refuses.
-	from        time.Time
+	from time.Time
+	// until is when the key that signs stops being valid, and expires whether
+	// it does at all.
+	until       time.Time
+	expires     bool
 	fingerprint string
 	public      []byte
 }
@@ -90,11 +94,35 @@ func Read(armored, passphrase string) (*Signer, error) {
 	if primary, _ := entity.PrimarySelfSignature(); primary != nil && primary.CreationTime.After(from) {
 		from = primary.CreationTime
 	}
+	until, expires := expiryOf(entity, key)
 	return &Signer{
-		entity: entity, from: from.UTC(),
+		entity: entity, from: from.UTC(), until: until, expires: expires,
 		fingerprint: strings.ToUpper(fmt.Sprintf("%x", entity.PrimaryKey.Fingerprint)),
 		public:      public.Bytes(),
 	}, nil
+}
+
+// expiryOf is when the key that signs stops being valid: the earlier of its
+// own lifetime and the primary key's, where either has one.
+func expiryOf(entity *openpgp.Entity, key openpgp.Key) (time.Time, bool) {
+	var until time.Time
+	expires := false
+	at := func(created time.Time, lifetime *uint32) {
+		if lifetime == nil || *lifetime == 0 {
+			return
+		}
+		end := created.Add(time.Duration(*lifetime) * time.Second).UTC()
+		if !expires || end.Before(until) {
+			until, expires = end, true
+		}
+	}
+	if key.SelfSignature != nil {
+		at(key.PublicKey.CreationTime, key.SelfSignature.KeyLifetimeSecs)
+	}
+	if primary, _ := entity.PrimarySelfSignature(); primary != nil {
+		at(entity.PrimaryKey.CreationTime, primary.KeyLifetimeSecs)
+	}
+	return until, expires
 }
 
 // locked reports whether any private key the entity holds is locked.
@@ -121,6 +149,10 @@ func (s *Signer) From() time.Time { return s.from }
 // with.
 func (s *Signer) PublicKey() []byte { return s.public }
 
+// ErrExpired says the signing key expired before the date a signature would
+// carry.
+var ErrExpired = errors.New("the signing key has expired")
+
 // Sign is an armored detached signature over body, dated at.
 //
 // Dated by what the document says rather than by the clock, and never before
@@ -136,6 +168,11 @@ func (s *Signer) Sign(body []byte, at time.Time) ([]byte, error) {
 	var out bytes.Buffer
 	config := &packet.Config{Time: func() time.Time { return at }}
 	if err := openpgp.ArmoredDetachSign(&out, s.entity, bytes.NewReader(body), config); err != nil {
+		if s.expires && !at.Before(s.until) {
+			return nil, fmt.Errorf("sign the document: %w: the key %s expired at %s, "+
+				"before the document's date %s: %w", ErrExpired, s.fingerprint,
+				s.until.Format(time.RFC3339), at.UTC().Format(time.RFC3339), err)
+		}
 		return nil, fmt.Errorf("sign the document: %w", err)
 	}
 	out.WriteByte('\n')
