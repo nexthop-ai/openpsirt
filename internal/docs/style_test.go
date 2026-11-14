@@ -6,8 +6,10 @@ package docs_test
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -46,28 +48,56 @@ func designDocuments(t *testing.T) map[string]string {
 	return documents(t, filepath.Join("..", "..", "design-docs", "*.md"))
 }
 
-// everyDocument is every markdown file the Spec register covers: the design
-// documents, the decisions, the agent instructions, the work list, and the
-// published pages.
+// everyDocument is every markdown file the Spec register covers: each one git
+// tracks or would add, wherever it sits, read from the repository's root. The
+// set comes from git, so a document in a new directory is read as soon as it
+// exists.
 //
 // The heading rules hold for all of them. The contents rule does not — a page
 // under `docs/` carries no list, because the site generates one — which is why
 // the two tests take different sets.
 func everyDocument(t *testing.T) map[string]string {
 	t.Helper()
+	root := filepath.Join("..", "..")
+	out, err := exec.Command("git", "-C", root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").Output() //nolint:gosec // G204: the root is this repository's, fixed here
+	if err != nil {
+		t.Fatalf("listing the tree: %v", err)
+	}
+	names := markdownIn(out)
+	if len(names) == 0 {
+		t.Fatal("git lists no markdown file, so this checked nothing")
+	}
 	docs := map[string]string{}
-	for _, pattern := range []string{
-		filepath.Join("..", "..", "*.md"),
-		filepath.Join("..", "..", "design-docs", "*.md"),
-		filepath.Join("..", "..", "docs", "*.md"),
-		filepath.Join("..", "..", "docs", "*", "*.md"),
-		filepath.Join("..", "..", "internal", "*", "testdata", "*.md"),
-	} {
-		for name, text := range documents(t, pattern) {
-			docs[name] = text
+	for _, name := range names {
+		path := filepath.Join(root, filepath.FromSlash(name))
+		body, err := os.ReadFile(path) //nolint:gosec // this repository's own documents
+		if err != nil {
+			t.Fatal(err)
 		}
+		docs[filepath.ToSlash(path)] = fence.ReplaceAllString(string(body), "")
 	}
 	return docs
+}
+
+// markdownIn is every markdown file in git's NUL-separated listing, once each.
+// An unmerged path is listed once per stage.
+func markdownIn(listing []byte) []string {
+	var names []string
+	for _, each := range strings.Split(string(listing), "\x00") {
+		if strings.HasSuffix(each, ".md") && !slices.Contains(names, each) {
+			names = append(names, each)
+		}
+	}
+	return names
+}
+
+func TestEveryMarkdownFileGitListsIsRead(t *testing.T) {
+	listing := []byte("README.md\x00pages/a.md\x00web/src/deep/notes.md\x00" +
+		"main.go\x00pages/a.md\x00docs/x.mdx\x00")
+	got := markdownIn(listing)
+	if want := []string{"README.md", "pages/a.md", "web/src/deep/notes.md"}; !slices.Equal(got, want) {
+		t.Errorf("read %q from the listing, want %q", got, want)
+	}
 }
 
 func documents(t *testing.T, pattern string) map[string]string {
