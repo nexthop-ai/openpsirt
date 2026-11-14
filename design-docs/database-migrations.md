@@ -235,7 +235,7 @@ for up to ten minutes (`design-docs/analytics-exports.md` § Exports).
 |---|---|---|
 | PostgreSQL | `lock_timeout`, set for the transaction before each statement | The upgrade's transaction rolls back, letting go of every table it took, and runs again after the pause |
 | MySQL, MariaDB | `lock_wait_timeout`, set for the session before each statement and put back to the session's own once it ends | The statement runs again where it stands. Each data-definition statement commits, so nothing earlier is held |
-| SQLite | The busy timeout of a minute every connection opens with (`design-docs/database.md` § SQLite settings) | The upgrade's transaction rolls back and runs again after the pause. In write-ahead-log mode a reader goes through beside a writer. A table locked on the migration's own connection fails it, since no wait frees one |
+| SQLite | The busy timeout every connection opens with, a minute unless the URL names its own (`design-docs/database.md` § SQLite settings) | The upgrade's transaction rolls back and runs again after the pause. In write-ahead-log mode a reader goes through beside a writer. A table locked on the migration's own connection fails it, since no wait frees one |
 
 | Rule | Reason |
 |---|---|
