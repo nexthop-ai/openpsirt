@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 )
 
@@ -18,6 +19,20 @@ import (
 // something unreadable.
 // Every other failure to complete one is the provider turning somebody down.
 var ErrUnanswered = errors.New("the provider did not answer")
+
+// unansweredStatus reports whether a provider's status says it did not
+// answer: a server error, or a rate limit. GitHub answers both of its rate
+// limits with a 403, saying which by a header: no requests left, or a time to
+// ask again.
+func unansweredStatus(resp *http.Response) bool {
+	switch {
+	case resp.StatusCode >= http.StatusInternalServerError, resp.StatusCode == http.StatusTooManyRequests:
+		return true
+	case resp.StatusCode == http.StatusForbidden:
+		return resp.Header.Get("X-RateLimit-Remaining") == "0" || resp.Header.Get("Retry-After") != ""
+	}
+	return false
+}
 
 // unanswered marks err as the provider failing to answer.
 func unanswered(err error) error {
