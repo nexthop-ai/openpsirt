@@ -7,8 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,10 +17,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
-	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 )
@@ -92,7 +87,9 @@ func TestEveryRefusedSignInLandsOnTheOneNoAccessScreen(t *testing.T) {
 func TestARoleAcrossEveryProductSignsSomebodyInBeforeAnyProductExists(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		rights := access.NewStore(db.DB)
+		r := signInOver(t, db, served{unseeded: true})
+		r.provider.Says = &signin.Identity{Subject: "1", Username: "the-security-team"}
+		rights := r.rights
 		person, err := rights.Ensure(ctx, "the-security-team", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -108,19 +105,7 @@ func TestARoleAcrossEveryProductSignsSomebodyInBeforeAnyProductExists(t *testing
 				t.Fatal(err)
 			}
 		}
-		provider := &httpapitest.StubProvider{
-			Says: &signin.Identity{Subject: "1", Username: "the-security-team"},
-		}
-		handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{
-			Mode: func(context.Context) access.Mode { return access.Direct },
-			DB:   db, Queue: queue.New(db, queue.DefaultOptions()),
-			Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(true),
-			Providers: map[string]signin.Provider{"stub": provider},
-			PlainHTTP: true,
-			BaseURL:   "http://example.com",
-		})
-
-		rec := callback(t, &signInReach{handler: handler}, "the-state", "a-code", true)
+		rec := callback(t, r, "the-state", "a-code", true)
 		if rec.Code != http.StatusFound || rec.Header().Get("Location") != "/" {
 			t.Fatalf("signing in answered %d to %q, want 302 to /: %s",
 				rec.Code, rec.Header().Get("Location"), rec.Body.String())
@@ -135,7 +120,7 @@ func TestARoleAcrossEveryProductSignsSomebodyInBeforeAnyProductExists(t *testing
 				req.AddCookie(cookie)
 			}
 			out := httptest.NewRecorder()
-			handler.ServeHTTP(out, req)
+			r.handler.ServeHTTP(out, req)
 			return out
 		}
 
@@ -248,18 +233,9 @@ func (f *keyFault) AfterQuery(context.Context, *bun.QueryEvent) {}
 func TestASignInWhoseKeyCouldNotBeReadIsAFaultNeverARefusal(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		fault := &keyFault{}
-		handle := dbtest.Hooked(db, fault)
-		provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
-		handler, _ := httpapi.New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{
-			Mode: func(context.Context) access.Mode { return access.Direct },
-			DB:   handle, Queue: queue.New(handle, queue.DefaultOptions()),
-			Access:    access.NewResolver(access.NewStore(handle.DB), access.Trust{}).OverPlainHTTP(true),
-			Providers: map[string]signin.Provider{"stub": provider},
-			PlainHTTP: true,
-			BaseURL:   "http://example.com",
-		})
+		r := signInOver(t, dbtest.Hooked(db, fault), served{})
 		begun := httptest.NewRecorder()
-		handler.ServeHTTP(begun, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
+		r.handler.ServeHTTP(begun, httptest.NewRequest(http.MethodGet, "/v1/sign-in/stub", nil))
 		if begun.Code != http.StatusFound {
 			t.Fatalf("starting a sign-in answered %d", begun.Code)
 		}
@@ -269,7 +245,7 @@ func TestASignInWhoseKeyCouldNotBeReadIsAFaultNeverARefusal(t *testing.T) {
 			req.AddCookie(cookie)
 		}
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
+		r.handler.ServeHTTP(rec, req)
 		if !fault.fired {
 			t.Fatal("the key was never read on the way back, so this checked nothing")
 		}
@@ -279,6 +255,9 @@ func TestASignInWhoseKeyCouldNotBeReadIsAFaultNeverARefusal(t *testing.T) {
 		}
 		if hasSession(rec.Result().Cookies()) {
 			t.Error("a sign-in whose key could not be read was handed a session")
+		}
+		if !strings.Contains(r.logged.String(), "level=ERROR") {
+			t.Errorf("the fault was not logged as an error: %s", r.logged.String())
 		}
 	})
 }

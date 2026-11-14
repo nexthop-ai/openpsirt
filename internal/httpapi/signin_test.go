@@ -4,6 +4,7 @@
 package httpapi_test
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -11,7 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -22,7 +22,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -48,6 +47,8 @@ type signInReach struct {
 	// mode is how the handler is told roles are assigned. Direct unless a
 	// test says otherwise.
 	mode access.Mode
+	// logged is what the handler logged.
+	logged *bytes.Buffer
 }
 
 // Most sign-in tests pin a redirect, a cookie or a refusal, not a query, and
@@ -75,78 +76,95 @@ type served struct {
 	overTLS bool
 	// unaddressed leaves the deployment without the address it is served on.
 	unaddressed bool
+	// unseeded records nobody, for a database missing a table seeding writes.
+	unseeded bool
 }
 
 func signInWith(t *testing.T, on httpapitest.Engines, how served, fn func(t *testing.T, r *signInReach)) {
 	t.Helper()
 	on(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		product := fixture.New(t, db).Product
-		rights := access.NewStore(db.DB)
-		granted, err := rights.Ensure(ctx, "granted", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, granted.ID, "granted"); err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.GrantRole(ctx, granted.ID, product.ID, access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
-		// A second person who also holds a role, so that a test about whose
-		// session comes back has two possible answers. With one, asserting
-		// the identity asserts the only value the provider stub could return.
-		other, err := rights.Ensure(ctx, "other", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, other.ID, "other"); err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.GrantRole(ctx, other.ID, product.ID, access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
-		// Somebody recorded and granted nothing, who must be refused exactly
-		// as a stranger is.
-		ungranted, err := rights.Ensure(ctx, "ungranted", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, ungranted.ID, "ungranted"); err != nil {
-			t.Fatal(err)
-		}
-
-		provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
-		reach := &signInReach{
-			provider: provider, rights: rights, db: db,
-			product: product.ID, mode: access.Direct,
-		}
-		// Plain HTTP unless the test says otherwise, so the cookies keep their
-		// bare names: a browser will not set a `__Host-` cookie without TLS,
-		// and a harness that prefixed them would be testing a shape no
-		// deployment of this configuration has.
-		plain := !how.overTLS
-		// Stated, because a provider compares the callback against what it
-		// was registered with, so it cannot be taken from the request.
-		base := "http://example.com"
-		if how.overTLS {
-			base = "https://example.com"
-		}
-		if how.unaddressed {
-			base = ""
-		}
-		handler, _ := httpapi.New(quiet, nil, core.Deps{
-			Mode: func(context.Context) access.Mode { return reach.mode },
-			DB:   db, Queue: queue.New(db, queue.DefaultOptions()),
-			Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(plain),
-			Providers: map[string]signin.Provider{"stub": provider},
-			PlainHTTP: plain,
-			BaseURL:   base,
-		})
-		reach.handler = handler
-		fn(t, reach)
+		fn(t, signInOver(t, db, how))
 	})
+}
+
+// signInOver builds the sign-in deployment over one handle, which a fault test
+// hands it with a table missing or a statement failing.
+func signInOver(t *testing.T, db *database.DB, how served) *signInReach {
+	t.Helper()
+	logged := &bytes.Buffer{}
+	provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
+	reach := &signInReach{
+		provider: provider, rights: access.NewStore(db.DB), db: db,
+		mode: access.Direct, logged: logged,
+	}
+	if !how.unseeded {
+		reach.product = seedSignIn(t, db, reach.rights)
+	}
+	// Plain HTTP unless the test says otherwise, so the cookies keep their
+	// bare names: a browser will not set a `__Host-` cookie without TLS,
+	// and a harness that prefixed them would be testing a shape no
+	// deployment of this configuration has.
+	plain := !how.overTLS
+	// Stated, because a provider compares the callback against what it
+	// was registered with, so it cannot be taken from the request.
+	base := "http://example.com"
+	if how.overTLS {
+		base = "https://example.com"
+	}
+	if how.unaddressed {
+		base = ""
+	}
+	handler, _ := httpapi.New(slog.New(slog.NewTextHandler(logged, nil)), nil, core.Deps{
+		Mode: func(context.Context) access.Mode { return reach.mode },
+		DB:   db, Queue: queue.New(db, queue.DefaultOptions()),
+		Access:    access.NewResolver(reach.rights, access.Trust{}).OverPlainHTTP(plain),
+		Providers: map[string]signin.Provider{"stub": provider},
+		PlainHTTP: plain,
+		BaseURL:   base,
+	})
+	reach.handler = handler
+	return reach
+}
+
+// seedSignIn records the people a sign-in test signs in as, and answers the
+// product they hold a role on.
+func seedSignIn(t *testing.T, db *database.DB, rights *access.Store) int64 {
+	t.Helper()
+	ctx := t.Context()
+	product := fixture.New(t, db).Product
+	granted, err := rights.Ensure(ctx, "granted", "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.Claim(ctx, granted.ID, "granted"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.GrantRole(ctx, granted.ID, product.ID, access.PublicRead); err != nil {
+		t.Fatal(err)
+	}
+	// A second person who also holds a role, so that a test about whose
+	// session comes back has two possible answers. With one, asserting
+	// the identity asserts the only value the provider stub could return.
+	other, err := rights.Ensure(ctx, "other", "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.Claim(ctx, other.ID, "other"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.GrantRole(ctx, other.ID, product.ID, access.PublicRead); err != nil {
+		t.Fatal(err)
+	}
+	// Somebody recorded and granted nothing, who must be refused exactly
+	// as a stranger is.
+	ungranted, err := rights.Ensure(ctx, "ungranted", "", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rights.Claim(ctx, ungranted.ID, "ungranted"); err != nil {
+		t.Fatal(err)
+	}
+	return product.ID
 }
 
 // callback is what the provider sends the browser back with.
@@ -861,19 +879,8 @@ func TestAMalformedSignInKeyFailsClosed(t *testing.T) {
 // "not authorized", an outage turns every browser away as though nothing had
 // granted them anything, and nothing is logged as an error.
 func TestAProviderSignInWhoseMatchCouldNotBeReadIsAFault(t *testing.T) {
-	handle := dbtest.Without(t, "person_identity")
-	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
-	rights := access.NewStore(handle.DB)
-	handler, _ := httpapi.New(quiet, nil, core.Deps{
-		Mode: func(context.Context) access.Mode { return access.Direct },
-		DB:   handle, Queue: queue.New(handle, queue.DefaultOptions()),
-		Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(true),
-		Providers: map[string]signin.Provider{"stub": provider},
-		PlainHTTP: true,
-		BaseURL:   "http://example.com",
-	})
-	rec := callback(t, &signInReach{handler: handler, provider: provider}, "the-state", "a-code", true)
+	r := signInOver(t, dbtest.Without(t, "person_identity"), served{unseeded: true})
+	rec := callback(t, r, "the-state", "a-code", true)
 	if !faulted(rec) {
 		t.Errorf("a sign-in over a lookup that failed answered %d to %q, want the try-again screen",
 			rec.Code, rec.Header().Get("Location"))
@@ -887,33 +894,8 @@ func TestAProviderSignInWhoseMatchCouldNotBeReadIsAFault(t *testing.T) {
 // words every fault is answered in and with no session handed over. The match
 // succeeds here, so what fails is the write after it.
 func TestASignInWhoseSessionCouldNotBeStartedSaysNothingAboutWhy(t *testing.T) {
-	handle := dbtest.Without(t, "session")
-	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
-	rights := access.NewStore(handle.DB)
-	product, err := catalog.NewStore(handle.DB).DeclareProduct(t.Context(), "mine", "mine")
-	if err != nil {
-		t.Fatal(err)
-	}
-	granted, err := rights.Ensure(t.Context(), "granted", "", nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := rights.Claim(t.Context(), granted.ID, "granted"); err != nil {
-		t.Fatal(err)
-	}
-	if err := rights.GrantRole(t.Context(), granted.ID, product.ID, access.PublicRead); err != nil {
-		t.Fatal(err)
-	}
-	handler, _ := httpapi.New(quiet, nil, core.Deps{
-		Mode: func(context.Context) access.Mode { return access.Direct },
-		DB:   handle, Queue: queue.New(handle, queue.DefaultOptions()),
-		Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(true),
-		Providers: map[string]signin.Provider{"stub": provider},
-		PlainHTTP: true,
-		BaseURL:   "http://example.com",
-	})
-	rec := callback(t, &signInReach{handler: handler, provider: provider}, "the-state", "a-code", true)
+	r := signInOver(t, dbtest.Without(t, "session"), served{})
+	rec := callback(t, r, "the-state", "a-code", true)
 	if !faulted(rec) {
 		t.Fatalf("a sign-in whose session could not be written answered %d to %q, want the try-again screen",
 			rec.Code, rec.Header().Get("Location"))
@@ -1043,33 +1025,8 @@ func (f *windowFault) AfterQuery(context.Context, *bun.QueryEvent) {}
 func TestASignInWhoseWindowCouldNotBeReadSaysNothingAboutWhy(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		fault := &windowFault{}
-		handle := dbtest.Hooked(db, fault)
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		provider := &httpapitest.StubProvider{Says: &signin.Identity{Subject: "1", Username: "granted"}}
-		rights := access.NewStore(handle.DB)
-		product, err := catalog.NewStore(handle.DB).DeclareProduct(t.Context(), "mine", "mine")
-		if err != nil {
-			t.Fatal(err)
-		}
-		granted, err := rights.Ensure(t.Context(), "granted", "", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(t.Context(), granted.ID, "granted"); err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.GrantRole(t.Context(), granted.ID, product.ID, access.PublicRead); err != nil {
-			t.Fatal(err)
-		}
-		handler, _ := httpapi.New(quiet, nil, core.Deps{
-			Mode: func(context.Context) access.Mode { return access.Direct },
-			DB:   handle, Queue: queue.New(handle, queue.DefaultOptions()),
-			Access:    access.NewResolver(rights, access.Trust{}).OverPlainHTTP(true),
-			Providers: map[string]signin.Provider{"stub": provider},
-			PlainHTTP: true,
-			BaseURL:   "http://example.com",
-		})
-		rec := callback(t, &signInReach{handler: handler, provider: provider}, "the-state", "a-code", true)
+		r := signInOver(t, dbtest.Hooked(db, fault), served{})
+		rec := callback(t, r, "the-state", "a-code", true)
 		if !fault.fired {
 			t.Fatal("the window was never read, so this checked nothing")
 		}
