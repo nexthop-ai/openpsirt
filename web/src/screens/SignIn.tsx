@@ -54,8 +54,8 @@ export const signedOutHere = "/?" + signedOut;
 const refused = "no-access";
 
 // The marker on the address a sign-in that failed on this side lands on
-// ("/?sign-in-failed"). It is a fault rather than a refusal, so the screen says
-// to try again.
+// ("/?sign-in-failed"). It marks a fault on this side, so the screen says to
+// try again.
 const failed = "sign-in-failed";
 
 // Whether the address carries one of the markers above.
@@ -151,7 +151,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
   const turnedAway = proxied || (!resuming && landedAt(refused) && offered.length > 0);
   const toRetry = !proxied && !resuming && landedAt(failed) && offered.length > 0;
   // The invitation waits for the ways in, which may say the proxy named them.
-  const invited = !turnedAway && !toRetry && !landed && (resuming || !providers.isPending);
+  const invited = !turnedAway && !toRetry && !landed && !providers.isPending;
 
   useEffect(() => {
     if (!forwarding || !only) return;
@@ -212,7 +212,7 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
               {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
             </p>
           )}
-          {resuming && !proxied && (
+          {resuming && !proxied && !providers.isPending && (
             <p className="text-center text-sm text-[var(--muted)]">Anything you typed is kept.</p>
           )}
         </div>

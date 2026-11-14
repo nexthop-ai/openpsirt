@@ -979,7 +979,7 @@ func TestASignInOverTLSReadsOnlyACookieBoundToThisHost(t *testing.T) {
 	})
 }
 
-// A sign-in that cannot start answers 500 in the same words whatever stopped
+// A sign-in that cannot start lands on the try-again screen whatever stopped
 // it, and sets nothing: what went wrong describes this deployment's
 // configuration, and the caller has proved nothing yet.
 func TestASignInThatCannotStartSaysNothingAboutWhy(t *testing.T) {

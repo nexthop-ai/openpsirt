@@ -174,3 +174,35 @@ func TestATokenNarrowedByRoleCarriesOnlyThoseRolesAcrossEveryProduct(t *testing.
 		}
 	})
 }
+
+func TestATokenPinnedToAProductHoldsNothingAcrossEveryProduct(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		store := access.NewStore(db.DB)
+		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "pinned", "pinned")
+		if err != nil {
+			t.Fatal(err)
+		}
+		person, err := store.Ensure(ctx, "scripted", "Scripted", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.GrantEstateRole(ctx, person.ID, access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		_, secret, err := store.NewToken(ctx, person.ID, "one product", &product.ID, nil, time.Hour, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		subject, err := store.ResolveToken(ctx, secret)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !subject.HoldsAnywhere(access.PublicRead) {
+			t.Error("a token pinned to a product lost the role it holds there")
+		}
+		if subject.HoldsEverywhere() {
+			t.Error("a token pinned to one product says it covers every product as each is declared")
+		}
+	})
+}

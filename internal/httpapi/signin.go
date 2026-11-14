@@ -506,7 +506,7 @@ func refuseSignIn(w http.ResponseWriter, r *http.Request, in core.Deps) {
 const faultedHere = "/?sign-in-failed"
 
 // errSignInFault marks a failure of this deployment's own while reading what a
-// sign-in left in the browser, which is a fault and never a refusal.
+// sign-in left in the browser; the sign-in lands on the try-again screen.
 var errSignInFault = errors.New("the sign-in key could not be read")
 
 // wentWrongHere records a fault where an operator can read it and says nothing

@@ -287,9 +287,9 @@ func (s Subject) narrowedTo(productID int64) Subject {
 	s.unnarrowed = false
 	// A role held across every product is held on this one, and nowhere else
 	// through this token. The estate grants were spread across products when
-	// the subject was built, so what is left above is already the intersection.
-	// The pinned product exists, so "holds this role anywhere" answers from it
-	// alike whether those roles are kept or not.
+	// the subject was built, so what is left above is already the intersection,
+	// and "holds this role anywhere" answers from it.
+	s.everywhere = nil
 	//
 	// The cases stay: being brought into one is a grant on a pair of a product
 	// and an issue, and a token pinned to that product does not take it away.
