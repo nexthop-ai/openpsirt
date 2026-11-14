@@ -354,10 +354,10 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 // the document was generated under.
 //
 // The document was generated before this transaction opened. Turning a
-// product's publishing off withdraws its documents in the transaction that
-// writes the product row, so a write of a fresh value into that row, matched
-// on publishing, either waits for the turn-off and matches nothing, or commits
-// first and has its document withdrawn by it. A fresh value, because MySQL and
+// product's publishing off writes the product row and then withdraws its
+// documents, in one transaction, so a write of a fresh value into that row,
+// matched on publishing, either waits for the turn-off and matches nothing, or
+// commits first and has its document withdrawn by it. A fresh value, because MySQL and
 // MariaDB skip a write that changes nothing and a cluster certifies only rows
 // written. A statuses setting changed since generation writes nothing either;
 // the next pass generates under the setting in force.

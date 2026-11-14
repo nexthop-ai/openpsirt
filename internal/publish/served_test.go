@@ -131,7 +131,7 @@ func TestWithdrawingAProductLeavesTheOthers(t *testing.T) {
 				publish.OpenVEXPath+"sonic/master.json", false),
 		}
 		theirs := row(t, db, other.ID, publish.OpenVEX, "main", publish.OpenVEXPath+"other-os/main.json", false)
-		if err := publish.NewStore(db).WithdrawProduct(ctx, f.Product.ID); err != nil {
+		if err := publish.NewStore(db).TurnOff(ctx, f.Product.ID); err != nil {
 			t.Fatal(err)
 		}
 		for _, one := range append(mine, theirs) {

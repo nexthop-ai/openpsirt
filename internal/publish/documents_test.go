@@ -4,6 +4,7 @@
 package publish_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -15,8 +16,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
@@ -630,8 +634,7 @@ func TestAPassRacingATurnOffServesNothingWhenTurnedOnAgain(t *testing.T) {
 		w.decide(w.Build, "CVE-2026-1002", libnl,
 			decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
 		// Turned off as an administrator turns it off.
-		w.publishes(w.Product, false)
-		if err := w.documents.WithdrawProduct(t.Context(), w.Product.ID); err != nil {
+		if err := w.documents.TurnOff(t.Context(), w.Product.ID); err != nil {
 			t.Fatal(err)
 		}
 
@@ -645,6 +648,54 @@ func TestAPassRacingATurnOffServesNothingWhenTurnedOnAgain(t *testing.T) {
 		w.publishes(w.Product, true)
 		if listed := w.listed("all"); len(listed) != 0 {
 			t.Errorf("turned on again, the product serves %d documents no pass worked out since: %+v",
+				len(listed), listed)
+		}
+	})
+}
+
+// A pass landing while a turn-off is open writes nothing the turn-off leaves
+// served. The turn-off takes the product's row before it withdraws, so a pass
+// either waits for it and matches nothing, or lands first and is withdrawn.
+// The pass lands just before the turn-off's write to the product's row, which
+// is after the withdrawal where the two are the other way round. SQLite holds
+// one connection, so nothing lands inside the turn-off there.
+func TestAPassLandingInsideATurnOffServesNothingWhenTurnedOnAgain(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1002", libnl})
+		w.decide(w.Build, "CVE-2026-1001", openssl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(w.Product, true)
+		w.write()
+		subject := w.anybody()
+		statuses, err := publish.Statuses(t.Context(), w.DB.DB)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.decide(w.Build, "CVE-2026-1002", libnl,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotInExecutePath})
+
+		hooked, rival := dbtest.RivalAfterRead(t, w.DB, "product", "product", 5*time.Second, func() error {
+			_, err := w.pass.Product(context.Background(), subject, w.Product, statuses)
+			return err
+		})
+		if err := hooked.RunInTx(t.Context(), nil, func(ctx context.Context, tx bun.Tx) error {
+			var on bool
+			if err := tx.NewSelect().TableExpr(`"product"`).ColumnExpr(`"publishes"`).
+				Where(`"id" = ?`, w.Product.ID).Scan(ctx, &on); err != nil {
+				return err
+			}
+			return publish.NewStore(tx).TurnOff(ctx, w.Product.ID)
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if err := rival(); err != nil {
+			t.Fatal(err)
+		}
+		w.publishes(w.Product, true)
+		if listed := w.listed("all"); len(listed) != 0 {
+			t.Errorf("turned on again, the product serves %d documents a pass inside the turn-off wrote: %+v",
 				len(listed), listed)
 		}
 	})

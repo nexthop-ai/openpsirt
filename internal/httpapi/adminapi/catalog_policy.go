@@ -104,18 +104,19 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 				return core.WentWrong(d.Logger, "whether it publishes could not be read", err)
 			}
 			before := held[product.ID]
-			// Withdrawn whenever it is off, stated again included: a publish
-			// run that began before it went off can still have written.
+			// Withdrawn whenever it is off, stated again included, so stating
+			// it off always leaves nothing of it served.
 			if !in.Body.Publishes {
-				if err := publish.NewStore(tx).WithdrawProduct(ctx, product.ID); err != nil {
+				if err := publish.NewStore(tx).TurnOff(ctx, product.ID); err != nil {
 					return core.WentWrong(d.Logger, "its documents could not be withdrawn", err)
+				}
+			} else if !before {
+				if err := store.SetPublishes(ctx, product.ID, true); err != nil {
+					return core.WentWrong(d.Logger, "whether it publishes could not be recorded", err)
 				}
 			}
 			if before == in.Body.Publishes {
 				return nil
-			}
-			if err := store.SetPublishes(ctx, product.ID, in.Body.Publishes); err != nil {
-				return core.WentWrong(d.Logger, "whether it publishes could not be recorded", err)
 			}
 			if err := core.Noted(ctx, tx, trail.Setting, "publication of "+product.Name,
 				trail.Said(publishing(before), true),

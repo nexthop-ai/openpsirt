@@ -226,7 +226,7 @@ what moved.
 | One replica writes, under a lease | The conditional write stops a double revision when a lease is lost mid-pass |
 | A product that cannot be worked out is logged and skipped; its documents stay as they were | |
 | What has not moved is stepped over on a digest read; what has is decided again in its own transaction | |
-| That transaction writes a fresh value into the product's row, matched on its publishing, and re-reads the statuses published; either moved since generation, it writes nothing | Turning a product off withdraws its documents in a transaction writing that row, so a late write either matches nothing or is withdrawn by it |
+| That transaction writes a fresh value into the product's row, matched on its publishing, and re-reads the statuses published; either moved since generation, it writes nothing | Turning a product off writes that row before it withdraws the documents, in one transaction, so a late write either matches nothing or is withdrawn by it |
 | Documents grow with decisions, never with scanner output | A document is an issue somebody decided |
 | A pass reads every build's decisions whatever is published, most of its cost (`design-docs/publishing-measurements.md`) | |
 
