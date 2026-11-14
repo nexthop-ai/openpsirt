@@ -281,6 +281,34 @@ func TestAnAgreementLostOnOneRowCountsEveryRowItCovers(t *testing.T) {
 	})
 }
 
+func TestAnAgreementLostOnlyOnARowTheReaderCannotReadIsNotListed(t *testing.T) {
+	// Listing it would tell a reader of disclosed work alone that an
+	// undisclosed row exists under the decision.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		decision, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
+		r.Agreed(t, decision)
+		var row triage.DecisionOccurrence
+		if err := r.DB.DB.NewSelect().Model(&row).Where(`"de"."id" = ?`, ids[0]).Scan(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		hidden := row
+		hidden.ID, hidden.LiveKey, hidden.OccurrenceIdentity, hidden.Visibility = 0, nil, "elsewhere", access.Private
+		if _, err := r.DB.DB.NewInsert().Model(&hidden).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if !slices.ContainsFunc(scrutiny(t, r, "private-triage", "").Lapsed,
+			func(one triageapi.LapsedApprovalBody) bool { return one.DecisionID == decision }) {
+			t.Fatal("the agreement is not listed as lost to a reader of every row, so this tests nothing")
+		}
+		for _, one := range scrutiny(t, r, "reader", "").Lapsed {
+			if one.DecisionID == decision {
+				t.Errorf("a reader of disclosed work alone is told the agreement was lost on a row they cannot read: %+v", one)
+			}
+		}
+	})
+}
+
 // A pair's share is of everything agreed, not of the pairs listed.
 //
 // The list is cut at the limit, and a share taken of the pairs left standing
