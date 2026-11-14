@@ -31,9 +31,6 @@ type CodeFindingDecisionBody struct {
 // occurrence alone rather than under its issue.
 const codeFindingDecisionPath = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/decision"
 
-// errCodeFindingClosed refuses a decision about a code finding somebody stated was fixed.
-var errCodeFindingClosed = errors.New("closed")
-
 func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "decide-code-finding", Method: http.MethodPost,
@@ -86,9 +83,6 @@ func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 			if err != nil {
 				return triage.Occurrence{}, nil, err
 			}
-			if codeFinding.ClosedAt != nil {
-				return triage.Occurrence{}, nil, errCodeFindingClosed
-			}
 			if err := analysis.Answerable(ctx, tx, subject, named.ProductID, codeFinding); err != nil {
 				return triage.Occurrence{}, nil, err
 			}
@@ -109,9 +103,8 @@ func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 			return first, occurrences, nil
 		})
 		switch {
-		case errors.Is(err, errCodeFindingClosed):
-			return nil, huma.Error409Conflict("that code finding is fixed, and opens again where it is seen again")
-		case errors.Is(err, analysis.ErrRecordedAsFlaw), errors.Is(err, finding.ErrCodeFindingPastEndOfLife):
+		case errors.Is(err, analysis.ErrRecordedAsFlaw), errors.Is(err, finding.ErrCodeFindingPastEndOfLife),
+			errors.Is(err, analysis.ErrCodeFindingFixed):
 			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, finding.ErrNoOpenFinding):
 			return nil, core.NoSuchFinding()
