@@ -200,7 +200,7 @@ export function Scope() {
           {products.data && (products.data.items ?? []).length === 0 && (
             <p className="hint">
               {!who?.admin && who?.everywhere
-                ? "No product is declared yet."
+                ? "No product is open."
                 : "You can reach no product yet."}
             </p>
           )}

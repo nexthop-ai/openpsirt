@@ -148,7 +148,7 @@ describe("the products somebody else reads", () => {
 });
 
 describe("the products somebody holding a role on every product reads", () => {
-  it("says no product is declared, never that a role is missing", async () => {
+  it("says no product is open, never that a role is missing", async () => {
     serve((path) => {
       if (path === "/v1/products") return { data: { items: [] } };
       if (path === "/v1/last-uploads") return { data: { items: [], quiet_after_days: 7 } };
@@ -156,7 +156,8 @@ describe("the products somebody holding a role on every product reads", () => {
     });
     mount.render(screen(<Products who={{ ...person(false), everywhere: true }} />, "/products"));
     await settle();
-    expect(host().textContent).toContain("No product is declared yet.");
+    expect(host().textContent).toContain("No product is open.");
+    expect(host().textContent).toContain("Your role reaches each product while it's open.");
     expect(host().textContent).not.toContain("An administrator grants a role");
   });
 

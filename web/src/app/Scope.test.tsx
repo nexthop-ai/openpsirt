@@ -151,9 +151,9 @@ describe("the scope panel over a catalog with nothing in it", () => {
       return { data: { items: [] } };
     };
 
-  it("says no product is declared to somebody reading every product", async () => {
+  it("says no product is open to somebody reading every product", async () => {
     await opened("/", empty(true));
-    expect(mount.host().textContent).toContain("No product is declared yet.");
+    expect(mount.host().textContent).toContain("No product is open.");
     expect(mount.host().textContent).not.toContain("You can reach no product yet.");
   });
 
