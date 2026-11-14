@@ -315,16 +315,17 @@ type Queue struct {
 // security severity for the rule, its precision, then newest first.
 func CodeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
 	limit, offset int) (*Queue, error) {
-	return codeFindingsOf(ctx, db, subject, scope, want, false, true, limit, offset)
+	return codeFindingsOf(ctx, db, subject, scope, want, false, true, time.Now(), limit, offset)
 }
 
 // CodeFindingPageOf is the rows of one page of CodeFindingsOf, with none of
 // its counts. A file is read a page at a time, and each count covers the
 // whole population, so counting on every page costs the file pages times the
-// population.
+// population. Read at the moment given, which is the file's, so a release
+// reaching its end of life between two pages moves no row.
 func CodeFindingPageOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
-	limit, offset int) ([]QueueRow, error) {
-	queue, err := codeFindingsOf(ctx, db, subject, scope, want, false, false, limit, offset)
+	at time.Time, limit, offset int) ([]QueueRow, error) {
+	queue, err := codeFindingsOf(ctx, db, subject, scope, want, false, false, at, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +342,7 @@ func CodeFindingCountsOf(ctx context.Context, db bun.IDB, subject access.Subject
 	if err := scope.mayCount(subject, "count the code findings"); err != nil {
 		return nil, err
 	}
-	return codeFindingsOf(ctx, db, subject, scope, "", false, true, 0, 0)
+	return codeFindingsOf(ctx, db, subject, scope, "", false, true, time.Now(), 0, 0)
 }
 
 // OpenCodeFindingsOf is the rows of one page of the code findings a findings
@@ -349,10 +350,10 @@ func CodeFindingCountsOf(ctx context.Context, db bun.IDB, subject access.Subject
 // selection, the ones a decision waits on included, as the file's findings
 // rows include a finding a decision waits on. A code finding open only in
 // releases past their end of life is left out, as the queue leaves it out.
-// Ordered as the queue is.
+// Ordered as the queue is, and read at the moment given, as CodeFindingPageOf is.
 func OpenCodeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
-	limit, offset int) ([]QueueRow, error) {
-	queue, err := codeFindingsOf(ctx, db, subject, scope, "", true, false, limit, offset)
+	at time.Time, limit, offset int) ([]QueueRow, error) {
+	queue, err := codeFindingsOf(ctx, db, subject, scope, "", true, false, at, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -361,9 +362,9 @@ func OpenCodeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject,
 
 // codeFindingsOf is CodeFindingsOf, with the open code findings a decision waits on kept in where
 // waiting is set and no state is named, and the counts read only where
-// counted is set.
+// counted is set. A release is past its end of life at the moment given.
 func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope, want State,
-	waiting, counted bool, limit, offset int) (*Queue, error) {
+	waiting, counted bool, at time.Time, limit, offset int) (*Queue, error) {
 
 	// Across products each row is narrowed to what the reader reads in its
 	// own product.
@@ -393,7 +394,7 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 	// so the queue counts none of them, and a code finding open only there leaves
 	// the queue though it may still be decided where it is seen elsewhere.
 	// The lists by state still show it.
-	ended, err := catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, time.Now().UTC())
+	ended, err := catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, at.UTC())
 	if err != nil {
 		return nil, err
 	}

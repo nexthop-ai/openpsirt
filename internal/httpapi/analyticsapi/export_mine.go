@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/uptrace/bun"
@@ -46,8 +47,8 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 				"variant", "variant name", "component",
 				"rows", "issues", "occurrences", "reasoning",
 			},
-			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
-				store := triage.NewStore(db)
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+				store := triage.NewStore(db).At(moment)
 				mine, _, err := store.Became(ctx, subject, limit, offset)
 				if err != nil || len(mine) == 0 {
 					return nil, err

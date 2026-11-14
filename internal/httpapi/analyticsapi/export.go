@@ -76,8 +76,8 @@ func registerExport(api huma.API, in core.Deps) {
 		}
 		subject, scope, floor, narrowed := at.Subject, at.Scope, at.MinimumSeverity, at.Filter
 
-		findings := func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
-			groups, _, err := finding.NewStore(db).Groups(ctx, subject, scope, limit, offset, narrowed)
+		findings := func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+			groups, _, err := finding.NewStore(db).At(moment).Groups(ctx, subject, scope, limit, offset, narrowed)
 			if err != nil {
 				return nil, err
 			}
@@ -147,8 +147,8 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		narrowed.MinSeverity = ""
-		findings := func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
-			groups, _, err := finding.NewStore(db).Anywhere(ctx, subject, limit, offset, narrowed)
+		findings := func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+			groups, _, err := finding.NewStore(db).At(moment).Anywhere(ctx, subject, limit, offset, narrowed)
 			if err != nil {
 				return nil, err
 			}
@@ -180,7 +180,7 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 // one product two ways in one file.
 func everyProductsCodeFindings(subject access.Subject) core.Paged {
 	var each core.Paged
-	return func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+	return func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
 		if each == nil {
 			products, err := catalog.NewStore(db).Products(ctx, subject)
 			if err != nil {
@@ -194,7 +194,7 @@ func everyProductsCodeFindings(subject access.Subject) core.Paged {
 			}
 			each = core.InTurn(parts...)
 		}
-		return each(ctx, db, limit, offset)
+		return each(ctx, db, moment, limit, offset)
 	}
 }
 
@@ -266,8 +266,8 @@ func withCodeFindings(by core.Narrowing, at core.AtOneBuild) core.Stated {
 // waits on kept in. No row carries source text. A product whose code findings the reader may not read is a part holding
 // no row.
 func codeFindingRows(subject access.Subject, scope analysis.Scope, product string) core.Paged {
-	return func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
-		open, err := analysis.OpenCodeFindingsOf(ctx, db, subject, scope, limit, offset)
+	return func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+		open, err := analysis.OpenCodeFindingsOf(ctx, db, subject, scope, moment, limit, offset)
 		if errors.Is(err, access.ErrDenied) {
 			return nil, nil
 		}

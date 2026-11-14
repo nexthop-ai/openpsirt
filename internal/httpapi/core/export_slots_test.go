@@ -6,6 +6,7 @@ package core
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -70,7 +71,7 @@ func TestAFileReadWholeTakesNoPlaceAmongExportsHoldingAConnection(t *testing.T) 
 			t.Errorf("a file read whole was refused while every place was taken: %v", err)
 		}
 		paged := Exporting{Header: []string{"n"},
-			Rows: func(context.Context, bun.IDB, int, int) ([][]string, error) { return nil, nil }}
+			Rows: func(context.Context, bun.IDB, time.Time, int, int) ([][]string, error) { return nil, nil }}
 		if _, err := Export(in, "csv", "paged", paged); err == nil {
 			t.Error("a paged file was let through with every place taken")
 		}

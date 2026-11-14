@@ -310,9 +310,9 @@ func registerCodeFindingQueue(api huma.API, in core.Deps) {
 			What:   "code findings",
 			About:  []core.Stated{{Label: "lists", Value: listedAs(input.State, input.Assigned == finding.HeldByNobody, scope, input.Beneath)}},
 			Header: codeFindingColumns(),
-			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
 				page, err := analysis.CodeFindingPageOf(ctx, db, subject, scope, analysis.State(input.State),
-					limit, offset)
+					moment, limit, offset)
 				if err != nil {
 					return nil, err
 				}
@@ -428,9 +428,9 @@ func registerCodeFindingQueueAcross(api huma.API, in core.Deps) {
 				{Label: "products", Value: "every product you read security testing work in"},
 			},
 			Header: codeFindingColumns(),
-			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
 				page, err := analysis.CodeFindingPageOf(ctx, db, subject, scope, analysis.State(input.State),
-					limit, offset)
+					moment, limit, offset)
 				if err != nil {
 					return nil, err
 				}

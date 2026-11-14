@@ -87,8 +87,8 @@ func registerDueExport(api huma.API, in core.Deps) {
 				"product", "product name", "branch_or_tag", "branch or tag name", "variant", "variant name",
 				"occurrences", "held by", "held by name", "due", "days left",
 			},
-			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
-				late, _, err := finding.NewStore(db).RunningOutPage(ctx, subject, scope,
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+				late, _, err := finding.NewStore(db).At(moment).RunningOutPage(ctx, subject, scope,
 					time.Duration(input.Days)*24*time.Hour, limit, offset)
 				if err != nil {
 					return nil, err
@@ -304,8 +304,8 @@ func registerAuditExport(api huma.API, in core.Deps) {
 				"state", "standing", "proposed by", "approved by", "two people", "ended",
 				"agreements", "reasoning",
 			},
-			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
-				audited, _, err := triage.NewStore(db).Audit(ctx, subject, filter, since, until, limit, offset)
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+				audited, _, err := triage.NewStore(db).At(moment).Audit(ctx, subject, filter, since, until, limit, offset)
 				if err != nil {
 					return nil, err
 				}
@@ -395,8 +395,8 @@ func registerQueueExport(api huma.API, in core.Deps) {
 				"occurrences", "builds",
 				"previously approved", "deferred days", "reasoning",
 			},
-			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
-				store := triage.NewStore(db)
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+				store := triage.NewStore(db).At(moment)
 				waiting, _, err := store.Queue(ctx, subject, filter, limit, offset)
 				if err != nil {
 					return nil, err
@@ -484,8 +484,8 @@ func registerComponentExport(api huma.API, in core.Deps) {
 			What:   "findings by component",
 			About:  []core.Stated{core.TriagedAtOrAbove(floor)},
 			Header: []string{"component", "version", "upstream", "ecosystem", "issues", "occurrences", "exploited"},
-			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
-				groups, _, err := finding.NewStore(db).ComponentGroups(ctx, subject, scope, limit, offset, narrowed)
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+				groups, _, err := finding.NewStore(db).At(moment).ComponentGroups(ctx, subject, scope, limit, offset, narrowed)
 				if err != nil {
 					return nil, err
 				}
@@ -550,7 +550,7 @@ func registerChangeExport(api huma.API, in core.Deps) {
 				{Label: "from", Value: boundStated(input.From, since)}, {Label: "to", Value: boundStated(input.To, until)}, {Label: "kind", Value: string(input.Kind)},
 			},
 			Header: []string{"at", "actor", "by", "by_name", "kind", "about", "was", "became", "unset", "cleared"},
-			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
 				changes, _, err := trail.NewStore(db).Changes(ctx, subject, trail.Kind(input.Kind),
 					trail.Over{Since: since, Until: until}, limit, offset)
 				if err != nil {

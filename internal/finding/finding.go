@@ -560,6 +560,16 @@ func NewStore(db bun.IDB) *Store {
 	return &Store{db: db, pool: pool, now: func() time.Time { return time.Now().UTC() }}
 }
 
+// At makes every moment the store reads the one given: a deadline passed, a
+// release past its end of life, a date that has run out. For a file read a
+// page at a time, where each page read at its own moment can sort a row into
+// a page already written.
+func (s *Store) At(moment time.Time) *Store {
+	moment = moment.UTC()
+	s.now = func() time.Time { return moment }
+	return s
+}
+
 // Sweeping has every write that opens work queue its product's assignment
 // sweep on q (Arrived).
 func (s *Store) Sweeping(q *queue.Queue) *Store {

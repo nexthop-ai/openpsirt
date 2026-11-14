@@ -37,7 +37,7 @@ func TestAnExportWritesEveryRowWhateverTheReadersPageIs(t *testing.T) {
 				const rows = 250
 				out := Exporting{
 					Header: []string{"n"},
-					Rows: func(_ context.Context, _ bun.IDB, limit, offset int) ([][]string, error) {
+					Rows: func(_ context.Context, _ bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
 						// A store's own ceiling, applied the way every store here
 						// applies one: silently.
 						if limit > readerPage {
@@ -51,7 +51,7 @@ func TestAnExportWritesEveryRowWhateverTheReadersPageIs(t *testing.T) {
 					},
 				}
 				var written [][]string
-				if err := eachPage(t.Context(), db, out, func(page [][]string) {
+				if err := eachPage(t.Context(), db, time.Now(), out, func(page [][]string) {
 					written = append(written, page...)
 				}, func() {}); err != nil {
 					t.Fatal(err)
@@ -91,7 +91,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 	}
 	var written [][]string
 	flushes := 0
-	if err := eachPage(t.Context(), nil, out, func(page [][]string) {
+	if err := eachPage(t.Context(), nil, time.Now(), out, func(page [][]string) {
 		written = append(written, page...)
 	}, func() { flushes++ }); err != nil {
 		t.Fatal(err)
@@ -122,7 +122,7 @@ func TestAStreamedExportWritesEveryRowAndSaysWhenItCannot(t *testing.T) {
 			return fmt.Errorf("the database went away")
 		},
 	}
-	if err := eachPage(t.Context(), nil, broken, func([][]string) {}, func() {}); err == nil {
+	if err := eachPage(t.Context(), nil, time.Now(), broken, func([][]string) {}, func() {}); err == nil {
 		t.Error("a walk that failed was reported as a clean end")
 	}
 }
@@ -133,7 +133,7 @@ func TestAnExportThatFailsPartwayStopsAndSaysSo(t *testing.T) {
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
 		out := Exporting{
 			Header: []string{"n"},
-			Rows: func(_ context.Context, _ bun.IDB, limit, offset int) ([][]string, error) {
+			Rows: func(_ context.Context, _ bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
 				if offset > 0 {
 					return nil, fmt.Errorf("the database went away")
 				}
@@ -145,7 +145,7 @@ func TestAnExportThatFailsPartwayStopsAndSaysSo(t *testing.T) {
 			},
 		}
 		written := 0
-		err := eachPage(t.Context(), db, out, func(page [][]string) { written += len(page) }, func() {})
+		err := eachPage(t.Context(), db, time.Now(), out, func(page [][]string) { written += len(page) }, func() {})
 		if err == nil {
 			t.Fatal("a reader that failed was walked to a clean end")
 		}
@@ -177,7 +177,7 @@ func TestAnExportThatStopsEarlySaysSoInTheFile(t *testing.T) {
 				pages := 0
 				out := Exporting{
 					Header: []string{"n"},
-					Rows: func(_ context.Context, _ bun.IDB, limit, offset int) ([][]string, error) {
+					Rows: func(_ context.Context, _ bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
 						pages++
 						if pages > 1 {
 							return nil, errors.New("the connection went away")
@@ -211,6 +211,37 @@ func TestAnExportThatStopsEarlySaysSoInTheFile(t *testing.T) {
 					t.Errorf("an export that stopped early threw away what it had: %q", tail(body))
 				}
 			})
+		}
+	})
+}
+
+// TestEveryPageOfAFileReadsAtOneMoment pins one clock to a paged file: every
+// page is handed the same moment. A page reading the clock for itself sorts a
+// row whose deadline passed between two pages into a page already written.
+func TestEveryPageOfAFileReadsAtOneMoment(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		var moments []time.Time
+		out := Exporting{
+			Header: []string{"n"},
+			Rows: func(_ context.Context, _ bun.IDB, at time.Time, limit, offset int) ([][]string, error) {
+				moments = append(moments, at)
+				if offset >= 3*limit {
+					return nil, nil
+				}
+				return [][]string{{fmt.Sprint(offset)}}, nil
+			},
+		}
+		rec := httptest.NewRecorder()
+		ctx := humatest.NewContext(nil,
+			httptest.NewRequest(http.MethodGet, "/export", nil).WithContext(t.Context()), rec)
+		writeExport(ctx, Deps{DB: db, Logger: slog.New(slog.DiscardHandler)}, "csv", "mine", out)
+		if len(moments) < 2 {
+			t.Fatalf("the file read %d pages, want several", len(moments))
+		}
+		for i, at := range moments {
+			if !at.Equal(moments[0]) {
+				t.Errorf("page %d was read at %s, the first at %s", i, at, moments[0])
+			}
 		}
 	})
 }
@@ -289,7 +320,7 @@ func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {
 func TestListsWrittenInTurnAreEachWrittenWholeInOrder(t *testing.T) {
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
 		list := func(name string, rows int) Paged {
-			return func(_ context.Context, _ bun.IDB, limit, offset int) ([][]string, error) {
+			return func(_ context.Context, _ bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
 				page := [][]string{}
 				for i := offset; i < offset+limit && i < rows; i++ {
 					page = append(page, []string{fmt.Sprintf("%s%d", name, i)})
@@ -308,7 +339,7 @@ func TestListsWrittenInTurnAreEachWrittenWholeInOrder(t *testing.T) {
 			}
 		}
 		var written []string
-		if err := eachPage(t.Context(), db, Exporting{Header: []string{"n"}, Rows: InTurn(parts...)},
+		if err := eachPage(t.Context(), db, time.Now(), Exporting{Header: []string{"n"}, Rows: InTurn(parts...)},
 			func(page [][]string) {
 				for _, row := range page {
 					written = append(written, row[0])
@@ -345,7 +376,7 @@ func TestAPagedExportReadsOneSnapshotWhateverIsWrittenMeanwhile(t *testing.T) {
 		pages := 0
 		out := Exporting{
 			Header: []string{"n"},
-			Rows: func(ctx context.Context, view bun.IDB, limit, offset int) ([][]string, error) {
+			Rows: func(ctx context.Context, view bun.IDB, _ time.Time, limit, offset int) ([][]string, error) {
 				if pages++; pages == 2 {
 					// Ahead of everything already written, the way a newest
 					// row lands on a list ordered newest first.
@@ -366,7 +397,7 @@ func TestAPagedExportReadsOneSnapshotWhateverIsWrittenMeanwhile(t *testing.T) {
 			},
 		}
 		var written []string
-		if err := eachPage(ctx, db, out, func(page [][]string) {
+		if err := eachPage(ctx, db, time.Now(), out, func(page [][]string) {
 			for _, row := range page {
 				written = append(written, row[0])
 			}

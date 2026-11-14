@@ -176,8 +176,8 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 			// Paged through the store the screen reads, so the file is the
 			// list rather than a second query that will come to disagree
 			// with it.
-			Rows: func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
-				upgrades, _, err := finding.NewStore(db).PlannedUpgrades(ctx, subject, scope, limit, offset, narrowed)
+			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
+				upgrades, _, err := finding.NewStore(db).At(moment).PlannedUpgrades(ctx, subject, scope, limit, offset, narrowed)
 				if err != nil {
 					return nil, err
 				}

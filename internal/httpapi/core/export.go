@@ -86,8 +86,14 @@ type Exporting struct {
 	Held [][]string
 }
 
-// Paged reads one page of a file's rows through db.
-type Paged func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error)
+// Paged reads one page of a file's rows through db, at the moment the file
+// states it was taken.
+//
+// Every page of a file is handed the same moment, and a page compares against
+// it rather than the clock: a deadline passing between two pages otherwise
+// sorts a row into a page already written, and the file repeats one row and
+// skips another, as a row written between them would.
+type Paged func(ctx context.Context, db bun.IDB, at time.Time, limit, offset int) ([][]string, error)
 
 // InTurn is the rows of several lists one after another, for a file holding
 // more than one: every row of the first, then every row of the next.
@@ -97,9 +103,9 @@ type Paged func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string,
 // before it, which is how every export is paged.
 func InTurn(parts ...Paged) Paged {
 	at, from := 0, 0
-	return func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+	return func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {
 		for at < len(parts) {
-			rows, err := parts[at](ctx, db, limit, offset-from)
+			rows, err := parts[at](ctx, db, moment, limit, offset-from)
 			if err != nil || len(rows) > 0 {
 				return rows, err
 			}
@@ -295,8 +301,10 @@ func writeExport(ctx huma.Context, in Deps, format, name string, out Exporting) 
 	ctx.SetHeader("Content-Disposition",
 		`attachment; filename="`+DownloadName(name)+"."+kind.extension+`"`)
 	going := writing(ctx)
-	write := kind.open(ctx, out)
-	if err := eachPage(ctx.Context(), in.DB, out, func(rows [][]string) {
+	// The one moment the file states and every page reads at.
+	now := time.Now().UTC()
+	write := kind.open(ctx, out, now)
+	if err := eachPage(ctx.Context(), in.DB, now, out, func(rows [][]string) {
 		for _, row := range rows {
 			write.row(row)
 		}
@@ -326,9 +334,9 @@ func writeExport(ctx huma.Context, in Deps, format, name string, out Exporting) 
 type exportFormat struct {
 	contentType string
 	extension   string
-	// open writes whatever goes above the rows and answers with the sink.
-	// Called after the headers, because the body writer is what commits them.
-	open func(huma.Context, Exporting) sink
+	// open writes whatever goes above the rows, the moment the file was taken
+	// among them, and answers with the sink. Called after the headers, because the body writer is what commits them.
+	open func(huma.Context, Exporting, time.Time) sink
 }
 
 // A sink is one format's four acts. Kept as closures over the writer rather
@@ -344,7 +352,7 @@ type sink struct {
 var asCSV = exportFormat{
 	contentType: "text/csv; charset=utf-8",
 	extension:   "csv",
-	open: func(ctx huma.Context, out Exporting) sink {
+	open: func(ctx huma.Context, out Exporting, now time.Time) sink {
 		w := csv.NewWriter(ctx.BodyWriter())
 		width := len(out.Header)
 		// The file's own header, above the column names, because a
@@ -355,7 +363,7 @@ var asCSV = exportFormat{
 		// so a two-field record above a fifteen-field header is a document a
 		// conformant reader refuses, and the field-count check the tests here
 		// run is what catches it.
-		for _, said := range preamble(out, time.Now(), ctx.URL().RawQuery) {
+		for _, said := range preamble(out, now, ctx.URL().RawQuery) {
 			_ = w.Write(padded(inert([]string{"# " + said.Label, said.Value}), width))
 		}
 		_ = w.Write(out.Header)
@@ -375,13 +383,13 @@ var asCSV = exportFormat{
 var asJSON = exportFormat{
 	contentType: "application/json; charset=utf-8",
 	extension:   "json",
-	open: func(ctx huma.Context, out Exporting) sink {
+	open: func(ctx huma.Context, out Exporting, now time.Time) sink {
 		body := ctx.BodyWriter()
 		// Written by hand rather than marshalled whole, for the reason the
 		// CSV is streamed: the point is that no complete list ever exists in
 		// memory.
 		_, _ = fmt.Fprint(body, "{")
-		for _, said := range preamble(out, time.Now(), ctx.URL().RawQuery) {
+		for _, said := range preamble(out, now, ctx.URL().RawQuery) {
 			_, _ = fmt.Fprintf(body, "%s:%s,", quoted(asKey(said.Label)), quoted(said.Value))
 		}
 		_, _ = fmt.Fprint(body, `"items":[`)
@@ -422,9 +430,9 @@ var asJSON = exportFormat{
 // truncation these files exist not to do. This costs one query at the end and
 // stops that being something anybody has to keep true.
 //
-// Every page of a paged file is read inside one snapshot, cut at the same
-// ceiling as a stream's cursor.
-func eachPage(ctx context.Context, db *database.DB, out Exporting,
+// Every page of a paged file is read inside one snapshot, at the moment now,
+// cut at the same ceiling as a stream's cursor.
+func eachPage(ctx context.Context, db *database.DB, now time.Time, out Exporting,
 	page func(rows [][]string), between func()) error {
 
 	switch {
@@ -441,7 +449,7 @@ func eachPage(ctx context.Context, db *database.DB, out Exporting,
 	defer cancel()
 	return database.Snapshot(ctx, db, func(ctx context.Context, view bun.IDB) error {
 		for offset := 0; ; {
-			rows, err := out.Rows(ctx, view, exportPage, offset)
+			rows, err := out.Rows(ctx, view, now, exportPage, offset)
 			if err != nil {
 				return err
 			}
