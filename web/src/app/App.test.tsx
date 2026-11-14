@@ -5,6 +5,7 @@ import { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { SignIn } from "../screens/SignIn";
+import { api } from "../api/client";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 
 const mount = mounted();
@@ -152,6 +153,14 @@ describe("the application for a browser the proxy named and this deployment refu
     expect(text()).not.toContain("Your session ended");
     expect(text()).not.toContain("Anything you typed is kept.");
     expect(text()).not.toContain("Continue with");
+  });
+
+  it("says nothing of a session ending while the ways in load", async () => {
+    vi.spyOn(api, "GET").mockImplementation(() => new Promise(() => {}));
+    mount.render(screen(<SignIn resuming />, "/"));
+    await settle();
+    expect(text()).not.toContain("Your session ended");
+    expect(text()).not.toContain("Anything you typed is kept.");
   });
 
   it("says there is no access here where no provider is configured", async () => {
