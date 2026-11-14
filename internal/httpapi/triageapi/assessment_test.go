@@ -183,7 +183,7 @@ func TestAnAssessmentSomebodyMayNotReachAnswersAsOneNobodyMade(t *testing.T) {
 // the count and what agreeing would do ask one readability rule, so no
 // waiting claim is left off a page and every page reports the same total.
 func TestEveryPageOfWaitingRatingsCarriesTheStoresTotal(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedInTwoImages(t)
 		for _, issue := range []string{"CVE-2026-9999", "CVE-2026-9998"} {
 			made := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
