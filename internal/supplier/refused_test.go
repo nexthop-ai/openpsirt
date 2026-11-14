@@ -47,10 +47,11 @@ func TestADocumentThePublisherAsksToBeAskedForLaterHoldsTheMark(t *testing.T) {
 
 // A refusal saying the request is not authorized or is forbidden is answered
 // the same way on every pass by a document the publisher restricted, and it is
-// also what a bot filter answers. Stepped over, so nothing holds for ever, and
-// recorded as what stopped the attempt, so nothing is lost silently.
+// also what a bot filter answers, as is a firewall's challenge, a 202. Stepped
+// over, so nothing holds for ever, and recorded as what stopped the attempt, so
+// nothing is lost silently.
 func TestADocumentThePublisherForbidsIsSteppedOverAndTheSupplierFails(t *testing.T) {
-	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusAccepted} {
 		t.Run(http.StatusText(code), func(t *testing.T) {
 			shipping(t, func(t *testing.T, f *ships) {
 				ctx := t.Context()

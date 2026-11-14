@@ -430,8 +430,8 @@ func (f *Fetcher) kept(ctx context.Context) (bool, error) {
 // A listing refused the same way on every pass is stepped over rather than
 // failing the supplier: a publisher serves one per label, and a label refused
 // today is not a reason to read none of the others. One answering "not
-// authorized" or "forbidden" is stepped over without marking the supplier
-// failed. A directory carries no label to leave a restricted one out by, so
+// authorized", "forbidden" or "accepted" is stepped over without marking the
+// supplier failed. A directory carries no label to leave a restricted one out by, so
 // one refused beside a readable one is the ordinary shape of a publisher with
 // a restricted label, and it answers that way on every pass. A supplier none
 // of whose listings could be read fails. A listing that could not be
@@ -1064,7 +1064,10 @@ func (f *Fetcher) fetch(ctx context.Context, client *http.Client, address string
 			// answers. A rate limit and a server having a bad day both hold
 			// the mark.
 			return nil, answered
-		case res.StatusCode == http.StatusUnauthorized, res.StatusCode == http.StatusForbidden:
+		case res.StatusCode == http.StatusUnauthorized, res.StatusCode == http.StatusForbidden,
+			res.StatusCode == http.StatusAccepted:
+			// A refusal of this client, which a bot filter answers too: a
+			// web application firewall's challenge is a 202.
 			return nil, unreadable{err: answered, barred: true}
 		default:
 			// Any other answer names this one address and is about the
