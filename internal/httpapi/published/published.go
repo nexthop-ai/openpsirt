@@ -378,17 +378,19 @@ func (s *server) document(ctx context.Context, v *view, path string) (*file, err
 	return nil, publish.ErrNotPublished
 }
 
-// signature is the detached signature over one document, carrying no date.
+// signature is the detached signature over one document, served with no
+// Last-Modified.
 //
 // Tagged by the document it signs and the public key as published rather than
 // by its own bytes, which carry a random salt and differ every time: a reader
 // holding the signature of an unchanged document is told so, without the key
 // being used again, and one holding a signature by a key replaced or re-signed
 // is sent the new one, since a signature dated before the key's newest
-// self-signature is refused by a reader's tooling. Undated because a
-// replacement key may have become valid before the document was released, and
-// a date that does not move with the key would confirm the old signature to a
-// reader asking by date.
+// self-signature is refused by a reader's tooling. Served with no
+// Last-Modified because a replacement key may have become valid before the
+// document was released, and a date that does not move with the key would
+// confirm the old signature to a reader asking by date. The signature itself
+// is dated at the document's release.
 func (s *server) signature(document *file, asked string) (*file, error) {
 	if s.Signer == nil {
 		return nil, publish.ErrNotPublished

@@ -71,7 +71,7 @@ document is about disclosed work in it (REQ-63, REQ-37).
 | Nothing names a row: paths and identifiers are built from names | |
 | Every answer carries an entity tag; a document and its digests also the moment it last moved; a request repeating either answers 304 | A list carries no date, since one that shrank is newer than its newest document |
 | `Cache-Control: public, no-cache` | A reader asks every time and fetches only what changed |
-| A signature is tagged by the document it signs and the public key as published, and carries no date | Its bytes carry a random salt, so an unchanged document's signature is confirmed without signing again; a reader holding one by a replaced or re-signed key is sent the new one, whenever that key became valid |
+| A signature is tagged by the document it signs and the public key as published, and served with no `Last-Modified` | Its bytes carry a random salt, so an unchanged document's signature is confirmed without signing again; a reader holding one by a replaced or re-signed key is sent the new one, whenever that key became valid |
 | A list reads every document's name and dates; a VEX document is read alone. Advisories' bytes are read only for the CSAF lists and for a CSAF path holding no VEX document | A whole-provider reader asks for each document and its files, and none of those lists the rest |
 | A VEX document is looked for before an advisory | Where an advisory's tracking identifier folds to a VEX document's path, the VEX document is served |
 | The feed and the description state the newest document's release, never the clock | An unchanged provider answers the same bytes |
