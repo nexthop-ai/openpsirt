@@ -1397,7 +1397,7 @@ openpsirt-upload upload \
 </tr>
 <tr>
 <td><code>--salt-file</code></td>
-<td>A file holding a secret that keys each result's fingerprint. Keep it fixed in the CI system's secret store and shared by every job sending a series: a new salt changes every fingerprint, and the next run is matched as a fingerprint change</td>
+<td>A file holding a secret of at least 32 bytes that keys each result's fingerprint, such as the output of <code>openssl rand -hex 32</code>. Keep it fixed in the CI system's secret store and shared by every job sending a series: a new salt changes every fingerprint, and the next run is matched as a fingerprint change</td>
 </tr>
 <tr>
 <td><code>--url</code></td>

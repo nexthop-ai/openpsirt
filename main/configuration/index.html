@@ -5578,6 +5578,22 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <td>A package identifier written <code>pkg://</code> is read as <code>pkg:</code>, an escaped slash or percent sign inside a name stays part of the name, a percent sign starting no escape is read as itself, and an identifier stating no version is read with the version stated beside it. v0.12.0 read each as another package, or every version as one</td>
 <td>Each such component is identified anew the next time its build's inventory is sent: its findings close on the earlier component and open on the new one. Until then a scan of the build keeps finding it as it was. Decisions, labels, assignments and upgrade promises on the earlier component do not carry over, so make them again on the new one</td>
 </tr>
+<tr>
+<td><code>openpsirt-upload</code> refuses a <code>--salt-file</code> holding fewer than 32 bytes, naming the file and its length</td>
+<td>Replace a shorter salt with one of at least 32 bytes, such as the output of <code>openssl rand -hex 32</code>. Every fingerprint changes once, and the next run is matched as a fingerprint change</td>
+</tr>
+<tr>
+<td>A stop whose requests or background work outlast <code>server.shutdown_grace</code> after the signal exits 1, which v0.12.0 exited 0</td>
+<td>Nothing, unless stops routinely exit 1: raise <code>server.shutdown_grace</code>, and <code>TimeoutStopSec</code> or <code>terminationGracePeriodSeconds</code> with it</td>
+</tr>
+<tr>
+<td>A request refused by the cross-site request check is answered 403, which v0.12.0 answered 401</td>
+<td>Nothing for the interface. A client treating 401 as a lapsed session no longer reads this refusal as one</td>
+</tr>
+<tr>
+<td>The releases out of support leave out a retired release and every release of a retired product. The download adds <code>product name</code> and <code>branch or tag name</code> beside <code>product</code> and <code>branch_or_tag</code></td>
+<td>A script reading the download by column position reads them by name</td>
+</tr>
 </tbody>
 </table>
 <h4 id="vex-statements-from-v0120">VEX statements from v0.12.0<a class="headerlink" href="#vex-statements-from-v0120" title="Permanent link">&para;</a></h4>
