@@ -199,6 +199,16 @@ type productBound struct {
 	args []any
 }
 
+// onProductBuild is whether the finding under an alias is on a build of the
+// product it binds. A visibility check reads only the finding's visibility,
+// which a finding of any product holds, so a read naming a finding and a
+// product binds one to the other with this.
+func onProductBuild(alias string) string {
+	return `EXISTS (SELECT 1 FROM "build" AS "tp"
+	JOIN "branch_or_tag" AS "sp" ON "sp"."id" = "tp"."branch_or_tag_id"
+	WHERE "tp"."id" = "` + alias + `"."build_id" AND "sp"."product_id" = ?)`
+}
+
 // inProduct is one product, bound as a value.
 func inProduct(productID int64) productBound {
 	return productBound{sql: "?", args: []any{productID}}

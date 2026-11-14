@@ -174,6 +174,8 @@ func ProposeRule(ctx context.Context, db bun.IDB, subject access.Subject, produc
 	if in.Prefix != "" {
 		clean, ok := sourcelink.CleanPath(in.Prefix)
 		switch {
+		case len(in.Prefix) > sourcelink.MostPathBytes:
+			return nil, refusal.Errorf("a path is at most %d bytes", sourcelink.MostPathBytes)
 		case !ok:
 			return nil, refusal.Errorf("path %q climbs out of the checkout or holds an empty segment", in.Prefix)
 		case clean != "":

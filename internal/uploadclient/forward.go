@@ -128,20 +128,23 @@ func settle(run obj, at *placer) settled {
 
 // resolveRule names a result's rule by its identifier. A rule cited by
 // position is looked up in the component the result names, and the position
-// removed, since merging runs reorders their rules.
+// removed, since merging runs reorders their rules. A rule of an extension
+// keeps naming its extension, since the driver or another extension may
+// define the same identifier.
 func resolveRule(res obj, driver obj, extensions []obj) {
 	ref := child(res, "rule")
 	id := str(res, "ruleId")
 	if id == "" {
 		id = str(ref, "id")
 	}
+	c, named := extensionOf(child(ref, "toolComponent"), extensions)
 	if id == "" {
 		index, ok := num(res, "ruleIndex")
 		if n, has := num(ref, "index"); has {
 			index, ok = n, true
 		}
 		component := driver
-		if c, has := num(child(ref, "toolComponent"), "index"); has {
+		if named {
 			component = nil
 			if c >= 0 && c < len(extensions) {
 				component = extensions[c]
@@ -156,6 +159,34 @@ func resolveRule(res obj, driver obj, extensions []obj) {
 	}
 	delete(res, "ruleIndex")
 	delete(res, "rule")
+	if id != "" && named && c >= 0 && c < len(extensions) {
+		res["rule"] = obj{"id": id, "toolComponent": obj{"index": c}}
+	}
+}
+
+// extensionOf is the position of the extension a component reference names:
+// by position, or else by GUID, or else by name. It is false for a reference
+// to the driver or to nothing the run lists.
+func extensionOf(ref obj, extensions []obj) (int, bool) {
+	if ref == nil {
+		return 0, false
+	}
+	if i, ok := num(ref, "index"); ok {
+		return i, true
+	}
+	for _, key := range []string{"guid", "name"} {
+		want := str(ref, key)
+		if want == "" {
+			continue
+		}
+		for i, ext := range extensions {
+			// A GUID is hexadecimal written in either case; a name is as written.
+			if got := str(ext, key); got == want || key == "guid" && strings.EqualFold(got, want) {
+				return i, true
+			}
+		}
+	}
+	return 0, false
 }
 
 // validRegion removes the end of a region that ends before it starts. clang's
@@ -193,10 +224,31 @@ func plainMessage(m obj) int {
 	return 1
 }
 
+// renumber rewrites the extension position a result's rule cites to the
+// merged run's, by where each of the run's own extensions sits once merged.
+// Settling has named every result's rule by identifier, and its extension by
+// position. A relationship's target and a result's taxa may name a taxonomy
+// by position instead, which nothing here reads, so they are left as
+// written.
+func renumber(run obj, components map[int]int) {
+	for _, res := range objects(run, "results") {
+		component := child(child(res, "rule"), "toolComponent")
+		if c, ok := num(component, "index"); ok {
+			if to, ok := components[c]; ok {
+				component["index"] = to
+			}
+		}
+	}
+}
+
 // merge folds the runs of one tool into one: clang writes a document per
-// translation unit, and the deployment reads one run of each tool. Rules are
-// listed once, by identifier, and every result names its rule by identifier
-// after settling, so an extension's rules join the driver's.
+// translation unit, and the deployment reads one run of each tool. The
+// driver's rules are listed once, by identifier, and each extension's within
+// that extension, extensions of two runs being one where they share a name, a
+// GUID and a version, and an extension with neither name nor GUID its own.
+// A result names its rule by identifier after settling, and a rule of an
+// extension by its extension's position, which is rewritten to the merged
+// list's.
 func merge(runs []obj) obj {
 	if len(runs) == 1 {
 		return runs[0]
@@ -206,17 +258,49 @@ func merge(runs []obj) obj {
 	seen := map[string]bool{}
 	var rules list
 	var results, invocations list
+	var extensions list
+	extensionAt := map[string]int{}
+	extensionRules := []map[string]bool{}
 	units, counted := 0, false
 	for _, run := range runs {
 		tool := child(run, "tool")
-		for _, component := range append([]obj{child(tool, "driver")}, objects(tool, "extensions")...) {
-			for _, rule := range objects(component, "rules") {
-				if id := str(rule, "id"); id != "" && !seen[id] {
-					seen[id] = true
-					rules = append(rules, rule)
+		components := map[int]int{}
+		for _, rule := range objects(child(tool, "driver"), "rules") {
+			if id := str(rule, "id"); id != "" && !seen[id] {
+				seen[id] = true
+				rules = append(rules, rule)
+			}
+		}
+		inRun := map[int]bool{}
+		for i, ext := range objects(tool, "extensions") {
+			key := str(ext, "name") + "\x00" + strings.ToLower(str(ext, "guid")) + "\x00" + str(ext, "version")
+			at, ok := extensionAt[key]
+			// An extension with neither a name nor a GUID is its own, and one
+			// run's extensions are never one another.
+			if !ok || str(ext, "name") == "" && str(ext, "guid") == "" || inRun[at] {
+				at = len(extensions)
+				if _, kept := extensionAt[key]; !kept {
+					extensionAt[key] = at
+				}
+				kept := obj{}
+				for k, v := range ext {
+					kept[k] = v
+				}
+				kept["rules"] = list{}
+				extensions = append(extensions, kept)
+				extensionRules = append(extensionRules, map[string]bool{})
+			}
+			inRun[at] = true
+			components[i] = at
+			merged := extensions[at].(obj)
+			for _, rule := range objects(ext, "rules") {
+				if id := str(rule, "id"); id != "" && !extensionRules[at][id] {
+					extensionRules[at][id] = true
+					merged["rules"] = append(merged["rules"].(list), rule)
 				}
 			}
 		}
+		renumber(run, components)
 		if str(driver, "version") == "" {
 			if v := str(child(tool, "driver"), "version"); v != "" {
 				driver["version"] = v
@@ -236,7 +320,11 @@ func merge(runs []obj) obj {
 		}
 	}
 	driver["rules"] = rules
-	delete(child(first, "tool"), "extensions")
+	if len(extensions) > 0 {
+		child(first, "tool")["extensions"] = extensions
+	} else {
+		delete(child(first, "tool"), "extensions")
+	}
 	if results != nil {
 		first["results"] = results
 	} else {

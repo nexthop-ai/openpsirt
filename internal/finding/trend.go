@@ -22,8 +22,22 @@ import (
 )
 
 // MostTrendSteps is the most steps a trend is worked out over: two years of
-// days.
-const MostTrendSteps = 730
+// days. MostTrendStep is the longest step.
+const (
+	MostTrendSteps = 730
+	MostTrendStep  = 366 * 24 * time.Hour
+)
+
+// TrendWindow refuses a trend's window out of range: a step of nothing or
+// longer than MostTrendStep, or steps outside 1 to MostTrendSteps. The edge
+// bounds what a request may ask, so a window past it is a fault in the caller,
+// answered as a fault.
+func TrendWindow(step time.Duration, steps int) error {
+	if steps < 1 || steps > MostTrendSteps || step <= 0 || step > MostTrendStep {
+		return fmt.Errorf("a trend over %d steps of %s: out of range", steps, step)
+	}
+	return nil
+}
 
 // Within narrows a trend to part of one build's tree.
 //
@@ -129,16 +143,8 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	if !all && len(products) == 0 {
 		return nil, nil
 	}
-	if steps <= 0 || steps > MostTrendSteps {
-		steps = 12
-	}
-	// A step of nothing makes every point the same instant.
-	if step <= 0 {
-		step = 7 * 24 * time.Hour
-	}
-	// The range is a query parameter, and the loops below walk it.
-	if step > 366*24*time.Hour {
-		step = 366 * 24 * time.Hour
+	if err := TrendWindow(step, steps); err != nil {
+		return nil, err
 	}
 	if since.IsZero() {
 		since = s.now().UTC().Add(-time.Duration(steps) * step)

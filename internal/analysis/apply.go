@@ -362,10 +362,12 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	if err != nil {
 		return "", err
 	}
-	matched, fresh, missed, returned, err := match(ctx, tx, open, keyed, run.FingerprintsChanged)
+	candidates, err := candidatesOf(ctx, tx, open, keyed)
 	if err != nil {
 		return "", err
 	}
+	matched, fresh, missed, returned := match(candidates, open, keyed, run.FingerprintsChanged)
+	heldOpen := heldAt(candidates)
 	var uncompared int
 	if comparable {
 		if missed, uncompared, err = comparedTo(ctx, store, run, open, missed); err != nil {
@@ -396,7 +398,7 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 		ruleIDs[name] = id
 	}
 
-	from, err := carry(ctx, tx, run, set.ID, previous == nil, fresh)
+	from, err := carry(ctx, tx, run, set.ID, previous == nil, fresh, heldOpen)
 	if err != nil {
 		return "", err
 	}
@@ -412,10 +414,11 @@ func (a *Applier) apply(ctx context.Context, tx bun.Tx, runID int64, read *held,
 	// Marked before the run reads a flaw record or writes a code finding's source: a
 	// disclosure or an inclusion of a code finding it describes waits for it, or reads
 	// again.
-	if err := finding.Describing(ctx, tx, set.ProductID, run.ID, freshOccurrences(set.ID, fresh, from), again); err != nil {
+	occurrences := freshOccurrences(set.ID, fresh, from, heldOpen)
+	if err := finding.Describing(ctx, tx, set.ProductID, run.ID, occurrences, again); err != nil {
 		return "", err
 	}
-	opened, err := a.open(ctx, tx, run, set.ProductID, set.ID, fresh, ruleIDs, from, components, inventory.root)
+	opened, err := a.open(ctx, tx, run, set.ProductID, fresh, occurrences, ruleIDs, from, components, inventory.root)
 	if err != nil {
 		return "", err
 	}

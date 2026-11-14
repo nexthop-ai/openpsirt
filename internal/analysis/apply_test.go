@@ -1112,6 +1112,36 @@ func TestACodeFindingsEvidenceIsAnsweredOnlyWhereTheSubjectReadsIt(t *testing.T)
 	})
 }
 
+func TestACodeFindingsEvidenceAndDecisionAreAnsweredOnlyInItsOwnProduct(t *testing.T) {
+	eachWorld(t, func(t *testing.T, w *world) {
+		ctx := t.Context()
+		w.inventory(t, w.Build.ID)
+		w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour), document([]sent{inFRR}, 10))
+		codeFinding := w.codeFindings(t, w.Build.ID)[0]
+		other := w.DeclareProduct("other", "Other")
+		rights := access.NewStore(w.DB.DB)
+		person, err := rights.Ensure(ctx, "elsewhere", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, role := range []access.Role{access.SecurityTestingRead, access.SecurityTestingTriage} {
+			if err := rights.GrantRole(ctx, person.ID, other.ID, role); err != nil {
+				t.Fatal(err)
+			}
+		}
+		elsewhere, err := rights.Resolve(ctx, "elsewhere")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := EvidenceOf(ctx, w.DB.DB, elsewhere, &codeFinding, other.ID); !errors.Is(err, finding.ErrNoOpenFinding) {
+			t.Errorf("the evidence of another product's code finding was answered %v; want no code finding", err)
+		}
+		if err := Answerable(ctx, w.DB.DB, elsewhere, other.ID, &codeFinding); !errors.Is(err, finding.ErrNoOpenFinding) {
+			t.Errorf("a decision about another product's code finding was answered %v; want no code finding", err)
+		}
+	})
+}
+
 func TestTheQueueAndEvidenceNameTheComponentACodeFindingIsPlacedOn(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Build.ID)

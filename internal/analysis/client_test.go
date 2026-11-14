@@ -234,3 +234,228 @@ func TestEveryMemberTheDeploymentReadsSurvivesTheClient(t *testing.T) {
 		t.Errorf("tool %+v, automation %q", forwarded.Tool, forwarded.AutomationID)
 	}
 }
+
+// forwarded is a SARIF document of a tool whose driver and an extension both
+// define the rule X, at different levels, with the results given.
+func forwarded(extensions, results string) []byte {
+	return []byte(`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql",` +
+		`"rules":[{"id":"X","defaultConfiguration":{"level":"note"}}]},"extensions":[` + extensions + `]},` +
+		`"results":[` + results + `]}]}`)
+}
+
+// forwardedAt is a result at a line of a.c citing its rule as given.
+func forwardedAt(line, rule string) string {
+	return `{` + rule + `,"message":{"text":"m"},"locations":[{"physicalLocation":` +
+		`{"artifactLocation":{"uri":"a.c"},"region":{"startLine":` + line + `}}}]}`
+}
+
+func TestAForwardedResultKeepsTheRuleOfTheExtensionItNames(t *testing.T) {
+	root := checkout(t, "git@github.com:example/sonic.git")
+	pack := `{"name":"pack","rules":[{"id":"X","defaultConfiguration":{"level":"error"}}]}`
+	other := `{"name":"other","rules":[{"id":"Y"}]}`
+	inputs := []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(pack,
+			forwardedAt("1", `"ruleId":"X","rule":{"id":"X","toolComponent":{"index":0}}`)+","+
+				forwardedAt("2", `"ruleId":"X"`))},
+		// The second document lists the pack second, so its position moves
+		// when the two are merged.
+		{Name: "b.sarif", Data: forwarded(other+","+pack,
+			forwardedAt("3", `"rule":{"index":0,"toolComponent":{"index":1}}`))},
+	}
+	exit := 0
+	runs, _, err := uploadclient.Build(t.Context(), uploadclient.Options{
+		Root: root, Work: root, Series: "codeql/default", Built: time.Now().UTC(),
+		ExitStatus: &exit, Client: "openpsirt-upload test",
+	}, inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("%d runs; want the two documents merged", len(runs))
+	}
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(runs[0].Doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	levels := map[int]string{}
+	for _, res := range log.Runs[0].Results {
+		if len(res.Locations) > 0 {
+			levels[res.Locations[0].StartLine] = res.Level
+		}
+	}
+	for line, want := range map[int]string{1: "error", 2: "note", 3: "error"} {
+		if levels[line] != want {
+			t.Errorf("the result on line %d is at %q; want %q, its own rule's", line, levels[line], want)
+		}
+	}
+}
+
+func TestTwoExtensionsSharingANameKeepTheirOwnRulesWhenForwarded(t *testing.T) {
+	root := checkout(t, "git@github.com:example/sonic.git")
+	strict := `{"name":"pack","guid":"11111111-1111-1111-1111-111111111111","rules":[{"id":"X","defaultConfiguration":{"level":"error"}}]}`
+	lenient := `{"name":"pack","guid":"22222222-2222-2222-2222-222222222222","rules":[{"id":"X","defaultConfiguration":{"level":"note"}}]}`
+	inputs := []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(strict,
+			forwardedAt("1", `"rule":{"id":"X","toolComponent":{"index":0}}`))},
+		{Name: "b.sarif", Data: forwarded(lenient,
+			forwardedAt("2", `"rule":{"id":"X","toolComponent":{"index":0}}`))},
+	}
+	exit := 0
+	runs, _, err := uploadclient.Build(t.Context(), uploadclient.Options{
+		Root: root, Work: root, Series: "codeql/default", Built: time.Now().UTC(),
+		ExitStatus: &exit, Client: "openpsirt-upload test",
+	}, inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("%d runs; want the two documents merged", len(runs))
+	}
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(runs[0].Doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	levels := map[int]string{}
+	for _, res := range log.Runs[0].Results {
+		if len(res.Locations) > 0 {
+			levels[res.Locations[0].StartLine] = res.Level
+		}
+	}
+	for line, want := range map[int]string{1: "error", 2: "note"} {
+		if levels[line] != want {
+			t.Errorf("the result on line %d is at %q; want %q, its own extension's", line, levels[line], want)
+		}
+	}
+}
+
+// forwardedOne is the one run the client forwards for inputs.
+func forwardedOne(t *testing.T, inputs []uploadclient.Input) []byte {
+	t.Helper()
+	root := checkout(t, "git@github.com:example/sonic.git")
+	exit := 0
+	runs, _, err := uploadclient.Build(t.Context(), uploadclient.Options{
+		Root: root, Work: root, Series: "codeql/default", Built: time.Now().UTC(),
+		ExitStatus: &exit, Client: "openpsirt-upload test",
+	}, inputs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("%d runs; want one", len(runs))
+	}
+	return runs[0].Doc
+}
+
+func TestAResultNamingItsExtensionByGUIDKeepsThatExtensionsRule(t *testing.T) {
+	// The result writes the GUID in the other case, which names the same
+	// extension.
+	pack := `{"name":"pack","guid":"abcdef00-1111-1111-1111-111111111111",` +
+		`"rules":[{"id":"X","defaultConfiguration":{"level":"error"}}]}`
+	doc := forwardedOne(t, []uploadclient.Input{{Name: "a.sarif", Data: forwarded(pack,
+		forwardedAt("1", `"rule":{"id":"X","toolComponent":{"guid":"ABCDEF00-1111-1111-1111-111111111111"}}`))}})
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	if got := log.Runs[0].Results[0].Level; got != "error" {
+		t.Errorf("the result is at %q; want %q, the extension's rule's", got, "error")
+	}
+}
+
+func TestOneRunListingAnExtensionTwiceLeavesLaterRunsOnTheFirst(t *testing.T) {
+	pack := func(rule string) string {
+		return `{"name":"pack","guid":"11111111-1111-1111-1111-111111111111","rules":[{"id":"` + rule + `"}]}`
+	}
+	doc := forwardedOne(t, []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(pack("X")+","+pack("Y"), "")},
+		{Name: "b.sarif", Data: forwarded(pack("X"),
+			forwardedAt("1", `"rule":{"id":"X","index":0,"toolComponent":{"index":0}}`))},
+	})
+	var got struct {
+		Runs []struct {
+			Results []struct {
+				Rule struct {
+					ToolComponent struct {
+						Index int `json:"index"`
+					} `json:"toolComponent"`
+				} `json:"rule"`
+			} `json:"results"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(doc, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Runs[0].Results) != 1 {
+		t.Fatalf("%d results; want one", len(got.Runs[0].Results))
+	}
+	if at := got.Runs[0].Results[0].Rule.ToolComponent.Index; at != 0 {
+		t.Errorf("the later run's pack merged into extension %d; want 0, the first listed", at)
+	}
+}
+
+func TestOneRunListingAnExtensionTwiceKeepsEachCopysRules(t *testing.T) {
+	pack := func(level string) string {
+		return `{"name":"pack","guid":"11111111-1111-1111-1111-111111111111",` +
+			`"rules":[{"id":"X","defaultConfiguration":{"level":"` + level + `"}}]}`
+	}
+	doc := forwardedOne(t, []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(pack("error")+","+pack("warning"),
+			forwardedAt("1", `"rule":{"id":"X","toolComponent":{"index":1}}`))},
+		// A second document, so the runs are merged.
+		{Name: "b.sarif", Data: forwarded("", "")},
+	})
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	if got := log.Runs[0].Results[0].Level; got != "warning" {
+		t.Errorf("the result is at %q; want %q, the second copy's rule's", got, "warning")
+	}
+}
+
+func TestOneExtensionWrittenWithItsGUIDInTwoCasesMergesOnce(t *testing.T) {
+	lower := `{"name":"pack","guid":"abcdef00-1111-1111-1111-111111111111","rules":[{"id":"X"}]}`
+	upper := `{"name":"pack","guid":"ABCDEF00-1111-1111-1111-111111111111","rules":[{"id":"Z"}]}`
+	run := func(ext string) []byte {
+		return []byte(`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"codeql"},"extensions":[` + ext +
+			`]},"results":[]}]}`)
+	}
+	doc := forwardedOne(t, []uploadclient.Input{{Name: "a.sarif", Data: run(lower)}, {Name: "b.sarif", Data: run(upper)}})
+	var got struct {
+		Runs []struct {
+			Tool struct {
+				Extensions []json.RawMessage `json:"extensions"`
+			} `json:"tool"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(doc, &got); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(got.Runs[0].Tool.Extensions); n != 1 {
+		t.Errorf("%d extensions; want the one pack", n)
+	}
+}
+
+func TestTwoExtensionsWithNoNameKeepTheirOwnRulesWhenForwarded(t *testing.T) {
+	strict := `{"version":"1.0","rules":[{"id":"X","defaultConfiguration":{"level":"error"}}]}`
+	lenient := `{"version":"1.0","rules":[{"id":"X","defaultConfiguration":{"level":"note"}}]}`
+	doc := forwardedOne(t, []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(strict, forwardedAt("1", `"rule":{"id":"X","toolComponent":{"index":0}}`))},
+		{Name: "b.sarif", Data: forwarded(lenient, forwardedAt("2", `"rule":{"id":"X","toolComponent":{"index":0}}`))},
+	})
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	levels := map[int]string{}
+	for _, res := range log.Runs[0].Results {
+		if len(res.Locations) > 0 {
+			levels[res.Locations[0].StartLine] = res.Level
+		}
+	}
+	for line, want := range map[int]string{1: "error", 2: "note"} {
+		if levels[line] != want {
+			t.Errorf("the result on line %d is at %q; want %q, its own extension's", line, levels[line], want)
+		}
+	}
+}

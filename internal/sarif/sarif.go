@@ -251,12 +251,14 @@ func containsPlaceholder(text string) bool { return strings.Contains(text, "{") 
 // fill replaces each {n} with the nth argument, leaving a placeholder with no
 // argument as written. It stops once most bytes are written, since a message
 // cut to that length is all that is kept and filling past it costs memory
-// for nothing.
+// for nothing. A placeholder is at most longestPlaceholder bytes, so the
+// closing brace is looked for no further: a text of opening braces alone
+// would otherwise cost its length squared.
 func fill(text string, arguments []string, most int) string {
 	var b strings.Builder
 	for i := 0; i < len(text) && b.Len() < most; i++ {
 		if text[i] == '{' {
-			end := strings.IndexByte(text[i:], '}')
+			end := strings.IndexByte(text[i:min(len(text), i+longestPlaceholder)], '}')
 			if end > 1 {
 				n, ok := index(text[i+1 : i+end])
 				if ok && n < len(arguments) {
@@ -271,8 +273,15 @@ func fill(text string, arguments []string, most int) string {
 	return b.String()
 }
 
+// mostPlaceholderDigits is the most digits index reads, and longestPlaceholder
+// a placeholder of that many with its braces.
+const (
+	mostPlaceholderDigits = 4
+	longestPlaceholder    = mostPlaceholderDigits + 2
+)
+
 func index(s string) (int, bool) {
-	if s == "" || len(s) > 4 {
+	if s == "" || len(s) > mostPlaceholderDigits {
 		return 0, false
 	}
 	n := 0

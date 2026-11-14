@@ -416,24 +416,27 @@ func (s *Store) ProposeMany(ctx context.Context, subject access.Subject,
 	return recorded, nil
 }
 
-// ProposeGrouped records one decision at an occurrence and at every occurrence more names,
-// as one action. more is asked inside the transaction the decision is written
-// in, on every attempt, so the occurrences it names are the ones the write lands
-// on: an occurrence answered, closed or covered between a read and the write is not
-// decided. Each occurrence more names takes the first proposal's argument.
+// ProposeGrouped records one decision at the occurrence at names and at every
+// other occurrence it names, as one action. at is asked inside the transaction
+// the decision is written in, on every attempt, so the occurrences it names are
+// the ones the write lands on: an occurrence answered, closed or covered between
+// a read and the write is not decided. Every occurrence takes the argument of the
+// proposal given, whose own occurrence is the one at names first.
 //
-// The first proposal's row is returned.
-func (s *Store) ProposeGrouped(ctx context.Context, subject access.Subject, first Proposal,
-	more func(context.Context, bun.IDB) ([]Occurrence, error)) (*DecisionOccurrence, error) {
+// The first occurrence's row is returned.
+func (s *Store) ProposeGrouped(ctx context.Context, subject access.Subject, decided Proposal,
+	at func(context.Context, bun.IDB) (Occurrence, []Occurrence, error)) (*DecisionOccurrence, error) {
 
-	proposals := []Proposal{first}
+	var proposals []Proposal
 	var recorded []*DecisionOccurrence
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		occurrences, err := more(ctx, tx)
+		occurrence, occurrences, err := at(ctx, tx)
 		if err != nil {
 			return err
 		}
-		proposals = proposals[:1]
+		first := decided
+		first.Occurrence = occurrence
+		proposals = []Proposal{first}
 		for _, occurrence := range occurrences {
 			also := first
 			also.Occurrence = occurrence

@@ -24,13 +24,130 @@ func strong(on string) bool { return on == onKey || on == onUnprinted }
 // described it.
 type candidate struct {
 	findingID   int64
+	occurrence  string
 	key         string
 	unprinted   string
 	functionKey string
 	lineKey     string
 	line        int
+	spot
+	// told is whether its key is held twice, by two results or by two
+	// occurrences, so its spot was read and tells it from the others.
+	told bool
 	// absent is whether the last comparable run did not see it.
 	absent bool
+}
+
+// spot is where on its line a code finding was last seen and what it said,
+// which tell apart code findings sharing a key.
+type spot struct {
+	column  int
+	message string
+}
+
+// spotOf is a spot as stored, a column of nothing being none.
+func spotOf(column *int, message string) spot {
+	s := spot{message: message}
+	if column != nil {
+		s.column = *column
+	}
+	return s
+}
+
+// spotKey is a key and a spot within it.
+type spotKey struct {
+	key string
+	spot
+}
+
+// bySpot indexes items by key and spot, in their order, keeping those keep
+// admits: where results sharing a key look for the one at their spot.
+func bySpot[T any](items []T, keep func(T) bool, at func(T) spotKey) map[spotKey][]T {
+	out := map[spotKey][]T{}
+	for _, it := range items {
+		if keep(it) {
+			k := at(it)
+			out[k] = append(out[k], it)
+		}
+	}
+	return out
+}
+
+// before is whether one spot sorts before another: by column, then message.
+func (s spot) before(o spot) bool {
+	if s.column != o.column {
+		return s.column < o.column
+	}
+	return s.message < o.message
+}
+
+// byRank pairs results with code findings sharing their key by the rank of
+// their spots, each list sorted by spot and paired in turn. The code findings
+// taking part are the first of theirs, in their order, as many as there are
+// results; the results taking part are the first by spot, as many as there
+// are code findings.
+func byRank[R, C any](results []R, codeFindings []C, spotR func(R) spot, spotC func(C) spot) []ranked[R, C] {
+	n := min(len(results), len(codeFindings))
+	rs := append([]R(nil), results...)
+	sort.SliceStable(rs, func(i, j int) bool { return spotR(rs[i]).before(spotR(rs[j])) })
+	cs := append([]C(nil), codeFindings[:n]...)
+	sort.SliceStable(cs, func(i, j int) bool { return spotC(cs[i]).before(spotC(cs[j])) })
+	out := make([]ranked[R, C], n)
+	for i := range n {
+		out[i] = ranked[R, C]{rs[i], cs[i]}
+	}
+	return out
+}
+
+// ranked is a result and the code finding byRank paired it with.
+type ranked[R, C any] struct {
+	result      R
+	codeFinding C
+}
+
+// heldTwice is the keys two results hold, or two occurrences: those where a
+// result is told from another by its column and message.
+func heldTwice(keys []string, holders map[string]map[string]bool) map[string]bool {
+	seen := make(map[string]bool, len(keys))
+	shared := map[string]bool{}
+	for _, k := range keys {
+		if seen[k] {
+			shared[k] = true
+		}
+		seen[k] = true
+	}
+	for k, occurrences := range holders {
+		if len(occurrences) > 1 {
+			shared[k] = true
+		}
+	}
+	return shared
+}
+
+// holding records that an occurrence holds a key.
+func holding(holders map[string]map[string]bool, key, occurrence string) {
+	if holders[key] == nil {
+		holders[key] = map[string]bool{}
+	}
+	holders[key][occurrence] = true
+}
+
+// candidatesHeldTwice is heldTwice over candidates.
+func candidatesHeldTwice(candidates []candidate, results []Keyed) map[string]bool {
+	holders := map[string]map[string]bool{}
+	for _, c := range candidates {
+		holding(holders, c.key, c.occurrence)
+	}
+	return heldTwice(keysOf(results), holders)
+}
+
+// keysOf is the whole keys of results.
+func keysOf(results []Keyed) []string {
+	out := make([]string, len(results))
+	for i, k := range results {
+		out[i] = k.Key
+	}
+	return out
 }
 
 // nearest is how many candidates sharing a result's line key, nearest it
@@ -92,21 +209,86 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 		if layer.on == onFunction && printsChanged {
 			unique(candidates, results, takenC, takenR, &out)
 		}
+		// Where a key is held twice, results under it are told apart by
+		// where they sit first, so each keeps the code finding it was paired
+		// with whatever order a run lists them in, or after a line moves them
+		// all: on the whole key by column and message, where those were read,
+		// and on the function by column.
+		var shared map[string]bool
+		var spotC func(candidate) spot
+		var spotR func(Keyed) spot
+		if layer.on == onKey {
+			shared = map[string]bool{}
+			for _, c := range candidates {
+				if c.told {
+					shared[c.key] = true
+				}
+			}
+			spotC = func(c candidate) spot { return c.spot }
+			spotR = func(k Keyed) spot { return spot{k.StartColumn, k.Message} }
+		} else {
+			holders := map[string]map[string]bool{}
+			for _, c := range order {
+				if !takenC[c] && candidates[c].functionKey != "" {
+					holding(holders, candidates[c].functionKey, candidates[c].occurrence)
+				}
+			}
+			var keys []string
+			for r, res := range results {
+				if !takenR[r] {
+					keys = append(keys, res.FunctionKey)
+				}
+			}
+			shared = heldTwice(keys, holders)
+			spotC = func(c candidate) spot { return spot{column: c.column} }
+			spotR = func(k Keyed) spot { return spot{column: k.StartColumn} }
+		}
+		at := bySpot(order, func(c int) bool { return !takenC[c] && shared[layer.ofC(candidates[c])] },
+			func(c int) spotKey { return spotKey{layer.ofC(candidates[c]), spotC(candidates[c])} })
+		for r, res := range results {
+			k := layer.ofR(res)
+			if takenR[r] || k == "" || !shared[k] {
+				continue
+			}
+			sk := spotKey{k, spotR(res)}
+			if cs := at[sk]; len(cs) > 0 {
+				c := cs[0]
+				at[sk] = cs[1:]
+				takenC[c], takenR[r] = true, true
+				out = append(out, pairing{result: r, candidate: c, on: layer.on})
+			}
+		}
 		waiting := map[string][]int{}
 		for _, c := range order {
 			if k := layer.ofC(candidates[c]); !takenC[c] && k != "" {
 				waiting[k] = append(waiting[k], c)
 			}
 		}
+		left := map[string][]int{}
 		for r, res := range results {
 			k := layer.ofR(res)
 			if takenR[r] || k == "" || len(waiting[k]) == 0 {
+				continue
+			}
+			if shared[k] {
+				left[k] = append(left[k], r)
 				continue
 			}
 			c := waiting[k][0]
 			waiting[k] = waiting[k][1:]
 			takenC[c], takenR[r] = true, true
 			out = append(out, pairing{result: r, candidate: c, on: layer.on})
+		}
+		// Under a key held twice, what no spot paired is paired in the order
+		// of its spots, so a shift moving every result on a line keeps each
+		// with its own, whatever order the run lists them in.
+		for k, rs := range left {
+			cs := waiting[k]
+			for _, p := range byRank(rs, cs,
+				func(r int) spot { return spotR(results[r]) }, func(c int) spot { return spotC(candidates[c]) }) {
+				takenC[p.codeFinding], takenR[p.result] = true, true
+				out = append(out, pairing{result: p.result, candidate: p.codeFinding, on: layer.on})
+			}
 		}
 	}
 
@@ -127,7 +309,7 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 		sort.SliceStable(group, func(i, j int) bool { return candidates[group[i]].line < candidates[group[j]].line })
 	}
 	type near struct {
-		distance, rank, result, candidate int
+		distance, moved, rank, result, candidate int
 	}
 	var pairs []near
 	for r, res := range results {
@@ -153,7 +335,14 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 			if d < 0 {
 				d = -d
 			}
-			pairs = append(pairs, near{distance: d, rank: rank[c], result: r, candidate: c})
+			// At one distance, the candidate nearest the result's column comes
+			// first, so results on one line keep theirs when a line moves
+			// them, and when a shift of indent moves them all too.
+			moved := res.StartColumn - candidates[c].column
+			if moved < 0 {
+				moved = -moved
+			}
+			pairs = append(pairs, near{distance: d, moved: moved, rank: rank[c], result: r, candidate: c})
 		}
 	}
 	sort.Slice(pairs, func(i, j int) bool {
@@ -161,6 +350,8 @@ func layered(candidates []candidate, results []Keyed, printsChanged bool) []pair
 		switch {
 		case a.distance != b.distance:
 			return a.distance < b.distance
+		case a.moved != b.moved:
+			return a.moved < b.moved
 		case a.rank != b.rank:
 			return a.rank < b.rank
 		}

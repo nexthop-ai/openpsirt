@@ -154,6 +154,9 @@ func (c *Config) Valid() error {
 	prefixes := map[string]bool{}
 	for i := range c.Paths {
 		p := &c.Paths[i]
+		if len(p.Prefix) > MostPathBytes {
+			return refusal.Errorf("path %d is longer than %d bytes", i+1, MostPathBytes)
+		}
 		prefix, ok := CleanPath(p.Prefix)
 		if !ok {
 			return refusal.Errorf("path %d, %q, is not a path within a checkout", i+1, p.Prefix)
@@ -172,7 +175,7 @@ func (c *Config) Valid() error {
 		case p.Remote == "" && p.Snippets == nil && p.DisclosedSnippets == nil:
 			return refusal.Errorf("path %q says nothing: name a repository, whether snippets are kept, "+
 				"or whether they are disclosed", prefix)
-		case strings.ContainsAny(p.Branch, " \t\n?#\\"):
+		case strings.ContainsAny(p.Branch, " \t\n?#\\"), p.Branch != "" && !linkedBranch(p.Branch):
 			return refusal.Errorf("path %q: %q is not a branch name", prefix, p.Branch)
 		}
 		p.PrefixIdentity = identity(prefix)
@@ -225,6 +228,10 @@ func template(t string, allowed []string) error {
 	}
 	return nil
 }
+
+// MostPathBytes is the longest path within a checkout that is stored: the
+// longest path a Linux file system takes.
+const MostPathBytes = 4096
 
 // CleanPath is a path within a checkout with no leading or trailing slash,
 // refused where a segment is empty or climbs out.
@@ -298,4 +305,11 @@ func (s *Store) Replace(ctx context.Context, productID int64, c Config) error {
 		return fmt.Errorf("record the repository paths of product %d: %w", productID, err)
 	}
 	return nil
+}
+
+// linkedBranch is whether a branch is one a link carries: no segment empty,
+// "." or "..", which git refuses in a branch name.
+func linkedBranch(branch string) bool {
+	_, ok := escapedPath(branch)
+	return ok
 }

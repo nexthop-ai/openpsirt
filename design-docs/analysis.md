@@ -79,6 +79,9 @@ and entries are bounded across the upload as memory: placed results take about
 | Runs | Per document |
 | Results, rules, repositories, named starting points | Per run |
 | Locations, related locations, flow steps | Per result |
+| Message strings, tags | Per rule, at the rules bound |
+| Arguments | Per message, at the locations bound |
+| Fingerprints | Per result, at the locations bound |
 | Starting-point chains | Per path; a loop refuses the document |
 | Property members | Per bag, every bag read or walked past, nested included |
 | Text | Per message or description, cut past it, placeholders included |
@@ -88,6 +91,8 @@ and entries are bounded across the upload as memory: placed results take about
 | Rule | Reason |
 |---|---|
 | Bytes as sent default to bytes decompressed, and one document may take the whole upload's bounds | Merged per-unit documents do |
+| A count past its bound refuses the document; only text is cut | A cut list loses what follows silently: a weakness tag, or the argument a placeholder names |
+| Placeholders are filled, and a rule found by its identifier's leading components, in time linear in the text | Both come from the document, so work growing with the square of a text is the document's to choose |
 | Defaults far exceed real producers: nesting 64 against 14, a bag 256 against 9, 1,000 places against 4, 10,000 flow steps against 12 (`design-docs/analysis-measurements.md` § Producer output) | Richer output is not refused |
 
 ## Run contents
@@ -103,8 +108,10 @@ and entries are bounded across the upload as memory: placed results take about
 | Kind `pass`, `notApplicable` or `informational` drops the result as `not-a-problem`; no kind is `fail`; `review` and `open` stay | |
 | A suppression with no status or `accepted` drops the result as `suppressed-by-the-tool`; `underReview` and `rejected` do not | |
 | `baselineState` `absent` drops the result as `absent` | It could never be found again |
-| Paths resolve through named starting points and place against the source root | Paths arrive absolute, as `file://`, relative, or under undefined starting points |
-| A path with no starting point is relative to the first invocation's working directory where that is in the checkout, else the top; one under the source root's own undefined name is relative to the top | cppcheck run from a subdirectory |
+| Paths resolve through named starting points and place against the source root; the root's own address, with or without its trailing slash, is the top of the checkout | Paths arrive absolute, as `file://`, relative, or under undefined starting points; a repository mapped to the root alone names the root's own address |
+| A path with no starting point is relative to the first invocation's working directory where that is in the checkout, else the top; one under the source root's own undefined name, directly or through a chain of starting points, is relative to the top | cppcheck run from a subdirectory |
+| The deployment and the upload client resolve a chain of starting points with one resolver | A chain ends at the same starting point on both, where it is within the deployment's chain bound |
+| A starting point whose own address names no starting point is relative to where the tool ran; the source root's name defined so is the undefined root | Tools write an output directory so; the top is where the root's name places |
 | A path outside the checkout drops its result, counted | |
 | A result repeating another on rule, path, line, column and message is dropped, counted | clang repeats a header per unit |
 | Whole-file contents, fixes and markdown messages are left out of every record, counted | |

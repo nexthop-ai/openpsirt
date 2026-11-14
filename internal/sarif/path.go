@@ -4,14 +4,11 @@
 package sarif
 
 import (
-	"net/url"
 	"path"
 	"strings"
-)
 
-// rootBases are the names a run gives its source root, in the order they are
-// preferred. The format suggests the first; tools write either.
-var rootBases = []string{"SRCROOT", "%SRCROOT%"}
+	"github.com/nexthop-ai/openpsirt/internal/sarif/uribase"
+)
 
 // Paths places a run's file addresses in its checkout.
 type Paths struct {
@@ -32,12 +29,12 @@ type Paths struct {
 // absolute path as the pipeline states it, used where the run names none.
 func PathsOf(run *Run, root string) Paths {
 	p := Paths{run: run}
-	if abs, ok := absoluteOf(root); ok {
+	if abs, ok := uribase.AbsolutePath(root); ok {
 		p.root = dir(abs)
 	}
-	for _, name := range rootBases {
+	for _, name := range uribase.RootNames {
 		if base, ok := run.Bases[name]; ok {
-			if abs, ok := p.absolute(base.URI, base.Base, 0); ok {
+			if abs, start, ok := uribase.Resolve(base.URI, base.Base, p.defined, len(run.Bases)); ok && start == uribase.Absolute {
 				p.root = dir(abs)
 				break
 			}
@@ -86,30 +83,32 @@ func (p Paths) Relative(uri, base string) (string, bool) {
 	return rel, ok && rel != ""
 }
 
-// place is Relative, with the checkout itself placed as the empty path.
+// place is Relative, with the checkout itself placed as the empty path. An
+// address whose chain ends at the root's undefined name is relative to the
+// root, and one ending at no starting point is relative to where the tool
+// was run, the root where the run does not say.
 func (p Paths) place(uri, base string) (string, bool) {
-	abs, ok := p.absolute(uri, base, 0)
-	if !ok {
-		// A relative address with the root's name left undefined is relative
-		// to the root, and one with no starting point to where the tool was
-		// run, the root where the run does not say. Any other undefined name
-		// places it nowhere this can tell.
-		if base != "" && !isRoot(base) {
-			return "", false
-		}
-		rel, ok := relativeOf(uri)
-		if !ok {
-			return "", false
-		}
-		if base == "" {
-			rel = p.working + rel
-		}
-		return clean(rel)
+	at, start, ok := uribase.Resolve(uri, base, p.defined, len(p.run.Bases))
+	switch {
+	case !ok:
+		return "", false
+	case start == uribase.FromRoot:
+		return clean(at)
+	case start == uribase.FromWork:
+		return clean(p.working + at)
 	}
-	if p.root == "" || !strings.HasPrefix(fold(abs), fold(p.root)) {
+	// The root itself is the checkout, written with or without its slash.
+	at = dir(at)
+	if p.root == "" || !strings.HasPrefix(fold(at), fold(p.root)) {
 		return "", false
 	}
-	return clean(abs[len(p.root):])
+	return clean(at[len(p.root):])
+}
+
+// defined is the run's named starting points, as Resolve reads them.
+func (p Paths) defined(name string) (string, string, bool) {
+	b, ok := p.run.Bases[name]
+	return b.URI, b.Base, ok && b.URI != ""
 }
 
 // Module is the position, in the run's list, of the repository a path in the
@@ -143,81 +142,10 @@ func (p Paths) Within(i int, rel string) string {
 	return strings.TrimPrefix(rel, p.modules[i])
 }
 
-// absolute resolves an address through its chain of named starting points to
-// an absolute one: a file URI's path, or an absolute path written bare. It is
-// false where the chain ends at an undefined name. Reading refused a run whose
-// chain loops, and the depth is bounded again here so that a run built by hand
-// cannot recurse without end.
-func (p Paths) absolute(uri, base string, depth int) (string, bool) {
-	if depth > len(p.run.Bases) {
-		return "", false
-	}
-	if abs, ok := absoluteOf(uri); ok {
-		return abs, true
-	}
-	if base == "" {
-		return "", false
-	}
-	next, ok := p.run.Bases[base]
-	if !ok || next.URI == "" {
-		return "", false
-	}
-	prefix, ok := p.absolute(next.URI, next.Base, depth+1)
-	if !ok {
-		return "", false
-	}
-	rel, ok := relativeOf(uri)
-	if !ok {
-		return "", false
-	}
-	return dir(prefix) + rel, true
-}
-
-// absoluteOf is an address's absolute path, where it is one: a file URI, an
-// absolute path, or a drive-letter path, with backslashes as slashes.
-func absoluteOf(uri string) (string, bool) {
-	s := strings.ReplaceAll(uri, `\`, "/")
-	if u, err := url.Parse(s); err == nil && u.Scheme != "" && len(u.Scheme) > 1 {
-		if !strings.EqualFold(u.Scheme, "file") {
-			return "", false
-		}
-		p := u.Path
-		if drive(strings.TrimPrefix(p, "/")) {
-			p = strings.TrimPrefix(p, "/")
-		}
-		return p, p != ""
-	}
-	if strings.HasPrefix(s, "/") || drive(s) {
-		return s, true
-	}
-	return "", false
-}
-
-// relativeOf is a relative address as a path: percent escapes decoded, and
-// backslashes as slashes. It is false for an address with a scheme.
-func relativeOf(uri string) (string, bool) {
-	s := strings.ReplaceAll(uri, `\`, "/")
-	if u, err := url.Parse(s); err == nil {
-		if u.Scheme != "" && !drive(s) {
-			return "", false
-		}
-		if u.Scheme == "" {
-			return u.Path, true
-		}
-	}
-	return s, true
-}
-
-// drive is whether a path begins with a drive letter.
-func drive(s string) bool {
-	return len(s) >= 3 && s[1] == ':' && s[2] == '/' &&
-		(s[0] >= 'a' && s[0] <= 'z' || s[0] >= 'A' && s[0] <= 'Z')
-}
-
 // clean is a relative path with no step outside where it starts, and empty
 // for where it starts.
 func clean(rel string) (string, bool) {
-	if strings.HasPrefix(rel, "/") || drive(rel) {
+	if strings.HasPrefix(rel, "/") || uribase.Drive(rel) {
 		return "", false
 	}
 	c := path.Clean(rel)
@@ -241,17 +169,8 @@ func dir(s string) string {
 // fold is a path compared as a drive letter is: without regard to its case.
 // The rest of the path is compared exactly.
 func fold(s string) string {
-	if drive(s) {
+	if uribase.Drive(s) {
 		return strings.ToLower(s[:1]) + s[1:]
 	}
 	return s
-}
-
-func isRoot(base string) bool {
-	for _, name := range rootBases {
-		if base == name {
-			return true
-		}
-	}
-	return false
 }

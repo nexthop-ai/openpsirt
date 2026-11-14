@@ -6,6 +6,7 @@ package uploadclient
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 )
 
@@ -106,11 +107,13 @@ func TestALinkOutOfTheCheckoutIsNotRead(t *testing.T) {
 }
 
 func TestEveryPathIsPlacedTheSameWayOnEverySystem(t *testing.T) {
-	unix := newPlacer("/home/builder/sonic", "/home/builder/sonic/build", []string{"src/Port.cpp", "a.c"})
+	unix := newPlacer("/home/builder/sonic", "/home/builder/sonic/build",
+		[]string{"src/Port.cpp", "a.c", "src/sonic-frr/frr/bgpd/bgp_attr.c"})
 	windows := newPlacer(`C:\builds\sonic`, `C:\builds\sonic`, []string{"src/Port.cpp"})
 	bases := map[string]obj{
 		"SRC":    {"uri": "file:///home/builder/sonic/src/"},
 		"NESTED": {"uri": "inner/", "uriBaseId": "SRC"},
+		"FRR":    {"uri": "src/sonic-frr/frr/", "uriBaseId": "SRCROOT"},
 	}
 	for _, c := range []struct {
 		name      string
@@ -124,6 +127,7 @@ func TestEveryPathIsPlacedTheSameWayOnEverySystem(t *testing.T) {
 		{"relative to the working directory", unix, "../a.c", "", inside, "a.c"},
 		{"the checkout's undefined name", unix, "src/Port.cpp", "SRCROOT", inside, "src/Port.cpp"},
 		{"a chain of named points", unix, "x.c", "NESTED", inside, "src/inner/x.c"},
+		{"a chain ending at the checkout's undefined name", unix, "bgpd/bgp_attr.c", "FRR", inside, "src/sonic-frr/frr/bgpd/bgp_attr.c"},
 		{"a name left undefined", unix, "x.c", "ELSEWHERE", unplaced, ""},
 		{"a system header", unix, "/usr/include/stdlib.h", "", outside, "/usr/include/stdlib.h"},
 		{"a step out of the checkout", unix, "../../../etc/passwd", "SRCROOT", outside, "/etc/passwd"},
@@ -137,6 +141,17 @@ func TestEveryPathIsPlacedTheSameWayOnEverySystem(t *testing.T) {
 		if where != c.where || got != c.want {
 			t.Errorf("%s: placed %d %q; want %d %q", c.name, where, got, c.where, c.want)
 		}
+	}
+}
+
+func TestAChainLongerThanTheDeploymentsBoundIsFollowedThroughEveryStartingPoint(t *testing.T) {
+	at := newPlacer("/home/builder/sonic", "/home/builder/sonic", []string{"src/d0/d1/d2/d3/d4/d5/d6/d7/d8/d9/d10/d11/d12/d13/d14/d15/d16/d17/x.c"})
+	bases := map[string]obj{"P0": {"uri": "src/d0/", "uriBaseId": "SRCROOT"}}
+	for i := 1; i <= 17; i++ {
+		bases["P"+strconv.Itoa(i)] = obj{"uri": "d" + strconv.Itoa(i) + "/", "uriBaseId": "P" + strconv.Itoa(i-1)}
+	}
+	if where, got := at.place("x.c", "P17", bases); where != inside || got != "src/d0/d1/d2/d3/d4/d5/d6/d7/d8/d9/d10/d11/d12/d13/d14/d15/d16/d17/x.c" {
+		t.Errorf("placed %d %q; want the chain through every named point followed", where, got)
 	}
 }
 

@@ -212,6 +212,24 @@ func TestACodeFindingIsFixedOnlyOnceARunNoLongerSeesIt(t *testing.T) {
 	})
 }
 
+// A code finding closed as fixed takes no decision, and that is asked where
+// the decision is written, so a fix landing after the code finding was looked
+// up is refused too.
+func TestADecisionAboutAFixedCodeFindingIsRefused(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		codeFinding := "/v1/products/mine/branches-and-tags/master/variants/broadcom/code-findings/" + occurrence
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.CodeFindingRun(false))
+		body := httpapitest.FixedBody(t, r, codeFinding, "the bounds check landed")
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFinding+"/fixed", body); got.Code != http.StatusOK {
+			t.Fatalf("closing the code finding answered %d: %s", got.Code, got.Body)
+		}
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost,
+			fmt.Sprintf(codeFindingDecisionAt, occurrence), `{"outcome":"confirmed","reasoning":"p leaks"}`),
+			http.StatusConflict)
+	})
+}
+
 func TestACodeFindingOpenAnewOnItsBuildIsNotFixedWhateverNarrowsTheList(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()

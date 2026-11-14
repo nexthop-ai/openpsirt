@@ -44,9 +44,11 @@ const (
 // it was cut from has decided. Whatever is left is looked up across the
 // series, open or closed, on the whole key alone: a probable pairing with a
 // code finding the build never saw is a guess. A result found nowhere is absent from
-// the answer, and opens an occurrence of its own.
-func carry(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, first bool, fresh []Keyed) (
-	map[int]carried, error) {
+// the answer, and opens an occurrence of its own. An occurrence is carried to
+// one result at most, and never one held open on the build, which the run's
+// own matching answered.
+func carry(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, first bool, fresh []Keyed,
+	held map[string]bool) (map[int]carried, error) {
 
 	out := map[int]carried{}
 	if len(fresh) == 0 {
@@ -63,7 +65,7 @@ func carry(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, fir
 			}
 		}
 	}
-	if err := fromSeriesKey(ctx, db, run.BuildID, seriesID, fresh, out); err != nil {
+	if err := fromSeriesKey(ctx, db, run.BuildID, seriesID, fresh, held, out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -98,60 +100,37 @@ func fromParentBuild(ctx context.Context, db bun.IDB, seriesID, parent int64, fr
 	if err != nil {
 		return err
 	}
-	absent := make(map[int64]bool, len(open))
-	ids := make([]int64, 0, len(open))
-	for _, s := range open {
-		ids = append(ids, s.FindingID)
-		absent[s.FindingID] = s.AbsentRunID != nil
-	}
-	candidates, err := candidatesOf(ctx, db, ids, absent)
+	candidates, err := candidatesOf(ctx, db, open, fresh)
 	if err != nil {
 		return fmt.Errorf("read what the branch this was cut from holds open: %w", err)
-	}
-	occurrences, err := occurrencesOf(ctx, db, ids)
-	if err != nil {
-		return err
 	}
 	layers := pair
 	if printsChanged {
 		layers = pairAcross
 	}
+	// Two code findings open at one occurrence on the parent build are two
+	// candidates; the occurrence goes to the first result paired with either,
+	// and the other result is looked up across the series.
+	given := map[string]bool{}
 	for _, p := range layers(candidates, fresh) {
-		id := candidates[p.candidate].findingID
-		out[p.result] = carried{occurrence: occurrences[id], on: p.on, from: fromParent}
+		o := candidates[p.candidate].occurrence
+		if given[o] {
+			continue
+		}
+		given[o] = true
+		out[p.result] = carried{occurrence: o, on: p.on, from: fromParent}
 	}
 	return nil
-}
-
-// occurrencesOf is the occurrence each of these findings is at.
-func occurrencesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, error) {
-	out := make(map[int64]string, len(ids))
-	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		var rows []struct {
-			ID         int64  `bun:"id"`
-			Occurrence string `bun:"occurrence_identity"`
-		}
-		if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-			ColumnExpr(`"f"."id", "f"."occurrence_identity"`).
-			Where(`"f"."id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
-			return err
-		}
-		for _, r := range rows {
-			out[r.ID] = r.Occurrence
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("read where these code findings are: %w", err)
-	}
-	return out, nil
 }
 
 // fromSeriesKey looks the results nothing has carried yet up across the
 // series on the whole key. A closed code finding on this build comes first, since
 // that is the same result found again here, and then the oldest code finding
-// elsewhere.
-func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fresh []Keyed, out map[int]carried) error {
+// elsewhere. Each result takes the first occurrence neither held open on the
+// build nor already carried to another result, so results sharing a key take
+// one occurrence each.
+func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fresh []Keyed, held map[string]bool,
+	out map[int]carried) error {
 	var keys []string
 	wanted := map[string]bool{}
 	for i, k := range fresh {
@@ -160,24 +139,17 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 			keys = append(keys, k.Key)
 		}
 	}
-	type held struct {
-		ID         int64      `bun:"id"`
-		Key        string     `bun:"match_key"`
-		Occurrence string     `bun:"occurrence_identity"`
-		BuildID    int64      `bun:"build_id"`
-		ClosedAt   *time.Time `bun:"closed_at"`
-	}
-	byKey := map[string][]held{}
+	byKey := map[string][]keyHit{}
 	where, args := kind.In(`"f"."kind"`, []kind.Kind{kind.Analysis})
 	for start := 0; start < len(keys); start += database.BatchSize {
 		end := min(start+database.BatchSize, len(keys))
-		var rows []held
+		var rows []keyHit
 		if err := db.NewSelect().
 			TableExpr(`"analysis_result" AS "ar"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "ar"."finding_id"`).
 			Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 			ColumnExpr(`"f"."id", "ar"."match_key", "f"."occurrence_identity", "f"."build_id"`).
-			ColumnExpr(`"f"."closed_at"`).
+			ColumnExpr(`"f"."closed_at", "ar"."start_column"`).
 			Where(`"si"."series_id" = ?`, seriesID).
 			Where(`"ar"."match_key" IN (?)`, bun.List(keys[start:end])).
 			Where(where, args...).
@@ -199,16 +171,135 @@ func fromSeriesKey(ctx context.Context, db bun.IDB, buildID, seriesID int64, fre
 			return a.ID < b.ID
 		})
 	}
+	used := make(map[string]bool, len(held)+len(out))
+	for o := range held {
+		used[o] = true
+	}
+	for _, c := range out {
+		used[c.occurrence] = true
+	}
+	// Where a key is held twice, by two results or by two occurrences of the
+	// series, a hit at the result's column saying what it says is taken first,
+	// so each keeps its occurrence whatever order a run lists them in; the rest
+	// take what is left. An occurrence is read at its most recently created
+	// code finding, so one message is read for each, never one per build.
+	holders := map[string]map[string]bool{}
+	for k, hits := range byKey {
+		for _, h := range hits {
+			holding(holders, k, h.Occurrence)
+		}
+	}
+	var waiting []string
 	for i, k := range fresh {
-		hits := byKey[k.Key]
-		if _, done := out[i]; done || len(hits) == 0 {
+		if _, done := out[i]; !done {
+			waiting = append(waiting, k.Key)
+		}
+	}
+	shared := heldTwice(waiting, holders)
+	newest := map[string]keyHit{}
+	for k := range shared {
+		for _, h := range byKey[k] {
+			if n, ok := newest[h.Occurrence]; !ok || h.ID > n.ID {
+				newest[h.Occurrence] = h
+			}
+		}
+	}
+	ids := make([]int64, 0, len(newest))
+	for _, h := range newest {
+		ids = append(ids, h.ID)
+	}
+	messages, err := messagesOf(ctx, db, ids)
+	if err != nil {
+		return err
+	}
+	var hits []keyHit
+	for k := range shared {
+		hits = append(hits, byKey[k]...)
+	}
+	at := bySpot(hits, func(keyHit) bool { return true }, func(h keyHit) spotKey {
+		n := newest[h.Occurrence]
+		return spotKey{h.Key, spotOf(n.Column, messages[n.ID])}
+	})
+	take := func(i int, hits []keyHit) {
+		for _, h := range hits {
+			if used[h.Occurrence] {
+				continue
+			}
+			c := carried{occurrence: h.Occurrence, on: onKey, from: fromSeries}
+			if h.BuildID == buildID && h.ClosedAt != nil {
+				c.from = fromReopened
+			}
+			used[h.Occurrence] = true
+			out[i] = c
+			return
+		}
+	}
+	for i, k := range fresh {
+		if _, done := out[i]; !done && shared[k.Key] {
+			take(i, at[spotKey{k.Key, spot{k.StartColumn, k.Message}}])
+		}
+	}
+	// Under a key held twice, the results no spot answered take what is
+	// left in the order of their spots, so a shift moving every result on a
+	// line keeps each with its own, whatever order the run lists them in.
+	left := map[string][]int{}
+	for i, k := range fresh {
+		if _, done := out[i]; done {
 			continue
 		}
-		c := carried{occurrence: hits[0].Occurrence, on: onKey, from: fromSeries}
-		if hits[0].BuildID == buildID && hits[0].ClosedAt != nil {
-			c.from = fromReopened
+		if shared[k.Key] {
+			left[k.Key] = append(left[k.Key], i)
+			continue
 		}
-		out[i] = c
+		take(i, byKey[k.Key])
+	}
+	for k, rs := range left {
+		var open []keyHit
+		seen := map[string]bool{}
+		for _, h := range byKey[k] {
+			if !used[h.Occurrence] && !seen[h.Occurrence] {
+				seen[h.Occurrence] = true
+				open = append(open, h)
+			}
+		}
+		for _, p := range byRank(rs, open, func(i int) spot { return spot{fresh[i].StartColumn, fresh[i].Message} },
+			func(h keyHit) spot { n := newest[h.Occurrence]; return spotOf(n.Column, messages[n.ID]) }) {
+			take(p.result, []keyHit{p.codeFinding})
+		}
 	}
 	return nil
+}
+
+// keyHit is a code finding of the series holding a key a result holds.
+type keyHit struct {
+	ID         int64      `bun:"id"`
+	Key        string     `bun:"match_key"`
+	Occurrence string     `bun:"occurrence_identity"`
+	BuildID    int64      `bun:"build_id"`
+	ClosedAt   *time.Time `bun:"closed_at"`
+	Column     *int       `bun:"start_column"`
+}
+
+// messagesOf is what each of these findings last said, by finding.
+func messagesOf(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(ids))
+	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		var rows []struct {
+			FindingID int64  `bun:"finding_id"`
+			Message   string `bun:"message_text"`
+		}
+		if err := db.NewSelect().TableExpr(`"analysis_result" AS "ar"`).
+			ColumnExpr(`"ar"."finding_id", "ar"."message_text"`).
+			Where(`"ar"."finding_id" IN (?)`, bun.List(batch)).Scan(ctx, &rows); err != nil {
+			return err
+		}
+		for _, r := range rows {
+			out[r.FindingID] = r.Message
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("read what the code findings sharing a key said: %w", err)
+	}
+	return out, nil
 }

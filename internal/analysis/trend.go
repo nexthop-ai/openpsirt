@@ -13,15 +13,11 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/series"
-	"github.com/nexthop-ai/openpsirt/internal/typedname"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
-
-// MostTrendSteps is the most steps a trend is worked out over: two years of
-// days.
-const MostTrendSteps = 730
 
 // TrendPoint is the code findings at a moment: those not fixed, split by the
 // tier of their rule's weaknesses, by series and by testing method, and those
@@ -114,8 +110,8 @@ func Trend(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	if err := scope.mayCount(subject, "trend the code findings"); err != nil {
 		return nil, err
 	}
-	if steps < 1 || steps > MostTrendSteps || step <= 0 {
-		return nil, fmt.Errorf("trend code findings over %d steps of %s: out of range", steps, step)
+	if err := finding.TrendWindow(step, steps); err != nil {
+		return nil, err
 	}
 	visible, err := scope.visible(subject)
 	if err != nil {
@@ -336,7 +332,9 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 		Join(`JOIN "build" AS "t" ON "t"."id" = "sr"."build_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "se"."product_id"`).
 		// The run applied before it on its build: the newest built before
-		// it, which is the run it was compared with when it was applied.
+		// it, which is the run it was compared with when it was applied. The
+		// build time names one run: a run built no later than the last applied
+		// to its build is superseded, decided with the series taken.
 		Join(`LEFT JOIN "series_run" AS "pr" ON "pr"."series_id" = "sr"."series_id"
 			AND "pr"."build_id" = "sr"."build_id" AND "pr"."status" = ?
 			AND "pr"."built_at" = (SELECT MAX("pb"."built_at") FROM "series_run" AS "pb"
@@ -353,21 +351,9 @@ func trendMarkers(ctx context.Context, db bun.IDB, scope Scope, since, until tim
 		Where(`"sr"."comparable" = FALSE`).
 		Where(`"sr"."applied_at" >= ?`, since).
 		Where(`"sr"."applied_at" < ?`, until)
-	if scope.BranchOrTagID != nil {
-		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
-	}
 	// Beneath takes a branch and a variant naming its build, and a branch and
-	// a variant have one build, so these two narrow the markers to it.
-	if scope.VariantID != nil {
-		q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
-	}
-	if scope.Method != "" {
-		q = q.Where(`"se"."kind" = ?`, methodKinds[scope.Method])
-	}
-	if scope.Series != "" {
-		q = q.Where(`"se"."name_folded" = ?`, typedname.Matching(scope.Series))
-	}
-	if err := q.Scan(ctx, &runs); err != nil {
+	// a variant have one build, so these narrow the markers to it.
+	if err := scope.runsIn(q).Scan(ctx, &runs); err != nil {
 		return nil, fmt.Errorf("read the runs of product %d that changed what they compare: %w", scope.ProductID, err)
 	}
 

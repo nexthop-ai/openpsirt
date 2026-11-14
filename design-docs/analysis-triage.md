@@ -42,7 +42,8 @@ it covers the code finding on every branch, tag and variant (REQ-25).
 | A code finding takes these outcomes alone, a vulnerability none | One asks whether it is real; the other how a known issue applies |
 | A dismissal states one of the four reasons | |
 | Approval needs `approver` and `security-testing-read` on the product, never the author | |
-| A fixed code finding takes no decision | It reopens when seen |
+| A fixed code finding takes no decision, refused with 409 | It reopens when seen |
+| The code finding, whether it is fixed, and the code findings the decision also answers are read inside the transaction writing it | A statement that it is fixed landing first is seen, and a retry reads again |
 | A probable pairing lapses a dismissal or not-security decision, re-affirmed as any lapsed decision (`design-docs/triage-lapse.md` § Re-affirmation); a confirmation stands | The pairing guesses it is the same result |
 | The lapse is written with the pairing | |
 | Decisions are read through the Decisions consumer (`design-docs/kinds.md` § Consumers) | The review queue and approval include them; the findings lists do not |
@@ -87,7 +88,7 @@ them.
 | It names a rule, a path or both, and one reason with reasoning | |
 | A rule with no path is refused, at proposal and approval, where it finds memory safety or injection (`design-docs/analysis-queue.md` § Weakness families) or no run recorded it; one approved before stops dismissing at once | Those are judged one at a time; a whole checker goes where it fights a convention, measures style or cannot model the code |
 | A path is a prefix from the checkout top, no edge slashes, compared exactly | `src` holds `src/a.c`, not `src2/a.c`; SQLite's LIKE ignores case |
-| A path leaving the checkout or with an empty segment is refused | |
+| A path leaving the checkout, with an empty segment, or longer than 4,096 bytes is refused, at the API and where it is stored | The longest path a Linux file system takes; the path is stored, trailed and compared with every code finding |
 | Its words never change; rewording is retiring and proposing | Approval is of what was read (REQ-28) |
 | Approval records the open code findings covered as its size; one shown none counts as one | |
 | The growth factor is `triage.suppression-rule-growth`, two by default (REQ-27) | |

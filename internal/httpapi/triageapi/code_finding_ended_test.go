@@ -77,7 +77,7 @@ func refusedAsEnded(t *testing.T, what string, got *httptest.ResponseRecorder) {
 }
 
 func TestACodeFindingPastItsEndOfLifeRefusesEveryChangeButAnAgreementAndAMove(t *testing.T) {
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		kept, _ := httpapitest.RecordedCodeFinding(t, r, false)
 		overflowsIn(t, r, "src/c.c", "416", "787", 3)
 		var overflow string

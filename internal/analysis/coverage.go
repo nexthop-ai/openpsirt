@@ -15,7 +15,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/series"
-	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
 // Analyzed is one series on one build in use: its newest applied run, its
@@ -93,19 +92,7 @@ func CoverageOf(ctx context.Context, db bun.IDB, subject access.Subject, scope S
 			Where(`"s"."retired_at" IS NULL`).
 			Where(`"va"."retired_at" IS NULL`).
 			Where(`"p"."retired_at" IS NULL`)
-		if scope.BranchOrTagID != nil {
-			q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
-		}
-		if scope.VariantID != nil {
-			q = q.Where(`"t"."variant_id" = ?`, *scope.VariantID)
-		}
-		if scope.Method != "" {
-			q = q.Where(`"se"."kind" = ?`, methodKinds[scope.Method])
-		}
-		if scope.Series != "" {
-			q = q.Where(`"se"."name_folded" = ?`, typedname.Matching(scope.Series))
-		}
-		return q
+		return scope.runsIn(q)
 	}
 
 	type pair struct{ series, build int64 }

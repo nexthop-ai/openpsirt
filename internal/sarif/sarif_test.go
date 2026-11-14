@@ -5,9 +5,11 @@ package sarif
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -207,7 +209,16 @@ func TestEachBoundRefusesTheDocumentNamingIt(t *testing.T) {
 		"depth": {run(`,"results":[{"properties":{"a":` + strings.Repeat("[", 40) + strings.Repeat("]", 40) + `}}]`),
 			func(*Limits) {}, "deeper than"},
 		"size": {run(`,"results":[` + many(`{"ruleId":"x"}`, 100) + `]`),
-			func(l *Limits) { l.MaxBytes = 200 }, "larger than the configured limit"},
+			func(l *Limits) { l.MaxBytes = 200 }, "more " + uploadBytes + " than the configured limit of 200"},
+		"message strings": {`{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"messageStrings":` +
+			`{"a":{"text":"x"},"b":{"text":"y"}}}]}}}]}`,
+			func(l *Limits) { l.MaxRules = 1 }, "message strings on a rule"},
+		"tags": {`{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"properties":{"tags":["a","b"]}}]}}}]}`,
+			func(l *Limits) { l.MaxRules = 1 }, "tags on a rule"},
+		"arguments": {run(`,"results":[{"message":{"text":"{0}","arguments":["a","b"]}}]`),
+			func(l *Limits) { l.MaxLocations = 1 }, "arguments to a message"},
+		"fingerprints": {run(`,"results":[{"partialFingerprints":{"a":"1","b":"2"}}]`),
+			func(l *Limits) { l.MaxLocations = 1 }, "fingerprints on a result"},
 		"held": {run(`,"results":[{"locations":[` + location + `]},{}]`),
 			func(l *Limits) { l.MaxHeld = 3 }, "other entries across the upload's documents"},
 	} {
@@ -215,6 +226,27 @@ func TestEachBoundRefusesTheDocumentNamingIt(t *testing.T) {
 			lim := limits()
 			c.lim(&lim)
 			refused(t, c.doc, lim, c.want)
+		})
+	}
+}
+
+func TestANameRepeatedAtItsBoundAddsNothingToRefuse(t *testing.T) {
+	for name, c := range map[string]struct {
+		doc string
+		lim func(*Limits)
+	}{
+		"bases": {run(`,"originalUriBaseIds":{"A":{},"A":{}}`), func(l *Limits) { l.MaxBases = 1 }},
+		"message strings": {`{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"messageStrings":` +
+			`{"a":{"text":"x"},"a":{"text":"y"}}}]}}}]}`, func(l *Limits) { l.MaxRules = 1 }},
+		"fingerprints": {run(`,"results":[{"partialFingerprints":{"a":"1","a":"2"}}]`),
+			func(l *Limits) { l.MaxLocations = 1 }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			lim := limits()
+			c.lim(&lim)
+			if _, err := NewUpload(lim).Read(strings.NewReader(c.doc)); err != nil {
+				t.Errorf("refused: %v; want a name given twice read as one entry", err)
+			}
 		})
 	}
 }
@@ -309,6 +341,34 @@ func TestAddressesResolveThroughTheirStartingPoints(t *testing.T) {
 		}
 		if got := paths.Within(placed[i].Module, placed[i].Path); got != w.within {
 			t.Errorf("result %d is %q within its repository; want %q", i, got, w.within)
+		}
+	}
+}
+
+func TestAChainEndingAtTheUndefinedRootIsUnderTheTop(t *testing.T) {
+	doc := run(`,"originalUriBaseIds":{"FRR":{"uri":"src/sonic-frr/frr/","uriBaseId":"SRCROOT"}},
+	"versionControlProvenance":[
+		{"repositoryUri":"https://github.com/sonic-net/sonic-buildimage","revisionId":"abc","mappedTo":{"uriBaseId":"SRCROOT"}},
+		{"repositoryUri":"https://github.com/FRRouting/frr","revisionId":"def","mappedTo":{"uriBaseId":"FRR"}}],
+	"results":[{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"bgpd/bgp_attr.c","uriBaseId":"FRR"}}}]}]`)
+	r := read(t, doc).Runs[0]
+	placed, dropped := Prepare(&r, "")
+	if len(placed) != 1 || dropped.Outside != 0 {
+		t.Fatalf("placed %+v, dropped %+v; want the result placed", placed, dropped)
+	}
+	if placed[0].Path != "src/sonic-frr/frr/bgpd/bgp_attr.c" || placed[0].Module != 1 {
+		t.Errorf("placed at %q in module %d; want src/sonic-frr/frr/bgpd/bgp_attr.c in FRR's", placed[0].Path, placed[0].Module)
+	}
+}
+
+func TestARepositoryMappedToTheRootWrittenWithoutItsSlashIsTheCheckout(t *testing.T) {
+	for _, root := range []string{"file:///src/checkout", "file:///src/checkout/"} {
+		r := read(t, run(`,"originalUriBaseIds":{"SRCROOT":{"uri":"`+root+`"}},
+		"versionControlProvenance":[
+			{"repositoryUri":"https://github.com/sonic-net/sonic-buildimage","revisionId":"abc","mappedTo":{"uriBaseId":"SRCROOT"}}],
+		"results":[]`)).Runs[0]
+		if at, ok := PathsOf(&r, "").ModulePath(0); !ok || at != "" {
+			t.Errorf("with SRCROOT at %s, the repository is at %q, placed %v; want the checkout itself", root, at, ok)
 		}
 	}
 }
@@ -663,6 +723,16 @@ func TestARuleIsFoundByIdentifierThenByPositionInItsComponent(t *testing.T) {
 	}
 }
 
+func TestTheLongestPrefixNamingARuleIsTheResultsRule(t *testing.T) {
+	doc := `{"version":"2.1.0","runs":[{"results":[{"ruleId":"r0/md5/x"}],
+	"tool":{"driver":{"name":"t","rules":[
+		{"id":"r0","defaultConfiguration":{"level":"note"}},
+		{"id":"r0/md5","defaultConfiguration":{"level":"error"}}]}}}]}`
+	if got := read(t, doc).Runs[0].Results[0].Level; got != "error" {
+		t.Errorf("the result is at %q; want %q, the rule r0/md5's", got, "error")
+	}
+}
+
 func TestClangTidyOutputIsReadWithNoFingerprintAndNoFunction(t *testing.T) {
 	log := readFile(t, "clangtidy-artemis.sarif")
 	r := log.Runs[0]
@@ -829,4 +899,48 @@ func TestTheBoundsLeftUnsetFollowTheUploadsBound(t *testing.T) {
 		t.Errorf("a document bound of 1 MiB left the upload as sent at %d and one document as sent at %d; want 1 GiB and 1 MiB",
 			part.MaxCompressed, part.MaxPartCompressed)
 	}
+}
+
+// finishesSoon fails unless fn returns within a time linear work takes many
+// times over and work squared in its input never does.
+func finishesSoon(t *testing.T, what string, fn func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		fn()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("%s did not finish: its work grows faster than its input", what)
+	}
+}
+
+func TestFillingOpeningBracesAloneReadsEachOnce(t *testing.T) {
+	text := strings.Repeat("{", 4<<20)
+	finishesSoon(t, "filling a text of opening braces", func() {
+		if got := fill(text, []string{"x"}, len(text)); got != text {
+			t.Errorf("filled %d bytes; want the text unchanged", len(got))
+		}
+	})
+}
+
+func TestARuleIsFoundByAnIdentifierOfManyComponentsReadingItOnce(t *testing.T) {
+	// Enough rules that a lookup hashes its key: a small map compares
+	// lengths instead.
+	rules := []Rule{{ID: "a"}, {ID: "b/c"}}
+	for i := range 64 {
+		rules = append(rules, Rule{ID: fmt.Sprintf("other-%d", i)})
+	}
+	byID := namesOf(rules)
+	long := strings.Repeat("a/", 1<<20) + "a"
+	finishesSoon(t, "finding the rule of a long identifier", func() {
+		if got := ruleOf(rules, byID, nil, long, pending{}); got == nil || got.ID != "a" {
+			t.Errorf("the rule is %+v; want a, by the identifier's first component", got)
+		}
+		if got := ruleOf(rules, byID, nil, "b/"+long, pending{}); got != nil {
+			t.Errorf("the rule is %+v; want none, since b names no rule", got)
+		}
+	})
 }

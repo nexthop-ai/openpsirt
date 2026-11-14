@@ -57,6 +57,8 @@ administrative trail.
 | A custom template begins `{repo}/` and names only `{commit}`, `{path}`, `{start}`, `{end}`, or `{from}` and `{to}` | Otherwise it could open another host |
 | A remote prefix may hold a path, naming a mirror; the longest prefix covers a remote, and the rest is the repository under its web address | `git.example.com/mirror/github/FRRouting/frr` opens at `https://github.com/FRRouting/frr` |
 | A path's repository and branch come together or not at all | |
+| A path is at most 4,096 bytes | The longest path a Linux file system takes |
+| A branch with an empty, `.` or `..` segment is refused | git refuses one, and a browser would resolve it out of the repository |
 | A path naming no repository and nothing of source is refused | |
 | At most 100 hosts and 2,000 paths | sonic-buildimage pins dozens of submodules |
 | Remotes and prefixes compare normalized: lower-case host, no edge slashes | |
@@ -70,12 +72,13 @@ administrative trail.
 | A remote is recorded and shown without credential or query | A token would reach every reader |
 | A remote on no host the product names is unlinked text | Its host is the uploader's choice |
 | A revision links only as a commit, 7 to 64 hexadecimal digits | A branch moves, and `?` or `#` would steer the link |
-| Each segment is percent-encoded; an empty, `.` or `..` segment unlinks the place | |
+| Each segment of the path and of an approximate link's branch is percent-encoded; an empty, `.` or `..` segment unlinks the place | |
 | A finished address must be `https` on the web address's host, or the place is unlinked | The last check after substitution |
 | A repository whose working tree differed from its commit is marked patched | The link shows the source before the patch |
-| A path no run repository holds links to the product's branch for its longest prefix, marked approximate | The commit is unknown, and the branch has moved since |
+| A path no run repository holds links to the product's branch for its longest prefix, marked approximate; a run repository whose remote is absent or unreadable holds nothing for this, and takes only a prefix at its own path or within it | The commit is unknown, and the branch has moved since; a prefix above it is the outer repository, where the path is a submodule pointer |
 | A place with no line opens the file; an end before the start is the start | |
 | A code finding no longer open carries its repository's comparison between the newest build seeing it and the first not, or says both are one commit, unpatched | Unchanged code means no fix there, and a build-time patch is invisible to commits |
+| A commit written abbreviated is the one written in full that it begins, regardless of capitals | git resolves an abbreviation so |
 
 An unlinked place says why: no repository, no named host, no commit, or a path
 leaving the repository.
@@ -118,6 +121,7 @@ answers one code finding on one build.
 | The occurrence identity addresses it | A rule name holds a slash |
 | Read through the Evidence consumer, analysis kind alone (`design-docs/kinds.md` § Consumers) | |
 | Read in the data layer at the subject's visibilities; one nobody may read answers as an empty occurrence (REQ-42, REQ-43) | |
+| Every read naming a code finding and a product binds the code finding to a build of that product: the evidence, its kin, the decision's check and the code findings one decision answers | A visibility is held by every product's findings, so reading it alone answers another product's |
 | The open finding answers, else the newest | |
 | Links are built when read, from the newest run's repositories and the settings | A host change reaches every place |
 

@@ -59,7 +59,7 @@ GET /v1/products/{product}/code-finding-trend?days=30
 | The tier is the rule's as rated now | No rating history is stored, as for the vulnerability trend |
 | No table of presence spans; every step is worked out from opening and closing times (REQ-74) | A return after absence is mostly analyzer nondeterminism, and absence closes nothing |
 | Each occurrence's steps are one bit each, read in one statement and counted in the application | A statement per step is hundreds of round trips; one statement takes 46 ms on PostgreSQL and 257 ms on MySQL 8.4 for 104 weeks of 4,000 code findings on a 16,000-component build (`design-docs/analysis-measurements.md` § Trend of code findings) |
-| A window is 1 to 730 days or 1 to 104 weeks, twelve weeks unless named; both in one request is refused | Two years is the backlog's widest window, in the steps the dependency trend takes (`design-docs/analytics-program.md` § Trends) |
+| A window is 1 to 730 days or 1 to 104 weeks, twelve weeks unless named; both in one request is refused; a window past the bound is refused, as the dependency trend's is | Two years is the backlog's widest window, in the steps the dependency trend takes (`design-docs/analytics-program.md` § Steps and windows) |
 
 ## Analyzer markers
 

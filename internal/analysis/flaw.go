@@ -32,6 +32,10 @@ import (
 // second flaw record of it.
 var ErrRecordedAsFlaw = triage.ErrCodeFindingRecordedAsFlaw
 
+// ErrCodeFindingFixed refuses a decision about a code finding somebody stated
+// was fixed.
+var ErrCodeFindingFixed = refusal.New("that code finding is fixed, and opens again where it is seen again")
+
 // ErrNotConfirmed refuses a flaw record of a code finding nobody confirmed.
 var ErrNotConfirmed = refusal.New("only a confirmed code finding is recorded as a flaw: confirm it first")
 
@@ -840,20 +844,28 @@ func RecordAsFlaw(ctx context.Context, db bun.IDB, subject access.Subject, in Re
 	return &Recorded{Identifier: identifier, Component: component, Builds: len(builds), Occurrences: len(rows)}, nil
 }
 
-// Answerable refuses a decision about a code finding the subject no longer reads in
-// full, or one recorded as a flaw, which is judged instead. Asked inside the
-// transaction writing the decision.
+// Answerable refuses a decision about a code finding that is not the
+// product's, that the subject no longer reads in
+// full, one somebody stated was fixed, or one recorded as a flaw, which is
+// judged instead. Asked inside the transaction writing the decision, so a fix
+// committed after the code finding was looked up is seen.
 func Answerable(ctx context.Context, tx bun.IDB, subject access.Subject, productID int64, codeFinding *finding.Finding) error {
 	reach := finding.CodeFindingReach(subject, productID)
-	read, err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
+	var closed []int
+	err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`CASE WHEN "f"."closed_at" IS NULL THEN 0 ELSE 1 END`).
 		Where(`"f"."id" = ?`, codeFinding.ID).
+		Where(onProductBuild("f"), productID).
 		Where(reach.Full, reach.FullArgs...).
-		Exists(ctx)
+		Scan(ctx, &closed)
 	if err != nil {
 		return fmt.Errorf("read whether code finding %d may be judged: %w", codeFinding.ID, err)
 	}
-	if !read {
+	if len(closed) == 0 {
 		return finding.ErrNoOpenFinding
+	}
+	if closed[0] == 1 {
+		return ErrCodeFindingFixed
 	}
 	recorded, err := finding.CodeFindingFlawAt(ctx, tx, productID, codeFinding.OccurrenceIdentity)
 	if err != nil {

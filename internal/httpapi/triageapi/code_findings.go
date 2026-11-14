@@ -31,9 +31,6 @@ type CodeFindingDecisionBody struct {
 // occurrence alone rather than under its issue.
 const codeFindingDecisionPath = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/code-findings/{occurrence}/decision"
 
-// errCodeFindingClosed refuses a decision about a code finding somebody stated was fixed.
-var errCodeFindingClosed = errors.New("closed")
-
 func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "decide-code-finding", Method: http.MethodPost,
@@ -69,21 +66,7 @@ func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		codeFinding, err := finding.NewStore(in.DB.DB).CodeFindingAt(ctx, subject, build.ID, input.Occurrence)
-		if err == nil && codeFinding.ClosedAt != nil {
-			err = errCodeFindingClosed
-		}
-		switch {
-		case errors.Is(err, errCodeFindingClosed):
-			return nil, huma.Error409Conflict("that code finding is fixed, and opens again where it is seen again")
-		case err != nil:
-			return nil, core.Absent(in.Logger, err, "that code finding could not be looked up", core.NoSuchFinding)
-		}
-		first := triage.Proposal{
-			Occurrence: triage.Occurrence{
-				ProductID: named.ProductID, VulnerabilityID: codeFinding.VulnerabilityID,
-				OccurrenceIdentity: codeFinding.OccurrenceIdentity, Visibility: codeFinding.Visibility, Kind: kind.Analysis,
-			},
+		decided := triage.Proposal{
 			Outcome:       triage.Outcome(input.Body.Outcome),
 			Justification: triage.Justification(input.Body.Reason),
 			Reasoning:     input.Body.Reasoning,
@@ -91,27 +74,37 @@ func registerCodeFindingDecisions(api huma.API, in core.Deps) {
 			MadeOn:        []int64{build.ID},
 		}
 		// One decision over the code finding and every code finding that is the same flaw and
-		// that nothing answers yet, worked out where the decision is written.
-		occurrence, err := store.ProposeGrouped(ctx, subject, first, func(ctx context.Context, tx bun.IDB) ([]triage.Occurrence, error) {
-			// Asked where the decision is written: a flaw record landing first
-			// makes the code finding its flaw's.
+		// that nothing answers yet, all read where the decision is written: a
+		// statement that it is fixed, or a flaw record, landing first is seen.
+		occurrence, err := store.ProposeGrouped(ctx, subject, decided, func(ctx context.Context, tx bun.IDB) (
+			triage.Occurrence, []triage.Occurrence, error) {
+
+			codeFinding, err := finding.NewStore(tx).CodeFindingAt(ctx, subject, build.ID, input.Occurrence)
+			if err != nil {
+				return triage.Occurrence{}, nil, err
+			}
 			if err := analysis.Answerable(ctx, tx, subject, named.ProductID, codeFinding); err != nil {
-				return nil, err
+				return triage.Occurrence{}, nil, err
+			}
+			first := triage.Occurrence{
+				ProductID: named.ProductID, VulnerabilityID: codeFinding.VulnerabilityID,
+				OccurrenceIdentity: codeFinding.OccurrenceIdentity, Visibility: codeFinding.Visibility, Kind: kind.Analysis,
 			}
 			kin, err := analysis.Unanswered(ctx, tx, subject, named.ProductID, codeFinding.ID)
 			if err != nil {
-				return nil, err
+				return triage.Occurrence{}, nil, err
 			}
 			occurrences := make([]triage.Occurrence, 0, len(kin))
 			for _, k := range kin {
-				also := first.Occurrence
+				also := first
 				also.VulnerabilityID, also.OccurrenceIdentity, also.Visibility = k.VulnerabilityID, k.Occurrence, k.Visibility
 				occurrences = append(occurrences, also)
 			}
-			return occurrences, nil
+			return first, occurrences, nil
 		})
 		switch {
-		case errors.Is(err, analysis.ErrRecordedAsFlaw), errors.Is(err, finding.ErrCodeFindingPastEndOfLife):
+		case errors.Is(err, analysis.ErrRecordedAsFlaw), errors.Is(err, finding.ErrCodeFindingPastEndOfLife),
+			errors.Is(err, analysis.ErrCodeFindingFixed):
 			return nil, huma.Error409Conflict(err.Error())
 		case errors.Is(err, finding.ErrNoOpenFinding):
 			return nil, core.NoSuchFinding()
