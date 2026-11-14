@@ -347,10 +347,12 @@ func forwardedOne(t *testing.T, inputs []uploadclient.Input) []byte {
 }
 
 func TestAResultNamingItsExtensionByGUIDKeepsThatExtensionsRule(t *testing.T) {
-	pack := `{"name":"pack","guid":"11111111-1111-1111-1111-111111111111",` +
+	// The result writes the GUID in the other case, which names the same
+	// extension.
+	pack := `{"name":"pack","guid":"abcdef00-1111-1111-1111-111111111111",` +
 		`"rules":[{"id":"X","defaultConfiguration":{"level":"error"}}]}`
 	doc := forwardedOne(t, []uploadclient.Input{{Name: "a.sarif", Data: forwarded(pack,
-		forwardedAt("1", `"rule":{"id":"X","toolComponent":{"guid":"11111111-1111-1111-1111-111111111111"}}`))}})
+		forwardedAt("1", `"rule":{"id":"X","toolComponent":{"guid":"ABCDEF00-1111-1111-1111-111111111111"}}`))}})
 	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(doc))
 	if err != nil {
 		t.Fatalf("the deployment refuses what the client wrote: %v", err)
@@ -388,6 +390,26 @@ func TestOneRunListingAnExtensionTwiceLeavesLaterRunsOnTheFirst(t *testing.T) {
 	}
 	if at := got.Runs[0].Results[0].Rule.ToolComponent.Index; at != 0 {
 		t.Errorf("the later run's pack merged into extension %d; want 0, the first listed", at)
+	}
+}
+
+func TestOneRunListingAnExtensionTwiceKeepsEachCopysRules(t *testing.T) {
+	pack := func(level string) string {
+		return `{"name":"pack","guid":"11111111-1111-1111-1111-111111111111",` +
+			`"rules":[{"id":"X","defaultConfiguration":{"level":"` + level + `"}}]}`
+	}
+	doc := forwardedOne(t, []uploadclient.Input{
+		{Name: "a.sarif", Data: forwarded(pack("error")+","+pack("warning"),
+			forwardedAt("1", `"rule":{"id":"X","toolComponent":{"index":1}}`))},
+		// A second document, so the runs are merged.
+		{Name: "b.sarif", Data: forwarded("", "")},
+	})
+	log, err := sarif.NewUpload(sarif.DefaultLimits()).Read(bytes.NewReader(doc))
+	if err != nil {
+		t.Fatalf("the deployment refuses what the client wrote: %v", err)
+	}
+	if got := log.Runs[0].Results[0].Level; got != "warning" {
+		t.Errorf("the result is at %q; want %q, the second copy's rule's", got, "warning")
 	}
 }
 

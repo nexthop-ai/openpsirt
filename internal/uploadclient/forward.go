@@ -224,51 +224,20 @@ func plainMessage(m obj) int {
 	return 1
 }
 
-// moves is where one run's components and rules sit once merged: each
-// extension's position, and each rule's position in the driver or in its
-// extension, by the run's own positions.
-type moves struct {
-	components  map[int]int
-	driverRules map[int]int
-	rules       map[int]map[int]int
-}
-
-// renumber rewrites the positions a result's rule cites to the merged run's:
-// the rule's position and its extension's, the extension named by position,
-// GUID or name. A rule the merge keeps no position for loses its position and
-// keeps its identifier. A notification's rule and descriptor are not
-// forwarded, and a relationship's target and a result's taxa may name a
-// taxonomy by position instead, which nothing here reads, so they are left as
+// renumber rewrites the extension position a result's rule cites to the
+// merged run's, by where each of the run's own extensions sits once merged.
+// Settling has named every result's rule by identifier, and its extension by
+// position. A relationship's target and a result's taxa may name a taxonomy
+// by position instead, which nothing here reads, so they are left as
 // written.
-func renumber(run obj, m moves) {
-	extensions := objects(child(run, "tool"), "extensions")
-	at := func(ref obj) {
-		if ref == nil {
-			return
-		}
-		component := child(ref, "toolComponent")
-		c, named := extensionOf(component, extensions)
-		byRule := m.driverRules
-		if named {
-			byRule = m.rules[c]
-		}
-		if j, ok := num(ref, "index"); ok {
-			if to, ok := byRule[j]; ok {
-				ref["index"] = to
-			} else {
-				delete(ref, "index")
-			}
-		}
-		// A component named by GUID or name is written by position too, since
-		// the merged list may hold two of one name.
-		if named {
-			if to, ok := m.components[c]; ok {
+func renumber(run obj, components map[int]int) {
+	for _, res := range objects(run, "results") {
+		component := child(child(res, "rule"), "toolComponent")
+		if c, ok := num(component, "index"); ok {
+			if to, ok := components[c]; ok {
 				component["index"] = to
 			}
 		}
-	}
-	for _, res := range objects(run, "results") {
-		at(child(res, "rule"))
 	}
 }
 
@@ -276,7 +245,8 @@ func renumber(run obj, m moves) {
 // translation unit, and the deployment reads one run of each tool. The
 // driver's rules are listed once, by identifier, and each extension's within
 // that extension, extensions of two runs being one where they share a name, a
-// GUID and a version, and an extension with neither name nor GUID its own. A result names its rule by identifier after settling, and a rule of an
+// GUID and a version, and an extension with neither name nor GUID its own.
+// A result names its rule by identifier after settling, and a rule of an
 // extension by its extension's position, which is rewritten to the merged
 // list's.
 func merge(runs []obj) obj {
@@ -285,26 +255,21 @@ func merge(runs []obj) obj {
 	}
 	first := runs[0]
 	driver := ensure(ensure(first, "tool"), "driver")
-	seen := map[string]int{}
+	seen := map[string]bool{}
 	var rules list
 	var results, invocations list
 	var extensions list
 	extensionAt := map[string]int{}
-	extensionRules := []map[string]int{}
+	extensionRules := []map[string]bool{}
 	units, counted := 0, false
 	for _, run := range runs {
 		tool := child(run, "tool")
-		m := moves{components: map[int]int{}, driverRules: map[int]int{}, rules: map[int]map[int]int{}}
-		for j, rule := range objects(child(tool, "driver"), "rules") {
-			id := str(rule, "id")
-			if id == "" {
-				continue
-			}
-			if _, ok := seen[id]; !ok {
-				seen[id] = len(rules)
+		components := map[int]int{}
+		for _, rule := range objects(child(tool, "driver"), "rules") {
+			if id := str(rule, "id"); id != "" && !seen[id] {
+				seen[id] = true
 				rules = append(rules, rule)
 			}
-			m.driverRules[j] = seen[id]
 		}
 		inRun := map[int]bool{}
 		for i, ext := range objects(tool, "extensions") {
@@ -323,25 +288,19 @@ func merge(runs []obj) obj {
 				}
 				kept["rules"] = list{}
 				extensions = append(extensions, kept)
-				extensionRules = append(extensionRules, map[string]int{})
+				extensionRules = append(extensionRules, map[string]bool{})
 			}
 			inRun[at] = true
-			m.components[i] = at
-			m.rules[i] = map[int]int{}
+			components[i] = at
 			merged := extensions[at].(obj)
-			for j, rule := range objects(ext, "rules") {
-				id := str(rule, "id")
-				if id == "" {
-					continue
-				}
-				if _, ok := extensionRules[at][id]; !ok {
-					extensionRules[at][id] = len(merged["rules"].(list))
+			for _, rule := range objects(ext, "rules") {
+				if id := str(rule, "id"); id != "" && !extensionRules[at][id] {
+					extensionRules[at][id] = true
 					merged["rules"] = append(merged["rules"].(list), rule)
 				}
-				m.rules[i][j] = extensionRules[at][id]
 			}
 		}
-		renumber(run, m)
+		renumber(run, components)
 		if str(driver, "version") == "" {
 			if v := str(child(tool, "driver"), "version"); v != "" {
 				driver["version"] = v
