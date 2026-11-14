@@ -160,16 +160,7 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 		}
 		parts, codeFindings := []core.Paged{findings}, withCodeFindings(input.Narrowing, core.AtOneBuild{})
 		if codeFindings.Value == codeFindingsListed {
-			products, err := catalog.NewStore(in.DB.DB).Products(ctx, subject)
-			if err != nil {
-				return nil, core.WentWrong(in.Logger, "the products could not be read", err)
-			}
-			for _, p := range products {
-				if _, err := access.Readable(subject, p.ID); err != nil {
-					continue
-				}
-				parts = append(parts, codeFindingRows(subject, analysis.Scope{ProductID: p.ID}, p.Name))
-			}
+			parts = append(parts, everyProductsCodeFindings(subject))
 		}
 		return core.Export(in, input.Format, "findings", core.Exporting{
 			What:   "findings, every product",
@@ -178,6 +169,33 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 			Rows:   core.InTurn(parts...),
 		})
 	})
+}
+
+// everyProductsCodeFindings is the open code findings of every product the
+// subject reads, one product after another by name.
+//
+// The products are read on the first page asked, through the handle that page
+// is read through, so a product's name on its code findings is the name its
+// findings carry: read before the file's snapshot, a rename in between names
+// one product two ways in one file.
+func everyProductsCodeFindings(subject access.Subject) core.Paged {
+	var each core.Paged
+	return func(ctx context.Context, db bun.IDB, limit, offset int) ([][]string, error) {
+		if each == nil {
+			products, err := catalog.NewStore(db).Products(ctx, subject)
+			if err != nil {
+				return nil, err
+			}
+			parts := make([]core.Paged, 0, len(products))
+			for _, p := range products {
+				if _, err := access.Readable(subject, p.ID); err == nil {
+					parts = append(parts, codeFindingRows(subject, analysis.Scope{ProductID: p.ID}, p.Name))
+				}
+			}
+			each = core.InTurn(parts...)
+		}
+		return each(ctx, db, limit, offset)
+	}
 }
 
 // findingColumns names the columns of a findings export, in the order

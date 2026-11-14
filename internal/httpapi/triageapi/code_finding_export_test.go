@@ -4,13 +4,22 @@
 package triageapi_test
 
 import (
+	"context"
 	"encoding/csv"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
+	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -221,6 +230,81 @@ func TestAFindingsFileHoldsAnOpenCodeFindingADecisionWaitsOn(t *testing.T) {
 		_, _, header, rows := findingsFile(t, r, "security-testing-reader", "/v1/products/mine/findings.csv")
 		if codeFindings := codeFindingRowsIn(t, header, rows); len(codeFindings) != 1 || codeFindings[0]["issue"] != "clang-tidy/leak" {
 			t.Errorf("the findings file holds the code findings %v; want the code finding a decision waits on", codeFindings)
+		}
+	})
+}
+
+// renameOnProductList renames a product, from outside any snapshot, as soon as
+// a list of products has been read: the moment between a file reading its
+// products and reading anything else.
+type renameOnProductList struct {
+	db       *bun.DB
+	from, to string
+	renamed  atomic.Bool
+	failed   atomic.Value
+}
+
+func (h *renameOnProductList) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+func (h *renameOnProductList) AfterQuery(ctx context.Context, e *bun.QueryEvent) {
+	if e.Model == nil {
+		return
+	}
+	if _, products := e.Model.Value().(*[]catalog.Product); !products || !h.renamed.CompareAndSwap(false, true) {
+		return
+	}
+	if _, err := h.db.NewRaw(`UPDATE "product" SET "name" = ? WHERE "name" = ?`, h.to, h.from).
+		Exec(context.WithoutCancel(ctx)); err != nil {
+		h.failed.Store(err)
+	}
+}
+
+// TestACrossProductFileNamesAProductOneWay pins the cross-product file's
+// product names to its snapshot: a product renamed while the file is read is
+// named the same on its findings and on its code findings.
+func TestACrossProductFileNamesAProductOneWay(t *testing.T) {
+	// One hook an engine, by the plain handle. The handler reads through a
+	// handle carrying it; the rename goes through the plain one, over the
+	// same connections.
+	var hooks sync.Map
+	watched := func(d *core.Deps) {
+		hook := &renameOnProductList{db: d.DB.DB, from: "mine", to: "renamed"}
+		hook.renamed.Store(true)
+		hooks.Store(d.DB.DB, hook)
+		d.DB = dbtest.Hooked(d.DB, hook)
+	}
+	httpapitest.ReachAdjusted(t, httpapitest.CastSeed.Each, watched, func(t *testing.T, r *httpapitest.Reach) {
+		found, _ := hooks.Load(r.DB.DB)
+		hook := found.(*renameOnProductList)
+		httpapitest.SeededCodeFinding(t, r)
+		r.Scanned(t)
+		// A second connection for the rename: the harness gives SQLite one,
+		// which the file's snapshot holds.
+		r.DB.SetMaxOpenConns(max(r.DB.Pool.MaxOpen, 2))
+		t.Cleanup(func() { r.DB.SetMaxOpenConns(r.DB.Pool.MaxOpen) })
+		hook.renamed.Store(false)
+		_, _, header, rows := findingsFile(t, r, "code-finding-handler", "/v1/findings.csv")
+		if err, _ := hook.failed.Load().(error); err != nil {
+			t.Fatal(err)
+		}
+		if !hook.renamed.Load() {
+			t.Fatal("the file read no list of products, so nothing was renamed")
+		}
+		product, codeFinding := slices.Index(header, "product"), slices.Index(header, "code finding")
+		named := map[string]map[string]bool{}
+		for _, row := range rows {
+			if named[row[codeFinding]] == nil {
+				named[row[codeFinding]] = map[string]bool{}
+			}
+			named[row[codeFinding]][row[product]] = true
+		}
+		if len(named["false"]) == 0 || len(named["true"]) == 0 {
+			t.Fatalf("the file holds findings under %v and code findings under %v; want both", named["false"], named["true"])
+		}
+		if len(named["false"]) != 1 || len(named["true"]) != 1 || !maps.Equal(named["false"], named["true"]) {
+			t.Errorf("the file names its findings' product %v and its code findings' %v", named["false"], named["true"])
 		}
 	})
 }
