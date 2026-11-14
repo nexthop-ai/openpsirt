@@ -884,6 +884,38 @@ func TestAPassLosingTheLeaseStopsWriting(t *testing.T) {
 	})
 }
 
+// A pass that loses the lease after its last document stops before the
+// listings, so the provider metadata, the index and the feed are written by
+// the replica holding it.
+func TestAPassLosingTheLeaseAfterItsLastDocumentWritesNoListing(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.issued(t, "A flaw in the recovery console")
+		leases := queue.NewLeases(f.db)
+		stolen := &stealing{Storage: f.files, steal: func() {
+			if err := leases.Release(ctx, directory.Lease, "one"); err != nil {
+				t.Error(err)
+			}
+			if mine, err := leases.Take(ctx, directory.Lease, "two", time.Hour); err != nil || !mine {
+				t.Errorf("the second replica could not take the lease: %v %v", mine, err)
+			}
+		}}
+		writer := directory.New(f.db, directory.Published(stolen), issuer,
+			directory.Config{List: true, Mirror: false}, "one", f.logger)
+		written, err := writer.Write(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !written.Elsewhere {
+			t.Errorf("a pass that lost the lease after its last document went on: %+v", written)
+		}
+		// The one document and the hash beside it.
+		if stolen.puts != 2 {
+			t.Errorf("a pass that lost the lease after its last document wrote %d files, want 2", stolen.puts)
+		}
+	})
+}
+
 // stealing is a store whose first file hands the lease to another replica.
 type stealing struct {
 	attach.Storage
