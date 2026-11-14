@@ -22,7 +22,7 @@ type ProvidersBody struct {
 	// NamedByProxy lets a browser the proxy named, and that is refused here,
 	// show the screen a refused sign-in lands on. It is the same for every
 	// reason a person is refused.
-	NamedByProxy bool `json:"named_by_proxy,omitempty" doc:"Whether the trusted proxy in front of this deployment named the person asking. Where it did and a request as them is refused, they were refused, for a reason this does not say"`
+	NamedByProxy bool `json:"named_by_proxy,omitempty" doc:"Whether the trusted proxy in front of this deployment named the person asking. Where it did and the read of the current user is refused, they were refused, for a reason this does not say"`
 }
 
 // ProviderBody is one way in.
@@ -40,8 +40,7 @@ func registerProviders(api huma.API, in core.Deps) {
 			"Answered without a credential, because it is what somebody sees before they " +
 			"have one. It is the only reading endpoint that is. It reports names an " +
 			"operator configured, and whether the trusted proxy in front of this deployment " +
-			"named the person asking; no account exists or does not exist as far as this is " +
-			"concerned, which is the disclosure that would matter.",
+			"named the person asking.",
 		Tags: []string{"Access"},
 	}, core.NoCredential, ""), func(ctx context.Context, _ *struct{}) (*struct{ Body ProvidersBody }, error) {
 		in := core.Of(ctx, in)

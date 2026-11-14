@@ -118,9 +118,9 @@ export function forwardable(count: number, resuming: boolean | undefined): boole
 }
 
 // The one screen somebody sees before they hold anything. It offers the ways
-// in this deployment has configured and says nothing else — which of them a
-// given person can use is not knowable until they have used it, and guessing
-// out loud would tell a stranger who has an account here.
+// in this deployment has configured; at a refused or failed landing, or for a
+// browser the proxy named, it also says what happened, and never why, since
+// a reason would tell a stranger who has an account here.
 //
 // `resuming` is the same offer made over the screen somebody was already on,
 // after a session ended under them. The words differ because the situation

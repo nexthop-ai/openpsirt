@@ -7251,7 +7251,7 @@ export interface paths {
          * List sign-in providers
          * @description Returns the sign-in providers this deployment has configured, so a sign-in page can offer them.
          *
-         *     Answered without a credential, because it is what somebody sees before they have one. It is the only reading endpoint that is. It reports names an operator configured, and whether the trusted proxy in front of this deployment named the person asking; no account exists or does not exist as far as this is concerned, which is the disclosure that would matter.
+         *     Answered without a credential, because it is what somebody sees before they have one. It is the only reading endpoint that is. It reports names an operator configured, and whether the trusted proxy in front of this deployment named the person asking.
          *
          *     Requires: nothing: this is answered before anybody has a credential
          */
@@ -14137,7 +14137,7 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["ProviderBody"][] | null;
-            /** @description Whether the trusted proxy in front of this deployment named the person asking. Where it did and a request as them is refused, they were refused, for a reason this does not say */
+            /** @description Whether the trusted proxy in front of this deployment named the person asking. Where it did and the read of the current user is refused, they were refused, for a reason this does not say */
             named_by_proxy?: boolean;
         };
         PublicationBody: {
