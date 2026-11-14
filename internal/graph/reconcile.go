@@ -52,6 +52,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 		Set(`"name" = (SELECT "c"."name" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
 		Set(`"version" = (SELECT "c"."version" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id")`).
 		Set(`"name_folded" = COALESCE((SELECT "c"."name_folded" FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id"), '')`).
+		Set(`"source_folded" = COALESCE((SELECT COALESCE(NULLIF("c"."upstream_folded", ''), "c"."name_folded") FROM "component" AS "c" WHERE "c"."id" = "graph_node"."component_id"), '')`).
 		Where(`"build_id" = ?`, buildID).
 		Where(`"closed_scan_id" IS NULL`).
 		Where(`"name_folded" IS NULL`).
@@ -93,7 +94,8 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 				node.UpstreamName != says.upstreamName ||
 				node.UpstreamVersion != says.upstreamVersion ||
 				node.Repository != says.repository ||
-				node.Name != says.name || node.Version != says.version {
+				node.Name != says.name || node.Version != says.version ||
+				node.SourceFolded != says.sourceFolded() {
 				restated[node.ID] = says
 			}
 			continue
@@ -113,6 +115,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			UpstreamName: says.upstreamName, UpstreamVersion: says.upstreamVersion,
 			Repository: says.repository,
 			Name:       says.name, Version: says.version, NameFolded: Folded(says.name),
+			SourceFolded: says.sourceFolded(),
 		})
 	}
 	// One statement per node. A build restates an identifier rarely, and
@@ -128,6 +131,7 @@ func reconcileNodes(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			Set(`"name" = ?`, says.name).
 			Set(`"version" = ?`, says.version).
 			Set(`"name_folded" = ?`, Folded(says.name)).
+			Set(`"source_folded" = ?`, says.sourceFolded()).
 			Where(`"id" = ?`, id).Exec(ctx); err != nil {
 			return nil, 0, 0, fmt.Errorf("record what the build states about a component: %w", err)
 		}
@@ -189,6 +193,16 @@ type stated struct {
 	upstreamName, upstreamVersion string
 	repository                    string
 	name, version                 string
+}
+
+// sourceFolded is the source package the build stated, else the name it
+// stated, folded: the node's counterpart of the component row's upstream fold,
+// else its name fold, which an assignment rule's source pattern reads.
+func (s stated) sourceFolded() string {
+	if folded := Folded(s.upstreamName); folded != "" {
+		return folded
+	}
+	return Folded(s.name)
 }
 
 // nullable is a stated identifier as the column holds it: absent where the

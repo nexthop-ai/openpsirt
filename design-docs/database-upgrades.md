@@ -237,7 +237,7 @@ finds done.
 | Table | Gains |
 |---|---|
 | `advisory_issue` | A mark held while the issue is on the advisory: true on every row not taken off, null on the rest; and the issue unique on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § The advisory) |
-| `graph_node` | The name and the version the build stated and the name's fold, all empty, and an index of each build's nodes by the fold (`design-docs/data-model-graph.md` § The dependency graph) |
+| `graph_node` | The name and the version the build stated, the name's fold and the stated source's fold, all empty, and an index of each build's nodes by each fold (`design-docs/data-model-graph.md` § The dependency graph) |
 | `received_vex_statement` | When each statement was made and which newer statement of its publisher set it aside, both empty, so a statement held before the upgrade is ordered by its upload (`design-docs/ingest-claims.md` § Administrator-supplied VEX); the older of two standing about one subject, such as two supplier advisories, set aside as overtaken by the newer |
 
 | Table | Loses |

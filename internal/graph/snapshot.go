@@ -65,6 +65,9 @@ type Node struct {
 	// NameFolded is Name folded as the component's name is, which a name
 	// somebody types is matched on.
 	NameFolded string `bun:"name_folded"`
+	// SourceFolded is the source package this build stated, else Name,
+	// folded: what an assignment rule's source pattern is matched on.
+	SourceFolded string `bun:"source_folded"`
 }
 
 // Edge is one component depending on another.

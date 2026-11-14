@@ -700,6 +700,7 @@ func TestANodeHoldingNoStatedNameIsRestatedOnlyWhereTheBuildDiffers(t *testing.T
 		}
 		if _, err := f.db.DB.NewUpdate().TableExpr(`"graph_node"`).
 			Set(`"name" = NULL`).Set(`"version" = NULL`).Set(`"name_folded" = NULL`).
+			Set(`"source_folded" = NULL`).
 			Where(`"build_id" = ?`, f.buildID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -725,6 +726,16 @@ func TestANodeHoldingNoStatedNameIsRestatedOnlyWhereTheBuildDiffers(t *testing.T
 			if d.Version != want {
 				t.Errorf("%s is scanned at %q, want %q", d.Name, d.Version, want)
 			}
+		}
+		unsourced, err := f.db.DB.NewSelect().TableExpr(`"graph_node"`).
+			Where(`"build_id" = ?`, f.buildID).Where(`"closed_scan_id" IS NULL`).
+			Where(`"is_root" = ?`, false).
+			Where(`("source_folded" IS NULL OR "source_folded" = '')`).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if unsourced != 0 {
+			t.Errorf("%d nodes hold no source fold after the next inventory", unsourced)
 		}
 	})
 }

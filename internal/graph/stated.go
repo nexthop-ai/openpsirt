@@ -115,6 +115,35 @@ func MatchingAs(ctx context.Context, db bun.IDB, like string, limit int, where s
 	return namedBy(ctx, db, `LIKE ?`+database.LikeClause, like, limit, where, args...)
 }
 
+// SourcedAs answers the components a build stated as built from the source
+// package named, or under that name where it stated no source, among the open
+// nodes the condition holds, written against the node as "n". Led by the
+// node's build and source fold.
+func SourcedAs(ctx context.Context, db bun.IDB, name, where string, args ...any) ([]int64, error) {
+	return sourcedBy(ctx, db, `= ?`, Folded(name), where, args...)
+}
+
+// SourceMatching is SourcedAs for a pattern, escaped for database.LikeClause.
+func SourceMatching(ctx context.Context, db bun.IDB, like, where string, args ...any) ([]int64, error) {
+	return sourcedBy(ctx, db, `LIKE ?`+database.LikeClause, like, where, args...)
+}
+
+// sourcedBy is SourcedAs and SourceMatching, compared by the comparison given.
+func sourcedBy(ctx context.Context, db bun.IDB, comparison, value, where string,
+	args ...any) ([]int64, error) {
+
+	var ids []int64
+	if err := db.NewSelect().Distinct().TableExpr(`"graph_node" AS "n"`).
+		ColumnExpr(`"n"."component_id"`).
+		Where(where, args...).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."source_folded" `+comparison, value).
+		Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read the components stated as built from %q: %w", value, err)
+	}
+	return ids, nil
+}
+
 // namedBy is NamedAs and MatchingAs: the row's fold and the node's, each
 // compared by the comparison given, read apart and unioned.
 func namedBy(ctx context.Context, db bun.IDB, comparison, value string, limit int,

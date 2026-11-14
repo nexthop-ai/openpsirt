@@ -44,7 +44,7 @@ func seedNodeV0120(t *testing.T, db *database.DB) int64 {
 }
 
 // A v0.12.0 database's graph nodes gain the name and version a build stated
-// and the name's fold, empty on every node already held, whether the upgrade
+// and the folds of the name and the stated source, empty on every node already held, whether the upgrade
 // ran whole or a start of it stopped after the first column or before the
 // index; the stops are ones SQLite never makes, since it changes a table in
 // one transaction.
@@ -81,14 +81,15 @@ func TestAV0120DatabaseResumesTheV0130NodeUpgradeFromEveryStop(t *testing.T) {
 					Name    *string `bun:"name"`
 					Version *string `bun:"version"`
 					Folded  *string `bun:"name_folded"`
+					Source  *string `bun:"source_folded"`
 				}
-				if err := db.DB.NewRaw(`SELECT "name", "version", "name_folded" FROM "graph_node" WHERE "id" = ?`, node).
+				if err := db.DB.NewRaw(`SELECT "name", "version", "name_folded", "source_folded" FROM "graph_node" WHERE "id" = ?`, node).
 					Scan(ctx, &stated); err != nil {
 					t.Fatal(err)
 				}
-				if stated.Name != nil || stated.Version != nil || stated.Folded != nil {
-					t.Errorf("a node held before the upgrade states %v, %v and %v, want none",
-						stated.Name, stated.Version, stated.Folded)
+				if stated.Name != nil || stated.Version != nil || stated.Folded != nil || stated.Source != nil {
+					t.Errorf("a node held before the upgrade states %v, %v, %v and %v, want none",
+						stated.Name, stated.Version, stated.Folded, stated.Source)
 				}
 				leaveAtLatest(t, ctx, db)
 			})

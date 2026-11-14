@@ -92,6 +92,8 @@ every binary built from it.
 |---|---|
 | Either key may be a pattern, with `*` the only metacharacter; `%` and `_` are escaped | Real package names hold them |
 | A rule matches without regard to capitals, its keys folded and cut as component names are; a longer key is refused when written | It could never match |
+| A source key matches the component row's upstream, else its name, or the source package a build of the product stated, else the name it stated; the stated components are read first, by the node's build and source fold, and join the row's as one set | The row holds what the first product to describe the package stated; two sets joined on the finding lose the semijoin |
+| The preview names each component as the finding's build stated it | The row's name can be another product's |
 | A pattern naming most of a build is refused, when written and at the preview, as a rule matching nothing is | The subtree is one recursive walk per build |
 | A place in the tree also holds every component a rescan replaced whose name a component there carries, as the tree counts it (`design-docs/data-model-graph.md` § Path traversal) | A flaw recorded on a version a rescan replaced stays open on it, and a rule and the count beside a node agree |
 | A place that is the build's root, named or matched by a pattern, also holds every component nothing pulls in and what it pulls in (`design-docs/data-model-graph.md` § Path traversal) | The tree draws them under the root. Such a rule, at an upgrade from a release that walked edges alone, takes at its first sweep the unheld work beneath them that a later rule placing beneath one of them used to take |

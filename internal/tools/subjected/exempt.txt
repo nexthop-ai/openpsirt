@@ -201,6 +201,8 @@ graph.Replaced Not varying by reader: which components of a build replaced other
 graph.ReplacedWithin Not varying by reader: the replaced components beneath a start in a build its caller already resolved.
 graph.RootAmong Not varying by reader: whether a walk starts from a build's root, for a build its caller already resolved.
 graph.RootsOf Not varying by reader: the roots of builds its callers already resolved for the subject.
+graph.SourceMatching Not varying by reader: resolving a source pattern among nodes its caller narrowed to the builds of a product it resolved for the subject.
+graph.SourcedAs Not varying by reader: resolving a source package name among nodes its caller narrowed to the builds of a product it resolved for the subject.
 graph.StatedImages A helper over a narrowed read: the image versions a build states, for claims about a build the caller already authorized.
 graph.StatedVersions A helper over a narrowed read: the versions builds state for images, for the across-builds read after it narrowed the builds with a subject.
 graph.Store.ComponentAs Not varying by reader: resolving a component name inside a build the route resolved for the caller first.

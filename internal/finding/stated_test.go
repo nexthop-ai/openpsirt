@@ -509,6 +509,45 @@ func TestARulesContainerReadsTheRowsNameAndTheStatedNameApart(t *testing.T) {
 	})
 }
 
+// An assignment rule's source pattern matches the source package a build of
+// the product stated, else the name it stated, where another product described
+// the package first under another name and no source.
+func TestARulesSourcePatternMatchesWhatTheBuildStated(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shippedTo(t, f.inAnotherProduct(t, "hedgehog"), stating(twoConsumers(), rot13))
+		sourced := libnl
+		sourced.UpstreamName, sourced.UpstreamVersion = "libnl3", "3.7"
+		mine := twoConsumers()
+		for i, c := range mine.Components {
+			if c.Purl == libnl.Purl {
+				mine.Components[i] = sourced
+			}
+		}
+		for i, d := range mine.Dependencies {
+			if d.Child.Purl == libnl.Purl {
+				mine.Dependencies[i].Child = sourced
+			}
+		}
+		f.shipped(t, mine)
+		f.applied(t, found("CVE-2026-1", sourced), found("CVE-2026-2", teamd))
+
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		for pattern, want := range map[string]string{
+			"libnl3": libnl.Name, "LIBNL3*": libnl.Name, teamd.Name: teamd.Name, "Team*": teamd.Name,
+		} {
+			caught, err := f.store.WouldMatch(ctx, who, f.productID, pattern, "", 20)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if caught.Total != 1 || len(caught.Components) != 1 || caught.Components[0] != want {
+				t.Errorf("a rule for the source %q catches %d at %v, want one at %s",
+					pattern, caught.Total, caught.Components, want)
+			}
+		}
+	})
+}
+
 // Every reader of an open finding names its component, its consumer and their
 // versions as the finding's own build stated them, where another product
 // described every package first under other names and versions.
