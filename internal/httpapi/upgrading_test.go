@@ -27,3 +27,19 @@ func TestTheUpgradingAnswerCarriesTheBrowserHeaders(t *testing.T) {
 		}
 	}
 }
+
+// While the schema is applied, a path the interface would refuse as the API's,
+// capitals and dot segments included, answers in the refusal shape, so a
+// client parsing JSON reads it.
+func TestTheUpgradingAnswerKnowsTheAPIHoweverItIsSpelled(t *testing.T) {
+	h := Upgrading()
+	for _, path := range []string{"/v1/version", "/V1/version", "/x/../v1/version", "/v1"} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Accept", "text/html")
+		h.ServeHTTP(rec, req)
+		if got := rec.Header().Get("Content-Type"); got != "application/problem+json" {
+			t.Errorf("GET %s while upgrading answered as %q", path, got)
+		}
+	}
+}

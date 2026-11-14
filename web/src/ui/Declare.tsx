@@ -142,3 +142,54 @@ export function Field({
     </div>
   );
 }
+
+// The drawer correcting a catalog row's name, the same on every level: its
+// name field first, then whatever else the level lets somebody correct.
+export function RenameDrawer({
+  editing,
+  onClose,
+  save,
+  ready,
+  hint,
+  name,
+  children,
+}: {
+  // editing is the row being corrected, and the drawer is open while it is set.
+  editing: string;
+  onClose: () => void;
+  save: { mutate: () => void; error: unknown; isPending: boolean };
+  // ready says every field holds something a save can send.
+  ready: boolean;
+  hint: string;
+  name: { value: string; onChange: (value: string) => void; placeholder: string; hint: string };
+  children?: ReactNode;
+}) {
+  return (
+    <Declare
+      title={`Edit ${editing}`}
+      open={editing !== ""}
+      onClose={onClose}
+      onSubmit={() => save.mutate()}
+      error={save.error}
+      busy={save.isPending || !ready}
+      ok="Save"
+      hint={hint}
+    >
+      <Field
+        label="Name"
+        value={name.value}
+        onChange={name.onChange}
+        placeholder={name.placeholder}
+        hint={name.hint}
+      />
+      {children}
+    </Declare>
+  );
+}
+
+// A refused retirement, said. Without it the button re-enables and the row
+// stays, which reads as nothing having happened.
+export function RetireRefused({ error }: { error: unknown }) {
+  if (error == null) return null;
+  return <Failed error={error} what="That could not be retired." />;
+}

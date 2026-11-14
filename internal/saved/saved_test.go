@@ -256,6 +256,13 @@ func TestOnePersonMayNotKeepAnUnboundedNumberOfFilters(t *testing.T) {
 		if total != 2 {
 			t.Errorf("the list says %d are kept, want the 2 there are", total)
 		}
+
+		// A lowered limit is named, with how many to forget to get under it.
+		_, err = f.store.SaveFilterPreparing(t.Context(), person.ID,
+			"third", "component=linux", saved.Filter{}, 1)
+		if err == nil || !strings.Contains(err.Error(), "keeping 2 saved filters and the limit is 1: forget 2") {
+			t.Errorf("a save past a lowered limit was refused as %v", err)
+		}
 	})
 }
 

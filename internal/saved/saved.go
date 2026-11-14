@@ -14,7 +14,6 @@ package saved
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"net/url"
 	"slices"
@@ -26,6 +25,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -243,27 +243,18 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 		Reasoning: prepares.Reasoning, DeferDays: prepares.DeferDays,
 	}
 
-	turn, err := s.ensureTurn(ctx, personID)
-	if err != nil {
+	// One person's saves take turns, on a row of their own: the count below
+	// bounds only what its transaction can see, and two saves of different
+	// names at once both count one under the limit and both add.
+	turn := "saved filters " + strconv.FormatInt(personID, 10)
+	if err := queue.EnsureTurn(ctx, s.db, turn); err != nil {
 		return nil, err
 	}
 	// An update then an insert, in one transaction, because there is no
 	// portable spelling of an upsert and because what the insert writes
 	// against has to be what the update just saw.
 	write := func(ctx context.Context, db bun.IDB) error {
-		// One person's saves take turns, on a row of their own: the count
-		// below bounds only what this transaction can see, and two saves of
-		// different names at once both count one under the limit and both
-		// add. A write to the row is a lock every engine takes without being
-		// asked in words of its own.
-		//
-		// The write puts a new value in the row every time. An update setting
-		// a column to what it already holds is matched and not written on
-		// MySQL and MariaDB, and a cluster certifies only rows that were
-		// written, so two saves on two nodes would both pass.
-		if _, err := db.NewUpdate().Model((*turnRow)(nil)).
-			Set(`"held_by" = ?`, rand.Text()).
-			Where(`"name" = ?`, turn).Exec(ctx); err != nil {
+		if err := queue.TakeTurn(ctx, db, turn); err != nil {
 			return err
 		}
 		res, err := db.NewUpdate().Model((*Filter)(nil)).
@@ -303,8 +294,10 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 			return err
 		}
 		if held >= int64(cap) {
-			return refusal.Errorf("you are keeping %d saved filters, which is the "+
-				"limit: forget one before keeping another", held)
+			// Named apart, because the limit may have been lowered below what
+			// somebody already keeps, and then one forgotten is not enough.
+			return refusal.Errorf("you are keeping %d saved filters and the limit is %d: "+
+				"forget %d before keeping another", held, cap, held-int64(cap)+1)
 		}
 		// A filter of this name that landed after the update above looked is
 		// a lost race: the unique index refuses this add, and taken again, the
@@ -322,29 +315,6 @@ func (s *Store) SaveFilterPreparing(ctx context.Context, personID int64,
 		return nil, fmt.Errorf("keep that filter: %w", err)
 	}
 	return kept, nil
-}
-
-// turnRow is the row one person's saves take turns on. It sits in the lease
-// table, which holds named rows whose only use is to be written, and nothing
-// takes it as a lease.
-type turnRow struct {
-	bun.BaseModel `bun:"table:lease"`
-
-	Name string `bun:"name,pk"`
-}
-
-// ensureTurn makes the row one person's saves take turns on, and answers its
-// name.
-//
-// Outside the transaction, because a second writer's insert is refused by the
-// primary key, and on PostgreSQL a refused statement aborts the transaction it
-// is in.
-func (s *Store) ensureTurn(ctx context.Context, personID int64) (string, error) {
-	name := "saved filters " + strconv.FormatInt(personID, 10)
-	if _, err := s.db.NewInsert().Model(&turnRow{Name: name}).Exec(ctx); err != nil && !database.IsDuplicate(err) {
-		return "", fmt.Errorf("record where saves take turns: %w", err)
-	}
-	return name, nil
 }
 
 // SavedFilters lists what one person has kept, by name: one list, offered on

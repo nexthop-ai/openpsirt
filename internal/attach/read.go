@@ -243,7 +243,7 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 	if err != nil {
 		return err
 	}
-	return s.files.Delete(ctx, row.ObjectKey)
+	return s.removeBytes(ctx, row.ObjectKey)
 }
 
 // removeRedacted removes the bytes of a file already marked redacted, and
@@ -254,7 +254,7 @@ func (s *Store) Redact(ctx context.Context, subject access.Subject, token, reaso
 // finishes: deleting what is already gone is not an error, so the repeat is
 // safe whoever marked it.
 func (s *Store) removeRedacted(ctx context.Context, key string) error {
-	if err := s.files.Delete(ctx, key); err != nil {
+	if err := s.removeBytes(ctx, key); err != nil {
 		return fmt.Errorf("remove a redacted file: %w", err)
 	}
 	return ErrGone
@@ -293,7 +293,13 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 	}
 
 	gone, orphaned, failed := 0, 0, 0
+	var stopped error
 	for i := range stale {
+		// A stopped pass stops claiming here, and only here: a claim runs on
+		// a context of its own, so one made after the stop succeeds.
+		if stopped = ctx.Err(); stopped != nil {
+			break
+		}
 		row := &stale[i]
 		// The row first, and the bytes after. The other order ran the guard
 		// after the loss it exists to prevent: a comment attaching the file
@@ -308,20 +314,10 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 		// Repeats both conditions the page was read under. A row redacted
 		// since the page was read carries who redacted it and why, and the
 		// record of that is what a redaction leaves.
-		res, err := s.db.NewDelete().Model((*Attachment)(nil)).
-			Where(`"id" = ?`, row.ID).
-			Where(`"attached_at" IS NULL`).
-			Where(`"redacted_at" IS NULL`).
-			Exec(ctx)
+		claimed, err := s.claim(ctx, row.ID)
 		if err != nil {
 			failed++
-			unreadable(ctx, s.logger, row, err)
-			continue
-		}
-		claimed, err := database.Affected(res)
-		if err != nil {
-			failed++
-			unreadable(ctx, s.logger, row, err)
+			unreadable(ctx, s.log(), row, err)
 			continue
 		}
 		if claimed == 0 {
@@ -329,25 +325,51 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 			// outcome the guard is for. The bytes stay.
 			continue
 		}
-		if err := s.files.Delete(ctx, row.ObjectKey); err != nil {
+		if err := s.removeBytes(ctx, row.ObjectKey); err != nil {
 			// The row is gone and the bytes are not. Named, because the key
 			// is the only thing left that can find them, and stepped over, so
 			// one undeletable object does not stall every row after it.
 			orphaned++
-			if s.logger != nil {
-				s.logger.ErrorContext(ctx,
-					"an attachment's record was removed and its bytes were not",
-					"key", row.ObjectKey, "filename", row.Filename, "error", err)
-			}
+			s.log().ErrorContext(ctx,
+				"an attachment's record was removed and its bytes were not",
+				"key", row.ObjectKey, "filename", row.Filename, "error", err)
 			continue
 		}
 		gone++
 	}
-	if (orphaned > 0 || failed > 0) && s.logger != nil {
-		s.logger.WarnContext(ctx, "a collection pass could not finish every row",
+	if orphaned > 0 || failed > 0 {
+		s.log().WarnContext(ctx, "a collection pass could not finish every row",
 			"collected", gone, "orphaned", orphaned, "unreadable", failed)
 	}
-	return gone, nil
+	return gone, stopped
+}
+
+// claim deletes an unattached, unredacted row, answering whether it did.
+//
+// On a context of its own, as removeBytes is: a stop during the statement
+// can answer it failed after the delete committed, which leaves bytes no row
+// names and no log line names either. The check before each row ends the pass.
+func (s *Store) claim(ctx context.Context, id int64) (int64, error) {
+	claiming, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
+	defer cancel()
+	res, err := s.db.NewDelete().Model((*Attachment)(nil)).
+		Where(`"id" = ?`, id).
+		Where(`"attached_at" IS NULL`).
+		Where(`"redacted_at" IS NULL`).
+		Exec(claiming)
+	if err != nil {
+		return 0, err
+	}
+	return database.Affected(res)
+}
+
+// removeBytes removes the bytes of a row already deleted or marked redacted,
+// on a context of its own, because a caller going away or a stop between the
+// row and its bytes would leave bytes behind.
+func (s *Store) removeBytes(ctx context.Context, key string) error {
+	removing, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
+	defer cancel()
+	return s.files.Delete(removing, key)
 }
 
 // unreadable says which row a collection pass could not claim, and why.
@@ -359,9 +381,6 @@ func (s *Store) Sweep(ctx context.Context, olderThan time.Duration) (int, error)
 // by, and the error, because a permission that was revoked and an engine that
 // went away are two different mornings.
 func unreadable(ctx context.Context, logger *slog.Logger, row *Attachment, err error) {
-	if logger == nil {
-		return
-	}
 	logger.ErrorContext(ctx, "an unattached upload could not be claimed for collection",
 		"key", row.ObjectKey, "filename", row.Filename, "error", err)
 }

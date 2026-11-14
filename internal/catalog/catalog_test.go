@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
@@ -616,3 +617,60 @@ func (h *beforeFillingIn) BeforeQuery(ctx context.Context, e *bun.QueryEvent) co
 }
 
 func (h *beforeFillingIn) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// The out-of-support report names a release the way every screen does, and
+// leaves out what was retired: retiring takes a row out of every list.
+func TestOutOfSupportShowsDeclaredNamesAndLeavesOutRetired(t *testing.T) {
+	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
+		ctx := t.Context()
+		ended := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+		product, err := s.DeclareProduct(ctx, "SONiC", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetProductEndOfLife(ctx, product.ID, &ended); err != nil {
+			t.Fatal(err)
+		}
+		kept, err := s.DeclareBranchOrTag(ctx, product.ID, "Release-2.4", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gone, err := s.DeclareBranchOrTag(ctx, product.ID, "Release-2.3", catalog.Branch, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RetireBranchOrTag(ctx, gone.ID); err != nil {
+			t.Fatal(err)
+		}
+		other, err := s.DeclareProduct(ctx, "Retired", "Retired")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.SetProductEndOfLife(ctx, other.ID, &ended); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.DeclareBranchOrTag(ctx, other.ID, "main", catalog.Branch, nil); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RetireProduct(ctx, other.ID); err != nil {
+			t.Fatal(err)
+		}
+
+		reader := access.NewPerson(1, "reader", false, map[int64][]access.Role{
+			product.ID: {access.PublicRead}, other.ID: {access.PublicRead},
+		}, 0)
+		rows, err := s.OutOfSupport(ctx, reader, time.Now(), time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].BranchOrTagID != kept.ID {
+			t.Fatalf("out of support: %+v, want the one release still in use", rows)
+		}
+		if rows[0].ProductShown != "SONiC" || rows[0].BranchOrTagShown != "Release-2.4" {
+			t.Errorf("shown as %q / %q", rows[0].ProductShown, rows[0].BranchOrTagShown)
+		}
+		if rows[0].Product != "sonic" || rows[0].BranchOrTag != "release-2.4" {
+			t.Errorf("addressed as %q / %q", rows[0].Product, rows[0].BranchOrTag)
+		}
+	})
+}

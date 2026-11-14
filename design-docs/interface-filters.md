@@ -113,7 +113,7 @@ Personal; nothing is shared.
 | Two saves of one new name at once keep one: one person's saves take turns, and an addition the unique index refuses, because a filter of that name landed after the save looked, is taken as a lost race and replaces it | On MySQL and MariaDB the look holds a gap lock, so nothing lands there |
 | Personal is enforced at the query; another person's name answers as no name | |
 | Opening one replaces the filters on screen, keeps the scope and grouping, and drops the page | |
-| The list is bounded by the per-person limit and says how many are kept in all; under a lowered limit, saving is refused until under it | |
+| The list is bounded by the per-person limit and says how many are kept in all; under a lowered limit, saving is refused until under it, naming the count kept, the limit and how many to forget | |
 
 A saved filter can prepare a decision and proposes nothing (REQ-27). Where it
 carries an outcome and words, picking it fills the decision form and says so

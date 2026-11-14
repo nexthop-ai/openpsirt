@@ -204,6 +204,7 @@ stored hashed and the cookie is unreadable by script.
 | Requests carrying a key or a token are exempt | Nothing sends those automatically |
 | Safe methods are named as a list | A method nobody thought of is guarded |
 | Both origins are compared as a browser serializes them: scheme and host lower case, no default port | `https://psirt.example.com:443` is the origin `https://psirt.example.com`; compared as written, the deployment's own writes are refused |
+| A write the guard refuses answers 403 "not authorized"; a missing or unknown credential answers 401 in the same words | A browser reads 401 as signed out, and a refused sign-out leaves its session live |
 
 ## Sign-in return addresses
 
@@ -226,6 +227,7 @@ sign-ins in flight.
 |---|---|
 | Minted only where nothing holds one, and the answer is what is stored; the caller takes whichever key won | Two replicas starting together both mint |
 | A stored key that is empty, short or not one this minted fails sign-in closed; removing the row lets the next sign-in mint afresh | An empty key is computable by anybody |
+| A key that cannot be read or is malformed is a fault on both halves of a sign-in, answered 500 and logged as an error; a returning browser whose own sealed value is missing, forged, incomplete or stale is refused 401 | An outage must not read as a run of browsers turned away |
 
 ## Browser headers
 

@@ -602,6 +602,24 @@ func TestANameCannotBreakOutOfTheHeaderItIsWrittenInto(t *testing.T) {
 	}
 }
 
+// A name past ASCII is carried in the extended parameter and only as ASCII in
+// the quoted one, so the header is one an object store signs and a browser
+// still names the file as it was uploaded.
+func TestANameBeyondASCIIIsCarriedInTheExtendedParameter(t *testing.T) {
+	got := attach.Disposition(&attach.Attachment{Filename: "отчёт; v=2.pdf",
+		ContentType: "application/pdf"})
+	want := `attachment; filename="_____; v=2.pdf"; filename*=UTF-8''` +
+		`%D0%BE%D1%82%D1%87%D1%91%D1%82%3B%20v%3D2.pdf`
+	if got != want {
+		t.Errorf("the disposition reads %q, want %q", got, want)
+	}
+	for _, r := range got {
+		if r > 0x7e {
+			t.Fatalf("the disposition carries %q, which a header cannot", r)
+		}
+	}
+}
+
 // An object the store will not delete is named and stepped over, and the rows
 // after it are still collected.
 func TestAnUndeletableObjectDoesNotStallTheSweep(t *testing.T) {
@@ -891,21 +909,23 @@ func TestARowACollectionPassCouldNotClaimIsNamed(t *testing.T) {
 	// and nobody can tell whether it is one row stuck or a different one each
 	// time, or what is wrong with it.
 	each(t, func(t *testing.T, f *fixture) {
-		ctx, stop := context.WithCancel(t.Context())
-		defer stop()
+		ctx := t.Context()
 		who := f.who(t, access.PublicTriage)
 		stuck := f.upload(t, who, "stuck.log", []byte("nothing will ever point here"))
 		f.age(t, past)
 
+		// The claim on a row the pass has in hand is the statement that fails.
+		claim := &failing{verb: "DELETE", table: "attachment"}
+		f.hook(claim)
 		var said bytes.Buffer
 		store := attach.NewStore(f.db.DB, f.files).
 			Reporting(slog.New(slog.NewTextHandler(&said, nil)))
-		// Taken away between the page and the loop, so the claim on a row the
-		// pass has in hand is the statement that fails.
-		attach.AfterPage(store, stop)
 
 		if _, err := store.Sweep(ctx, 24*time.Hour); err != nil {
 			t.Fatalf("sweep: %v", err)
+		}
+		if !claim.fired {
+			t.Fatal("no claim was made, so this checked nothing")
 		}
 		wrote := said.String()
 		for _, want := range []string{stuck.ObjectKey, "stuck.log", "error="} {
@@ -916,6 +936,135 @@ func TestARowACollectionPassCouldNotClaimIsNamed(t *testing.T) {
 		}
 	})
 }
+
+// failing fails every statement of one verb naming one table, however the
+// engine quotes it.
+type failing struct {
+	verb, table string
+	fired       bool
+}
+
+func (f *failing) BeforeQuery(ctx context.Context, e *bun.QueryEvent) context.Context {
+	if !strings.HasPrefix(e.Query, f.verb) || !strings.Contains(e.Query, f.table) {
+		return ctx
+	}
+	f.fired = true
+	failed, cancel := context.WithCancel(ctx)
+	cancel()
+	return failed
+}
+
+func (f *failing) AfterQuery(context.Context, *bun.QueryEvent) {}
+
+// A pass stopped part way stops claiming rows, rather than failing a claim
+// and logging an error for every row left in its page.
+func TestAStoppedCollectionPassStopsClaiming(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		for _, name := range []string{"one.log", "two.log", "three.log"} {
+			f.upload(t, who, name, []byte("nothing will ever point here"))
+		}
+		f.age(t, past)
+
+		var said bytes.Buffer
+		store := attach.NewStore(f.db.DB, f.files).
+			Reporting(slog.New(slog.NewTextHandler(&said, nil)))
+		attach.AfterPage(store, stop)
+		if _, err := store.Sweep(ctx, 24*time.Hour); !errors.Is(err, context.Canceled) {
+			t.Errorf("a stopped pass answered %v", err)
+		}
+		if strings.Contains(said.String(), "level=ERROR") {
+			t.Errorf("a stopped pass logged errors: %s", said.String())
+		}
+		if held := filesUnder(t, f.root); held != 3 {
+			t.Errorf("a pass stopped before its first claim removed files: %d of 3 left", held)
+		}
+	})
+}
+
+// cancelHonoring is a store whose delete fails on a context that has ended,
+// as a store reached over the network does.
+type cancelHonoring struct{ attach.Storage }
+
+func (s cancelHonoring) Delete(ctx context.Context, key string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.Storage.Delete(ctx, key)
+}
+
+// An upload whose record failed because its caller went away still removes
+// its bytes: the request's context is often why the record failed.
+func TestAnUploadWhoseCallerWentAwayLeavesNoBytes(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		store := attach.NewStore(f.db.DB, cancelHonoring{f.files})
+		attach.BeforeRecord(store, stop)
+		if _, err := store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue},
+			"evidence.log", strings.NewReader("abc"), 3, roomy, plenty, plenty, false); err == nil {
+			t.Fatal("an upload whose caller went away was recorded")
+		}
+		if held := filesUnder(t, f.root); held != 0 {
+			t.Errorf("an upload that was not recorded left %d files", held)
+		}
+	})
+}
+
+// An upload whose record failed and whose bytes could not be removed names
+// the key, which is then the only thing that can find them.
+func TestAnUploadWhoseBytesCouldNotBeRemovedNamesTheKey(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		who := f.who(t, access.PublicTriage)
+		var said bytes.Buffer
+		store := attach.NewStore(f.db.DB, undeletable{f.files}).
+			Reporting(slog.New(slog.NewTextHandler(&said, nil)))
+		attach.BeforeRecord(store, stop)
+		if _, err := store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue},
+			"evidence.log", strings.NewReader("abc"), 3, roomy, plenty, plenty, false); err == nil {
+			t.Fatal("an upload whose caller went away was recorded")
+		}
+		if !strings.Contains(said.String(), "left bytes behind") || !strings.Contains(said.String(), "key=") {
+			t.Errorf("bytes nothing records were not named: %s", said.String())
+		}
+	})
+}
+
+// A commit the driver reports as failed may have committed: the bytes its row
+// names stay, and the upload is answered as the success it was.
+func TestAnUploadReportedFailedAfterItsCommitKeepsItsBytes(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		store := attach.NewStore(f.db.DB, f.files)
+		attach.Recorded(store, func(error) error { return context.Canceled })
+		got, err := store.Upload(ctx, who, attach.Against{ProductID: f.product, VulnerabilityID: f.issue},
+			"evidence.log", strings.NewReader("abc"), 3, roomy, plenty, plenty, false)
+		if err != nil || got == nil {
+			t.Fatalf("a committed upload answered %v", err)
+		}
+		var rows []attach.Attachment
+		if err := f.db.NewSelect().Model(&rows).Where(`"filename" = ?`, "evidence.log").Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].ID != got.ID {
+			t.Fatalf("the committed upload holds %d rows, answered %d", len(rows), got.ID)
+		}
+		if _, err := f.files.Open(ctx, rows[0].ObjectKey); err != nil {
+			t.Errorf("the bytes a committed row names were removed: %v", err)
+		}
+	})
+}
+
+// undeletable is a store that deletes nothing.
+type undeletable struct{ attach.Storage }
+
+func (undeletable) Delete(context.Context, string) error { return errors.New("the store refused") }
 
 func TestALongNameIsShortenedBetweenCharacters(t *testing.T) {
 	// A served and stored filename is cut between characters, so a name whose

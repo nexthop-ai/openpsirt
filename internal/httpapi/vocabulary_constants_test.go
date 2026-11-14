@@ -139,11 +139,30 @@ func TestEveryVocabularyListsEveryConstantOfItsType(t *testing.T) {
 func constantsOf(t *testing.T, dir, typ string) map[string]string {
 	t.Helper()
 
+	found := map[string]string{}
+	constSpecs(t, dir, func(file *ast.File, value *ast.ValueSpec) {
+		named, ok := value.Type.(*ast.Ident)
+		if !ok || named.Name != typ || len(value.Values) != len(value.Names) {
+			return
+		}
+		for i, constant := range value.Names {
+			if word, ok := stringValue(t, file, value.Values[i]); ok {
+				found[constant.Name] = word
+			}
+		}
+	})
+	return found
+}
+
+// constSpecs calls visit with every constant declaration in a package's
+// source, its tests left out, and the file it is in.
+func constSpecs(t *testing.T, dir string, visit func(file *ast.File, value *ast.ValueSpec)) {
+	t.Helper()
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := map[string]string{}
 	for _, entry := range entries {
 		name := entry.Name()
 		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
@@ -160,23 +179,12 @@ func constantsOf(t *testing.T, dir, typ string) map[string]string {
 				continue
 			}
 			for _, spec := range group.Specs {
-				value, ok := spec.(*ast.ValueSpec)
-				if !ok {
-					continue
-				}
-				named, ok := value.Type.(*ast.Ident)
-				if !ok || named.Name != typ || len(value.Values) != len(value.Names) {
-					continue
-				}
-				for i, constant := range value.Names {
-					if word, ok := stringValue(t, file, value.Values[i]); ok {
-						found[constant.Name] = word
-					}
+				if value, ok := spec.(*ast.ValueSpec); ok {
+					visit(file, value)
 				}
 			}
 		}
 	}
-	return found
 }
 
 // stringValue is the string a constant's value spells: a literal, or a
@@ -217,40 +225,18 @@ func stringValue(t *testing.T, file *ast.File, value ast.Expr) (string, bool) {
 func untypedConstantsOf(t *testing.T, dir string) map[string]string {
 	t.Helper()
 
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
 	found := map[string]string{}
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
+	constSpecs(t, dir, func(_ *ast.File, value *ast.ValueSpec) {
+		if value.Type != nil || len(value.Values) != len(value.Names) {
+			return
 		}
-		path := filepath.Join(dir, name)
-		file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.SkipObjectResolution)
-		if err != nil {
-			t.Fatalf("parse %s: %v", path, err)
-		}
-		for _, decl := range file.Decls {
-			group, ok := decl.(*ast.GenDecl)
-			if !ok || group.Tok != token.CONST {
-				continue
-			}
-			for _, spec := range group.Specs {
-				value, ok := spec.(*ast.ValueSpec)
-				if !ok || value.Type != nil || len(value.Values) != len(value.Names) {
-					continue
-				}
-				for i, constant := range value.Names {
-					if literal, ok := value.Values[i].(*ast.BasicLit); ok && literal.Kind == token.STRING {
-						if word, err := strconv.Unquote(literal.Value); err == nil {
-							found[constant.Name] = word
-						}
-					}
+		for i, constant := range value.Names {
+			if literal, ok := value.Values[i].(*ast.BasicLit); ok && literal.Kind == token.STRING {
+				if word, err := strconv.Unquote(literal.Value); err == nil {
+					found[constant.Name] = word
 				}
 			}
 		}
-	}
+	})
 	return found
 }

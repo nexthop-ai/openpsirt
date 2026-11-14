@@ -148,9 +148,19 @@ it takes a **lease** on the work's name under the same conditional update.
 Work that waits reads what it decides from after its turn comes, inside what
 serializes it.
 
-One row of the lease table is a lock that nothing takes as a lease: an upload
-writes a fresh value into it to serialize the check of room left
-(`design-docs/attachments.md` § Quota and removal).
+A **turn** is a row of the lease table that nothing takes as a lease. A
+transaction writes a fresh value into it, so the next one writing it waits for
+the first to commit. One mechanism serves every turn.
+
+| Turn | Serializes |
+|---|---|
+| Attachment uploads | The check of room left (`design-docs/attachments.md` § Quota and removal) |
+| One person's saved filters | The check of how many they keep (`design-docs/database-transactions.md` § Reads a write depends on) |
+
+| Rule | Reason |
+|---|---|
+| The row is made before the transaction opens, a duplicate ignored | A refused insert aborts a PostgreSQL transaction |
+| Each take writes a new random value | MySQL and MariaDB match and do not write an unchanged value, and a cluster certifies only written rows |
 
 ## Backlog refusal
 

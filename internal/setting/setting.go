@@ -696,27 +696,29 @@ func NewStore(db bun.IDB) *Store {
 //
 // A setting with a former name answers from a row under that name where none
 // is under its own, so a value written there still holds.
+//
+// Both names are read in one statement, which sees one snapshot on every
+// engine: read in two, a change committing between them moves the row from
+// the former name to the own one after the first read looked, and the
+// setting reads as unset.
 func (s *Store) Get(ctx context.Context, name string) (string, bool, error) {
-	value, set, err := s.read(ctx, name)
-	if err != nil || set {
-		return value, set, err
-	}
+	names := []string{name}
 	if former, ok := formerNames[name]; ok {
-		return s.read(ctx, former)
+		names = append(names, former)
 	}
-	return "", false, nil
-}
-
-// read reads the row under one name.
-func (s *Store) read(ctx context.Context, name string) (string, bool, error) {
-	row := new(Setting)
-	switch err := s.db.NewSelect().Model(row).Where(`"name" = ?`, name).Scan(ctx); {
-	case database.IsNoRows(err):
-		return "", false, nil
-	case err != nil:
+	var rows []Setting
+	if err := s.db.NewSelect().Model(&rows).
+		Where(`"name" IN (?)`, bun.List(names)).Scan(ctx); err != nil {
 		return "", false, fmt.Errorf("read the %q setting: %w", name, err)
 	}
-	return row.Value, true, nil
+	value, set := "", false
+	for _, row := range rows {
+		if row.Name == name {
+			return row.Value, true, nil
+		}
+		value, set = row.Value, true
+	}
+	return value, set, nil
 }
 
 // formerNames is the name each renamed setting had, by its name now. The
@@ -763,27 +765,35 @@ type FormerName struct {
 
 // FormerNames is every row held under a setting's former name, in the order
 // of the names they stand for.
+//
+// Every name is read in one statement, for the reason Get reads both of a
+// setting's names in one.
 func (s *Store) FormerNames(ctx context.Context) ([]FormerName, error) {
 	names := make([]string, 0, len(formerNames))
-	for name := range formerNames {
+	both := make([]string, 0, 2*len(formerNames))
+	for name, former := range formerNames {
 		names = append(names, name)
+		both = append(both, name, former)
+	}
+	if len(both) == 0 {
+		return nil, nil
 	}
 	slices.Sort(names)
+	var rows []Setting
+	if err := s.db.NewSelect().Model(&rows).
+		Where(`"name" IN (?)`, bun.List(both)).Scan(ctx); err != nil {
+		return nil, fmt.Errorf("read the settings held under former names: %w", err)
+	}
+	held := make(map[string]bool, len(rows))
+	for _, row := range rows {
+		held[row.Name] = true
+	}
 	var out []FormerName
 	for _, name := range names {
 		former := formerNames[name]
-		_, held, err := s.read(ctx, former)
-		if err != nil {
-			return nil, err
+		if held[former] {
+			out = append(out, FormerName{Former: former, Name: name, Shadowed: held[name]})
 		}
-		if !held {
-			continue
-		}
-		_, shadowed, err := s.read(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, FormerName{Former: former, Name: name, Shadowed: shadowed})
 	}
 	return out, nil
 }

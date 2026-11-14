@@ -129,35 +129,13 @@ func registerVariantEdits(api huma.API, d core.Declaring) {
 		Product string `path:"product"`
 		Variant string `path:"variant"`
 	}) (*struct{}, error) {
-		d := d.In(ctx)
-		if err := core.Administrating(ctx); err != nil {
-			return nil, err
-		}
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, product, variant, err := core.VariantIn(ctx, d, tx, in.Product, in.Variant)
+		return retireRow(ctx, d, "variant", func(ctx context.Context, held core.Declaring, tx bun.Tx) (string, func() error, error) {
+			store, product, variant, err := core.VariantIn(ctx, held, tx, in.Product, in.Variant)
 			if err != nil {
-				return err
+				return "", nil, err
 			}
-			if err := store.RetireVariant(ctx, variant.ID); err != nil {
-				if errors.Is(err, catalog.ErrNotFound) {
-					// Already retired: the write is conditional on it being in
-					// use, so nothing matched. Refused rather than answered as
-					// done, so that two administrators retiring it at once do
-					// not both record having done so.
-					return huma.NewError(http.StatusConflict,
-						"that variant is already retired")
-				}
-				return core.WentWrong(d.Logger, "that variant could not be retired", err)
-			}
-			if err := core.Noted(ctx, tx, trail.Catalog, product.Name+" "+variant.Name,
-				trail.Said("in use", true), nil); err != nil {
-				return core.NotRecorded(d.Logger, err)
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-		return &struct{}{}, nil
+			return product.Name + " " + variant.Name, func() error { return store.RetireVariant(ctx, variant.ID) }, nil
+		})
 	})
 }
 
@@ -264,30 +242,13 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
 		Product string `path:"product"`
 	}) (*struct{}, error) {
-		d := d.In(ctx)
-		if err := core.Administrating(ctx); err != nil {
-			return nil, err
-		}
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
+		return retireRow(ctx, d, "product", func(ctx context.Context, held core.Declaring, tx bun.Tx) (string, func() error, error) {
+			store, product, err := core.ProductIn(ctx, held, tx, in.Product)
 			if err != nil {
-				return err
+				return "", nil, err
 			}
-			if err := store.RetireProduct(ctx, product.ID); err != nil {
-				if errors.Is(err, catalog.ErrNotFound) {
-					return huma.NewError(http.StatusConflict, "that product is already retired")
-				}
-				return core.WentWrong(d.Logger, "that product could not be retired", err)
-			}
-			if err := core.Noted(ctx, tx, trail.Catalog, product.Name,
-				trail.Said("in use", true), nil); err != nil {
-				return core.NotRecorded(d.Logger, err)
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-		return &struct{}{}, nil
+			return product.Name, func() error { return store.RetireProduct(ctx, product.ID) }, nil
+		})
 	})
 
 	huma.Register(api, core.Requiring(huma.Operation{
@@ -360,31 +321,50 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 		Product     string `path:"product"`
 		BranchOrTag string `path:"branch_or_tag"`
 	}) (*struct{}, error) {
-		d := d.In(ctx)
-		if err := core.Administrating(ctx); err != nil {
-			return nil, err
-		}
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
-			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag)
+		return retireRow(ctx, d, "release", func(ctx context.Context, held core.Declaring, tx bun.Tx) (string, func() error, error) {
+			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, held, tx, in.Product, in.BranchOrTag)
 			if err != nil {
-				return err
+				return "", nil, err
 			}
-			if err := store.RetireBranchOrTag(ctx, branchOrTag.ID); err != nil {
-				if errors.Is(err, catalog.ErrNotFound) {
-					return huma.NewError(http.StatusConflict, "that release is already retired")
-				}
-				return core.WentWrong(d.Logger, "that release could not be retired", err)
-			}
-			if err := core.Noted(ctx, tx, trail.Catalog, product.Name+" "+branchOrTag.Name,
-				trail.Said("in use", true), nil); err != nil {
-				return core.NotRecorded(d.Logger, err)
-			}
-			return nil
-		}); err != nil {
-			return nil, err
-		}
-		return &struct{}{}, nil
+			return product.Name + " " + branchOrTag.Name,
+				func() error { return store.RetireBranchOrTag(ctx, branchOrTag.ID) }, nil
+		})
 	})
+}
+
+// retireRow retires one catalog row, as every level does: an administrator's
+// act, in one transaction with its trail row. find resolves the row through
+// the deployment it is handed, and answers what the trail names it by and the
+// store's retirement of it. A row already retired is refused naming noun, so
+// two administrators at once do not both record having retired it.
+func retireRow(ctx context.Context, d core.Declaring, noun string,
+	find func(ctx context.Context, in core.Declaring, tx bun.Tx) (string, func() error, error)) (*struct{}, error) {
+
+	in := d.In(ctx)
+	if err := core.Administrating(ctx); err != nil {
+		return nil, err
+	}
+	if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+		about, retire, err := find(ctx, in, tx)
+		if err != nil {
+			return err
+		}
+		if err := retire(); err != nil {
+			if errors.Is(err, catalog.ErrNotFound) {
+				// The write is conditional on the row being in use, so
+				// nothing matched.
+				return huma.NewError(http.StatusConflict, "that "+noun+" is already retired")
+			}
+			return core.WentWrong(in.Logger, "that "+noun+" could not be retired", err)
+		}
+		if err := core.Noted(ctx, tx, trail.Catalog, about, trail.Said("in use", true), nil); err != nil {
+			return core.NotRecorded(in.Logger, err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return &struct{}{}, nil
 }
 
 // catalogLevel is the part of the catalog a rename moves.

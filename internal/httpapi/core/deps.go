@@ -139,11 +139,13 @@ func Of(ctx context.Context, held Deps) Deps {
 	return held
 }
 
-// Attachments returns a store over the files this deployment holds. A nil
-// Storage inside it is the deployment that configured none, and every path
-// through it refuses in the same words.
+// Attachments returns a store over the files this deployment holds, logging
+// what it could not remove where the deployment logs, or where the process
+// does when the deployment names no logger. A nil Storage inside it
+// is the deployment that configured none, and every path through it refuses
+// in the same words.
 func (in Deps) Attachments() *attach.Store {
-	return attach.NewStore(in.DB.DB, in.Files)
+	return attach.NewStore(in.DB.DB, in.Files).Reporting(in.Logger)
 }
 
 // Catalog returns a store over the handle it is given.

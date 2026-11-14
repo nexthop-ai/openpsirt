@@ -544,7 +544,10 @@ type Retired struct {
 	ProductID     int64
 	Product       string
 	BranchOrTag   string
-	Kind          Kind
+	// ProductShown and BranchOrTagShown are what a screen calls each.
+	ProductShown     string
+	BranchOrTagShown string
+	Kind             Kind
 	// EndedOn is the date support ended: the release's own where it stated
 	// one, its product's otherwise.
 	EndedOn time.Time
@@ -565,6 +568,10 @@ type Retired struct {
 // A release whose date has not arrived is included where `by` is later than
 // `at`, so one call answers both what has ended and what is about to. Which of
 // the two a row is, is the caller's to read off the date it carries.
+//
+// A retired release, or a release of a retired product, is left out: retiring
+// takes a row out of every list. BranchesAndTagsEndingBy keeps them, because
+// the deadline sweep sharing it still strips their deadlines.
 func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 	at, by time.Time) ([]Retired, error) {
 
@@ -599,6 +606,8 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 			ProductID     int64      `bun:"product_id"`
 			Product       string     `bun:"product"`
 			BranchOrTag   string     `bun:"branch_or_tag"`
+			ProductShown  string     `bun:"product_name"`
+			ReleaseShown  string     `bun:"branch_or_tag_name"`
 			Kind          Kind       `bun:"kind"`
 			OwnEOL        *time.Time `bun:"own_eol"`
 			ProductEOL    *time.Time `bun:"product_eol"`
@@ -613,7 +622,11 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 			ColumnExpr(`"p"."id" AS "product_id"`).
 			ColumnExpr(`"p"."name" AS "product"`).
 			ColumnExpr(`"p"."eol_on" AS "product_eol"`).
+			ColumnExpr(ShownExpr("p")+` AS "product_name"`).
+			ColumnExpr(ShownExpr("s")+` AS "branch_or_tag_name"`).
 			Where(`"s"."id" IN (?)`, bun.List(batch)).
+			Where(`"s"."retired_at" IS NULL`).
+			Where(`"p"."retired_at" IS NULL`).
 			OrderExpr(`"p"."name", "s"."name"`)
 		if !all {
 			q = q.Where(`"s"."product_id" IN (?)`, bun.List(products))
@@ -625,6 +638,7 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 			ended := Retired{
 				BranchOrTagID: row.BranchOrTagID, ProductID: row.ProductID,
 				Product: row.Product, BranchOrTag: row.BranchOrTag, Kind: row.Kind,
+				ProductShown: row.ProductShown, BranchOrTagShown: row.ReleaseShown,
 			}
 			switch {
 			case row.OwnEOL != nil:
@@ -830,16 +844,22 @@ func (s *Store) DeclareBranchOrTag(ctx context.Context, productID int64, name st
 
 // BranchOrTagByName finds a branch or tag within a product.
 func (s *Store) BranchOrTagByName(ctx context.Context, productID int64, name string) (*BranchOrTag, error) {
-	st := new(BranchOrTag)
-	err := s.db.NewSelect().Model(st).
+	return rowByName[BranchOrTag](ctx, s.db, productID, name, "branch or tag")
+}
+
+// rowByName reads the row of one model a product holds under a name, matched
+// as every name is. what names the kind in the error.
+func rowByName[T any](ctx context.Context, db bun.IDB, productID int64, name, what string) (*T, error) {
+	row := new(T)
+	err := db.NewSelect().Model(row).
 		Where(`"product_id" = ?`, productID).Where(`"name" = ?`, typedname.Matching(name)).Scan(ctx)
 	if err != nil {
 		if database.IsNoRows(err) {
-			return nil, fmt.Errorf("branch or tag %q: %w", name, ErrNotFound)
+			return nil, fmt.Errorf("%s %q: %w", what, name, ErrNotFound)
 		}
-		return nil, fmt.Errorf("look up branch or tag %q: %w", name, err)
+		return nil, fmt.Errorf("look up %s %q: %w", what, name, err)
 	}
-	return st, nil
+	return row, nil
 }
 
 // DeclareVariant records a way a product is built.
@@ -872,16 +892,7 @@ func (s *Store) DeclareVariant(ctx context.Context, productID int64, name string
 
 // VariantByName finds one of a product's variants.
 func (s *Store) VariantByName(ctx context.Context, productID int64, name string) (*Variant, error) {
-	v := new(Variant)
-	err := s.db.NewSelect().Model(v).
-		Where(`"product_id" = ?`, productID).Where(`"name" = ?`, typedname.Matching(name)).Scan(ctx)
-	if err != nil {
-		if database.IsNoRows(err) {
-			return nil, fmt.Errorf("variant %q: %w", name, ErrNotFound)
-		}
-		return nil, fmt.Errorf("look up variant %q: %w", name, err)
-	}
-	return v, nil
+	return rowByName[Variant](ctx, s.db, productID, name, "variant")
 }
 
 // Resolve turns the names a scan supplies into the build it is filed against.

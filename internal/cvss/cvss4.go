@@ -256,10 +256,6 @@ func macroScore(given map[string]string) float64 {
 	// exploitation, so every base vector sits at the top of it. It still
 	// counts, because the mean is over the classes that have something below
 	// them and this one does.
-	// Class five never separates two base vectors: nothing states
-	// exploitation, so every base vector sits at the top of it. It still
-	// counts, because the mean is over the classes that have something below
-	// them and this one does.
 	total, counted := 0.0, 0
 	for class := 1; class <= 5; class++ {
 		steps := e.down(class)

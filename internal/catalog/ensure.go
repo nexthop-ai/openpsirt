@@ -335,7 +335,8 @@ func (s *Store) Variants(ctx context.Context, subject access.Subject, productID 
 func (s *Store) BuiltAs(ctx context.Context, subject access.Subject, branchOrTagID int64) ([]Variant, error) {
 	var branchOrTag BranchOrTag
 	if err := s.db.NewSelect().Model(&branchOrTag).Where(`"id" = ?`, branchOrTagID).Scan(ctx); err != nil {
-		return nil, fmt.Errorf("look up the release %d: %w", branchOrTagID, err)
+		return nil, missingOr(err, fmt.Sprintf("release %d", branchOrTagID),
+			fmt.Sprintf("look up release %d", branchOrTagID))
 	}
 	if !subject.Sees(branchOrTag.ProductID) {
 		return nil, access.Denied("list what a release is built as")

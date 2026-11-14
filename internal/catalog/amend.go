@@ -26,28 +26,16 @@ import (
 // the caller, which is where that is known. This refuses nothing on that
 // ground and is not the place the rule is enforced.
 func (s *Store) RenameVariant(ctx context.Context, productID, variantID int64, name string) error {
-	if err := validAddressedName("variant", name); err != nil {
-		return err
-	}
-	existing, err := s.VariantByName(ctx, productID, name)
-	switch {
-	case err == nil && existing.ID != variantID:
-		return fmt.Errorf("variant %q: %w", name, ErrExists)
-	case err == nil:
-		// Already called this, in some spelling of it. The matching name is
-		// unchanged and the spelling may not be, so the write still runs.
-	case !errors.Is(err, ErrNotFound):
-		return err
-	}
-	res, err := s.db.NewUpdate().Model((*Variant)(nil)).
-		Set(`"name" = ?`, typedname.Matching(name)).
-		Set(`"display_name" = ?`, name).
-		Where(`"id" = ?`, variantID).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("rename variant %d: %w", variantID, err)
-	}
-	return counted(res, "variant", variantID, "rename")
+	return s.renameRow(ctx, renaming{
+		model: (*Variant)(nil), what: "variant", id: variantID, product: &productID, display: true,
+		holder: func(ctx context.Context, name string) (int64, error) {
+			held, err := s.VariantByName(ctx, productID, name)
+			if err != nil {
+				return 0, err
+			}
+			return held.ID, nil
+		},
+	}, name)
 }
 
 // SetVariantCustomerFacing records whether a variant ships to customers.
@@ -94,25 +82,16 @@ func (s *Store) restoreVariant(ctx context.Context, variantID int64) (bool, erro
 // documents show and is corrected separately, because it is text rather than
 // something anything is identified by.
 func (s *Store) RenameProduct(ctx context.Context, productID int64, name string) error {
-	if err := validAddressedName("product", name); err != nil {
-		return err
-	}
-	existing, err := s.ProductByName(ctx, name)
-	switch {
-	case err == nil && existing.ID != productID:
-		return fmt.Errorf("product %q: %w", name, ErrExists)
-	case err == nil:
-	case !errors.Is(err, ErrNotFound):
-		return err
-	}
-	res, err := s.db.NewUpdate().Model((*Product)(nil)).
-		Set(`"name" = ?`, typedname.Matching(name)).
-		Where(`"id" = ?`, productID).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("rename product %d: %w", productID, err)
-	}
-	return counted(res, "product", productID, "rename")
+	return s.renameRow(ctx, renaming{
+		model: (*Product)(nil), what: "product", id: productID,
+		holder: func(ctx context.Context, name string) (int64, error) {
+			held, err := s.ProductByName(ctx, name)
+			if err != nil {
+				return 0, err
+			}
+			return held.ID, nil
+		},
+	}, name)
 }
 
 // SetProductDisplayName records what a product is called on a screen.
@@ -157,26 +136,72 @@ func (s *Store) restoreProduct(ctx context.Context, productID int64) (bool, erro
 // spelling shown back are derived from one string, and a release has no
 // display name of its own that anything sets apart from it.
 func (s *Store) RenameBranchOrTag(ctx context.Context, productID, branchOrTagID int64, name string) error {
-	if err := validAddressedName("release", name); err != nil {
+	return s.renameRow(ctx, renaming{
+		model: (*BranchOrTag)(nil), what: "release", id: branchOrTagID, product: &productID, display: true,
+		holder: func(ctx context.Context, name string) (int64, error) {
+			held, err := s.BranchOrTagByName(ctx, productID, name)
+			if err != nil {
+				return 0, err
+			}
+			return held.ID, nil
+		},
+	}, name)
+}
+
+// renaming is one catalog row a rename moves, and how to find which row of
+// its kind already holds a name.
+type renaming struct {
+	model any
+	// what names the kind, in the words a refusal uses.
+	what string
+	id   int64
+	// product is the product the row must belong to, where its kind belongs
+	// to one. A row of another product matches nothing, and the rename
+	// answers that nothing was there, because the taken-name check was asked
+	// of this product.
+	product *int64
+	// display says the kind keeps the spelling shown back beside its matching
+	// name, and both move.
+	display bool
+	// holder answers the row of this kind already called name.
+	holder func(ctx context.Context, name string) (int64, error)
+}
+
+// renameRow is the one rename every level of the catalog makes: the name
+// checked, refused where another row holds it, and written.
+func (s *Store) renameRow(ctx context.Context, r renaming, name string) error {
+	if err := validAddressedName(r.what, name); err != nil {
 		return err
 	}
-	existing, err := s.BranchOrTagByName(ctx, productID, name)
+	holder, err := r.holder(ctx, name)
 	switch {
-	case err == nil && existing.ID != branchOrTagID:
-		return fmt.Errorf("release %q: %w", name, ErrExists)
+	case err == nil && holder != r.id:
+		return fmt.Errorf("%s %q: %w", r.what, name, ErrExists)
 	case err == nil:
+		// Already called this, in some spelling of it. The matching name is
+		// unchanged and the spelling may not be, so the write still runs.
 	case !errors.Is(err, ErrNotFound):
 		return err
 	}
-	res, err := s.db.NewUpdate().Model((*BranchOrTag)(nil)).
+	q := s.db.NewUpdate().Model(r.model).
 		Set(`"name" = ?`, typedname.Matching(name)).
-		Set(`"display_name" = ?`, name).
-		Where(`"id" = ?`, branchOrTagID).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("rename release %d: %w", branchOrTagID, err)
+		Where(`"id" = ?`, r.id)
+	if r.display {
+		q = q.Set(`"display_name" = ?`, name)
 	}
-	return counted(res, "release", branchOrTagID, "rename")
+	if r.product != nil {
+		q = q.Where(`"product_id" = ?`, *r.product)
+	}
+	res, err := q.Exec(ctx)
+	if database.IsDuplicate(err) {
+		// Taken between the check and the write, by a rename or declaration
+		// at the same moment.
+		return fmt.Errorf("%s %q: %w", r.what, name, ErrExists)
+	}
+	if err != nil {
+		return fmt.Errorf("rename %s %d: %w", r.what, r.id, err)
+	}
+	return counted(res, r.what, r.id, "rename")
 }
 
 // RetireBranchOrTag takes a release out of use.

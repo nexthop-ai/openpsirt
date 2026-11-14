@@ -155,6 +155,7 @@ Both are authorized identically and first.
 | Content type | Chosen by this deployment, never the uploaded one |
 | Disposition | `Content-Disposition: attachment` |
 | File name | The uploaded name without its directory, with control and format characters, quotes, backslashes and slashes replaced, cut to 120 bytes. A right-to-left override before `fdp.exe` shows a program as a document |
+| A name past ASCII | Quoted with each character past ASCII replaced by `_`, and carried whole in the RFC 6266 `filename*` parameter. A header is ISO-8859-1, and an object store refuses a signed URL whose disposition is not |
 | Inline display | A small allowlist of raster image types; a vector image is a document with a scripting engine |
 
 The signed URL carries these as response overrides, so they survive the
@@ -205,9 +206,19 @@ not.
 | A row the reaper could not claim leaves its bytes alone | Text naming an upload is saved after the upload commits |
 | A row the reaper could not finish does not end the pass | One undeletable object would stall collection |
 | What the reaper destroyed and failed to destroy is named by key, never counted | |
+| A reaper pass stopped part way claims no further row, logs what it could not finish, and its stop is not logged as a failure | A claim runs on a context of its own, so the check before each row is what ends the pass |
+| A redaction's removal, the reaper's claim and removal, and the removal of an upload's bytes whose row failed each run on a context of their own, bounded at 30 seconds | One still running when the shutdown grace ends fails the exit |
+| A redaction removes the bytes past its caller going away | Cut short after the row is marked, the bytes stay until somebody redacts again |
+| The reaper claims a row and removes its bytes past a stop | A stop answering the claim failed after it committed, or landing between the row and its bytes, would leave bytes nothing names |
+| An upload's bytes whose row failed are removed past its caller going away | A caller that went away is the commonest reason the row failed |
+| Those bytes are kept where the row is found, or cannot be looked for | A commit answered as failed may have landed, and the bytes stay with their row |
+| An upload whose row is found is answered as uploaded | Answered failed, the caller sends a second copy, which counts against the room beside the first |
+| Bytes an upload could not remove are logged by key on every path that uploads | The key is the only thing left that finds them |
 
 ## Limits
 
 | Rule | Reason |
 |---|---|
 | Uploads are not scanned for malware | Scanning belongs in front of the bucket, an operator's choice |
+| On a MySQL or MariaDB cluster, the look for a row whose commit was answered as failed can reach a node the commit has not, and the bytes are then removed under a committed row | The commit failing on the caller's side is rare, and the alternative keeps the bytes of every failed upload |
+| A database outage that fails an upload leaves its bytes, named in the log and by no row | The look for its row fails too, and removing them could remove a committed row's bytes |

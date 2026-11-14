@@ -182,12 +182,45 @@ func Visible(name string) string {
 // Always "attachment" for anything downloaded, and "inline" only for the
 // allowlist. The filename is quoted and has already had quotes taken out of
 // it, so nothing in it can end the parameter early.
+//
+// A header value is ISO-8859-1, and an object store refuses a signed address
+// whose disposition holds anything else, so the quoted name is ASCII alone. A
+// name holding anything past ASCII is carried whole in the RFC 6266
+// filename* parameter, which every browser prefers.
 func Disposition(a *Attachment) string {
 	how := "attachment"
 	if a.Inline() {
 		how = "inline"
 	}
-	return fmt.Sprintf(`%s; filename="%s"`, how, SafeName(a.Filename))
+	name := SafeName(a.Filename)
+	plain := strings.Map(func(r rune) rune {
+		if r > 0x7e {
+			return '_'
+		}
+		return r
+	}, name)
+	if plain == name {
+		return fmt.Sprintf(`%s; filename="%s"`, how, name)
+	}
+	return fmt.Sprintf(`%s; filename="%s"; filename*=UTF-8''%s`, how, plain, extValue(name))
+}
+
+// extValue is a name percent-encoded as RFC 8187 writes an extended
+// parameter: every byte other than a letter, a digit or one of
+// !#$&+-.^_`|~ is written as %XX.
+func extValue(name string) string {
+	var b strings.Builder
+	for i := range len(name) {
+		c := name[i]
+		switch {
+		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9',
+			strings.IndexByte("!#$&+-.^_`|~", c) >= 0:
+			b.WriteByte(c)
+		default:
+			fmt.Fprintf(&b, "%%%02X", c)
+		}
+	}
+	return b.String()
 }
 
 // mintToken returns an identifier nobody can guess.

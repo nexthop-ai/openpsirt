@@ -81,7 +81,6 @@ analysis.Applier.Apply A background pass: the analyzer worker applies one stored
 analysis.CodeFindingName A helper over a narrowed read: it names a flaw record the collaborator grant already read for the caller with a subject, inside the same transaction.
 attach.Attached A helper over a narrowed read: it marks the uploads that text refers to as attached, after the caller stored that text under its own authorization.
 attach.Store.Sweep A background pass: the attachment sweep removes uploads no stored text ever referred to.
-catalog.Store.BranchOrTagByName Not varying by reader: resolving a release name inside a product the route resolved for the caller.
 catalog.Store.BranchesAndTagsByID Not varying by reader: the names of releases a pipeline key already points at. Its route requires administration.
 catalog.Store.BranchesAndTagsEndingBy Not varying by reader: which releases will be out of support by a date, read by the catalog beside its own narrowed answer.
 catalog.Store.BranchesAndTagsPastEndOfLife Not varying by reader: which releases are out of support by a date, a fact of the catalog every narrowed read and sweep excludes alike.
@@ -119,11 +118,11 @@ catalog.Store.SetPublishes Who is asking: it records whether a product publishes
 catalog.Store.SetReleasedOn Who is asking: it records when a release went out. Its route requires administration.
 catalog.Store.SetVariantCustomerFacing Who is asking: it records whether a variant ships to customers. Its route requires administration.
 catalog.Store.TagBranchesAndTags A background pass: the deadline sweep reads which releases cannot change.
-catalog.Store.VariantByName Not varying by reader: resolving a variant name inside a product the route resolved for the caller.
 catalog.Store.VariantsByID Not varying by reader: the names of variants a pipeline key already points at. Its route requires administration.
 currency.Refresher.Once A background pass: one cycle of the currency refresher.
 currency.Refresher.Run A background pass: the currency refresher asks package indexes about components on a schedule.
 currency.RootOwners Not varying by reader: the names the deployment's own roots are published under. The unanswered list classifies against them and answers only the names its reader may see.
+database.AnalyzeAndLog A background pass: startup and the migrations refresh the engine's table statistics and log what they did.
 database.AnalyzeEveryTable A background pass: startup and the migrations refresh the engine's table statistics.
 database.DB.ServerTime Not varying by reader: the database server's own clock.
 database.InBatches Not varying by reader: an engine helper inserting rows its caller already chose.
@@ -265,6 +264,7 @@ publish.AnyPublishedForBranchOrTag Not varying by reader: whether any served doc
 publish.AnyPublishedForProduct Not varying by reader: whether any served document names a product. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 publish.AnyPublishedForVariant Not varying by reader: whether any served document names a variant. The catalog rename asks it inside its own transaction, on a route only an administrator reaches.
 publish.Store.TurnOff Who is asking: an administrator turning publishing off for a product records it and withdraws its documents, on a route only an administrator reaches.
+queue.EnsureTurn Not varying by reader: it makes the row a turn is taken on, for a write its caller already authorized.
 queue.Held Not varying by reader: whether a replica holds a lease, for the patch branch progress on a screen only an administrator reaches.
 queue.Leases.Await A background pass: a replica waits its turn to rewrite deadlines after a policy change.
 queue.Leases.Handback A background pass: a replica hands back a lease as a pass ends.
@@ -284,6 +284,7 @@ queue.Queue.Postpone A background pass: a worker puts a job back to wait.
 queue.Queue.Renew A background pass: a worker renews its hold on a job.
 queue.Queue.Settle A background pass: a worker records how a job ended.
 queue.Queue.Succeed A background pass: a worker records a job done.
+queue.TakeTurn Not varying by reader: it makes other writers taking one turn wait, inside a transaction its caller already authorized.
 saved.Store.ForgetFilter A person's own record: it removes a filter the signed-in person saved, keyed by their id.
 saved.Store.SaveFilterPreparing A person's own record: it saves a filter for the signed-in person, keyed by their id.
 saved.Store.SavedFilters A person's own record: the filters the signed-in person saved, keyed by their id.

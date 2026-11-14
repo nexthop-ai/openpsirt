@@ -86,9 +86,9 @@ func TestAWriteFromABrowserHasToProveItCameFromOurOwnPage(t *testing.T) {
 			csrf string
 			want int
 		}{
-			{"nothing echoed", "", http.StatusUnauthorized},
-			{"a guess", "not-the-value", http.StatusUnauthorized},
-			{"another session's value", other.CSRF, http.StatusUnauthorized},
+			{"nothing echoed", "", http.StatusForbidden},
+			{"a guess", "not-the-value", http.StatusForbidden},
+			{"another session's value", other.CSRF, http.StatusForbidden},
 			{"its own value", issued.CSRF, http.StatusCreated},
 		} {
 			got := asBrowser(t, r, issued, http.MethodPost, "/v1/products", c.csrf).Code
@@ -138,9 +138,9 @@ func TestAWriteFromSomebodyElsesPageIsRefused(t *testing.T) {
 			origin string
 			want   int
 		}{
-			{"somebody else's page", "https://evil.example", http.StatusUnauthorized},
-			{"no origin at all", "", http.StatusUnauthorized},
-			{"a lookalike host", "http://example.com.evil.example", http.StatusUnauthorized},
+			{"somebody else's page", "https://evil.example", http.StatusForbidden},
+			{"no origin at all", "", http.StatusForbidden},
+			{"a lookalike host", "http://example.com.evil.example", http.StatusForbidden},
 			{"our own page", "http://example.com", http.StatusCreated},
 		} {
 			req := httptest.NewRequest(http.MethodPost, "/v1/products",
@@ -221,6 +221,21 @@ func TestTheAnswerAboutYourselfSaysWhetherTheProxySignedYouIn(t *testing.T) {
 		got := asBrowser(t, r, issued, http.MethodGet, "/v1/session/me", "")
 		if got.Code != http.StatusOK || strings.Contains(got.Body.String(), "by_proxy") {
 			t.Errorf("a session of ours answered %d: %s", got.Code, got.Body.String())
+		}
+	})
+}
+
+// A sign-out the forgery guard refuses is told apart from one that found no
+// session: the session still works, so the answer is never the 401 a browser
+// reads as signed out.
+func TestARefusedSignOutIsNotReadAsSignedOut(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		issued := signIn(t, r, "reader")
+
+		out := asBrowser(t, r, issued, http.MethodDelete, "/v1/session", "not-the-value")
+		httpapitest.RefusedWith(t, out, http.StatusForbidden)
+		if got := asBrowser(t, r, issued, http.MethodGet, "/v1/products", "").Code; got != http.StatusOK {
+			t.Errorf("the session a refused sign-out left answered %d, want 200", got)
 		}
 	})
 }
