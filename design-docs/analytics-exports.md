@@ -19,7 +19,7 @@ audit log, the review queue, what became of the reader's own decisions, the
 by-component view, what is running out of time, the last upload per build, what
 is out of support, a comparison of two builds, a comparison of two builds'
 inventories, the planned upgrades of a product and of one build, the code
-finding queue, what keeps being put off, the backlog over time, the findings
+finding queue, the code finding trend and figures, what keeps being put off, the backlog over time, the findings
 burndown, administrative changes, what a build holds that the scanner cannot
 match, and the disposition register.
 
@@ -43,7 +43,7 @@ complete list exists to filter afterwards. A file is read one of three ways.
 | Every page of a paged file reads at the moment the file states it was taken: a deadline, a date run out and an end of life | A deadline passing between two pages sorts a row into a page already written, which repeats or skips a row as a write between them does |
 | A list grouped in the application from everything it reads is read whole, once | Paged, every page repeats the whole read: what keeps being put off is grouped from every deferral |
 | A failure part-way writes a line saying the file is incomplete, and is logged | The 200 has gone out, so nothing else tells an operator; a reader that went away, or one too slow for the stall bound or the ceiling, is a warning |
-| A stream's cursor and a paged file's snapshot are held ten minutes at most, then cut with the incomplete marker | A slow reader otherwise holds a connection about 41 hours for 249,288 occurrences read in 1.9 s; on SQLite, the whole pool. A snapshot also holds back the engine's clean-up of old row versions, and on SQLite a checkpoint of the write-ahead log past it: ten minutes beside 100 write transactions a second grew MySQL 8's history list to 139,646 and MariaDB's to 154,061. A findings file of 12,000 groups reads in 44 s on MySQL, the slowest engine (`design-docs/analytics-measurements.md` § Export snapshots) |
+| A stream's cursor and a paged file's snapshot are held ten minutes at most, then cut with the incomplete marker | A slow reader otherwise holds a connection about 41 hours for 249,288 occurrences read in 1.9 s; on a pool of one connection, the whole pool. A snapshot also holds back the engine's clean-up of old row versions, and on SQLite a checkpoint of the write-ahead log past it. On PostgreSQL, MySQL and MariaDB it holds a shared lock on every table it has read until it ends, so a migration altering one of them, such as a replica's at start during a rolling upgrade, waits for the file, and every later request on that table waits behind the migration. Ten minutes beside 100 write transactions a second grew MySQL 8's history list to 139,646 and MariaDB's to 154,061. A findings file of 12,000 groups reads in 44 s on MySQL, the slowest engine (`design-docs/analytics-measurements.md` § Export snapshots) |
 | Files reading the database as they are written are a fifth of the pool at once, at least one; one more is refused with 503 and a time to ask again | A file read whole holds no connection and takes no place |
 | A refusal is answered before the first byte | After it, a refusal sits inside a 200 |
 | The deadline report pages by offset, with the build in the ordering | An arbitrary order repeats one row and skips another |

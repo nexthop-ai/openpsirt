@@ -259,7 +259,8 @@ func tail(body string) string {
 //
 // The write deadline only fires for a reader that stops. One that takes a row
 // every so often keeps it moving, and the cursor holds a connection for as
-// long as that takes. On SQLite that connection is the whole pool. The reader
+// long as that takes. The harness gives SQLite a pool of one, so that
+// connection is the whole pool. The reader
 // here blocks on the second row, as a socket to a slow client does, and the
 // connection has to be free again while it is still blocked.
 func TestAStreamedExportGivesItsConnectionBackAtTheCeiling(t *testing.T) {

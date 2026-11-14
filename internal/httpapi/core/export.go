@@ -21,18 +21,19 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// Exporting writes a list out as it is read.
+// Exporting writes a list out: paged, streamed, or read whole beforehand,
+// which Rows, Stream and Held below say.
 //
-// The subject travels through the stream. An export is the easiest place in
+// The subject travels with the reading. An export is the easiest place in
 // this codebase to build a list first and narrow it afterwards, which is
-// exactly the failure the narrowing helper's own comment warns about — so this
-// is the same query with the same subject, paged and written as it goes, and
-// there is no point at which a whole unnarrowed list exists.
+// exactly the failure the narrowing helper's own comment warns about — so a
+// file is the screen's own query with the same subject, and there is no point
+// at which a whole unnarrowed list exists.
 //
-// Paged rather than unbounded. A year of a real deployment is more rows
-// than a process should hold, and the page is the same page the screen reads:
-// one query shape, so a spreadsheet and a screen cannot disagree about what
-// the filter means.
+// A large list is paged or streamed, never held. A year of a real deployment
+// is more rows than a process should hold, and a page is the same page the
+// screen reads: one query shape, so a spreadsheet and a screen cannot disagree
+// about what the filter means.
 type Exporting struct {
 	// The name of the file, in the words the report it comes from is known
 	// by. Stated on every export, with the moment it was taken, by
@@ -197,8 +198,9 @@ const exportStall = 2 * time.Minute
 //
 // A reader that takes a page every two minutes keeps exportStall from ever
 // firing, and the cursor, with its connection, is held for as long as the file
-// takes at that pace: about 41 hours for a build of 249,288 occurrences. On SQLite
-// that connection is the whole pool, so every other request waits behind it.
+// takes at that pace: about 41 hours for a build of 249,288 occurrences. On a
+// pool of one connection, which an in-memory SQLite database always is, that
+// connection is the whole pool, so every other request waits behind it.
 // The measured file takes 1.9 seconds to read from the database, so the
 // ceiling leaves an honest download on a slow link room to finish. A file cut
 // at the ceiling carries the incomplete marker.
