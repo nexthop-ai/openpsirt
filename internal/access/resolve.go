@@ -483,8 +483,9 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 		Where(`"person_id" = ?`, person.ID).Where(`"active" = ?`, true).Scan(ctx); err != nil {
 		return Subject{}, fmt.Errorf("read what %q may do everywhere: %w", identity, err)
 	}
+	var everywhere []Role
 	if len(estate) > 0 {
-		everywhere := make([]Role, 0, len(estate))
+		everywhere = make([]Role, 0, len(estate))
 		for _, grant := range estate {
 			if boundDerived && s.stale(ctx, grant.Source, grant.CreatedAt) {
 				continue
@@ -544,7 +545,12 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	// Somebody holding the audit permission alone holds access: they reach no
 	// product and read the deployment's own records, which is the whole of
 	// what it is for.
-	if !administers && !audits && len(grants) == 0 && len(cases) == 0 && len(codeFindings) == 0 {
+	//
+	// A role across every product is access whatever the catalog holds. Spread
+	// over a catalog with nothing in it, it adds no per-product grant, so it is
+	// counted as held here and reaches no product until one is declared.
+	if !administers && !audits && len(grants) == 0 && len(everywhere) == 0 &&
+		len(cases) == 0 && len(codeFindings) == 0 {
 		return Subject{}, ErrDenied
 	}
 
@@ -565,7 +571,7 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 		on = append(on, team.PartyID)
 	}
 	subject := NewPerson(person.ID, person.Identity, administers, grants,
-		person.PartyID, on...).OnCases(cases).OnCodeFindings(codeFindings)
+		person.PartyID, on...).OnCases(cases).OnCodeFindings(codeFindings).Everywhere(everywhere)
 	if audits {
 		subject = subject.Auditing()
 	}

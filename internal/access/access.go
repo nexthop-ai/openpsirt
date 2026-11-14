@@ -280,6 +280,11 @@ type Subject struct {
 	// as occurrences per product. It reads those code findings' evidence and nothing else
 	// of the product. Carried on the subject for the reason cases are.
 	codeFindings map[int64][]string
+	// everywhere is the roles held across every product. Already spread over
+	// the catalog into grants, which is what every product-scoped question
+	// reads; kept apart only so that "holds this role anywhere" answers yes
+	// for somebody holding it across a catalog with nothing in it yet.
+	everywhere []Role
 	// casesReadOnly takes the write half of a case grant away, for a
 	// credential narrowed to roles that do not include triage. Inverted so
 	// that the zero value acts, which is what every subject not narrowed this
@@ -433,6 +438,15 @@ func (s Subject) OnCases(cases map[int64][]int64) Subject {
 // Chained for the reason OnCases is.
 func (s Subject) OnCodeFindings(codeFindings map[int64][]string) Subject {
 	s.codeFindings = codeFindings
+	return s
+}
+
+// Everywhere returns this subject holding roles across every product.
+//
+// The roles reach a product only through the grants they were spread into, so
+// this widens no product-scoped question. Chained for the reason OnCases is.
+func (s Subject) Everywhere(roles []Role) Subject {
+	s.everywhere = roles
 	return s
 }
 
@@ -891,12 +905,15 @@ func (s Subject) HoldsAnywhere(roles ...Role) bool {
 	if s.Kind != Person {
 		return false
 	}
-	for _, held := range s.grants {
-		for _, role := range held {
-			for _, wanted := range roles {
-				if role == wanted {
-					return true
-				}
+	for _, wanted := range roles {
+		// A role across every product is held anywhere a product could be,
+		// including a catalog with none in it yet.
+		if holds(s.everywhere, wanted) {
+			return true
+		}
+		for _, held := range s.grants {
+			if holds(held, wanted) {
+				return true
 			}
 		}
 	}
