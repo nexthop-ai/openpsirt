@@ -125,8 +125,10 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
   const offered = providers.data?.items ?? [];
   const only = offered.length === 1 ? offered[0] : undefined;
   const forwarding = Boolean(only) && forwardable(offered.length, resuming);
-  // Where no way in is configured, that is the one thing worth saying.
-  const turnedAway = !resuming && marked(refused) && offered.length > 0;
+  // Where no way in is configured, that is the one thing worth saying, so
+  // nothing is said until the ways in are read.
+  const refusedHere = !resuming && marked(refused);
+  const turnedAway = refusedHere && offered.length > 0;
 
   useEffect(() => {
     if (!forwarding || !only) return;
@@ -176,9 +178,11 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
               <p className="mt-1 text-sm text-[var(--muted)]">Ask an administrator for access.</p>
             </div>
           ) : (
-            <p className="text-sm text-[var(--muted)]">
-              {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
-            </p>
+            !(refusedHere && providers.isPending) && (
+              <p className="text-sm text-[var(--muted)]">
+                {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
+              </p>
+            )
           )}
           {resuming && (
             <p className="text-center text-sm text-[var(--muted)]">Anything you typed is kept.</p>
