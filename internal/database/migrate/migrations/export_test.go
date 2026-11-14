@@ -5,6 +5,7 @@ package migrations
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log/slog"
 	"slices"
@@ -392,4 +393,14 @@ const PublishedBatchV0130 = publishedBatchV0130
 func ShortLockWaits(ctx context.Context) context.Context {
 	return context.WithValue(ctx, waitsKey{}, lockWaits{attemptSeconds: 1,
 		pause: 100 * time.Millisecond, most: 200 * time.Millisecond})
+}
+
+// BoundV0110Renames sets the v0.11.0 renames' bound on tx and puts it back,
+// as the renames do around their statements.
+func BoundV0110Renames(ctx context.Context, raw *sql.Tx, engine database.Engine) error {
+	restore, err := renamer{u: &upgrader{ctx: ctx, raw: raw, engine: engine}}.bound()
+	if err != nil {
+		return err
+	}
+	return restore()
 }

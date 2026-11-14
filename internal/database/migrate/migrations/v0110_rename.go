@@ -421,7 +421,8 @@ func renameV0110Stopping(ctx context.Context, tx bun.Tx, stopAfter string) (err 
 	}
 	defer func() {
 		// PostgreSQL's bound is the transaction's own, and a failed rename
-		// ends the transaction, so a reset there fails and says nothing.
+		// fails the upgrade, whose transaction rolls back and takes the
+		// bound with it.
 		if err != nil && r.u.engine == database.Postgres {
 			return
 		}
@@ -475,9 +476,13 @@ func (r renamer) bound() (func() error, error) {
 		set = []string{fmt.Sprintf("SET LOCAL lock_timeout = '%ds'", renameAttemptWait)}
 		reset = []string{"SET LOCAL lock_timeout TO DEFAULT"}
 	case database.MySQL, database.MariaDB:
-		set = []string{fmt.Sprintf("SET SESSION lock_wait_timeout = %d", renameAttemptWait),
+		// The session's own bound is kept and put back, never the server's
+		// default, which would drop a bound the database URL set.
+		set = []string{fmt.Sprintf("SET @openpsirt_rename_wait = @@SESSION.lock_wait_timeout, "+
+			"SESSION lock_wait_timeout = %d", renameAttemptWait),
 			"SET SESSION foreign_key_checks = 0"}
-		reset = []string{"SET SESSION lock_wait_timeout = DEFAULT", "SET SESSION foreign_key_checks = 1"}
+		reset = []string{"SET SESSION lock_wait_timeout = @openpsirt_rename_wait",
+			"SET SESSION foreign_key_checks = 1"}
 	default:
 		return func() error { return nil }, nil
 	}

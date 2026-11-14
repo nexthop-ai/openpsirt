@@ -70,7 +70,7 @@ func TestABoundAppliedInPartIsPutBack(t *testing.T) {
 	if _, err := renamerOver(t, d).bound(); err == nil {
 		t.Fatal("a bound whose second setting was refused was reported applied")
 	}
-	if !slices.Contains(d.ran, "SET SESSION lock_wait_timeout = DEFAULT") {
+	if !slices.Contains(d.ran, "SET SESSION lock_wait_timeout = @openpsirt_rename_wait") {
 		t.Errorf("the lock wait applied before the refusal was left in place; ran %q", d.ran)
 	}
 	if slices.Contains(d.ran, "SET SESSION foreign_key_checks = 1") {
@@ -85,7 +85,7 @@ func TestEverySettingIsPutBackWhereOneFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d.refuses = "lock_wait_timeout = DEFAULT"
+	d.refuses = "lock_wait_timeout = @openpsirt_rename_wait"
 	if err := restore(); err == nil {
 		t.Error("a setting that could not be put back was not reported")
 	}

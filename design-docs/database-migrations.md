@@ -246,7 +246,7 @@ for up to ten minutes (`design-docs/analytics-exports.md` § Exports).
 | A deadlock that ends the migration's statement is an attempt that waited out its bound | A holder reading a table the migration already took closes a cycle, and an ended attempt changed nothing |
 | On PostgreSQL a deadlock ends whichever side checks first, once its wait passes the server's deadlock timeout | Each side checks on its own clock |
 | On MySQL and MariaDB a deadlock ends the holder | A schema change outweighs a read |
-| On MySQL and MariaDB a bound the session already carried, such as one the URL set, is put back after each statement | The bound belongs to the session, and the connection goes back to the pool |
+| On MySQL and MariaDB a bound the session already carried, such as one the URL set, is put back after each statement, and after the v0.11.0 renames | The bound belongs to the session, and the connection goes back to the pool |
 | An upgrade gives up only when stopped or on a failure other than a lock wait | A holder that ends, an export's ten-minute snapshot among them, is waited out, and the migration takes the table at the first attempt that finds it free |
 | Each attempt that waits out its bound is logged with its number, the time waited, the statement, and every other session on the database with a transaction open, oldest first, twenty at most | A holder that never lets go holds the start, and the log names the session to end |
 | On PostgreSQL a session whose state is hidden is named after the open transactions, whether it holds one or sits idle | Another role's state and times show only to a role that reads every session's statistics |
@@ -254,7 +254,6 @@ for up to ten minutes (`design-docs/analytics-exports.md` § Exports).
 | Where MySQL and MariaDB list no open transaction, every session on the database the account can see is named, idle ones included, the migrating instance's own among them | The session holding the migration lock is one of them, and ending it gives the lock up mid-migration (§ Migration locks) |
 | On PostgreSQL a retried upgrade runs its earlier statements again, holding each table it takes until the attempt ends | A statement queued on such a table waits at most one attempt and the statements before it |
 | The v0.11.0 renames wait in their own attempts of three seconds with a pause of a second, inside the upgrade's transaction on PostgreSQL | Their migration is the release's record, and is amended only for a fix the owner approves |
-| On MySQL and MariaDB the v0.11.0 renames end by setting the session's bound to the server's default, so a connection that ran them leaves without a bound its URL set | Their migration is the release's record |
 | The baseline never waits | It makes its tables in an empty database, where no session holds one |
 
 ## Migration locks
