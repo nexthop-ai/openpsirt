@@ -744,7 +744,7 @@ func (r *Reader) document(ctx context.Context, client *http.Client, up Upstream,
 	digest := hex.EncodeToString(sum[:])
 	moved := false
 	if err := finding.EnsureStatementsLock(ctx, r.db); err != nil {
-		return false, err
+		return false, local{err}
 	}
 	err = database.Within(ctx, r.db, func(ctx context.Context, tx bun.IDB) error {
 		if err := finding.TakeStatements(ctx, tx); err != nil {

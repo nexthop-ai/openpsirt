@@ -742,7 +742,7 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, feed Feed, one 
 	statements := ours(advisory, ships)
 	var recorded int
 	if err := finding.EnsureStatementsLock(ctx, f.db); err != nil {
-		return 0, err
+		return 0, local{err}
 	}
 	err := database.Within(ctx, f.db, func(ctx context.Context, tx bun.IDB) error {
 		if err := finding.TakeStatements(ctx, tx); err != nil {

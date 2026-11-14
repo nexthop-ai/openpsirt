@@ -277,3 +277,73 @@ func TestAFailureHereIsNotRecordedAgainstTheSupplier(t *testing.T) {
 		}
 	})
 }
+
+// A database failure during a pass, reading what the product ships or recording
+// what a document says, is this deployment's: recorded as such, never as the
+// publisher's, and the supplier stays due.
+func TestADatabaseFailureDuringAPassIsNotRecordedAgainstTheSupplier(t *testing.T) {
+	for _, at := range []struct {
+		name  string
+		table string
+		ask   int
+	}{
+		{"reading what the product ships", "graph_node", 1},
+		{"the statements lock before a document", "lease", 2},
+		{"the transaction recording a document", "received_vex_statement", 2},
+	} {
+		t.Run(at.name, func(t *testing.T) {
+			shipping(t, func(t *testing.T, f *ships) {
+				ctx := t.Context()
+				p := serving(t)
+				p.publishes("/2026/EL-50.json", "2026-09-20T00:00:00Z",
+					advisory("EL-2026-0050", "libnl-3-200", "3.7.1", "CVE-2026-5210"))
+				store, row, pass := passOver(t, f, p, "test")
+				row.CaughtUpTo, row.CaughtUpMark, row.CreatedAt = &long, "", long
+				away := func(from, to string) {
+					t.Helper()
+					if _, err := f.db.ExecContext(context.WithoutCancel(ctx),
+						`ALTER TABLE "`+from+`" RENAME TO "`+to+`"`); err != nil {
+						t.Fatal(err)
+					}
+				}
+				moved := false
+				t.Cleanup(func() {
+					if moved {
+						away(at.table+"_away", at.table)
+					}
+				})
+				// The lease is asked for before the listing and before each
+				// document.
+				asked := 0
+				fetch := fetching(t, f, p)
+				fetch.Keep = func(context.Context) (bool, error) {
+					asked++
+					if asked == at.ask {
+						away(at.table, at.table+"_away")
+						moved = true
+					}
+					return true, nil
+				}
+				supplier.FetchForTest(pass, fetch)
+
+				_, err := supplier.FromForTest(ctx, pass, *row)
+				away(at.table+"_away", at.table)
+				moved = false
+				if asked < at.ask {
+					t.Fatalf("the lease was asked for %d times, so the failure was never reached", asked)
+				}
+				if err == nil {
+					t.Fatal("a pass the database failed reported nothing")
+				}
+				rows, err := store.For(ctx, f.by, f.product)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(rows) != 1 || rows[0].FetchedAt != nil ||
+					!strings.HasPrefix(rows[0].Failed, "this deployment failed, not the publisher") {
+					t.Errorf("a database failure was recorded against the supplier: %+v", rows)
+				}
+			})
+		})
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -244,6 +245,85 @@ func TestAReadThatCannotAskForTheLeaseRecordsItFailedHere(t *testing.T) {
 				}
 				if up.Failed != "this deployment failed, not the upstream; its log says why" {
 					t.Errorf("a read that failed here recorded %q", up.Failed)
+				}
+			})
+		})
+	}
+}
+
+// A database failure while a read records what a document says, or sets aside
+// what one it stopped listing said, is this deployment's: the upstream records
+// it in fixed words and stays due.
+func TestADatabaseFailureRecordingADocumentFailedHere(t *testing.T) {
+	for _, at := range []struct {
+		name     string
+		table    string
+		ask      int
+		withdraw bool
+	}{
+		{"reading what was read before", "upstream_document", 1, false},
+		{"the statements lock before a document", "lease", 2, false},
+		{"the transaction recording a document", "upstream_document", 2, false},
+		{"the statements lock before a withdrawal", "lease", 1, true},
+	} {
+		t.Run(at.name, func(t *testing.T) {
+			fixture.Each(t, func(t *testing.T, f *fixture.World) {
+				w := newWorld(t, f)
+				w.trust()
+				ctx := t.Context()
+				// The lease is asked for before the listing and before each
+				// document; a withdrawal follows the last ask.
+				if at.withdraw {
+					w.read()
+					if _, err := w.DB.DB.NewUpdate().Model((*publish.Document)(nil)).
+						Set(`"withdrawn_at" = ?`, time.Now().UTC()).
+						Where(`"subject" = ?`, portable).Exec(ctx); err != nil {
+						t.Fatal(err)
+					}
+				}
+				away := func(from, to string) {
+					t.Helper()
+					if _, err := w.DB.ExecContext(context.WithoutCancel(ctx),
+						`ALTER TABLE "`+from+`" RENAME TO "`+to+`"`); err != nil {
+						t.Fatal(err)
+					}
+				}
+				moved := false
+				t.Cleanup(func() {
+					if moved {
+						away(at.table+"_away", at.table)
+					}
+				})
+				asked := 0
+				upstream.Keeping(w.reader, func(context.Context) (bool, error) {
+					asked++
+					if asked == at.ask {
+						away(at.table, at.table+"_away")
+						moved = true
+					}
+					return true, nil
+				})
+				up, err := upstream.NewStore(w.DB.DB).For(ctx, w.admin, w.fork.ID)
+				if err != nil || up == nil {
+					t.Fatalf("the fork trusts no upstream: %v", err)
+				}
+				fetched := up.FetchedAt
+				_, err = w.reader.From(ctx, *up)
+				away(at.table+"_away", at.table)
+				moved = false
+				if !errors.As(err, new(upstream.Local)) {
+					t.Fatalf("a read the database failed reported %v", err)
+				}
+				up, err = upstream.NewStore(w.DB.DB).For(ctx, w.admin, w.fork.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if up.Failed != "this deployment failed, not the upstream; its log says why" {
+					t.Errorf("a read the database failed recorded %q", up.Failed)
+				}
+				if (fetched == nil) != (up.FetchedAt == nil) ||
+					(fetched != nil && !fetched.Equal(*up.FetchedAt)) {
+					t.Error("a read the database failed moved when the upstream was last read")
 				}
 			})
 		})

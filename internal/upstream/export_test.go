@@ -21,3 +21,6 @@ func Keeping(r *Reader, keep func(context.Context) (bool, error)) { r.keep = kee
 func Record(ctx context.Context, r *Reader, up Upstream, failed error) error {
 	return r.record(ctx, up, up.Listings, up.KeyOffered, failed, false)
 }
+
+// Local is a failure of this deployment during a pass.
+type Local = local
