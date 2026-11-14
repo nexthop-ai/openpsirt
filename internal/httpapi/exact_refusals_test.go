@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"io/fs"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -69,24 +70,53 @@ func boundedRefusals(file *ast.File, name string) []string {
 // success range's floor, so a test failing only inside it passes a fault), or
 // ordered either way against a refusal's status by name. Whatever holds the
 // status — a recorder's Code, or a plain int a helper returned — nothing but a
-// status is compared with these.
+// status is compared with these. A bound is read on either side, as a number
+// or by its name, and each bound is matched in both its strict and its
+// inclusive spelling.
 func ordered(compared *ast.BinaryExpr) bool {
 	switch compared.Op {
 	case token.LSS, token.LEQ, token.GTR, token.GEQ:
 	default:
 		return false
 	}
-	if bound, ok := compared.Y.(*ast.BasicLit); ok {
+	status, bound, op := compared.X, compared.Y, compared.Op
+	if _, left := numeric(status); left {
+		if _, right := numeric(bound); !right {
+			status, bound, op = bound, status, mirrored[op]
+		}
+	}
+	if v, ok := numeric(bound); ok {
 		switch {
-		case bound.Value == "400" && (compared.Op == token.LSS || compared.Op == token.LEQ):
+		case op == token.LSS && v == 400, op == token.LEQ && (v == 399 || v == 400):
 			return true
-		case bound.Value == "200" && (compared.Op == token.GEQ || compared.Op == token.GTR):
+		case op == token.GEQ && v == 200, op == token.GTR && (v == 199 || v == 200):
 			// The floor of the success range. A status below 300 alone is
 			// how a helper decides whether to read a success's body.
 			return true
 		}
 	}
-	return refusalStatuses[statusNamed(compared.X)] || refusalStatuses[statusNamed(compared.Y)]
+	return refusalStatuses[statusNamed(status)] || refusalStatuses[statusNamed(bound)]
+}
+
+// mirrored is the comparison holding with its two sides swapped.
+var mirrored = map[token.Token]token.Token{
+	token.LSS: token.GTR, token.GTR: token.LSS, token.LEQ: token.GEQ, token.GEQ: token.LEQ,
+}
+
+// numeric is the status an expression is, written as a number or as the name
+// net/http gives one of the two bounds read here.
+func numeric(expr ast.Expr) (int, bool) {
+	if literal, ok := expr.(*ast.BasicLit); ok && literal.Kind == token.INT {
+		v, err := strconv.Atoi(literal.Value)
+		return v, err == nil
+	}
+	switch statusNamed(expr) {
+	case "StatusOK":
+		return 200, true
+	case "StatusBadRequest":
+		return 400, true
+	}
+	return 0, false
 }
 
 // failsOnlyOnSuccess reports `if status == http.StatusOK { t.Error(...) }`:
@@ -187,6 +217,12 @@ func successExpected() { if got.Code != http.StatusOK { t.Errorf("refused") } }
 func decoding() { if got.Code == http.StatusCreated { if err := decode(); err != nil { t.Fatal(err) } } }
 func successRange() { if got >= 200 && got < 300 { fail() } }
 func notASuccess() { if got < 200 || got >= 300 { t.Fatal() } }
+func namedFloor() { if got >= http.StatusOK && got < 300 { fail() } }
+func floorOnTheLeft() { if 200 <= got { fail() } }
+func floorBelow() { if got > 199 { fail() } }
+func capOnTheLeft() { if 400 > got { fail() } }
+func capInclusive() { if got <= 399 { fail() } }
+func faultOnTheLeft() { if 500 <= got { fail() } }
 `
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "x_test.go", source, 0)
@@ -195,7 +231,9 @@ func notASuccess() { if got < 200 || got >= 300 { t.Fatal() } }
 	}
 	got := strings.Join(boundedRefusals(file, "x_test.go"), ",")
 	if want := "x_test.go:bounded,x_test.go:bothSides,x_test.go:bareInt,x_test.go:named," +
-		"x_test.go:namedBelow,x_test.go:anythingButSuccess,x_test.go:successRange"; got != want {
+		"x_test.go:namedBelow,x_test.go:anythingButSuccess,x_test.go:successRange," +
+		"x_test.go:namedFloor,x_test.go:floorOnTheLeft,x_test.go:floorBelow,x_test.go:capOnTheLeft," +
+		"x_test.go:capInclusive"; got != want {
 		t.Errorf("reported %q, want %q", got, want)
 	}
 }
