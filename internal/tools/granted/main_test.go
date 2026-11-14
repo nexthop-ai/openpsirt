@@ -361,9 +361,8 @@ func TestWhatAnotherPackageDeclaresIsFollowed(t *testing.T) {
 	}
 }
 
-// A reader passes what it reaches to its callers, and a caller that is itself
-// such a reader passes on what it reached through its calls. Reading both
-// halves through the exempt readers is reaching both tables.
+// A reader passes what it reaches to its callers, so reading both halves
+// through the exempt readers is reaching both tables.
 func TestAReaderCallingBothHalvesReachesBoth(t *testing.T) {
 	got := judged(t, map[string]string{
 		"internal/p/x.go": `package p
@@ -444,5 +443,25 @@ func TestReadersCallingEachOtherSettle(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("the readers' reach never settled")
+	}
+}
+
+// A half reaching the other table through a half it calls passes both tables
+// to its callers, so a function calling only that half reaches both.
+func TestAHalfReachingBothThroughAnotherHalfPassesBoth(t *testing.T) {
+	sources := accessSources(t)
+	sources["internal/q/q.go"] = []byte(`package q
+		func a() { db.NewSelect().Join("role_grant") }
+		func b() { db.NewSelect().Join("role_grant_all"); s.a() }
+		func c() { s.b() }`)
+	found, err := check(module, sources, []string{"internal/q/q.go:a", "internal/q/q.go:b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if table, reported := found["internal/q/q.go:c"]; reported {
+		t.Errorf("c reported as reaching %s alone, though the half it calls reaches both", table)
+	}
+	if _, reported := found["internal/q/q.go:a"]; !reported {
+		t.Error("a reaches role_grant alone and is not reported")
 	}
 }

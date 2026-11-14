@@ -133,6 +133,14 @@ func TestWhatATierIsChosenFrom(t *testing.T) {
 			[]tier{engines},
 		},
 		{
+			// A route test reaching every engine through the route harness
+			// carries no SQL and imports no store.
+			"a route test run through the route harness",
+			write("reach_test.go", "package p\n\nimport \"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest\"\n\n"+
+				"func TestX(t *testing.T) { httpapitest.EachReach(t) }\n"),
+			[]tier{engines},
+		},
+		{
 			"plain go",
 			write("plain.go", "package p\n\nfunc add(a, b int) int { return a + b }\n"),
 			[]tier{code},

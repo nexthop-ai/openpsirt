@@ -159,13 +159,27 @@ func h(at time.Time) (string, string) {
 
 var closure = func(at time.Time) string { when := at; return when.Format(time.DateOnly) }
 
-func reused(at time.Time, all []time.Time) (string, string, string) {
+func ranged(at time.Time, all []time.Time) string {
 	when := at.UTC()
 	for _, when := range all {
-		_ = when.Format(time.DateOnly)
+		_ = when
 	}
-	echo := func(when time.Time) string { return when.Format(time.DateOnly) }
-	return when.Format(time.DateOnly), echo(at), ""
+	return when.Format(time.DateOnly)
+}
+
+func param(at time.Time) string {
+	when := at.UTC()
+	_ = func(when time.Time) {}
+	return when.Format(time.DateOnly)
+}
+
+func declared(at time.Time) string {
+	when := at.UTC()
+	{
+		var when = at
+		_ = when
+	}
+	return when.Format(time.DateOnly)
 }
 
 func g(v value) string { return v.Format(notALayout) }

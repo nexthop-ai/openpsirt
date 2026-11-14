@@ -595,3 +595,16 @@ func TestAValueOfARepeatedPropertyOnlyTheSecondGaveIsAddedAsItsOwn(t *testing.T)
 		t.Errorf("merged %s, want %s", body, want)
 	}
 }
+
+func TestAPropertyTheSecondRepeatsIsAddedWithoutADisagreement(t *testing.T) {
+	body, ok := mergeProperties(
+		json.RawMessage(`[{"name":"syft:cpe23","value":"cpe:a"}]`),
+		json.RawMessage(`[{"name":"syft:cpe23","value":"cpe:b"},{"name":"syft:cpe23","value":"cpe:c"}]`))
+	if !ok {
+		t.Fatal("nothing merged")
+	}
+	want := `[{"name":"syft:cpe23","value":"cpe:a"},{"name":"syft:cpe23","value":"cpe:b"},{"name":"syft:cpe23","value":"cpe:c"}]`
+	if string(body) != want {
+		t.Errorf("merged %s, want %s", body, want)
+	}
+}
