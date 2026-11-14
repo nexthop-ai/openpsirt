@@ -269,12 +269,16 @@ func StoredPurl(purl string) string {
 	}
 	pairs := strings.Split(qualifiers, "&")
 	kept := make([]string, 0, len(pairs))
+	// How many pairs the walk read through, so that a walk stopping early,
+	// after which the subpath may be the rest of an address it did not keep,
+	// is told apart.
+	walked := 0
 	for _, pair := range pairs {
 		key, value, found := strings.Cut(pair, "=")
-		if !found {
+		if !found || !qualifierKey(key) {
 			// No qualifier the specification allows: the rest of a value
-			// holding a raw "&", such as a password, so that value and every
-			// pair after it go.
+			// holding a raw "&", such as a password or a path, so that value
+			// and every pair after it go.
 			if len(kept) > 0 {
 				kept = kept[:len(kept)-1]
 			}
@@ -286,6 +290,11 @@ func StoredPurl(purl string) string {
 			// credential end. Neither the pair nor any after it is kept: a
 			// credential holding a raw "&" goes on into the pairs after it.
 			break
+		}
+		// An address escaped twice is read as it would be decoded again, or
+		// a reader decoding it once more finds the credential.
+		if again, err := url.PathUnescape(decoded); err == nil {
+			decoded = again
 		}
 		if !sourcelink.Schemed(decoded) {
 			// An address written without a scheme loses a password before
@@ -306,6 +315,7 @@ func StoredPurl(purl string) string {
 			if queryUnescaped(value) {
 				break
 			}
+			walked++
 			continue
 		}
 		parsed, err := url.Parse(decoded)
@@ -334,17 +344,45 @@ func StoredPurl(purl string) string {
 			// the pairs after it as that query, so they are not kept.
 			break
 		}
+		walked++
 	}
 	purl = body
 	if len(kept) > 0 {
 		purl += "?" + strings.Join(kept, "&")
 	}
-	// A subpath holding a value after the qualifiers is the fragment of an
-	// address, written unescaped, and is not kept.
-	if hasSubpath && !strings.Contains(subpath, "=") {
+	// A subpath after a walk that stopped may be the rest of an address it
+	// dropped, and one holding a value or a user, escaped or not, is the
+	// fragment of an address written unescaped. Neither is kept.
+	if hasSubpath && walked == len(pairs) && plainSubpath(subpath) {
 		purl += "#" + subpath
 	}
 	return purl
+}
+
+// plainSubpath is whether a subpath decodes, and holds no equals sign, "@"
+// or question mark once decoded: a path within the package and nothing of an
+// address.
+func plainSubpath(subpath string) bool {
+	decoded, err := url.PathUnescape(subpath)
+	return err == nil && !strings.ContainsAny(decoded, "=@?")
+}
+
+// qualifierKey is whether a qualifier's key is one the purl specification
+// allows: ASCII letters, digits, ".", "-" and "_", not starting with a digit.
+func qualifierKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		switch {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', c == '.', c == '-', c == '_':
+		case '0' <= c && c <= '9' && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // queryUnescaped says whether a qualifier's value holds an address whose query

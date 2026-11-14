@@ -814,6 +814,16 @@ func TestAPackageIdentifierIsStoredWithoutSlashesAfterItsScheme(t *testing.T) {
 	})
 }
 
+// The scheme is read in any case, so slashes after a scheme written in
+// capitals are dropped from identity too.
+func TestSlashesAfterASchemeInCapitalsLeaveOnePackage(t *testing.T) {
+	capitals := graph.Described{Purl: "PKG://deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
+	plain := graph.Described{Purl: "pkg:deb/debian/curl@8.5.0", Name: "curl", Version: "8.5.0"}
+	if capitals.Identity() != plain.Identity() {
+		t.Errorf("%s and %s are identified as two packages", capitals.Purl, plain.Purl)
+	}
+}
+
 // A qualifier's address loses its credential and its query however it is
 // written: escaped as the specification asks, or plain with its query running
 // on into the pairs after it.
@@ -879,14 +889,32 @@ func TestAQualifierAddressIsStoredWithoutItsCredentialOrQuery(t *testing.T) {
 			"pkg:maven/org/re@1?repository_url=repo.example.com/maven&type=jar"},
 		{"pkg:generic/h@1?download_url=https://h.example.com/a=b/f.tgz%3Ftoken%3Dx&upstream=openssl%403.0",
 			"pkg:generic/h@1?download_url=https://h.example.com/a%3Db/f.tgz&upstream=openssl%403.0"},
+		{"pkg:generic/pk@1?download_url=https://h.example.com/a&b/c%3Ftoken=SECRET",
+			"pkg:generic/pk@1"},
+		{"pkg:generic/de@1?download_url=https%253A%252F%252Fuser%253ASECRET%2540h.example.com%252Ff.bin",
+			"pkg:generic/de@1?download_url=https://h.example.com/f.bin"},
+		{"pkg:generic/sx@1?download_url=https://h.example.com/a%zz#SECRETTOKEN", "pkg:generic/sx@1"},
+		{"pkg:generic/sf@1?download_url=https://h.example.com/f.bin#access_token%3DSECRET",
+			"pkg:generic/sf@1?download_url=https://h.example.com/f.bin"},
+		{"pkg:maven/org/nc@1?repository_url=repo.example.com/maven%23SECRET&type=jar",
+			"pkg:maven/org/nc@1?repository_url=repo.example.com/maven&type=jar"},
+		{"pkg:golang/example.com/tu@v1?vcs_url=//glpat-SECRET@host.example.com/x",
+			"pkg:golang/example.com/tu@v1?vcs_url=//host.example.com/x"},
+		{"pkg:maven/org/ru@1?repository_url=to&ken@repo.example.com/maven", "pkg:maven/org/ru@1"},
 		{"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git",
 			"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git"},
 		// Another scheme is not a package identifier, and its slashes are
 		// its own.
 		{"https://example.com/x", "https://example.com/x"},
 	} {
-		if got := graph.StoredPurl(c.stated); got != c.want {
+		got := graph.StoredPurl(c.stated)
+		if got != c.want {
 			t.Errorf("%s is stored as %s, want %s", c.stated, got, c.want)
+		}
+		// A stored identifier read again is stored as it stands, which is
+		// what lets the upgrade leave a clean row alone.
+		if again := graph.StoredPurl(got); again != got {
+			t.Errorf("%s, stored again, is stored as %s", got, again)
 		}
 	}
 }

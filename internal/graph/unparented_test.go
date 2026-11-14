@@ -111,6 +111,14 @@ func TestAComponentPulledInOnlyByItselfHangsFromTheRoot(t *testing.T) {
 			t.Errorf("%s is shown with %d above and %d below, want neither: it is not its own neighbor",
 				looped.Name, len(above), len(below))
 		}
+		tally, err := f.store.Counts(ctx, everyone(f), f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tally.Edges != 1 {
+			t.Errorf("the build counts %d edges placing its components, want 1: an edge to itself places nothing",
+				tally.Edges)
+		}
 	})
 }
 

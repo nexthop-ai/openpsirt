@@ -30,31 +30,69 @@ const publishedBatchV0130 = 50
 
 // purlCredentialsV0130 rewrites the package identifiers v0.12.0 stored as
 // v0.13.0 stores them: the slashes after the scheme dropped, and any
-// credential and query taken out of the addresses its qualifiers hold. Only a
-// row starting "pkg:/" in any case, or holding a colon, a question mark or a
-// fragment mark after its qualifiers start, plain or escaped, is read: an
-// address with a credential or a query has one, and a distribution's arch and
-// distro qualifiers do not. Only a row that changes is written, so
-// a start after one that stopped part way writes what the first missed.
-// No identity is rewritten. Each document served to anybody then states every
-// identifier it holds as it now stands.
+// credential and query taken out of the addresses its qualifiers hold. Every
+// row holding a question mark, or starting "pkg:/" in any case, is read, and
+// the cleaner decides: a filter naming the shapes a credential takes misses
+// the next shape. Only a row that changes is written.
+//
+// The identifiers are read first and written last, with every document
+// served to anybody rewritten in between. On MySQL and MariaDB the earlier
+// steps' definitions commit on their own, so this step's writes can be cut
+// off part way; a start after one stopped before the identifiers were written
+// finds them as they were and rewrites the documents again, and one stopped
+// after has nothing left in a document to rewrite. No identity is rewritten.
 func purlCredentialsV0130(ctx context.Context, tx bun.Tx) error {
-	cleaned, err := purlCredentialsInBatchesV0130(ctx, tx, purlBatchV0130)
-	if err != nil {
-		return err
+	var pass purlPassV0130
+	for _, phase := range purlPhasesV0130 {
+		if err := phase(ctx, tx, &pass); err != nil {
+			return err
+		}
 	}
-	if err := publishedPurlsV0130(ctx, tx, cleaned, publishedBatchV0130); err != nil {
-		return err
-	}
-	return remoteCredentialsV0130(ctx, tx, purlBatchV0130)
+	return nil
 }
+
+// purlPassV0130 is what one start of the credential step carries from one
+// phase to the next: each identifier the cleaning rewrites, beside what it
+// becomes.
+type purlPassV0130 struct{ cleaned map[string]string }
+
+// purlPhasesV0130 is the credential step in the order it runs: the
+// identifiers read, the served documents rewritten, the identifiers written,
+// the remotes rewritten.
+var purlPhasesV0130 = []func(context.Context, bun.Tx, *purlPassV0130) error{
+	func(ctx context.Context, tx bun.Tx, pass *purlPassV0130) (err error) {
+		pass.cleaned, err = purlCredentialsInBatchesV0130(ctx, tx, purlBatchV0130, false)
+		return err
+	},
+	func(ctx context.Context, tx bun.Tx, pass *purlPassV0130) error {
+		for _, at := range servedDocumentsV0130 {
+			if err := servedPurlsV0130(ctx, tx, at[0], at[1], pass.cleaned, publishedBatchV0130); err != nil {
+				return err
+			}
+		}
+		return nil
+	},
+	func(ctx context.Context, tx bun.Tx, _ *purlPassV0130) error {
+		_, err := purlCredentialsInBatchesV0130(ctx, tx, purlBatchV0130, true)
+		return err
+	},
+	func(ctx context.Context, tx bun.Tx, _ *purlPassV0130) error {
+		return remoteCredentialsV0130(ctx, tx, purlBatchV0130)
+	},
+}
+
+// servedDocumentsV0130 is each table and column holding a document served to
+// anybody: published VEX documents, and the advisories that went out, whose
+// product tree names a build by its root.
+var servedDocumentsV0130 = [][2]string{{"published_document", "document"}, {"advisory_issuance", "document"}}
 
 // remoteColumnsV0130 is each table and column holding a repository remote an
 // upload stated.
 var remoteColumnsV0130 = [][2]string{{"graph_node", "repository"}, {"series_module", "remote"}}
 
-// remoteCredentialsV0130 rewrites each remote holding an "@" or a question
-// mark as v0.13.0 stores it, and one that cannot be read as no remote.
+// remoteCredentialsV0130 rewrites each remote holding an "@", a question mark
+// or a fragment mark as v0.13.0 stores it, and one that cannot be read as no
+// remote.
 func remoteCredentialsV0130(ctx context.Context, tx bun.Tx, batch int) error {
 	for _, at := range remoteColumnsV0130 {
 		table, column := at[0], at[1]
@@ -64,8 +102,8 @@ func remoteCredentialsV0130(ctx context.Context, tx bun.Tx, batch int) error {
 				remote string
 			}
 			rows, err := tx.QueryContext(ctx, `SELECT "id", "`+column+`" FROM "`+table+`"
-				WHERE "id" > ? AND ("`+column+`" LIKE ? OR "`+column+`" LIKE ?)
-				ORDER BY "id" LIMIT ?`, after, "%@%", "%?%", batch)
+				WHERE "id" > ? AND ("`+column+`" LIKE ? OR "`+column+`" LIKE ? OR "`+column+`" LIKE ?)
+				ORDER BY "id" LIMIT ?`, after, "%@%", "%?%", "%#%", batch)
 			if err != nil {
 				return fmt.Errorf("read the remotes of %s: %w", table, err)
 			}
@@ -106,9 +144,9 @@ func remoteCredentialsV0130(ctx context.Context, tx bun.Tx, batch int) error {
 }
 
 // purlCredentialsInBatchesV0130 cleans as purlCredentialsV0130 does, reading
-// batch rows at a time, and returns each identifier it rewrote beside what it
-// became.
-func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) (map[string]string, error) {
+// batch rows at a time, and returns each identifier that cleaning rewrites
+// beside what it becomes. Only where write is set are the rows rewritten.
+func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int, write bool) (map[string]string, error) {
 	cleaned := map[string]string{}
 	for _, at := range purlColumnsV0130 {
 		table, column := at[0], at[1]
@@ -118,10 +156,8 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) (m
 				purl string
 			}
 			rows, err := tx.QueryContext(ctx, `SELECT "id", "`+column+`" FROM "`+table+`"
-				WHERE "id" > ? AND ("`+column+`" LIKE ? OR "`+column+`" LIKE ? OR "`+column+`" LIKE ?
-				  OR LOWER("`+column+`") LIKE ? OR LOWER("`+column+`") LIKE ? OR LOWER("`+column+`") LIKE ?
-				  OR LOWER("`+column+`") LIKE ?)
-				ORDER BY "id" LIMIT ?`, after, "%?%:%", "%?%?%", "%?%#%", "%?%3a%", "%?%3f%", "%?%23%", "pkg:/%", batch)
+				WHERE "id" > ? AND ("`+column+`" LIKE ? OR LOWER("`+column+`") LIKE ?)
+				ORDER BY "id" LIMIT ?`, after, "%?%", "pkg:/%", batch)
 			if err != nil {
 				return nil, fmt.Errorf("read the package identifiers of %s: %w", table, err)
 			}
@@ -146,10 +182,12 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) (m
 			if err := rows.Err(); err != nil {
 				return nil, fmt.Errorf("read the package identifiers of %s: %w", table, err)
 			}
-			for _, row := range found {
-				if _, err := tx.ExecContext(ctx, `UPDATE "`+table+`" SET "`+column+`" = ? WHERE "id" = ?`,
-					row.purl, row.id); err != nil {
-					return nil, fmt.Errorf("clean the package identifier of %s %d: %w", table, row.id, err)
+			if write {
+				for _, row := range found {
+					if _, err := tx.ExecContext(ctx, `UPDATE "`+table+`" SET "`+column+`" = ? WHERE "id" = ?`,
+						row.purl, row.id); err != nil {
+						return nil, fmt.Errorf("clean the package identifier of %s %d: %w", table, row.id, err)
+					}
 				}
 			}
 			if read < batch {
@@ -160,31 +198,27 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int) (m
 	return cleaned, nil
 }
 
-// publishedPurlsV0130 rewrites each identifier the cleaning rewrote wherever a
-// document served to anybody states it. A document states one as a whole JSON
-// string, so the quoted encoding is matched, and one identifier beginning
-// another is never matched inside it. A document left unchanged is not
-// written.
-func publishedPurlsV0130(ctx context.Context, tx bun.Tx, cleaned map[string]string, batch int) error {
+// servedPurlsV0130 rewrites each identifier the cleaning rewrites wherever a
+// document in table's column states it. A document states one inside a JSON
+// string: as the whole string, as a product's identifier does, or as a part
+// of one split at "|" or " as part of ", as a CSAF relationship's identifier
+// and name are. Each string is read decoded, so one identifier beginning
+// another is never matched inside it, and only a string that changes is
+// written again. A document left unchanged is not written.
+func servedPurlsV0130(ctx context.Context, tx bun.Tx, table, column string, cleaned map[string]string,
+	batch int) error {
 	if len(cleaned) == 0 {
 		return nil
 	}
-	// No quoted string begins another, so the order the pairs are tried in
-	// changes nothing.
-	swaps := make([]string, 0, 2*len(cleaned))
-	for from, to := range cleaned {
-		swaps = append(swaps, jsonStringV0130(from), jsonStringV0130(to))
-	}
-	replacer := strings.NewReplacer(swaps...)
 	for after := int64(0); ; {
 		type held struct {
 			id       int64
 			document string
 		}
-		rows, err := tx.QueryContext(ctx, `SELECT "id", "document" FROM "published_document"
-			WHERE "id" > ? ORDER BY "id" LIMIT ?`, after, batch)
+		rows, err := tx.QueryContext(ctx, `SELECT "id", "`+column+`" FROM "`+table+`"
+			WHERE "id" > ? AND "`+column+`" IS NOT NULL ORDER BY "id" LIMIT ?`, after, batch)
 		if err != nil {
-			return fmt.Errorf("read the published documents: %w", err)
+			return fmt.Errorf("read the documents of %s: %w", table, err)
 		}
 		var found []held
 		read := 0
@@ -192,25 +226,25 @@ func publishedPurlsV0130(ctx context.Context, tx bun.Tx, cleaned map[string]stri
 			var row held
 			if err := rows.Scan(&row.id, &row.document); err != nil {
 				_ = rows.Close()
-				return fmt.Errorf("read a published document: %w", err)
+				return fmt.Errorf("read a document of %s: %w", table, err)
 			}
 			read++
 			after = row.id
-			document := replacer.Replace(row.document)
+			document := statedAnewV0130(row.document, cleaned)
 			if document != row.document {
 				found = append(found, held{id: row.id, document: document})
 			}
 		}
 		if err := rows.Close(); err != nil {
-			return fmt.Errorf("read the published documents: %w", err)
+			return fmt.Errorf("read the documents of %s: %w", table, err)
 		}
 		if err := rows.Err(); err != nil {
-			return fmt.Errorf("read the published documents: %w", err)
+			return fmt.Errorf("read the documents of %s: %w", table, err)
 		}
 		for _, row := range found {
-			if _, err := tx.ExecContext(ctx, `UPDATE "published_document" SET "document" = ? WHERE "id" = ?`,
+			if _, err := tx.ExecContext(ctx, `UPDATE "`+table+`" SET "`+column+`" = ? WHERE "id" = ?`,
 				row.document, row.id); err != nil {
-				return fmt.Errorf("clean published document %d: %w", row.id, err)
+				return fmt.Errorf("clean document %d of %s: %w", row.id, table, err)
 			}
 		}
 		if read < batch {
@@ -218,6 +252,64 @@ func publishedPurlsV0130(ctx context.Context, tx bun.Tx, cleaned map[string]stri
 		}
 	}
 }
+
+// statedAnewV0130 is a JSON document with every string stating a cleaned
+// identifier written again, and every other byte as it was.
+func statedAnewV0130(document string, cleaned map[string]string) string {
+	var b strings.Builder
+	last, changed := 0, false
+	for i := 0; i < len(document); i++ {
+		if document[i] != '"' {
+			continue
+		}
+		end := i + 1
+		for end < len(document) && document[end] != '"' {
+			if document[end] == '\\' {
+				end++
+			}
+			end++
+		}
+		if end >= len(document) {
+			break
+		}
+		var text string
+		if err := json.Unmarshal([]byte(document[i:end+1]), &text); err == nil {
+			if now := identifiersAnewV0130(text, cleaned); now != text {
+				b.WriteString(document[last:i])
+				b.WriteString(jsonStringV0130(now))
+				last, changed = end+1, true
+			}
+		}
+		i = end
+	}
+	if !changed {
+		return document
+	}
+	b.WriteString(document[last:])
+	return b.String()
+}
+
+// identifiersAnewV0130 is a string with each cleaned identifier it states
+// rewritten: the whole string, or a part of it between "|" and " as part of ".
+func identifiersAnewV0130(text string, cleaned map[string]string) string {
+	if now, ok := cleaned[text]; ok {
+		return now
+	}
+	halves := strings.Split(text, withinV0130)
+	for i, half := range halves {
+		parts := strings.Split(half, "|")
+		for j, part := range parts {
+			if now, ok := cleaned[part]; ok {
+				parts[j] = now
+			}
+		}
+		halves[i] = strings.Join(parts, "|")
+	}
+	return strings.Join(halves, withinV0130)
+}
+
+// withinV0130 joins a CSAF relationship's two product names.
+const withinV0130 = " as part of "
 
 // jsonStringV0130 is a string as encoding/json writes it, quotes included.
 func jsonStringV0130(value string) string {
@@ -227,12 +319,14 @@ func jsonStringV0130(value string) string {
 
 // purlWithoutCredentialV0130 is a package identifier as v0.13.0 stores one:
 // the slashes after its scheme dropped, and any credential and query taken
-// out of each qualifier holding an address, with or without a scheme. A qualifier holding an address
+// out of each qualifier holding an address, with or without a scheme, an
+// address escaped twice read as decoded twice. A qualifier holding an address
 // that does not parse is dropped, since where its credential ends cannot be
-// told, and so are a pair whose escapes do not decode, the pairs after an
-// address whose query is written unescaped, since they are that query, and a
-// subpath holding a value after an address, since it is that address's
-// fragment.
+// told, and so are a pair whose escapes do not decode, a pair whose key the
+// specification does not allow with the pair before it, since it is the rest
+// of that value, the pairs after an address whose query is written unescaped,
+// since they are that query, and a subpath after a walk that stopped or
+// holding a value, a user or a query, since it is an address's fragment.
 func purlWithoutCredentialV0130(purl string) string {
 	purl = strings.TrimSpace(purl)
 	if scheme, rest, found := strings.Cut(purl, ":"); found && strings.EqualFold(scheme, "pkg") {
@@ -248,12 +342,13 @@ func purlWithoutCredentialV0130(purl string) string {
 	}
 	pairs := strings.Split(qualifiers, "&")
 	kept := make([]string, 0, len(pairs))
+	walked := 0
 	for _, pair := range pairs {
 		key, value, found := strings.Cut(pair, "=")
-		if !found {
+		if !found || !qualifierKeyV0130(key) {
 			// No qualifier the specification allows: the rest of a value
-			// holding a raw "&", such as a password, so that value and every
-			// pair after it go.
+			// holding a raw "&", such as a password or a path, so that value
+			// and every pair after it go.
 			if len(kept) > 0 {
 				kept = kept[:len(kept)-1]
 			}
@@ -262,6 +357,9 @@ func purlWithoutCredentialV0130(purl string) string {
 		decoded, err := url.PathUnescape(value)
 		if err != nil {
 			break
+		}
+		if again, err := url.PathUnescape(decoded); err == nil {
+			decoded = again
 		}
 		if !schemedV0130(decoded) {
 			bare, readable := withoutPasswordV0130(decoded)
@@ -278,6 +376,7 @@ func purlWithoutCredentialV0130(purl string) string {
 			if queryUnescapedV0130(value) {
 				break
 			}
+			walked++
 			continue
 		}
 		parsed, err := url.Parse(decoded)
@@ -300,15 +399,37 @@ func purlWithoutCredentialV0130(purl string) string {
 		if queryUnescapedV0130(value) {
 			break
 		}
+		walked++
 	}
 	purl = body
 	if len(kept) > 0 {
 		purl += "?" + strings.Join(kept, "&")
 	}
-	if hasSubpath && !strings.Contains(subpath, "=") {
-		purl += "#" + subpath
+	if hasSubpath && walked == len(pairs) {
+		if decoded, err := url.PathUnescape(subpath); err == nil && !strings.ContainsAny(decoded, "=@?") {
+			purl += "#" + subpath
+		}
 	}
 	return purl
+}
+
+// qualifierKeyV0130 is whether a qualifier's key is one the purl
+// specification allows: ASCII letters, digits, ".", "-" and "_", not starting
+// with a digit.
+func qualifierKeyV0130(key string) bool {
+	if key == "" {
+		return false
+	}
+	for i := 0; i < len(key); i++ {
+		c := key[i]
+		switch {
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', c == '.', c == '-', c == '_':
+		case '0' <= c && c <= '9' && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // queryUnescapedV0130 says whether a qualifier's value holds an address whose
@@ -367,8 +488,8 @@ func withoutPasswordV0130(address string) (string, bool) {
 }
 
 // remoteWithoutCredentialV0130 is a remote as v0.13.0 stores one: without a
-// user, password or query, and none where its credential ends cannot be
-// told.
+// user, password, query or fragment, and none where its credential ends
+// cannot be told.
 func remoteWithoutCredentialV0130(remote string) string {
 	if schemedV0130(remote) {
 		u, err := url.Parse(remote)
@@ -376,13 +497,16 @@ func remoteWithoutCredentialV0130(remote string) string {
 			return ""
 		}
 		u.User, u.RawQuery, u.ForceQuery = nil, "", false
+		u.Fragment, u.RawFragment = "", ""
 		return u.String()
 	}
 	bare, readable := withoutPasswordV0130(remote)
 	if !readable {
 		return ""
 	}
-	bare, _, _ = strings.Cut(bare, "?")
+	if at := strings.IndexAny(bare, "?#"); at >= 0 {
+		bare = bare[:at]
+	}
 	return bare
 }
 

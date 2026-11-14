@@ -9,6 +9,8 @@ package finding
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/uptrace/bun"
 
@@ -171,6 +173,24 @@ func openComponents(ctx context.Context, db bun.IDB, buildID int64, at graph.Mom
 		held.byID[row.ID] = row
 		held.byIdentity[row.Identity] = row
 		held.byName[row.Name] = append(held.byName[row.Name], row)
+	}
+	// A report names a component by what the scanner was given, hashed as
+	// identity is read now. A component stored before then holds an identity
+	// that description no longer hashes to, and is matched by the
+	// description too; a stored identity is never displaced by one.
+	scanned, err := graph.NewStore(db).ScannedAs(ctx, buildID, at)
+	if err != nil {
+		return inventory{}, err
+	}
+	for _, id := range slices.Sorted(maps.Keys(scanned)) {
+		described := scanned[id]
+		row, present := held.byID[id]
+		if !present {
+			continue
+		}
+		if _, taken := held.byIdentity[described.Identity()]; !taken {
+			held.byIdentity[described.Identity()] = row
+		}
 	}
 	return held, nil
 }

@@ -363,6 +363,25 @@ func StopV0130AfterEndedByColumn(ctx context.Context, db *database.DB) error {
 	})
 }
 
+// PurlPhasesV0130 is how many phases the v0.13.0 credential step runs in.
+var PurlPhasesV0130 = len(purlPhasesV0130)
+
+// StopV0130AfterPurlPhase runs the first phases of the v0.13.0 credential
+// step and nothing else, committed: a start that stopped there on MySQL or
+// MariaDB, where each of the step's writes lands on its own.
+func StopV0130AfterPurlPhase(ctx context.Context, db *database.DB, phases int) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		var pass purlPassV0130
+		for _, phase := range purlPhasesV0130[:phases] {
+			if err := phase(ctx, tx, &pass); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 // PublishedBatchV0130 is how many published documents one read of the
 // v0.13.0 upgrade takes.
 const PublishedBatchV0130 = publishedBatchV0130

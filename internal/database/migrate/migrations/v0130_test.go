@@ -232,6 +232,18 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 				"pkg:maven/org/re@1?repository_url=repo.example.com/maven&type=jar"},
 			{"pkg:generic/h@1?download_url=https://h.example.com/a=b/f.tgz%3Ftoken%3Dx&upstream=openssl%403.0",
 				"pkg:generic/h@1?download_url=https://h.example.com/a%3Db/f.tgz&upstream=openssl%403.0"},
+			{"pkg:generic/pk@1?download_url=https://h.example.com/a&b/c%3Ftoken=SECRET",
+				"pkg:generic/pk@1"},
+			{"pkg:generic/de@1?download_url=https%253A%252F%252Fuser%253ASECRET%2540h.example.com%252Ff.bin",
+				"pkg:generic/de@1?download_url=https://h.example.com/f.bin"},
+			{"pkg:generic/sx@1?download_url=https://h.example.com/a%zz#SECRETTOKEN", "pkg:generic/sx@1"},
+			{"pkg:generic/sf@1?download_url=https://h.example.com/f.bin#access_token%3DSECRET",
+				"pkg:generic/sf@1?download_url=https://h.example.com/f.bin"},
+			{"pkg:maven/org/nc@1?repository_url=repo.example.com/maven%23SECRET&type=jar",
+				"pkg:maven/org/nc@1?repository_url=repo.example.com/maven&type=jar"},
+			{"pkg:golang/example.com/tu@v1?vcs_url=//glpat-SECRET@host.example.com/x",
+				"pkg:golang/example.com/tu@v1?vcs_url=//host.example.com/x"},
+			{"pkg:maven/org/ru@1?repository_url=to&ken@repo.example.com/maven", "pkg:maven/org/ru@1"},
 			{"pkg://deb/debian/curl@8.5.0", "pkg:deb/debian/curl@8.5.0"},
 			{"PKG://deb/debian/wget@1.21", "PKG:deb/debian/wget@1.21"},
 			{"pkg:npm/%40scope/y@2?vcs_url=git%2Bhttps://github.com/scope/y.git",
@@ -311,20 +323,25 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPublishedDocuments(t *testing.T) {
 			slashed = "pkg://deb/debian/curl@8.5.0"
 			longer  = "pkg://deb/debian/curl@8.5.0-1"
 		)
-		exec(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, "p", "P", at)
-		var product int64
-		if err := db.DB.NewRaw(`SELECT MAX("id") FROM "product"`).Scan(ctx, &product); err != nil {
-			t.Fatal(err)
-		}
+		seeded := seedCoversV0120(t, db)
+		product := seeded.product
 		for i, purl := range []string{raw, slashed} {
 			exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
 				"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
 				fmt.Sprintf("identity-%d", i), purl, "x", "1", "x", fmt.Sprintf("fold-%d", i), at)
 		}
+		// A CSAF product tree names a component by its identifier, and a
+		// relationship by the component's identifier joined to what holds it,
+		// both as an identifier and as a name.
 		body := func(root, other string) string {
 			encoded, err := json.Marshal(map[string]any{
 				"product": map[string]string{"@id": root},
 				"helpers": []string{other, longer},
+				"relationship": map[string]string{
+					"product_id": root + "|" + other,
+					"name":       root + " as part of " + other,
+				},
+				"known_affected": []string{root + "|build-1", longer + "|" + other},
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -341,25 +358,100 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPublishedDocuments(t *testing.T) {
 				product, "csaf-vex", subject, "p/"+subject+".json", "digest-"+subject, "tracking", "title", 1,
 				at, at, "affected", "settled", body(raw, slashed))
 		}
+		// An advisory that went out names a build by its root as the
+		// product's identification helper, and is served to anybody too.
+		exec(`INSERT INTO "advisory_edition" ("advisory_id", "ordinal", "written_by", "written_at")
+			VALUES (?, ?, ?, ?)`, seeded.advisory, 1, seeded.person, at)
+		var edition int64
+		if err := db.DB.NewRaw(`SELECT MAX("id") FROM "advisory_edition"`).Scan(ctx, &edition); err != nil {
+			t.Fatal(err)
+		}
+		exec(`INSERT INTO "advisory_issuance" ("advisory_id", "ordinal", "edition_id", "document", "digest",
+			"issued_by", "issued_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			seeded.advisory, 1, edition, body(raw, slashed), "digest", seeded.person, at)
 
 		dbtest.MigrateTo(t, db, v0130)
 
-		var got []string
-		if err := db.DB.NewRaw(`SELECT "document" FROM "published_document" ORDER BY "id"`).
-			Scan(ctx, &got); err != nil {
-			t.Fatal(err)
-		}
-		if len(got) != documents {
-			t.Fatalf("%d documents are published after the upgrade, want %d", len(got), documents)
-		}
 		want := body(clean, "pkg:deb/debian/curl@8.5.0")
-		for i, document := range got {
-			if document != want {
-				t.Errorf("published document %d holds\n%s\nafter the upgrade, want\n%s", i, document, want)
+		for _, table := range []string{"published_document", "advisory_issuance"} {
+			var got []string
+			if err := db.DB.NewRaw(`SELECT "document" FROM "`+table+`" ORDER BY "id"`).
+				Scan(ctx, &got); err != nil {
+				t.Fatal(err)
+			}
+			if want := map[string]int{"published_document": documents, "advisory_issuance": 1}[table]; len(got) != want {
+				t.Fatalf("%s holds %d documents after the upgrade, want %d", table, len(got), want)
+			}
+			for i, document := range got {
+				if document != want {
+					t.Errorf("%s %d holds\n%s\nafter the upgrade, want\n%s", table, i, document, want)
+				}
 			}
 		}
 		leaveAtLatest(t, ctx, db)
 	})
+}
+
+// A start of the credential step that stopped after any of its phases leaves
+// the next start nothing served still holding the credential: the documents
+// are rewritten before the identifiers they are matched against are.
+func TestAStoppedCredentialStepLeavesNoDocumentHoldingACredential(t *testing.T) {
+	for phases := 1; phases < migrations.PurlPhasesV0130; phases++ {
+		t.Run(fmt.Sprintf("after %d", phases), func(t *testing.T) {
+			dbtest.Each(t, func(t *testing.T, db *database.DB) {
+				ctx := t.Context()
+				dbtest.Empty(t, db)
+				dbtest.MigrateTo(t, db, v0120)
+				at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+				exec := func(query string, args ...any) {
+					t.Helper()
+					if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+						t.Fatalf("%v\n%s", err, query)
+					}
+				}
+				//nolint:gosec // G101: the credential this upgrade takes out
+				const (
+					raw   = "pkg:generic/x@1?download_url=https://user:SECRET@example.com/x.bin"
+					clean = "pkg:generic/x@1?download_url=https://example.com/x.bin"
+				)
+				product := seedCoversV0120(t, db).product
+				exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
+					"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, "identity", raw, "x", "1", "x", "fold", at)
+				body := func(purl string) string {
+					encoded, err := json.Marshal(map[string]string{"@id": purl})
+					if err != nil {
+						t.Fatal(err)
+					}
+					return string(encoded)
+				}
+				exec(`INSERT INTO "published_document" ("product_id", "kind", "subject", "path", "path_digest",
+					"tracking_id", "title", "version", "first_at", "current_at", "statuses", "settled", "document")
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					product, "csaf-vex", "CVE-2026-1", "p/CVE-2026-1.json", "digest", "tracking", "title", 1,
+					at, at, "affected", "settled", body(raw))
+				if err := migrations.StopV0130AfterPurlPhase(ctx, db, phases); err != nil {
+					t.Fatalf("make what a stopped upgrade left: %v", err)
+				}
+
+				dbtest.MigrateTo(t, db, v0130)
+
+				var document, purl string
+				if err := db.DB.NewRaw(`SELECT "document" FROM "published_document"`).Scan(ctx, &document); err != nil {
+					t.Fatal(err)
+				}
+				if document != body(clean) {
+					t.Errorf("the published document holds %s after the upgrade, want %s", document, body(clean))
+				}
+				if err := db.DB.NewRaw(`SELECT "purl" FROM "component"`).Scan(ctx, &purl); err != nil {
+					t.Fatal(err)
+				}
+				if purl != clean {
+					t.Errorf("the component holds %s after the upgrade, want %s", purl, clean)
+				}
+				leaveAtLatest(t, ctx, db)
+			})
+		})
+	}
 }
 
 // A remote a node holds, written without a scheme, loses a password before its
@@ -398,6 +490,8 @@ func TestTheV0130UpgradeTakesCredentialsOutOfRemotes(t *testing.T) {
 			{"user:SECRET@gitlab.example.com/o/https://r", ptr("gitlab.example.com/o/https://r")},
 			{"//user:SECRET@gitlab.example.com/g/p.git", ptr("//gitlab.example.com/g/p.git")},
 			{"https://github.com/a/b.git", ptr("https://github.com/a/b.git")},
+			{"https://github.com/a/b.git#access_token=SECRET", ptr("https://github.com/a/b.git")},
+			{"gitlab.example.com/g/p.git#private_token=SECRET", ptr("gitlab.example.com/g/p.git")},
 		}
 		exec(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, "p", "P", at)
 		product := id(`SELECT MAX("id") FROM "product"`)

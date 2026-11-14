@@ -117,3 +117,46 @@ func TestABuildWithNoInventoryHasNoRoot(t *testing.T) {
 		}
 	})
 }
+
+// Components tied on what they hold and on their name are kept at the bound by
+// which was recorded first, so every engine and every request keeps the same
+// one.
+func TestTheTreeSeenUpwardKeepsTheSameOfTiedComponentsAtItsBound(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		older, newer := at("twin", "1"), at("twin", "2")
+		snap := graph.Snapshot{Root: root, Components: []graph.Described{older, newer},
+			Dependencies: []graph.Dependency{{Parent: root, Child: older}, {Parent: root, Child: newer}}}
+		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
+			t.Fatal(err)
+		}
+		f.report(t,
+			finding.Reported{Issue: finding.Named{Identifier: "CVE-2026-0001", Severity: "high"}, Component: older},
+			finding.Reported{Issue: finding.Named{Identifier: "CVE-2026-0002", Severity: "high"}, Component: newer})
+		const party = 81
+		holdEverything(t, f, party)
+		holder := access.NewPerson(2, "holder", false,
+			map[int64][]access.Role{*f.scope.ProductID: {access.PublicRead}}, party)
+
+		var first string
+		if err := f.db.DB.NewSelect().TableExpr(`"component"`).Column("version").
+			Where(`"name" = ?`, "twin").OrderExpr(`"id"`).Limit(1).Scan(t.Context(), &first); err != nil {
+			t.Fatal(err)
+		}
+		rows, complete, err := f.store.AssemblingAtMost(1).Ours(t.Context(), holder, f.buildID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if complete {
+			t.Error("a tree over more components than it assembles read as complete")
+		}
+		var kept []string
+		for _, row := range rows {
+			if row.Component == "twin" {
+				kept = append(kept, row.Version)
+			}
+		}
+		if len(kept) != 1 || kept[0] != first {
+			t.Errorf("the bound kept twin at %v, want the one recorded first, at %s", kept, first)
+		}
+	})
+}

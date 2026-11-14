@@ -217,6 +217,7 @@ graph.Store.CurrentComponents A background pass: the scanner is fed a build's co
 graph.Store.DeclaredScopes A helper over a narrowed read: the finding detail reads it after authorizing the finding.
 graph.Store.Moved A background pass: the inventory watch reads what one scan changed before deciding who hears of it.
 graph.Store.Movements A helper over a narrowed read: the trend works out the uploads behind returns it read with the reader's subject, and the inventory watch reaches it through Moved.
+graph.Store.ScannedAs A background pass: applying a scan matches what the scanner reports against the identities it was fed.
 graph.Store.Stated A background pass: applying a scan matches the build's claims against what the build states for its components.
 graph.Within Not varying by reader: a walk of one build's graph, built as a subquery its caller narrows.
 graph.WithinAnd Not varying by reader: a walk of one build's graph with named components beside it, built as a subquery the finding reads narrow with a subject.

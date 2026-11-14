@@ -296,6 +296,30 @@ func (s *Store) CurrentComponents(ctx context.Context, buildID int64) ([]Describ
 // ComponentsAt is what a build contained at a moment, as CurrentComponents
 // gives it to the scanner.
 func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]Described, error) {
+	_, described, err := s.componentsAt(ctx, buildID, at)
+	return described, err
+}
+
+// ScannedAs is each component a build contained at a moment, by component,
+// as ComponentsAt gives it to the scanner. A scanner's report names a
+// component by what it was given, and a component stored before identity was
+// read the way it is now holds an identity that description no longer hashes
+// to.
+func (s *Store) ScannedAs(ctx context.Context, buildID int64, at Moment) (map[int64]Described, error) {
+	ids, described, err := s.componentsAt(ctx, buildID, at)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]Described, len(ids))
+	for i, id := range ids {
+		out[id] = described[i]
+	}
+	return out, nil
+}
+
+// componentsAt is ComponentsAt with the component each description is of,
+// in the same order.
+func (s *Store) componentsAt(ctx context.Context, buildID int64, at Moment) ([]int64, []Described, error) {
 	held, args := at.Held("n")
 	var rows []struct {
 		ComponentID     int64  `bun:"component_id"`
@@ -321,7 +345,7 @@ func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]D
 		Where(`"n"."is_root" = ?`, false).
 		Scan(ctx, &rows)
 	if err != nil {
-		return nil, fmt.Errorf("read what a build contains: %w", err)
+		return nil, nil, fmt.Errorf("read what a build contains: %w", err)
 	}
 	ids := make([]int64, 0, len(rows))
 	for _, row := range rows {
@@ -329,7 +353,7 @@ func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]D
 	}
 	others, err := s.statedInProduct(ctx, buildID, ids)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	described := make([]Described, 0, len(rows))
@@ -343,7 +367,7 @@ func (s *Store) ComponentsAt(ctx context.Context, buildID int64, at Moment) ([]D
 		}
 		described = append(described, stated)
 	}
-	return described, nil
+	return ids, described, nil
 }
 
 // statedRow is what one node states for its component.
@@ -1201,7 +1225,7 @@ func (s *Store) topLevel(ctx context.Context, readable []access.Visibility,
 				WhereOr(`EXISTS (SELECT 1 FROM "graph_edge" AS "re"
 					JOIN "graph_node" AS "rn" ON "rn"."id" = "re"."parent_id"
 					WHERE "re"."child_id" = "fn"."id" AND "re"."closed_scan_id" IS NULL
-					  AND "re"."parent_id" <> "re"."child_id" AND "rn"."is_root" = ?)`, true)
+					  AND "rn"."is_root" = ?)`, true)
 		}).
 		Scan(ctx, &rows)
 	if err != nil {
@@ -1331,6 +1355,8 @@ func (s *Store) Counts(ctx context.Context, subject access.Subject, buildID int6
 		TableExpr(`"graph_edge" AS "e"`).
 		Where(`"e"."build_id" = ?`, buildID).
 		Where(`"e"."closed_scan_id" IS NULL`).
+		// An edge from a component to itself places nothing.
+		Where(`"e"."parent_id" <> "e"."child_id"`).
 		Count(ctx)
 	if err != nil {
 		return Tally{}, fmt.Errorf("count what this build's edges are: %w", err)

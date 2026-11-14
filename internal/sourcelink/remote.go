@@ -55,10 +55,10 @@ func parse(remote string) (host, path string) {
 	return strings.ToLower(host), path
 }
 
-// WithoutCredential is a remote with any credential and query taken out of
-// it. A remote comes from an upload, and a token in it would reach every
-// reader of what it is shown on. One whose credential cannot be told apart
-// from the rest is not shown.
+// WithoutCredential is a remote with any credential, query and fragment taken
+// out of it. A remote comes from an upload, and a token in it would reach
+// every reader of what it is shown on; nothing reads a remote's fragment. One
+// whose credential cannot be told apart from the rest is not shown.
 func WithoutCredential(remote string) string {
 	s := strings.TrimSpace(remote)
 	if !Schemed(s) {
@@ -66,7 +66,9 @@ func WithoutCredential(remote string) string {
 		if !readable {
 			return ""
 		}
-		bare, _, _ = strings.Cut(bare, "?")
+		if at := strings.IndexAny(bare, "?#"); at >= 0 {
+			bare = bare[:at]
+		}
 		return bare
 	}
 	u, err := url.Parse(s)
@@ -76,6 +78,7 @@ func WithoutCredential(remote string) string {
 		return ""
 	}
 	u.User, u.RawQuery, u.ForceQuery = nil, "", false
+	u.Fragment, u.RawFragment = "", ""
 	return u.String()
 }
 
