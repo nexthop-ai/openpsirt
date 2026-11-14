@@ -83,7 +83,7 @@ type WhoBody struct {
 	Reach   []CanBody `json:"reach" doc:"The products they can reach, and what they may do in each"`
 	// Everywhere tells an empty Reach over a catalog with no open product from
 	// one over nothing granted.
-	Everywhere bool `json:"everywhere,omitempty" doc:"Whether they hold a role across every product, which covers each product as it is declared"`
+	Everywhere bool `json:"everywhere,omitempty" doc:"Whether they read findings across every product, which covers each product as it is declared"`
 	// Collaborates says a screen has their own cases to ask for: a grant on
 	// one issue or one code finding reaches nothing in Reach.
 	Collaborates bool `json:"collaborates,omitempty" doc:"They hold a grant on one case, or on one code finding recorded as a flaw, which the list of their own cases names"`
@@ -145,7 +145,7 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 			Identity: subject.Identity, Admin: subject.Admin, Audits: subject.Audits,
 			Kind: string(subject.Kind), Reach: []CanBody{}, Outcomes: outcomeBodies(),
 			ByProxy:    access.FromBrowserWithoutSession(access.SessionFrom(ctx)),
-			Everywhere: subject.HoldsEverywhere(),
+			Everywhere: subject.ReadsEverywhere(),
 		}
 		// Each of these fails the answer rather than being left out. Omitted, a
 		// limit reads to the interface as no limit at all.

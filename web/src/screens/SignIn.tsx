@@ -216,6 +216,13 @@ export function SignIn({ resuming }: { resuming?: boolean }) {
               {resuming ? "Your session ended. Sign in to carry on." : "Sign in to continue"}
             </p>
           )}
+          {/* The resume overlay is named by one of the lines above, and by
+              this while none is drawn. */}
+          {resuming && !turnedAway && !toRetry && !invited && (
+            <p id="sign-in-state" className="sr-only">
+              Sign in
+            </p>
+          )}
           {resuming && !proxied && !providers.isPending && (
             <p className="text-center text-sm text-[var(--muted)]">Anything you typed is kept.</p>
           )}

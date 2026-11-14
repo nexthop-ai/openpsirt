@@ -913,10 +913,21 @@ func (s Subject) HoldsAnywhere(roles ...Role) bool {
 	return false
 }
 
-// HoldsEverywhere reports whether this subject holds a role across every
-// product, which covers each product as it is declared.
-func (s Subject) HoldsEverywhere() bool {
-	return s.Kind == Person && len(s.everywhere) > 0
+// ReadsEverywhere reports whether this subject reads findings of some
+// visibility across every product, which covers each product as it is
+// declared. A role across every product that reads nothing, such as approving
+// alone, reaches no product a screen lists.
+func (s Subject) ReadsEverywhere() bool {
+	if s.Kind != Person {
+		return false
+	}
+	for _, v := range Visibilities() {
+		read, triage := reading(v)
+		if holds(s.everywhere, read) || holds(s.everywhere, triage) {
+			return true
+		}
+	}
+	return false
 }
 
 // Products returns the products whose findings this subject may read, at
