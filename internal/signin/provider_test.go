@@ -796,6 +796,11 @@ func TestAGitHubThatDoesNotAnswerIsToldApartFromOneThatSaysNo(t *testing.T) {
 			w.Header().Set("X-RateLimit-Remaining", "0")
 			w.WriteHeader(http.StatusForbidden)
 		}, false, true},
+		{"a profile answering 403 with a time to ask again", func(w http.ResponseWriter) {
+			w.Header().Set("Retry-After", "60")
+			w.Header().Set("X-RateLimit-Remaining", "4000")
+			w.WriteHeader(http.StatusForbidden)
+		}, false, true},
 		{"a profile that does not parse", func(w http.ResponseWriter) { _, _ = w.Write([]byte("{")) }, false, true},
 		{"a profile nobody serves", nil, true, true},
 		{"a profile answering 401", func(w http.ResponseWriter) { w.WriteHeader(http.StatusUnauthorized) }, false, false},
