@@ -3694,7 +3694,7 @@ not its identifier, not that there is one.</p>
 <tr>
 <td><code>OPENPSIRT_PUBLISH_KEY</code></td>
 <td><code>publishing.key</code></td>
-<td>An armored OpenPGP private key to sign every published document with. With one, each document carries an <code>.asc</code> signature beside it, the public key is served and named in the provider description, and the provider claims the trusted provider role. Without one, documents carry digests only. Refused at startup if it is not one signing key that can sign now, or where publishing is off</td>
+<td>An armored OpenPGP private key to sign every published document with. With one, each document carries an <code>.asc</code> signature beside it, the public key is served and named in the provider description, and the provider claims the trusted provider role. Without one, documents carry digests only. Refused at startup if it is not one signing key that can sign now, or where publishing is off. A key expiring is logged as a warning from 30 days before, at startup and daily</td>
 <td>unset</td>
 </tr>
 <tr>
@@ -3756,11 +3756,11 @@ or not, since readers hold the documents by addresses built from it. A release
 or variant keeps its name once it has a scanned build and a document of its
 product has been served, and a release also once its own OpenVEX document has
 been. A release or variant nothing was scanned for may be renamed.</p>
-<p>A document's filename is built from its product's name, lower-cased, with
-every run of characters other than letters, digits, a plus and a hyphen made
-one underscore. Turning publishing on for a product, or renaming one that
-publishes, is refused where another product that publishes or has published
-gets the same filename this way.</p>
+<p>A CSAF VEX document's tracking identifier is <code>VEX-</code>, the product's numeric
+identifier, its name and the issue, such as <code>VEX-12-sonic-GHSA-x-y</code>. Its
+filename is that identifier lower-cased, with every run of characters other
+than letters, digits, a plus and a hyphen made one underscore, so two products'
+documents never share one.</p>
 <h2 id="upstream-currency">Upstream currency<a class="headerlink" href="#upstream-currency" title="Permanent link">&para;</a></h2>
 <p>Off unless an administrator turns it on, under Settings. Everything a scan
 needs arrives as a file somebody imported, so a deployment that cannot reach out
@@ -5450,6 +5450,10 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <td>Nothing the upgrade can do. Where v0.12.0 saw an issue taken off, put back and taken off again, an advisory issued during an earlier stretch is read as not naming it: what went out is shown to readers who may not see that issue, and a rename that issuance should refuse is allowed</td>
 </tr>
 <tr>
+<td>A release marked affected on an advisory, cleared and marked again keeps every stretch it was marked for, each with who marked and who cleared it. v0.12.0 kept one row and overwrote who marked and cleared it before, and the upgrade cannot recover an earlier stretch</td>
+<td>Nothing the upgrade can do. Where v0.12.0 saw a release marked, cleared and marked again, only the last marking and who made it are shown</td>
+</tr>
+<tr>
 <td>A variable starting <code>OPENPSIRT_</code> that names no setting stops the process at startup, naming it. v0.12.0 ignored it, so a misspelled setting kept its default</td>
 <td>Correct or unset each variable the refusal names. Kubernetes service links are not refused</td>
 </tr>
@@ -5496,6 +5500,26 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <tr>
 <td>A build's components are shown, searched and given to the scanner by the name and version that build stated. v0.12.0 used those of whichever build described the package first, in any product</td>
 <td>Nothing. A build shows its own once its inventory is sent again; until then it keeps the names and versions v0.12.0 showed</td>
+</tr>
+<tr>
+<td>A CSAF VEX document's tracking identifier opens on its product's numeric identifier, <code>VEX-12-sonic-GHSA-x-y</code> where v0.12.0 wrote <code>VEX-sonic-GHSA-x-y</code>, so every CSAF VEX document's identifier and path change once. The first publishing pass after the upgrade writes each at its new path as a new document, version 1 in the current year's folder, and its old path answers 404, unless the pass refuses its new path as held, which it logs. Nothing is written to or left in <a href="#the-published-advisory-directory">the published advisory directory</a>, which holds advisories alone, so no file is orphaned</td>
+<td>Nothing for a reader that follows the provider index or the feed. Point a link or bookmark kept to a single CSAF VEX document at its new path</td>
+</tr>
+<tr>
+<td>A reader keeping CSAF VEX documents by tracking identifier, another OpenPSIRT reading this deployment as an upstream among them, sees every old document withdrawn and a new one about each issue, with nothing linking the two</td>
+<td>On another OpenPSIRT, review each statement again: one accepted from an old document is set aside, and decisions started from it carry the set-aside notice; one declined comes back to the review queue</td>
+</tr>
+<tr>
+<td>Turning publishing on for a product, and renaming one that publishes, are no longer refused for a name that folds like another product's</td>
+<td>Nothing</td>
+</tr>
+<tr>
+<td><code>POST /v1/advisories/{advisory}/approval</code> takes <code>{"edition": n}</code>, the edition agreed to, and answers 409 where the advisory has moved to another edition since. v0.12.0 took no body</td>
+<td>Send the <code>edition</code> the advisory reported, or the oldest of the <code>Advisory-Edition</code> values its releases and its document named where those were read too. A request without it is refused</td>
+</tr>
+<tr>
+<td>A build's OpenVEX document states a decision not to fix that names no mitigation as affected, its action saying no fix is planned. v0.12.0 left such a decision out</td>
+<td>Nothing, unless one should not be stated: the first publishing pass after the upgrade states every one</td>
 </tr>
 </tbody>
 </table>
