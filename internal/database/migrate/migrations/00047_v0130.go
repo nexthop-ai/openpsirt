@@ -19,12 +19,7 @@ func init() {
 //
 // Run in one transaction of its own, the way migrations 44 to 46 are.
 func upV0130(ctx context.Context, sqldb *sql.DB) error {
-	return inV020(ctx, sqldb, func(ctx context.Context, tx bun.Tx) error {
-		if err := upgradeV0130(ctx, tx); err != nil {
-			return err
-		}
-		return changeRecorded(ctx, tx, 47)
-	})
+	return releaseUpgrade(ctx, sqldb, 47, upgradeV0130)
 }
 
 // upgradeV0130 changes the schema v0.12.0 built into v0.13.0's.

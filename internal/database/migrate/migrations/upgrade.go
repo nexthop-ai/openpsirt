@@ -565,3 +565,37 @@ func (u *upgrader) dropDefault(table, column string) error {
 	}
 	return u.run([]string{`ALTER TABLE "` + table + `" ALTER COLUMN "` + column + `" DROP DEFAULT`})
 }
+
+// releaseUpgrade runs a release's upgrade to version as inV020 does, and
+// writes the record of the change in the same transaction. Every release's
+// migration from v0.13.0's on runs through it.
+func releaseUpgrade(ctx context.Context, sqldb *sql.DB, version int64,
+	run func(context.Context, bun.Tx) error) error {
+	return inV020(ctx, sqldb, func(ctx context.Context, tx bun.Tx) error {
+		if err := run(ctx, tx); err != nil {
+			return err
+		}
+		return changeRecorded(ctx, tx, version)
+	})
+}
+
+// changeRecorded writes, in a release's upgrade transaction, the record of
+// the change to version, where the database has the table for it. It commits
+// with the schema and rolls back with it, so a process killed after the
+// commit and before the migration library records the version leaves a
+// record that keeps every serving instance paused; the upgrade that records
+// the version removes it.
+func changeRecorded(ctx context.Context, tx bun.Tx, version int64) error {
+	u, err := upgraderIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if present, err := u.hasTable("schema_change"); err != nil || !present {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO "schema_change" ("started_at", "started_by", "target_version")
+		VALUES (?, ?, ?)`, time.Now().UTC(), fmt.Sprintf("the migration to version %d", version), version); err != nil {
+		return fmt.Errorf("record the schema change: %w", err)
+	}
+	return nil
+}

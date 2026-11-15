@@ -247,7 +247,7 @@ a stopped upgrade run again finds done.
 
 | Table | Created |
 |---|---|
-| `schema_change` | The record of an upgrade under way: when it started, which process started it and the last version it applies, empty (`design-docs/database-migrations.md` § Instances during an upgrade). Migration 47 writes its own row in its transaction, after making the table |
+| `schema_change` | The record of an upgrade under way: when it started, which process started it and the last version it applies, empty (`design-docs/database-migrations.md` § Instances during an upgrade). Migration 47 writes its own row in its transaction, after its other steps. On MySQL and MariaDB the upgrade writes no row before its first statement, since the table does not exist yet, so a v0.13.0 upgrade failing part way before its row leaves none; a v0.12.0 instance does not look, and a v0.13.0 instance at version 46 stops as behind |
 
 | Table | Loses |
 |---|---|

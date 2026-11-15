@@ -307,7 +307,7 @@ outage for as long as its migrations take.
 |---|---|
 | An upgrade takes the schema change lock after reading the version, where a migration is outstanding, and lets it go after the last migration and the statistics refresh, on every path | A start with nothing to apply takes the migration lock alone, so a replica starting beside others pauses none of them |
 | On MySQL and MariaDB, beside the lock, the upgrade writes a row to the schema change record, where the database has that table, naming the last version it applies | The lock goes with its session; the row outlives an upgrade that fails part way |
-| On every engine, a release's migration writes a row naming its version in its own transaction | It commits with the schema and rolls back with it, so a process killed after the commit and before the migration library records the version leaves a row |
+| On every engine, a release's migration writes a row naming its version in its own transaction, which a test holds for every release migration from v0.13.0's on | It commits with the schema and rolls back with it, so a process killed after the commit and before the migration library records the version leaves a row |
 | An upgrade ending any way removes every row naming a version no later than the one then applied | A success leaves no row; a failure leaves the rows of what is still outstanding |
 | A row counts while the version applied is behind the one it names | A row left by a process ended after its last migration, or by a removal that failed, pauses nobody |
 | A start with nothing to apply removes every row the version applied has reached | The record holds only upgrades still outstanding |
