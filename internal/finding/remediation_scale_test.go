@@ -18,12 +18,13 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 // Remediation's figures over the full-size image with fifteen issues at every
 // component: ten fixed everywhere, five still open, every other issue dated.
 func TestMeasureTimeToFixFromPublication(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)

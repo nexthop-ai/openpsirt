@@ -41,6 +41,7 @@ Satisfies REQ-43, REQ-61, REQ-62, REQ-63, REQ-75.
 | `internal/chunked/` | A stored document's bounded parts, written and read as a stream. See `design-docs/ingest.md` § Document storage |
 | `internal/queue/` | Durable background work. See `design-docs/queue.md` |
 | `internal/sbom/`, `internal/scanner/` | Reading and scanning an inventory. See `design-docs/ingest-parsing.md`, `design-docs/ingest-scanner.md` |
+| `internal/sbom/sbomtest/` | The full-size inventory fixture as the reader reads it, for tests and measurements in any package |
 | `internal/docread/` | A third party's document as a bounded stream. See `design-docs/ingest-parsing.md` |
 | `internal/sarif/` | Reading SARIF and placing results in the checkout. See `design-docs/analysis-source.md` |
 | `internal/sarif/uribase/` | Resolving a SARIF address through its starting points, for the reader and the upload client alike. See `design-docs/analysis.md` § Run contents |

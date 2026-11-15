@@ -31,6 +31,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 const (
@@ -61,7 +62,7 @@ var receiptShapes = []struct {
 }
 
 func TestMeasureThePageOfReceipts(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	for _, shape := range receiptShapes {
 		t.Run(shape.name, func(t *testing.T) {
 			measureReceipts(t, doc, shape.churn)

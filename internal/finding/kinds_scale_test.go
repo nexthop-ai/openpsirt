@@ -16,8 +16,6 @@ package finding_test
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -29,52 +27,15 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 // kernelIssues is how many issues the kernel of a real switch image carried:
 // 4,943 of the 6,822 rows on its findings list.
 const kernelIssues = 4943
 
-// fullSizeImage reads the full-size fixture the inventory reader is tested
-// against.
-func fullSizeImage(t *testing.T) *sbom.Document {
-	t.Helper()
-	if _, err := exec.LookPath("xz"); err != nil {
-		t.Skip("xz is not available, so the full-size fixture cannot be read here")
-	}
-	dir, err := os.OpenRoot(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dir.Close() })
-	out, err := dir.Create("image.cdx.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command("xz", "--decompress", "--stdout", "../sbom/testdata/switch-image.cdx.json.xz")
-	cmd.Stdout = out
-	runErr := cmd.Run()
-	if err := out.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if runErr != nil {
-		t.Fatalf("decompress the fixture: %v", runErr)
-	}
-	in, err := dir.Open("image.cdx.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = in.Close() })
-	doc, err := sbom.Read(in, sbom.Limits{})
-	if err != nil {
-		t.Fatalf("read the fixture: %v", err)
-	}
-	return doc
-}
-
 func TestMeasurePackageKindsOnARealImage(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)

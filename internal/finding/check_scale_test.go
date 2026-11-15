@@ -26,6 +26,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 // checkedImage is the full-size image's build with its first inventory
@@ -143,7 +144,7 @@ func checkedImage(t *testing.T, doc *sbom.Document, db *database.DB) *world.Worl
 }
 
 func TestMeasureTheCheckOfAReplacedInventory(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		checkedImage(t, doc, db)
 	})
@@ -153,7 +154,7 @@ func TestMeasureTheCheckOfAReplacedInventory(t *testing.T) {
 // history: a run opening fifteen issues at every component of the replacement,
 // a third of them closed by a later run as upgraded.
 func TestMeasureRemediationBesideACheck(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := checkedImage(t, doc, db)

@@ -28,13 +28,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 // statedBuilds is how many builds of the product hold the full image.
 const statedBuilds = 8
 
 func TestMeasureSearchingByTheNameABuildStated(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)
@@ -175,7 +176,7 @@ const everyProduct = 16
 // granted every product of a deployment of several, each holding the image in
 // several builds.
 func TestMeasureSearchingByTheNameABuildStatedAcrossProducts(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)

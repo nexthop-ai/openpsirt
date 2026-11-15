@@ -25,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 // One rescan ten days after the first scan moves the kernel and every
@@ -40,7 +41,7 @@ func TestMeasureTheTrendBeneathAComponentOverAYearOfRescans(t *testing.T) {
 }
 
 func measureBeneathMoved(t *testing.T, rescans int) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)
