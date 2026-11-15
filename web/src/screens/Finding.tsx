@@ -210,13 +210,14 @@ export function Finding() {
   // same pair are one occurrence, and the head counts what a decision covers.
   const distinct = new Set(occurrences.map((occurrence) => occurrence.occurrence)).size;
   // The decisions standing here, one representative row each, read for the
-  // reasoning and the approvals the decision row does not carry.
+  // reasoning and the approvals the decision row does not carry. Every one is
+  // read, because a decision without its card has no control to act on it.
   const standingIds = useMemo(
     () => (it?.standing ?? []).map((c) => c.decision_occurrence_id),
     [it],
   );
   const standing = useQueries({
-    queries: standingIds.slice(0, SAMPLE).map((id) => ({
+    queries: standingIds.map((id) => ({
       queryKey: ["decision-occurrence", id],
       queryFn: async () =>
         unwrap(await api.GET("/v1/decision-occurrences/{id}", { params: { path: { id } } })),
@@ -298,7 +299,7 @@ export function Finding() {
   // a decision with another decision's summary the moment one of the parallel reads
   // was slow or failed — and the summary is where the identifier the reasoning
   // editor writes to comes from, so a revision landed on the wrong decision.
-  const pairs = standingIds.slice(0, SAMPLE).flatMap((_, i) => {
+  const pairs = standingIds.flatMap((_, i) => {
     const decision = standing[i]?.data;
     return decision ? [{ decision, summary: it.standing?.[i] }] : [];
   });

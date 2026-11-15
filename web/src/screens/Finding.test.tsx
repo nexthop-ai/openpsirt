@@ -37,7 +37,7 @@ function decision(id: number, decisionId: number) {
   };
 }
 
-function serving(decisions: Record<number, unknown>) {
+function serving(decisions: Record<number, unknown>, about: typeof finding = finding) {
   serve((path, init) => {
     if (path === "/v1/session/me") {
       return {
@@ -50,7 +50,7 @@ function serving(decisions: Record<number, unknown>) {
         },
       };
     }
-    if (path.endsWith("/components/{component}")) return { data: finding };
+    if (path.endsWith("/components/{component}")) return { data: about };
     if (path === "/v1/decision-occurrences/{id}") {
       const id = (init as { params: { path: { id: number } } }).params.path.id;
       const answer = decisions[id];
@@ -82,5 +82,23 @@ describe("the decisions standing on a finding", () => {
     await settle();
     expect(card(101)?.textContent).toContain("3 occurrences here");
     expect(card(102)?.textContent).toContain("7 occurrences here");
+  });
+
+  it("draws every decision standing, however many there are", async () => {
+    // Past any sample size: a decision left undrawn reads as an occurrence
+    // nobody decided, with no control to approve or revise it.
+    const many = Array.from({ length: 12 }, (_, i) => i + 1);
+    serving(Object.fromEntries(many.map((n) => [n, decision(n, 100 + n)])), {
+      ...finding,
+      standing: many.map((n) => ({
+        decision_occurrence_id: n,
+        decision_id: 100 + n,
+        occurrences: n,
+        state: "proposed",
+      })),
+    });
+    mount.render(screen(<Finding />, ADDRESS, PATTERN));
+    await settle();
+    for (const n of many) expect(card(100 + n)?.textContent).toContain(`${n} occurrence`);
   });
 });
