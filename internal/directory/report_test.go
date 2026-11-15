@@ -42,7 +42,7 @@ func TestEachPassSaysWhatItDid(t *testing.T) {
 		{"written", Written{Documents: 1},
 			nil, "wrote the published advisory directory", slog.LevelInfo},
 		{"unchanged", Written{Documents: 1, Unchanged: true}, nil, "", 0},
-		{"nothing at all", Written{Unchanged: true}, nil, "", 0},
+		{"nothing at all", Written{}, nil, "", 0},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			logged := &kept{}
