@@ -94,7 +94,7 @@ published word otherwise (REQ-29).
 | It names the product it asks about | Bound where the scope names one, from the row's branch or tag across products, from the decision on a decision row: three named spellings, because a placeholder cannot bind a column |
 | A flaw recorded here is rated by its recording product, and that rating is that product's rating in force; a rating claim there replaces it, and withdrawing the claim returns to it | Held per product, never on the shared issue row, which would tell readers of every product how bad an undisclosed flaw is |
 | The recording product's lists, documents and exports carry the score it recorded; the issue page and evidence carry it where every record of the issue is in reach | |
-| Sorting by score reads the issue's own, so a recorded flaw with no published score sorts with the unscored | |
+| Sorting by severity ranks the band of the rating in force first and the issue's own score inside the band, so a critical with no score sorts above a high scored 8.1, and a recorded flaw with no published score sorts last in its band | One number orders a grouped page: the band's rank times 10,000 plus the score in hundredths, which is at most 1,000 |
 | A query reading the published word aliases it `published` | Those queries ask whether a rating is milder than the world's; aliased `severity` they read as the rating in force |
 
 ## Urgency

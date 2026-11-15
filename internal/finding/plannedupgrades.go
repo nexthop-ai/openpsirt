@@ -400,12 +400,13 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(overParts.incident() + ` AS "incident"`).
 		// The total rides on the page, as the findings list's does.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
-		// The issue is joined only where the order needs it, the way the
-		// findings list does it, and after the first level has grouped the
-		// occurrences to one row per issue.
+		// The issue and this product's rating of it are joined only where the
+		// order needs them, the way the findings list does it, and after the
+		// first level has grouped the occurrences to one row per issue.
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if by, known := order[filter.SortBy]; known && by.issue {
-				return q.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`)
+				return q.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+					Join(rating.Here, filter.ProductID)
 			}
 			return q
 		}).

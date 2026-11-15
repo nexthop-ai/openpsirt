@@ -5768,7 +5768,7 @@ components:
           description: "Publication date unknown: an occurrence a replaced inventory's check recorded opens from that inventory's last scan, because no date is known for the issue. Only on a list read with open_on"
           type: boolean
         score:
-          description: The severity as a number, which is what the order compares
+          description: The severity as a number, which orders the findings inside one band when the list is sorted by severity
           format: double
           type: number
         score_version:
@@ -20150,12 +20150,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -20690,12 +20690,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -29451,12 +29451,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -30113,12 +30113,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -30691,12 +30691,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -31283,12 +31283,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age
@@ -31885,12 +31885,12 @@ paths:
             type:
               - array
               - "null"
-        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+        - description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
           explode: false
           in: query
           name: sort
           schema:
-            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. A finding with no deadline sorts last whichever direction is asked for"
+            description: "The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, this product's own where it states one, then by score inside the band. A finding with no deadline sorts last whichever direction is asked for"
             enum:
               - urgency
               - age

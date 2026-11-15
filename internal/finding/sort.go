@@ -3,6 +3,8 @@
 
 package finding
 
+import "github.com/nexthop-ai/openpsirt/internal/rating"
+
 // SortKey is a column somebody may order the findings list by.
 //
 // An allowlist, and the allowlist is the only thing that reaches the
@@ -34,13 +36,20 @@ const (
 	// ByLikelihood is the published estimate that it will be exploited, which
 	// ranks above severity and is how a batch of "worth doing now" is built.
 	ByLikelihood SortKey = "epss"
-	// BySeverity is the rating in force, as the number the ordering compares
-	// rather than the word.
+	// BySeverity is the rating in force: its band first, the product's own
+	// rating where it states one, then the score inside the band.
 	BySeverity SortKey = "severity"
 )
 
-// order is the expression each key sorts by, whether it needs the issue
-// joined, and whether the expression is the name of a column every grouped
+// bySeverity is BySeverity as one number: the band's rank above the score in
+// hundredths. A score in hundredths is at most 1000, so the band always decides
+// and the score only orders the issues inside one. A critical with no score
+// sorts above a high scored 8.1. One number, because a grouped page selects one
+// expression to sort by.
+var bySeverity = `MAX(` + rankCase(rating.BandExpr, 0) + ` * 10000 + COALESCE("v"."score_centi", 0))`
+
+// order is the expression each key sorts by, whether it needs the issue and
+// the product's rating of it joined, and whether the expression is the name of a column every grouped
 // page selects. Keyed by the constant rather than by a string a caller
 // supplies: what reaches the statement is this map's value, never its lookup.
 var order = map[SortKey]struct {
@@ -53,7 +62,7 @@ var order = map[SortKey]struct {
 	ByDeadline:    {expr: `MIN("f"."due_at")`},
 	ByOccurrences: {expr: "places", column: true},
 	ByLikelihood:  {expr: `MAX(COALESCE("v"."likelihood_ppm", 0))`, issue: true},
-	BySeverity:    {expr: `MAX(COALESCE("v"."score_centi", 0))`, issue: true},
+	BySeverity:    {expr: bySeverity, issue: true},
 }
 
 // orderedBy is the by-component view's order: what an asked-for key sorts by,

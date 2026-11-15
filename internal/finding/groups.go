@@ -18,6 +18,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
+	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -901,11 +902,13 @@ func (s *Store) heads(ctx context.Context, buildIDs []int64, visible []access.Vi
 	if key != "" {
 		grouped = grouped.ColumnExpr(key + ` AS "sort_key"`)
 	}
-	// The issue is joined only where the order needs it, and after the
-	// grouping: one row per issue and component, rather than a lookup behind
-	// every open occurrence in the selection for a sort almost nobody asks for.
+	// The issue and this product's rating of it are joined only where the
+	// order needs them, and after the grouping: one row per issue and
+	// component, rather than a lookup behind every open occurrence in the
+	// selection for a sort almost nobody asks for.
 	if by, known := order[filter.SortBy]; known && by.issue {
-		grouped = grouped.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`)
+		grouped = grouped.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+			Join(rating.Here, filter.ProductID)
 	}
 	page := paged(s.db, grouped, "vulnerability_id", "fold", "component_id", "places",
 		"urgency", "exploited", "incident").

@@ -464,8 +464,9 @@ func TestAWordAnAdvisoryWroteWhereAVersionBelongsIsNotTheUpgrade(t *testing.T) {
 // ranked is a finding of a stated severity, so an ordering test can put one
 // group above another on something other than how many rows it has.
 //
-// The number as well as the word: what the severity key orders by is the
-// score, and two issues rated in words alone are a tie the tie-break decides.
+// The number as well as the word: the severity key orders by the band, then
+// by the score inside it, and two issues rated in one word alone are a tie the
+// tie-break decides.
 func ranked(id string, component graph.Described, severity string, score float64) finding.Reported {
 	one := found(id, component)
 	one.Issue.Severity = severity
