@@ -292,3 +292,21 @@ func TestThePackagesScannedAreTheModulesOwnAndNotInstalledOnes(t *testing.T) {
 		t.Errorf("a command without the placeholder became %q", got)
 	}
 }
+
+func TestTheBaseIsWrittenFromItsCommitAndTheRepositoryIsLeftAlone(t *testing.T) {
+	dir := repository(t, map[string]string{"go.mod": "module x\n", "inner/a.go": "package inner\n"})
+	write(t, dir, map[string]string{"inner/a.go": "package changed\n"})
+	into := t.TempDir() + string(filepath.Separator) + "base"
+	if err := extract(dir, "HEAD", into); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(into + string(filepath.Separator) + "inner" + string(filepath.Separator) + "a.go") //nolint:gosec // G304: a file this test wrote
+	if err != nil || string(got) != "package inner\n" {
+		t.Errorf("the base's file read %q, %v; want the committed text", got, err)
+	}
+	//nolint:gosec // G204: git, over a repository this test made
+	if listed, err := exec.Command("git", "-C", dir, "worktree", "list", "--porcelain").Output(); err != nil ||
+		strings.Count(string(listed), "worktree ") != 1 {
+		t.Errorf("the repository's worktrees read %q, %v; want its own alone", listed, err)
+	}
+}

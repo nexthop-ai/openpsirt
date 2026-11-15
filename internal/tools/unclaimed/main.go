@@ -246,8 +246,10 @@ func straysIn(text string, rows map[string]bool) []string {
 	return strays
 }
 
-// straysInTree is every stray identifier in the files git tracks or would
-// add, each as "path: identifier", and how many files it read. This tool's
+// straysInTree is every stray identifier in the files git tracks, each as
+// "path: identifier", and how many files it read. Tracked rather than every
+// file on disk, because a checkout's own untracked notes are nobody's
+// citation. This tool's
 // own tests are left out, because their inputs are identifiers that name
 // nothing.
 func straysInTree(decisions string) ([]string, int, error) {
@@ -255,7 +257,7 @@ func straysInTree(decisions string) ([]string, int, error) {
 	for _, match := range row.FindAllStringSubmatch(decisions, -1) {
 		rows[canonical(match[1])] = true
 	}
-	files, err := walk.Unignored()
+	files, err := walk.Tracked()
 	if err != nil {
 		return nil, 0, err
 	}

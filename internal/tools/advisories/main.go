@@ -29,6 +29,7 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -560,7 +561,7 @@ func checkGo(root string, command []string, commit string) ([]advisory, func(adv
 	return found.found, func(a advisory) bool { return affected(a) && reached[a.ID+" "+a.Name] }, nil
 }
 
-// goReachedAt scans the base in a detached checkout of its own and returns
+// goReachedAt scans the base in a copy of its tree of its own and returns
 // each advisory it reaches, by identifier and module. A version the base held
 // is present only where the base also called what the advisory affects: a
 // change making a vulnerable symbol reachable introduces it.
@@ -571,19 +572,9 @@ func goReachedAt(root string, command []string, commit string) (map[string]bool,
 	}
 	defer func() { _ = os.RemoveAll(parent) }()
 	dir := filepath.Join(parent, "base")
-	// A run stopped before its deferred removal leaves its checkout
-	// registered; pruning first forgets any whose directory is gone.
-	//nolint:gosec // G204: a fixed git command over the repository given
-	_ = exec.Command("git", "-C", root, "worktree", "prune").Run()
-	//nolint:gosec // G204: a commit git merge-base named, checked out under a directory this made
-	if out, err := exec.Command("git", "-C", root, "worktree", "add", "--quiet", "--detach", dir, commit).
-		CombinedOutput(); err != nil {
-		return nil, fmt.Errorf("check out %s to scan it: %w\n%s", commit, err, out)
+	if err := extract(root, commit, dir); err != nil {
+		return nil, fmt.Errorf("check out %s to scan it: %w", commit, err)
 	}
-	defer func() {
-		//nolint:gosec // G204: as above
-		_ = exec.Command("git", "-C", root, "worktree", "remove", "--force", dir).Run()
-	}()
 	out, err := scan("go", dir, command)
 	if err != nil {
 		return nil, fmt.Errorf("scanning %s: %w", commit, err)
@@ -597,6 +588,83 @@ func goReachedAt(root string, command []string, commit string) (map[string]bool,
 		reached[a.ID+" "+a.Name] = true
 	}
 	return reached, nil
+}
+
+// extract writes the tree at commit into dir, from git archive, touching
+// nothing in the repository itself. Writes go through dir as a root, so no
+// entry lands outside it.
+func extract(root, commit, dir string) error {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return err
+	}
+	into, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = into.Close() }()
+	//nolint:gosec // G204: a commit git merge-base named
+	archive := exec.Command("git", "-C", root, "archive", "--format=tar", commit)
+	var stderr bytes.Buffer
+	archive.Stderr = &stderr
+	stream, err := archive.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := archive.Start(); err != nil {
+		return err
+	}
+	written := writeTree(into, tar.NewReader(stream))
+	if err := archive.Wait(); err != nil {
+		return fmt.Errorf("git archive: %w\n%s", err, stderr.String())
+	}
+	return written
+}
+
+// writeTree writes each directory, file and link a tar stream holds under
+// into, with the file's executable bit kept.
+func writeTree(into *os.Root, stream *tar.Reader) error {
+	for {
+		header, err := stream.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		name := filepath.FromSlash(strings.TrimSuffix(header.Name, "/"))
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := into.MkdirAll(name, 0o750); err != nil {
+				return err
+			}
+		case tar.TypeSymlink:
+			if err := into.MkdirAll(filepath.Dir(name), 0o750); err != nil {
+				return err
+			}
+			if err := into.Symlink(header.Linkname, name); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := into.MkdirAll(filepath.Dir(name), 0o750); err != nil {
+				return err
+			}
+			mode := os.FileMode(0o640)
+			if header.Mode&0o111 != 0 {
+				mode = 0o750
+			}
+			file, err := into.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(file, stream) //nolint:gosec // G110: this repository's own tree
+			if closed := file.Close(); err == nil {
+				err = closed
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 // lockOnly is the audit command reading a lockfile alone. Presence is decided
