@@ -362,6 +362,85 @@ func TestEveryReplacedBranchInventoryIsOwedOneCheck(t *testing.T) {
 	})
 }
 
+// owedOne leaves the replaced inventory owed its check, with newer data dated
+// past the settle delay and the schedule's lease free.
+func owedOne(t *testing.T, f *checkFixture) {
+	t.Helper()
+	ctx := t.Context()
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	f.published(t, "CVE-2026-0007", f.arrived.Add(24*time.Hour))
+	s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0007", libnl)}}
+	f.waiting(t)
+	if _, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").Once(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := queue.NewLeases(f.db.DB).Release(ctx, scanner.ScheduleLease, "test"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checksOf is what the check jobs name.
+func checksOf(t *testing.T, f *checkFixture) []string {
+	t.Helper()
+	var refs []string
+	if err := f.db.NewSelect().Table("job").Column("reference").
+		Where(`"kind" = ?`, queue.Check).OrderExpr(`"reference"`).Scan(t.Context(), &refs); err != nil {
+		t.Fatal(err)
+	}
+	return refs
+}
+
+// A pass's worth of checks already waiting stops the asking, so an owed
+// check waits for the next pass rather than deepening the queue.
+func TestAPassWorthOfChecksAlreadyWaitingStopsTheAsking(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		owedOne(t, f)
+		roomy := queue.New(f.db, queue.Options{
+			MaxAttempts: 5, MaxBacklog: 10_000, ClaimTimeout: 30 * time.Minute,
+			Heartbeat: 5 * time.Minute, Backoff: 30 * time.Second,
+		})
+		// Numbered, because only a reference naming an inventory is counted.
+		for i := range scanner.ChecksLimit {
+			if _, err := roomy.Add(ctx, queue.Check, strconv.Itoa(1_000_000+i)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if _, err := scanner.NewSchedule(f.db, roomy, quiet, "test").Once(ctx); err != nil {
+			t.Fatalf("a pass's worth of checks waiting was reported as a failure: %v", err)
+		}
+		if refs := checksOf(t, f); len(refs) != scanner.ChecksLimit {
+			t.Errorf("%d checks queued, want the %d already waiting and no more", len(refs), scanner.ChecksLimit)
+		}
+	})
+}
+
+// A full queue stops the asking for checks without failing the pass, and the
+// owed check stays owed.
+func TestAFullQueueStopsTheAskingForChecksRatherThanFailing(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		owedOne(t, f)
+		full := queue.New(f.db, queue.Options{
+			MaxAttempts: 5, MaxBacklog: 1, ClaimTimeout: 30 * time.Minute,
+			Heartbeat: 5 * time.Minute, Backoff: 30 * time.Second,
+		})
+		if _, err := full.Add(ctx, queue.Check, "999999"); err != nil {
+			t.Fatal(err)
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if _, err := scanner.NewSchedule(f.db, full, quiet, "test").Once(ctx); err != nil {
+			t.Fatalf("a full queue was reported as a failure: %v", err)
+		}
+		if refs := checksOf(t, f); len(refs) != 1 || refs[0] != "999999" {
+			t.Errorf("checks queued %v, want the one already waiting alone", refs)
+		}
+	})
+}
+
 func TestAnInventoryReplacedBeforeTheUpgradeIsNeverAskedFor(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()
