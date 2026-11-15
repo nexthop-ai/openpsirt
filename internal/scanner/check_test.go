@@ -263,6 +263,63 @@ func TestTheRunnerChecksAReplacedInventoryWhenNoScanWaits(t *testing.T) {
 	})
 }
 
+func TestAReplacementItsRecordClearsClosesTheCheckedRowAsUnaffected(t *testing.T) {
+	// The replacement holds the occurrence at a version the issue's CVE
+	// record states unaffected: the row is closed for that reason, carrying
+	// the lines that say so.
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0007", f.arrived.Add(24*time.Hour))
+		const lines = `[{"version":"3.9.0","status":"unaffected"}]`
+		cleared := reportAt("CVE-2026-0007", libnlFixed)
+		cleared.Unaffected = lines
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{
+			reportAt("CVE-2026-0007", libnl), cleared,
+		}}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want one recorded", checking)
+		}
+		var got finding.Finding
+		if err := f.db.NewSelect().Model(&got).Where(`"build_id" = ?`, f.build).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if got.ClosedBecause != finding.Unaffected || got.UnaffectedBy != lines || got.MovedTo != "" {
+			t.Errorf("closed because %q by %q moving to %q, want unaffected by %q and no move",
+				got.ClosedBecause, got.UnaffectedBy, got.MovedTo, lines)
+		}
+	})
+}
+
+func TestACheckLeavesAnIssueNothingHereHoldsAlone(t *testing.T) {
+	// With the date pass off nothing files an issue the check is first to
+	// report, so it has no date and is no finding of the replaced inventory.
+	// The inventory was never scanned, so no data date bounds the stretch
+	// it was current from below.
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		if _, err := f.db.NewDelete().Table("scan_run").Where(`"build_id" = ?`, f.build).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.IssueDates, "off"); err != nil {
+			t.Fatal(err)
+		}
+		f.published(t, "CVE-2026-0007", f.arrived.Add(24*time.Hour))
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{
+			reportAt("CVE-2026-0007", libnl), reportAt("CVE-2026-0010", libnl),
+		}}
+		checking := f.check(t, s)
+		if checking == nil || checking.Checked.Dated != 1 || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want the one issue held here dated and recorded", checking)
+		}
+		n, err := f.db.NewSelect().Table("vulnerability").Where(`"identifier" = ?`, "CVE-2026-0010").Count(ctx)
+		if err != nil || n != 0 {
+			t.Fatalf("the issue nothing held is filed %d times, %v; want not at all", n, err)
+		}
+	})
+}
+
 func TestACheckWritesNothingAnExistingRowAlreadyCovers(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()
