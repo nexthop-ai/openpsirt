@@ -352,15 +352,32 @@ func TestAnEdgeNamingAFileIsNotAnEdgeNamingNothing(t *testing.T) {
 	}
 }
 
+// twoEdgesSPDX is minimalSPDX with a second package under the root, so that
+// a bound of one edge has two to count rather than one.
+func twoEdgesSPDX() string {
+	doc := strings.Replace(minimalSPDX, `"packages": [`,
+		`"packages": [{"SPDXID": "SPDXRef-b", "name": "zlib", "versionInfo": "1.3", "downloadLocation": "NONE"},`, 1)
+	return strings.Replace(doc, `"relationships": [`, `"relationships": [`+
+		`{"spdxElementId": "SPDXRef-root", "relatedSpdxElement": "SPDXRef-b", "relationshipType": "DEPENDS_ON"},`, 1)
+}
+
+// A deployment sets one bound and leaves the rest unset, which reads as zero;
+// the reader holds every unset bound at its default rather than at zero, so
+// the document is read.
+func TestABoundLeftUnsetIsReadAtItsDefault(t *testing.T) {
+	read, err := sbom.Read(strings.NewReader(twoEdgesSPDX()), sbom.Limits{MaxDepth: 8})
+	if err != nil {
+		t.Fatalf("a document within every default was refused: %v", err)
+	}
+	if len(read.Components) != 2 {
+		t.Errorf("read %d components, want 2", len(read.Components))
+	}
+}
+
 func TestTheSecondFormatChargesTheSameBounds(t *testing.T) {
 	// A bound that holds on one format and not the other is a bound somebody
 	// routes around by changing which one they send.
-	// A second package under the root, so that a bound of one edge has two to
-	// count rather than one.
-	twoEdges := strings.Replace(minimalSPDX, `"packages": [`,
-		`"packages": [{"SPDXID": "SPDXRef-b", "name": "zlib", "versionInfo": "1.3", "downloadLocation": "NONE"},`, 1)
-	twoEdges = strings.Replace(twoEdges, `"relationships": [`, `"relationships": [`+
-		`{"spdxElementId": "SPDXRef-root", "relatedSpdxElement": "SPDXRef-b", "relationshipType": "DEPENDS_ON"},`, 1)
+	twoEdges := twoEdgesSPDX()
 
 	for _, tc := range []struct {
 		name  string

@@ -74,19 +74,6 @@ func TestTheAnalyzerBoundsAreReachableFromTheEnvironment(t *testing.T) {
 	}
 }
 
-// Anything not set keeps the reader's own default rather than becoming zero,
-// which is what lets a deployment change one bound without restating the rest.
-func TestAnUnsetIngestBoundKeepsItsDefault(t *testing.T) {
-	t.Setenv("OPENPSIRT_INGEST_MAX_DEPTH", "8")
-	loaded, err := config.Load(os.Environ())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := loaded.Limits().OrDefault().MaxEdges; got != sbom.DefaultLimits().MaxEdges {
-		t.Errorf("an unset ceiling became %d rather than the default", got)
-	}
-}
-
 // Every scanner bound is configurable, each reaching the field it names, with
 // distinct values for the reason the ingest bounds above have them.
 func TestTheScannerBoundsAreReachableFromTheEnvironment(t *testing.T) {
