@@ -5602,6 +5602,10 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <td>The releases out of support leave out a retired release and every release of a retired product. The download adds <code>product name</code> and <code>branch or tag name</code> beside <code>product</code> and <code>branch_or_tag</code></td>
 <td>A script reading the download by column position reads them by name</td>
 </tr>
+<tr>
+<td><code>openpsirt-upload</code> reduces an analyzer's markdown-only message holding a table one row a line, its cells joined by a vertical bar with a space either side, where v0.12.0's reduced it one cell a line. The message is part of how a code finding is matched</td>
+<td>Nothing the upgrade can do. Each code finding whose message holds a table re-matches once, on the first analysis this release's <code>openpsirt-upload</code> sends: it opens as a new finding, its decision stays on the earlier one, and that decision is asked again. Upgrade <code>openpsirt-upload</code> wherever it sends for one series, since a v0.12.0 client and this one disagree on such a message</td>
+</tr>
 </tbody>
 </table>
 <h4 id="vex-statements-from-v0120">VEX statements from v0.12.0<a class="headerlink" href="#vex-statements-from-v0120" title="Permanent link">&para;</a></h4>

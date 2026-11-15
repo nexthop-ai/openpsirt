@@ -28712,26 +28712,19 @@ paths:
           required: true
           schema:
             type: string
-        - description: Limit to one product, by name. Empty means every product you can see
-          explode: false
-          in: query
-          name: product
-          schema:
-            description: Limit to one product, by name. Empty means every product you can see
-            type: string
-        - description: Limit to one branch or tag. Only meaningful with a product
+        - description: Limit to one branch or tag of the product
           explode: false
           in: query
           name: branch_or_tag
           schema:
-            description: Limit to one branch or tag. Only meaningful with a product
+            description: Limit to one branch or tag of the product
             type: string
-        - description: Limit to one variant. Only meaningful with a product, and independent of the branch
+        - description: Limit to one variant of the product, independent of the branch
           explode: false
           in: query
           name: variant
           schema:
-            description: Limit to one variant. Only meaningful with a product, and independent of the branch
+            description: Limit to one variant of the product, independent of the branch
             type: string
       responses:
         "200":
