@@ -197,16 +197,16 @@ func (h *heldOpen) Write(b []byte) (int, error) {
 
 func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 	// Nothing makes an approval unique per decision — a second approver adds a
-	// row — and it was joined, so each extra one multiplied its finding into
-	// two rows on a page whose total counts findings. The page then held one
-	// row fewer than it said, and every later offset skipped one, so an
-	// auditor paging a register never saw some of it and nothing said so.
+	// row — so a second approval must not multiply its finding into two rows
+	// on a page whose total counts findings. A page holding one row fewer than
+	// it says shifts every later offset by one, and an auditor paging the
+	// register never sees the row skipped.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
 		decision, ids := r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", httpapitest.Dismissal)
 		r.Agreed(t, decision)
 		// A second agreement on the same decision, which is what the schema
-		// allows and what multiplied the row. Written directly, because a
+		// allows and what a join would multiply. Written directly, because a
 		// second approver going through the endpoint is a different subject
 		// and this is about the shape of the row rather than about who may
 		// add one.
@@ -247,10 +247,9 @@ func TestTheRegisterPagesWithoutSkippingRows(t *testing.T) {
 // TestTheRegisterNamesWhatItWasMeasuredWith is the auditor's chain.
 //
 // Shipped artifact, inventory, run, scanner and database, disposition. The
-// register is the last link and named none of the first four, so what it said
-// stood on nothing a reader could check — while every one of them was already
-// recorded, and the route that hands back the inventory it names already
-// existed and was reachable from nothing.
+// register is the last link and names the first four, so what it says stands
+// on something a reader can check, down to the inventory the route it names
+// hands back.
 func TestTheRegisterNamesWhatItWasMeasuredWith(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
@@ -322,8 +321,8 @@ func TestTheRegisterNamesWhatItWasMeasuredWith(t *testing.T) {
 
 // TestTheRegisterNarrows is what an auditor does with it.
 //
-// It took no filters at all, so "show me what nobody decided" on a build of a
-// quarter of a million rows was a spreadsheet and a search box.
+// "Show me what nobody decided" on a build of a quarter of a million rows is a
+// filter on the register, never a spreadsheet and a search box.
 func TestTheRegisterNarrows(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)

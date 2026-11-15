@@ -132,13 +132,13 @@ func TestOutOfSupportSaysWhenTheFileWasTaken(t *testing.T) {
 	})
 }
 
-// TestNothingWarnedBeforeAReleaseCrossed is the warning half.
+// TestAReleaseAboutToEndIsListedApartWithDaysLeft is the warning half.
 //
 // The day a release goes out of support the deadline comes off every open
 // finding on it, so a pile of work leaves every overdue count at once with
-// nobody having decided anything. A report of the past alone shows that only
-// as the figures moving.
-func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
+// nobody having decided anything. A horizon asked for lists what is about to
+// cross before the figures move.
+func TestAReleaseAboutToEndIsListedApartWithDaysLeft(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 		started := time.Now().UTC()
@@ -178,7 +178,7 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 			return out
 		}
 
-		// Asked for nothing, this is the past-only report it has always been.
+		// Asked for nothing, the report holds only releases already ended.
 		// A second population appearing unasked would change what every figure
 		// on the screen counts.
 		if now := asked(t, ""); len(now.Items) != 0 || len(now.Ending) != 0 {
@@ -198,9 +198,9 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		}
 		// Negative, which is the same figure read the other way: how long is
 		// left rather than how long ago — and it is the whole number of days
-		// somebody plans in. Days count from today rather than from the
-		// instant, or a release ending tomorrow reads as zero days left. A run
-		// crossing midnight since the date was set reads one day fewer.
+		// somebody plans in. Days are counted from today, so a release ending
+		// tomorrow reads as one day left. A run crossing midnight since the
+		// date was set reads one day fewer.
 		crossed := time.Now().UTC().Format(time.DateOnly) != started.Format(time.DateOnly)
 		if days := ahead.Ending[0].EndedDays; days != -20 && (!crossed || days != -19) {
 			t.Errorf("a date twenty days ahead reads as %d days", days)
