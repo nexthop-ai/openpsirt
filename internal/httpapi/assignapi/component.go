@@ -46,7 +46,7 @@ type PerBuildBody struct {
 	Consumers   int `json:"consumers" doc:"The number of things outside the source package pulling any of its binaries in here. One binary pulling in another is not counted"`
 	Occurrences int `json:"occurrences" doc:"The number of times those sit somewhere in this build. What the ceiling on one action is measured against"`
 	// Upgrades are the versions this build could move to.
-	Upgrades []core.UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a branch or tag on a maintained older line and a branch or tag that has moved on have different builds"`
+	Upgrades []core.UpgradeBody `json:"upgrades,omitempty" doc:"Versions upstream released that would close some of what is open here, most-closing first. Per build, because a branch or tag on a maintained older line and one that has moved on need different upgrades"`
 	DueAt    string             `json:"due_at,omitempty" doc:"The earliest deadline among what is open here. A commitment at or before it needs no approval; past it a second person agrees"`
 	// CommittedTo is the promise already made for this build, read off the
 	// decisions.

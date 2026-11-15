@@ -222,7 +222,7 @@ func (s *Store) ReachingAcross(ctx context.Context, subject access.Subject,
 			Version:           row.Version,
 			ComponentUpstream: row.ComponentUpstream, ConsumerUpstream: row.ConsumerUpstream,
 			Occurrences: row.Occurrences,
-			// Its place, elsewhere or right here. A screen code findings with
+			// Its place, elsewhere or right here. A screen leads with
 			// the version, because that is what differs, and says where as an
 			// aside — but it still has to be able to say "here".
 			Here: row.BuildID == hereBuildID,

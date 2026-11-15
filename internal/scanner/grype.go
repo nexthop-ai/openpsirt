@@ -128,9 +128,6 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	limits := g.Limits.OrDefault()
 	out := bounded{most: limits.MaxOutput}
 	errs := trailing{most: limits.MaxComplaint}
-	// Reading the inventory from standard input rather than from a file: a
-	// component name is somebody else's text, and nothing from a scan file is
-	// ever used as a path.
 	// The inventory goes to the program's input rather than being named as a
 	// path. That is deliberate — nothing from a scan file is ever used as a
 	// path, so a component called something hostile stays data — and it is
@@ -164,8 +161,8 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 		return Result{}, err
 	}
 	// Its own words while succeeding, bounded the same way the failure is. A
-	// scanner writes progress to this branch or tag as well, which it suppresses when
-	// nothing is watching — as nothing is here.
+	// scanner writes progress to standard error as well, which it suppresses
+	// when nothing is watching, as nothing is here.
 	result.Caution = tail(strings.TrimSpace(errs.String()))
 	return result, nil
 }

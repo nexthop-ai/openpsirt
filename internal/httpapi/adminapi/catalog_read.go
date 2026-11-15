@@ -114,10 +114,9 @@ func registerCatalogReading(api huma.API, d core.Declaring) {
 		Summary: "List a product's branches and tags",
 		Description: "Every branch or tag declared under this product, with how many variants each " +
 			"has and how much is open in it.\n\n" +
-			"A branch or tag is a branch or a tag: a branch is scanned nightly and superseded, a " +
-			"tag is immutable and kept. Both are declared before a scan may name one, so a " +
-			"typo in a pipeline is refused rather than quietly creating a line with findings " +
-			"and reports of its own.\n\n" +
+			"A branch is scanned nightly and superseded; a tag is immutable and kept. Both are " +
+			"declared before a scan may name one, so a typo in a pipeline is refused rather " +
+			"than quietly creating a line with findings and reports of its own.\n\n" +
 			"A branch or tag past its end-of-life date is listed and says so. It stops being a " +
 			"place a fix may be declared for, and what is open against it is still counted.\n\n" +
 			"A retired branch or tag is left out unless asked for. Ask for it to resolve a name " +

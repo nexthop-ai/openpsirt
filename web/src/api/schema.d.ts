@@ -2837,7 +2837,7 @@ export interface paths {
          * List a product's branches and tags
          * @description Every branch or tag declared under this product, with how many variants each has and how much is open in it.
          *
-         *     A branch or tag is a branch or a tag: a branch is scanned nightly and superseded, a tag is immutable and kept. Both are declared before a scan may name one, so a typo in a pipeline is refused rather than quietly creating a line with findings and reports of its own.
+         *     A branch is scanned nightly and superseded; a tag is immutable and kept. Both are declared before a scan may name one, so a typo in a pipeline is refused rather than quietly creating a line with findings and reports of its own.
          *
          *     A branch or tag past its end-of-life date is listed and says so. It stops being a place a fix may be declared for, and what is open against it is still counted.
          *
@@ -13744,7 +13744,7 @@ export interface components {
             source: string;
             /** @description The version somebody has committed to moving this build to */
             upgrade_to?: string;
-            /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because a branch or tag on a maintained older line and a branch or tag that has moved on have different builds */
+            /** @description Versions upstream released that would close some of what is open here, most-closing first. Per build, because a branch or tag on a maintained older line and one that has moved on need different upgrades */
             upgrades?: components["schemas"]["UpgradeBody"][] | null;
             variant: string;
             /** @description The version the source package was built at */
