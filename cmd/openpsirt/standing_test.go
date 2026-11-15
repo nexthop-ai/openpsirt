@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/config"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
@@ -39,6 +40,8 @@ type switched struct {
 	// starts counts the times the passes were started, and stopped the times
 	// a start's context ended.
 	starts, stopped atomic.Int32
+	// paused counts the stops whose cause was a pause for a schema change.
+	paused atomic.Int32
 	// stuck keeps a pass from ending once stopped until release closes.
 	stuck   atomic.Bool
 	release chan struct{}
@@ -103,6 +106,9 @@ func serveSwitched(t *testing.T, db *database.DB) *switched {
 			go func() {
 				defer workers.Done()
 				<-ctx.Done()
+				if errors.Is(context.Cause(ctx), queue.ErrPaused) {
+					s.paused.Add(1)
+				}
 				s.stopped.Add(1)
 				if s.stuck.Load() {
 					<-s.release
@@ -362,6 +368,7 @@ func TestAStartServesOnlyASchemaItsLookFindsItsOwn(t *testing.T) {
 	}{
 		{schema.Serves, nil, true},
 		{schema.Changes, nil, false},
+		{schema.Stranded, nil, false},
 		{schema.Superseded, nil, false},
 		{schema.Behind, nil, false},
 		{schema.Serves, errors.New("the look failed"), false},
@@ -383,6 +390,9 @@ func TestAStuckPassHoldsBackOnlyThePasses(t *testing.T) {
 		s.stuck.Store(true)
 		s.see(t, schema.Changes)
 		eventually(t, "the passes were stopped", func() bool { return s.stopped.Load() == 1 })
+		if s.paused.Load() != 1 {
+			t.Error("a pause stopped the passes without saying it was a pause, so their jobs count as failed")
+		}
 		s.see(t, schema.Serves)
 		eventually(t, "the router answered again", func() bool {
 			code, _, body := s.ask(t, "/")

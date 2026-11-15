@@ -231,6 +231,11 @@ type phase struct {
 	ended context.Context
 }
 
+// errStranded is a schema an upgrade left with its record standing and
+// nothing changing it.
+var errStranded = errors.New("an upgrade left the schema changed without recording its version, as one " +
+	"failing part way on MySQL or MariaDB does: complete the upgrade or restore the backup taken before it")
+
 // errSchemaChanging is why a request the router was answering ended.
 var errSchemaChanging = errors.New("another instance is changing the schema")
 
@@ -418,6 +423,8 @@ func lookBeforeServing(ctx context.Context, look func(context.Context) (schema.S
 		return fmt.Errorf("could not ask whether the schema is changing before serving: %w", err)
 	case standing == schema.Changes:
 		return fmt.Errorf("another instance began changing the schema, at version %d, while this one started", applied)
+	case standing == schema.Stranded:
+		return fmt.Errorf("%w, at version %d", errStranded, applied)
 	case standing != schema.Serves:
 		return fmt.Errorf("the database is at schema version %d, and this build carries %d", applied, carried)
 	}
@@ -500,7 +507,10 @@ func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger,
 	}
 	// Reading stops when the signal arrives, before the server drains, so a
 	// scan is not picked up during the seconds we are on our way out.
-	running, stopRunning := context.WithCancel(ctx)
+	// A pause ends the passes with queue.ErrPaused as the cause, so a job a
+	// pause stopped is handed back untried rather than failed.
+	running, endRunning := context.WithCancelCause(ctx)
+	stopRunning := func() { endRunning(nil) }
 	defer func() { stopRunning() }()
 	workers := start(running)
 	srv := server.srv
@@ -515,7 +525,8 @@ func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger,
 	var stalled <-chan time.Time
 	var stopping error
 	restart := func() {
-		running, stopRunning = context.WithCancel(ctx) //nolint:gosec // G118: the deferred call above cancels whichever context is current
+		running, endRunning = context.WithCancelCause(ctx)
+		stopRunning = func() { endRunning(nil) }
 		workers = start(running)
 		halted, stalled = false, nil
 	}
@@ -547,20 +558,25 @@ serving:
 			break serving
 		case seen := <-standings:
 			switch seen.standing {
-			case schema.Changes:
+			case schema.Changes, schema.Stranded:
 				if !halted {
-					stopRunning()
+					endRunning(queue.ErrPaused)
 					drained = ended(workers)
 					halted = true
 				}
-				if paused {
-					continue
+				// Logged on every move between these, which the watch sends
+				// only when the standing differs.
+				if !paused {
+					server.pause()
+					paused = true
 				}
-				server.pause()
-				paused = true
-				if seen.failed {
+				switch {
+				case seen.failed:
 					logger.Warn("could not look at the schema: not serving until a look succeeds")
-				} else {
+				case seen.standing == schema.Stranded:
+					logger.Error(errStranded.Error()+": not serving", "applied", seen.applied,
+						"carried", seen.carried)
+				default:
 					logger.Warn("another instance is changing the schema: not serving until it is this build's",
 						"applied", seen.applied, "carried", seen.carried)
 				}

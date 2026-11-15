@@ -62,6 +62,20 @@ func NewObserver(ctx context.Context, db *database.DB) (*Observer, error) {
 	return o, nil
 }
 
+// Change is what a look found of a schema change.
+type Change int
+
+const (
+	// Unchanged is no lock held and no record standing.
+	Unchanged Change = iota
+	// Held is the schema change lock held by an instance changing the schema.
+	Held
+	// Recorded is a record standing of an upgrade to a later version than the
+	// one applied, with the lock free: one that left the schema part changed,
+	// or committed a migration before its version was recorded.
+	Recorded
+)
+
 // Look reports whether another instance is changing the schema, and the
 // highest schema version applied, on one connection of its own. Taking the
 // connection is bounded by acquireWithin and the questions by lookWithin.
@@ -69,23 +83,23 @@ func NewObserver(ctx context.Context, db *database.DB) (*Observer, error) {
 // The version is read first and answered even where asking about a change
 // then fails, since a version ahead settles what a serving instance does
 // whatever else is true. It is read again after, and the later answer kept.
-func (o *Observer) Look(ctx context.Context, acquireWithin, lookWithin time.Duration) (bool, int64, error) {
+func (o *Observer) Look(ctx context.Context, acquireWithin, lookWithin time.Duration) (Change, int64, error) {
 	acquiring, cancel := context.WithTimeout(ctx, acquireWithin)
 	conn, err := o.db.Conn(acquiring)
 	cancel()
 	if err != nil {
-		return false, 0, fmt.Errorf("take a connection to ask about the schema: %w", err)
+		return Unchanged, 0, fmt.Errorf("take a connection to ask about the schema: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
 	asking, cancel := context.WithTimeout(ctx, lookWithin)
 	defer cancel()
 	applied, err := o.applied(asking, conn)
 	if err != nil {
-		return false, 0, err
+		return Unchanged, 0, err
 	}
 	changing, err := o.changing(asking, conn, applied)
 	if err != nil {
-		return false, applied, err
+		return Unchanged, applied, err
 	}
 	// Read again, since an upgrade may have finished and let go of the lock
 	// between the two reads: an absent lock with the first version would
@@ -95,20 +109,29 @@ func (o *Observer) Look(ctx context.Context, acquireWithin, lookWithin time.Dura
 }
 
 // changing reports whether an instance holds the schema change lock, which it
-// holds from before its first migration's statements to after its last, or a
-// record stands of an upgrade reaching a version later than applied, which an
-// upgrade that left the schema part changed leaves.
-func (o *Observer) changing(ctx context.Context, q rowQuerier, applied int64) (bool, error) {
+// holds from before its first migration's statements to after its last, or
+// else whether a record stands of an upgrade reaching a version later than
+// applied.
+func (o *Observer) changing(ctx context.Context, q rowQuerier, applied int64) (Change, error) {
 	held, err := o.locked(ctx, q)
-	if err != nil || held || !o.recorded {
-		return held, err
+	if err != nil {
+		return Unchanged, err
+	}
+	if held {
+		return Held, nil
+	}
+	if !o.recorded {
+		return Unchanged, nil
 	}
 	var records int
 	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+ChangeTable+`" WHERE "target_version" > ?`,
 		applied).Scan(&records); err != nil {
-		return false, fmt.Errorf("read the record of schema changes: %w", err)
+		return Unchanged, fmt.Errorf("read the record of schema changes: %w", err)
 	}
-	return records > 0, nil
+	if records > 0 {
+		return Recorded, nil
+	}
+	return Unchanged, nil
 }
 
 // locked reports whether an instance holds the schema change lock.

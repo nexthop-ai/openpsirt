@@ -332,7 +332,8 @@ outage for as long as its migrations take.
 | Standing | When | The instance |
 |---|---|---|
 | Serves | The applied version is this build's and nothing is changing it | Serves through the router, and runs its passes |
-| Changes | The change lock is held or a record stands, at a version not ahead of this build's | Pauses, and resumes at Serves |
+| Changes | The change lock is held, at a version not ahead of this build's | Pauses, and resumes at Serves |
+| Stranded | A record stands of an upgrade to a later version than the one applied, with the lock free, at a version not ahead of this build's | Pauses, logging at Error that the upgrade must complete or the backup be restored, and resumes at Serves; a start refuses with the same words |
 | Behind | The applied version is behind this build's and nothing is changing it, such as a restored backup | Stops |
 | Superseded | The applied version is ahead of this build's, whether or not anything is changing it | Stops |
 
@@ -344,6 +345,7 @@ outage for as long as its migrations take.
 | Keeps the answer of a request whose handler wrote a success | What it did took effect, and a retry would repeat it |
 | Keeps a redirect | A browser follows it, and it may carry a session the handler set; a sign-in the pause ended redirects to the sign-in failure screen |
 | Stops every pass and the queue's workers | No pass writes while another instance migrates |
+| Hands a job it stopped back untried, its attempt given back | A pause is no failure of the job, and looks that fail pause too |
 | Answers through the router again at Serves, whether or not the stopped passes have ended | The router does not depend on the passes |
 | Starts the passes again once the stopped ones have ended | Two copies of one pass never run at once |
 | Stops, exiting 1, where a stopped pass has not ended within the shutdown grace of serving again | A pass that ignores its context would otherwise keep the passes off with nothing logged |

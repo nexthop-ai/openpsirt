@@ -79,6 +79,12 @@ const (
 	// Superseded is a schema a later release applied, which this build never
 	// serves again.
 	Superseded
+	// Stranded is a schema at or behind this build's version that an upgrade
+	// left with its record standing and nothing holding the lock: on MySQL or
+	// MariaDB part changed by an upgrade that failed, or committed by a
+	// migration whose version was never recorded. Nothing serves it until an
+	// upgrade reaches the version the record names or the backup is restored.
+	Stranded
 	// Behind is a schema older than this build's that nothing is changing,
 	// such as a restored backup. A start of this build migrates or refuses
 	// it, so a serving instance stops and the platform starts it again.
@@ -109,32 +115,34 @@ func NewWatcher(ctx context.Context, db *database.DB) (*Watcher, error) {
 // ahead is Superseded even where asking about a change failed: a later
 // release may have reshaped what that asks.
 func (w *Watcher) Look(ctx context.Context) (Standing, int64, int64, error) {
-	changing, applied, err := w.observer.Look(ctx, AcquireWithin, LookWithin)
-	standing, err := looked(changing, applied, w.expected, err)
+	change, applied, err := w.observer.Look(ctx, AcquireWithin, LookWithin)
+	standing, err := looked(change, applied, w.expected, err)
 	return standing, applied, w.expected, err
 }
 
 // looked is the standing a look answered, given what asking failed with.
-func looked(changing bool, applied, expected int64, failed error) (Standing, error) {
+func looked(change migrate.Change, applied, expected int64, failed error) (Standing, error) {
 	if applied > expected {
 		return Superseded, nil
 	}
 	if failed != nil {
 		return Serves, failed
 	}
-	return stands(changing, applied, expected), nil
+	return stands(change, applied, expected), nil
 }
 
 // stands is the standing of a schema at applied, for a build carrying
-// expected, changing or not. A version ahead outranks a change: a later
-// release mid-upgrade has already left this build behind. A change outranks
-// a version behind, which an upgrade passes through.
-func stands(changing bool, applied, expected int64) Standing {
+// expected, given what a look found of a change. A version ahead outranks a
+// change: a later release mid-upgrade has already left this build behind. A
+// change outranks a version behind, which an upgrade passes through.
+func stands(change migrate.Change, applied, expected int64) Standing {
 	switch {
 	case applied > expected:
 		return Superseded
-	case changing:
+	case change == migrate.Held:
 		return Changes
+	case change == migrate.Recorded:
+		return Stranded
 	case applied < expected:
 		return Behind
 	}

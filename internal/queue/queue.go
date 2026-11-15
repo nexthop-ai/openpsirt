@@ -763,6 +763,10 @@ func (q *Queue) Fail(ctx context.Context, id int64, worker string, cause error) 
 	})
 }
 
+// ErrPaused is the cause a serving instance ends its work with while another
+// instance changes the schema. A job it stopped is handed back untried.
+var ErrPaused = errors.New("background work paused while another instance changes the schema")
+
 // Postpone hands work back to the queue untried, by the worker that holds it,
 // to be claimed again once the delay has passed.
 //
@@ -1013,7 +1017,12 @@ func (q *Queue) Settle(ctx context.Context, job *Job, worker, noun string,
 	ceiling := errors.Is(taken, ErrHeldTooLong)
 
 	var ended error
-	if work != nil {
+	switch {
+	case work != nil && errors.Is(context.Cause(ctx), ErrPaused):
+		// Nothing about the job failed: the instance stopped its work while
+		// another changed the schema, so the attempt is given back.
+		ended = q.Postpone(settled, job.ID, worker, 0, ErrPaused.Error())
+	case work != nil:
 		if recover != nil && ctx.Err() == nil && (taken == nil || ceiling) {
 			if err := recover(settled); err != nil && logger != nil {
 				logger.Warn("could not record why work failed",
@@ -1021,7 +1030,7 @@ func (q *Queue) Settle(ctx context.Context, job *Job, worker, noun string,
 			}
 		}
 		ended = q.Fail(settled, job.ID, worker, work)
-	} else {
+	default:
 		ended = q.Succeed(settled, job.ID, worker)
 	}
 

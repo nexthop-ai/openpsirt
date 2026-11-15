@@ -32,7 +32,8 @@ func changingWithin(t *testing.T, o *Observer, want bool, doing string) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		got, err := o.changing(t.Context(), o.db, 0)
+		change, err := o.changing(t.Context(), o.db, 0)
+		got := change != Unchanged
 		if err != nil {
 			t.Fatalf("%s: asking whether the schema is changing: %v", doing, err)
 		}
@@ -258,9 +259,9 @@ func TestALookWaitsForABusyPool(t *testing.T) {
 		t.Fatal("a look answered with every connection held past its bound on taking one")
 	}
 	time.AfterFunc(300*time.Millisecond, func() { _ = busy.Close() })
-	changing, applied, err := observer.Look(ctx, time.Minute, 100*time.Millisecond)
-	if err != nil || changing || applied != 7 {
-		t.Fatalf("a look past a pool busy for longer than its questions take: %v at %d, %v", changing, applied, err)
+	change, applied, err := observer.Look(ctx, time.Minute, 100*time.Millisecond)
+	if err != nil || change != Unchanged || applied != 7 {
+		t.Fatalf("a look past a pool busy for longer than its questions take: %v at %d, %v", change, applied, err)
 	}
 }
 

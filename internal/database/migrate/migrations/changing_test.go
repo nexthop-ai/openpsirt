@@ -48,7 +48,10 @@ func TestAnUpgradeHoldsTheChangeLockFromBeforeItsFirstStatement(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		look := func() (bool, int64, error) { return observer.Look(ctx, time.Minute, time.Minute) }
+		look := func() (bool, int64, error) {
+			change, applied, err := observer.Look(ctx, time.Minute, time.Minute)
+			return change != migrate.Unchanged, applied, err
+		}
 		const notice = time.Second
 		done := make(chan error, 1)
 		go func() { done <- migrate.Up(context.WithoutCancel(ctx), db, quiet(), notice) }()
@@ -136,11 +139,11 @@ func TestARecordTheVersionHasReachedPausesNobody(t *testing.T) {
 		}
 		changing := func() bool {
 			t.Helper()
-			changing, _, err := observer.Look(ctx, time.Minute, time.Minute)
+			change, _, err := observer.Look(ctx, time.Minute, time.Minute)
 			if err != nil {
 				t.Fatal(err)
 			}
-			return changing
+			return change != migrate.Unchanged
 		}
 		count := func(where string) int {
 			t.Helper()
@@ -189,11 +192,11 @@ func TestAnUpgradeCommittedWithoutItsVersionKeepsInstancesPaused(t *testing.T) {
 		}
 		look := func() (bool, int64) {
 			t.Helper()
-			changing, applied, err := observer.Look(ctx, time.Minute, time.Minute)
+			change, applied, err := observer.Look(ctx, time.Minute, time.Minute)
 			if err != nil {
 				t.Fatal(err)
 			}
-			return changing, applied
+			return change == migrate.Recorded, applied
 		}
 		if changing, applied := look(); !changing || applied != v0120 {
 			t.Errorf("after the upgrade committed unrecorded a serving instance saw changing %v at %d", changing, applied)

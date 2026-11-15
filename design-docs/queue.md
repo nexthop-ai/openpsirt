@@ -91,6 +91,7 @@ timeout, so several renewals may fail before the claim is at risk.
 | The job ends | Renewal stops first and the worker waits for it, so nothing else writes the job while the ending is written |
 | The claim went stale while the work ran | The finishing statement carries the claim's condition, so only the holder finishes. A refused finish is reported as "no longer held" and logged |
 | Shutdown mid-job | The job is handed back as a failed attempt. The ending writes run on their own context, detached from the cancellation and bounded by a few seconds |
+| A pause for a schema change mid-job | The job is handed back untried, its attempt given back, so pauses never fail a job (`design-docs/database-migrations.md` § Instances during an upgrade) |
 | The work never returns | Renewal stops at the ceiling on one hold, the work is canceled, and the attempt is this job's failure |
 
 | Rule | Reason |

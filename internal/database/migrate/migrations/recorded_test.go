@@ -18,10 +18,16 @@ const firstRecorded = 47
 // migrationFile is a migration's file name, with its version.
 var migrationFile = regexp.MustCompile(`^(\d{5})_[a-z0-9_]+\.go$`)
 
-// unrecorded reports whether a migration's source runs its upgrade without
-// writing the record of the change in the same transaction.
-func unrecorded(source string) bool {
-	return !strings.Contains(source, "releaseUpgrade(") || strings.Contains(source, "inV020(")
+// recording is a migration's call writing the record of its change, with the
+// version it names.
+var recording = regexp.MustCompile(`releaseUpgrade\(ctx, sqldb, (\d+),`)
+
+// unrecorded reports whether a migration's source, of version, runs its
+// upgrade without writing the record of the change to that version in the
+// same transaction.
+func unrecorded(source string, version int) bool {
+	m := recording.FindStringSubmatch(source)
+	return m == nil || m[1] != strconv.Itoa(version) || strings.Contains(source, "inV020(")
 }
 
 // Every release's migration from the one that made the record of schema
@@ -29,11 +35,14 @@ func unrecorded(source string) bool {
 // between the commit and the migration library recording the version leaves
 // serving instances paused on every engine.
 func TestEveryReleaseMigrationRecordsItsChange(t *testing.T) {
-	if !unrecorded("return inV020(ctx, sqldb, upgradeV0140)") {
+	if !unrecorded("return inV020(ctx, sqldb, upgradeV0140)", 48) {
 		t.Error("a migration calling inV020 directly was not reported")
 	}
-	if unrecorded("return releaseUpgrade(ctx, sqldb, 48, upgradeV0140)") {
-		t.Error("a migration through releaseUpgrade was reported")
+	if !unrecorded("return releaseUpgrade(ctx, sqldb, 47, upgradeV0140)", 48) {
+		t.Error("a migration recording another version than its own was not reported")
+	}
+	if unrecorded("return releaseUpgrade(ctx, sqldb, 48, upgradeV0140)", 48) {
+		t.Error("a migration recording its own version through releaseUpgrade was reported")
 	}
 	entries, err := os.ReadDir(".")
 	if err != nil {
@@ -54,9 +63,9 @@ func TestEveryReleaseMigrationRecordsItsChange(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if unrecorded(string(source)) {
-			t.Errorf("%s runs its upgrade without releaseUpgrade, so nothing records the change in its transaction",
-				entry.Name())
+		if unrecorded(string(source), version) {
+			t.Errorf("%s runs its upgrade without releaseUpgrade naming version %d, so nothing records the "+
+				"change in its transaction", entry.Name(), version)
 		}
 	}
 	if examined == 0 {
