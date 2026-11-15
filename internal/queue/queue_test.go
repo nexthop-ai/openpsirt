@@ -246,13 +246,7 @@ func TestWorkWhoseJobWasTakenOverSettlesAsHandedOver(t *testing.T) {
 func TestWorkStoppedAtTheCeilingSettlesAsAFailure(t *testing.T) {
 	each(t, queue.DefaultOptions(), func(t *testing.T, db *database.DB, q *queue.Queue) {
 		ctx := t.Context()
-		if _, err := q.Add(ctx, "ingest", "wedged"); err != nil {
-			t.Fatal(err)
-		}
-		job, err := q.Claim(ctx, "worker", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claim: %v", err)
-		}
+		job := claimed(t, q, "ingest", "wedged", "worker")
 		stopped := errors.New("stopped at the ceiling")
 		recovered := false
 		logged, logger := records()
