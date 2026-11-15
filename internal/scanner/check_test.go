@@ -216,6 +216,53 @@ func TestAReplacedInventoryRecordsWhatWasPublishedWhileItWasCurrent(t *testing.T
 	})
 }
 
+func TestTheRunnerChecksAReplacedInventoryWhenNoScanWaits(t *testing.T) {
+	// The runner's loop is the one production path to a check: it asks for a
+	// check only when no scan waits. The interval is longer than the test, so
+	// only the first pass can be what checks.
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0007", f.arrived.Add(24*time.Hour))
+		if _, err := f.queue.Add(ctx, queue.Check, strconv.FormatInt(f.old, 10)); err != nil {
+			t.Fatal(err)
+		}
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0007", libnl)}}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			scanner.NewRunner(f.db, f.queue, s, quiet, "test").Run(ctx, time.Hour)
+		}()
+
+		var runs []finding.Run
+		read := func() bool {
+			runs = nil
+			if err := f.db.NewSelect().Model(&runs).Where(`"checked_scan_id" = ?`, f.old).
+				Where(`"finished_at" IS NOT NULL`).Scan(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			return len(runs) > 0
+		}
+		waitFor(t, read, "the runner to check the replaced inventory")
+		stop()
+		select {
+		case <-returned:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the loop did not return when its context ended")
+		}
+		if len(runs) != 1 || runs[0].Failure != "" {
+			t.Fatalf("check runs %+v, want one that did not fail", runs)
+		}
+		n, err := f.db.NewSelect().Table("finding").Where(`"build_id" = ?`, f.build).
+			Where(`"opened_run_id" = ?`, runs[0].ID).Count(t.Context())
+		if err != nil || n != 1 {
+			t.Errorf("the check recorded %d findings, %v; want the one published while the inventory was current", n, err)
+		}
+	})
+}
+
 func TestACheckWritesNothingAnExistingRowAlreadyCovers(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()
