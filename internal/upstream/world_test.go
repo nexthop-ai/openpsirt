@@ -21,6 +21,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -566,8 +567,8 @@ func mirrorWith(t *testing.T, w *world, how mirroring) *mirrored {
 					`"content":{"src":"`+m.base+doc+`"}}`)
 			}
 			_, _ = io.WriteString(rw, `{"feed":{"id":"feed","entry":[`+strings.Join(entries, ",")+`]}}`)
-		case strings.HasSuffix(path, publish.SHA256Suffix):
-			sum, ok := sums[strings.TrimSuffix(path, publish.SHA256Suffix)]
+		case strings.HasSuffix(path, csaf.SHA256Suffix):
+			sum, ok := sums[strings.TrimSuffix(path, csaf.SHA256Suffix)]
 			if !ok {
 				http.NotFound(rw, req)
 				return

@@ -17,7 +17,7 @@ import (
 // which is this tree's own license. `NOTICE` records that.
 //
 // Taken rather than written, for the same reason the PEP 440 cases are and the
-// two distribution suites are not: the license permits it. Three of the
+// two distribution suites are not: the license permits it. Some of the
 // tables below are a bug report each — a qualifier that sorted inconsistently,
 // a number too long for the comparison to shortcut, and a qualifier written
 // after a dot rather than a hyphen. Nobody reading a description of Maven

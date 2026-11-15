@@ -328,9 +328,9 @@ export function App() {
                 element={<Moved to={(at) => plannedUpgradesAt(built(at))} />}
               />
               {/* An address this application does not answer. It says so, and
-                keeps the address in the bar: redirecting home threw away the
-                one piece of evidence a link built wrong leaves behind, which
-                is the link. */}
+                keeps the address in the bar, because the link is the one piece
+                of evidence a link built wrong leaves behind, and redirecting
+                home throws it away. */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

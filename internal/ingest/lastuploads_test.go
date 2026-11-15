@@ -367,10 +367,10 @@ func buildOf(t *testing.T, db *database.DB, branchOrTag, variant string) int64 {
 	t.Helper()
 	var id int64
 	if err := db.DB.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		ColumnExpr(`"tg"."id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
+		ColumnExpr(`"b"."id"`).
 		Where(`"st"."name" = ?`, branchOrTag).Where(`"va"."name" = ?`, variant).
 		Scan(t.Context(), &id); err != nil {
 		t.Fatal(err)

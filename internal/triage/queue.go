@@ -95,6 +95,8 @@ type Outlier struct {
 	Description           string
 	// Why names which of the things made it stand out.
 	Why []string
+	// rank is where it sorts by severity, as every severity sort ranks it.
+	rank int
 }
 
 // outlierRows is how many outliers a queue card carries. Enough to read;
@@ -298,8 +300,8 @@ func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Where(finding.DecisionOccurrenceFiledAt("de", "f")).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
@@ -448,9 +450,9 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, decis
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		// Grouped on the names and shown in the spelling somebody declared:
 		// the list is text a person reads, and one build is one entry
@@ -590,8 +592,8 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, decisio
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).
@@ -657,10 +659,15 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 		// decision was made in.
 		word := issue.RatedIn(rated[finding.RatedKey{ProductID: productID,
 			VulnerabilityID: issue.ID}]).InForce()
-		if word == "" && issue.ScoreCenti != nil {
-			word = finding.SeverityWord(*issue.ScoreCenti)
+		score := 0
+		if issue.ScoreCenti != nil {
+			score = *issue.ScoreCenti
+		}
+		if word == "" && score > 0 {
+			word = finding.SeverityWord(score)
 		}
 		one := Outlier{
+			rank:                 finding.SortRank(word, score),
 			DecisionOccurrenceID: occurrencesOf[issue.ID][0], DecisionOccurrenceIDs: occurrencesOf[issue.ID],
 			Vulnerability: issue.Identifier, Severity: word,
 			Incident: attacked[issue.ID], Exploited: issue.Exploited,
@@ -700,8 +707,8 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 		if a.Exploited != b.Exploited {
 			return a.Exploited
 		}
-		if finding.Ranks(a.Severity) != finding.Ranks(b.Severity) {
-			return finding.Ranks(a.Severity) > finding.Ranks(b.Severity)
+		if a.rank != b.rank {
+			return a.rank > b.rank
 		}
 		return a.Vulnerability < b.Vulnerability
 	})

@@ -165,8 +165,8 @@ func coversSomething(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.Where(`EXISTS (SELECT 1 FROM "finding" AS "fc"`+
 		` JOIN "component" AS "c" ON "c"."id" = "fc"."component_id"`+
 		` LEFT JOIN "component" AS "uc" ON "uc"."id" = "fc"."consumer_id"`+
-		` JOIN "build" AS "tgc" ON "tgc"."id" = "fc"."build_id"`+
-		` JOIN "branch_or_tag" AS "stc" ON "stc"."id" = "tgc"."branch_or_tag_id"`+
+		` JOIN "build" AS "bc" ON "bc"."id" = "fc"."build_id"`+
+		` JOIN "branch_or_tag" AS "stc" ON "stc"."id" = "bc"."branch_or_tag_id"`+
 		` WHERE "stc"."product_id" = "de"."product_id" AND "fc"."closed_at" IS NULL`+
 		` AND `+kinds+
 		` AND `+finding.DecisionOccurrenceOf("fc")+

@@ -66,9 +66,9 @@ func (s *Store) OwnCases(ctx context.Context, subject access.Subject) ([]OwnCase
 	var codeFindings []OwnCodeFinding
 	if err := s.db.NewSelect().
 		TableExpr(`"code_finding_collaborator" AS "lc"`).
-		Join(`JOIN "code_finding_flaw" AS "lh" ON "lh"."product_id" = "lc"."product_id"
-			AND "lh"."occurrence_identity" = "lc"."occurrence_identity"`).
-		Join(`JOIN "vulnerability" AS "fv" ON "fv"."id" = "lh"."vulnerability_id"`).
+		Join(`JOIN "code_finding_flaw" AS "cff" ON "cff"."product_id" = "lc"."product_id"
+			AND "cff"."occurrence_identity" = "lc"."occurrence_identity"`).
+		Join(`JOIN "vulnerability" AS "fv" ON "fv"."id" = "cff"."vulnerability_id"`).
 		Join(`JOIN "finding" AS "f" ON "f"."id" = (SELECT MAX("sf"."id") FROM "finding" AS "sf"
 			JOIN "build" AS "sb" ON "sb"."id" = "sf"."build_id"
 			JOIN "branch_or_tag" AS "sst" ON "sst"."id" = "sb"."branch_or_tag_id"
@@ -76,9 +76,9 @@ func (s *Store) OwnCases(ctx context.Context, subject access.Subject) ([]OwnCase
 			  AND "sf"."kind" = ? AND "sst"."product_id" = "lc"."product_id")`, kind.Analysis).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "lc"."product_id"`).
 		Apply(catalog.BuildNames("p", "st", "va")).
 		ColumnExpr(`"lc"."occurrence_identity" AS "occurrence"`).
@@ -88,7 +88,7 @@ func (s *Store) OwnCases(ctx context.Context, subject access.Subject) ([]OwnCase
 		ColumnExpr(`"lc"."added_at" AS "added_at"`).
 		Where(`"lc"."person_id" = ?`, subject.ID).
 		Where(`"lc"."live_person_id" IS NOT NULL`).
-		Where(`"lh"."disclosed_at" IS NULL`).
+		Where(`"cff"."disclosed_at" IS NULL`).
 		OrderExpr(`"lc"."added_at" DESC, "lc"."id" DESC`).
 		Scan(ctx, &codeFindings); err != nil {
 		return nil, nil, fmt.Errorf("read the code findings you were granted: %w", err)

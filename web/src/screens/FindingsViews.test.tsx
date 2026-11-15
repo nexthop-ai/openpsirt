@@ -177,6 +177,48 @@ describe("the open findings by upgrade", () => {
   });
 });
 
+describe("an upgrade whose worst issue is unrated", () => {
+  it("is labelled unrated with its score, never medium", async () => {
+    serve((path) =>
+      path === "/v1/products/{product}/planned-upgrades"
+        ? {
+            data: {
+              total: 1,
+              items: [
+                {
+                  upstream: "libnl",
+                  from: "3.7",
+                  to: "3.9",
+                  components: ["libnl-3-200"],
+                  severity: "unrated",
+                  score: 9.8,
+                  issues: 1,
+                  in: [],
+                },
+              ],
+            },
+          }
+        : undefined,
+    );
+    mount.render(
+      screen(
+        <ByBump
+          at={{ product: "sonic" }}
+          query={{}}
+          offset={0}
+          size={50}
+          onPage={() => undefined}
+          cannot={[]}
+        />,
+      ),
+    );
+    await settle();
+    const cell = mount.host().querySelector(".sev")?.parentElement?.textContent ?? "";
+    expect(cell).toBe("Unrated9.8");
+    expect(text().toLowerCase()).not.toContain("medium");
+  });
+});
+
 describe("the pager", () => {
   it("draws nothing for a single page", () => {
     mount.render(<Pager offset={0} total={10} size={50} onGo={() => undefined} />);

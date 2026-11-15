@@ -24,8 +24,12 @@ import (
 const ProjectionDays = 14
 
 // MostBurndownDays is the most days a burndown is drawn over: two years, the
-// widest window a trend heldSpans for.
+// widest window any trend covers.
 const MostBurndownDays = 730
+
+// mostProjectionDays is the furthest ahead a projected zero date is given: ten
+// years. A date further out says nothing anybody plans by.
+const mostProjectionDays = 10 * 365
 
 // BurnPoint is one day of a burndown: what was left at its end, and what moved
 // in it.
@@ -402,8 +406,7 @@ func projected(points []BurnPoint, now time.Time) Projection {
 	left := points[len(points)-1].Left
 	if out.Converging && left > 0 {
 		days := float64(left) / out.PerDay
-		// Past the widest window drawn, the date says nothing anybody plans by.
-		if days <= 10*365 {
+		if days <= mostProjectionDays {
 			zero := now.Truncate(24 * time.Hour).Add(time.Duration(days*24) * time.Hour)
 			out.ZeroOn = &zero
 		}
@@ -460,8 +463,8 @@ func (s *Store) firstOpened(ctx context.Context, narrow trendNarrowing, within W
 	}
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`MIN("f"."opened_at") AS "opened"`)
 	if !within.Purl.Empty() {
 		q = q.ColumnExpr(`"f"."component_id" AS "component_id"`).GroupExpr(`"f"."component_id"`)
@@ -622,8 +625,8 @@ func (s *Store) dismissedSpans(ctx context.Context, narrow trendNarrowing, since
 	}
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		// The consumer, for the version a decision is keyed on.
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).

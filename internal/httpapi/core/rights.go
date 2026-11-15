@@ -90,7 +90,7 @@ type requires struct {
 }
 
 // said renders the requirement as the line the reference shows: short, and the
-// same shape every time, because it is read in a list of ninety.
+// same shape every time, because it is read in a list of every operation.
 func (r requires) said() string {
 	var what string
 	switch {

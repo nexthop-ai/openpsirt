@@ -336,7 +336,7 @@ func turnsOnSeverity(decision Decision) bool {
 		return false
 	}
 	// A rule is rated by nobody, so nothing about a code finding rises.
-	if decision.Outcome.AboutALead() {
+	if decision.Outcome.AboutACodeFinding() {
 		return false
 	}
 	switch decision.Outcome {

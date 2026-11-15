@@ -16,8 +16,8 @@ import (
 // v0120 is the migration v0.12.0 carries v0.11.0's schema across with.
 const v0120 = 46
 
-// The former tests a stopped start of the v0.12.0 upgrade is checked by, each
-// a subtest of the one below under its own name.
+// The invariants a stopped start of the v0.12.0 upgrade is checked against,
+// each a subtest of the one below under its own name.
 const (
 	columnsAlreadyThere = "TheV0120UpgradeStepsOverColumnsAlreadyThere"
 	checkedRunResumes   = "AV0120UpgradeStoppedPartWayThroughTheCheckedRunResumes"
@@ -37,7 +37,7 @@ type stopV0120 struct {
 
 // Two v0.11.0 databases per engine, each holding a replaced inventory and a
 // current one, are stopped at the points of the v0.12.0 upgrade checked here
-// and upgraded once each. The stops of one former test are alternatives, a
+// and upgraded once each. The stops of one invariant are alternatives, a
 // few of the dates against all of them and the run's column against its
 // index, so each database takes one of each, in the order the upgrade
 // reaches them; building a database to v0.11.0 is most of what such a test
@@ -84,7 +84,7 @@ func TestAV0110DatabaseResumesTheV0120UpgradeFromEveryStop(t *testing.T) {
 	for _, build := range []struct {
 		name  string
 		stops []stopV0120
-		// marked is the former test whose subject is which inventory owes a
+		// marked is the invariant whose subject is which inventory owes a
 		// check after this database's upgrade.
 		marked string
 	}{

@@ -69,7 +69,7 @@ func TestTheAnalyzerBoundsAreReachableFromTheEnvironment(t *testing.T) {
 	if got := loaded.AnalysisLimits().OrDefault(); got != want {
 		t.Errorf("the analyzer bounds read as %+v, want %+v", got, want)
 	}
-	if got := loaded.AnalysisDocuments(); got != 23 {
+	if got := loaded.AnalysisMaxDocuments; got != 23 {
 		t.Errorf("the analyzer document bound read as %d, want 23", got)
 	}
 }

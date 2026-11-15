@@ -7,10 +7,10 @@
 // Go's own convention is that a doc comment opens with the name of the thing
 // it documents, which makes the drift mechanically visible: a comment opening
 // "DefaultAttachmentMaxSize is …" above `const DefaultAssignmentBatch` is a block
-// that was left behind when its symbol moved. Nineteen of those arrived in one
-// round of file splits and insertions, each of them making `godoc` render one
-// symbol's documentation under another's name — and each invisible to every
-// other check here, because the code is correct.
+// that was left behind when its symbol moved. File splits and insertions
+// leave such blocks, each making `godoc` render one symbol's documentation
+// under another's name, and each invisible to every other check here,
+// because the code is correct.
 //
 // Only the opening word is read, and only where it names a symbol this
 // repository declares: a comment that opens with a sentence rather than a
@@ -18,23 +18,20 @@
 // convention and this is a check for a specific accident.
 //
 // A symbol's kind is decided over the package rather than over the file in
-// hand. Read per file, the check could not see the very accident it is for —
-// a block left behind when its symbol moved to another file names something
-// the file it sits in does not declare, so the same-file test read it as
-// prose and passed it, and file splits are where these come from.
+// hand, because a block left behind when its symbol moved to another file
+// names something its own file does not declare, and file splits are where
+// these come from.
 //
-// The package rather than the whole tree, which was measured: against every
-// name the tree declares, the check reports forty-three comments and about
-// forty of them are English. "Default", "Reading", "Two", "Only", "Scope" and
-// "Set" are all symbols somewhere, and a comment here opening with one of
-// them is a sentence. A check that fires on prose is a check people learn to
-// ignore, so the question asked is whether the comment names something its
-// own package declares.
+// The package rather than the whole tree: a check over every name the tree
+// declares fires on English words. "Default", "Reading", "Two", "Only",
+// "Scope" and "Set" are all symbols somewhere, and a comment here opening
+// with one of them is a sentence. A check that fires on prose is a check
+// people learn to ignore, so the question asked is whether the comment names
+// something its own package declares.
 //
-// The opening is any declared name followed by any word, rather than a name
-// followed by one of a list of verbs. Go's convention puts no constraint on
-// the verb, and a list of them leaves every comment opening with a verb
-// nobody thought of unread.
+// The opening is any declared name followed by any word. Go's convention puts
+// no constraint on the verb, and a list of verbs leaves every comment opening
+// with a verb nobody thought of unread.
 package main
 
 import (
@@ -230,8 +227,7 @@ func floating(path string, fset *token.FileSet, file *ast.File,
 
 	// Every group the tree hands to something: a declaration, a struct field,
 	// an interface method. A field's comment is documentation of that field
-	// and is not floating, and reading only declaration docs made every one
-	// of them a report.
+	// and is not floating.
 	attached := map[*ast.CommentGroup]bool{}
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch n := node.(type) {
@@ -342,9 +338,9 @@ type block struct {
 
 // documented is every doc comment in a file with what it sits on.
 //
-// A spec inside a grouped declaration carries its own doc comment, and reading
-// only the group's left every comment inside a const or var block unread —
-// which is where a good part of this tree's documentation is.
+// A spec inside a grouped declaration carries its own doc comment, so each
+// spec's is read as well as the group's, which reaches every comment inside a
+// const or var block.
 func documented(path string, file *ast.File) []block {
 	var blocks []block
 	keep := func(doc *ast.CommentGroup, names ...string) {

@@ -49,7 +49,7 @@ Every Go tool the gate or image runs is required by its own module under
 |---|---|
 | The version is a requirement in the module's `go.mod`, checksummed in its `go.sum` | Dependency updates move requirements |
 | One module per tool | A bump never moves another tool's libraries |
-| A build-constrained file imports the tool's command | The requirement is direct, which updates move |
+| A build-constrained file imports the tool's command, the path the `tool` directive names, enforced by `pins-check` | `go mod tidy` marks a requirement only the `tool` directive names as indirect; a direct one is what updates move |
 | A tool's directory is named for its command, enforced by `pins-check` | Targets call tools by directory |
 | The image builds the inventory generator from the makefile's module | |
 
@@ -91,8 +91,9 @@ introduces, and report one already on its target branch (REQ-75).
 |---|---|
 | The base is the merge base with `AUDIT_BASE`, `origin/main` unless set; CI fetches full history | |
 | An advisory is present when the base was affected, and introduced otherwise | A bump fixing one advisory of two stays green |
-| A Go finding is present when the base's `go.mod` version is in its affected ranges | |
-| A standard-library finding is present when the base Dockerfile's Go release is in its ranges, or `go.mod`'s `go` line where the base has no Dockerfile | That tag is every workflow's toolchain |
+| A Go finding is present when the base's `go.mod` version is in its affected ranges and a scan of the base reaches it | A change making a vulnerable symbol reachable introduces the advisory, though the base held the version |
+| The base is scanned in a copy of its tree written from `git archive`, over the packages it holds, only when some finding's version was already held | A package the change adds is not in the base; most changes carry no held finding and pay for one scan. The repository itself is left untouched |
+| A standard-library finding is present when the base Dockerfile's Go release is in its ranges; where the base has no Dockerfile, `go.mod`'s `toolchain` line, else its `go` line | That tag is every workflow's toolchain, and the toolchain line is the narrower pin |
 | A base Dockerfile whose `FROM golang:` release this cannot read refuses when the scan holds a standard-library finding | Falling back to the `go` floor reads a toolchain moved back past a fix as already affected. A test holds the repository's own Dockerfile to the pattern |
 | An npm advisory is present when npm's audit of the base lockfile names it for the same package | A moved or still-affected package was affected before |
 | An npm advisory is named by its address's last segment, else `npm-` and npm's number for it; one with neither refuses | Advisories sharing an empty name would let the base's hide a new one |

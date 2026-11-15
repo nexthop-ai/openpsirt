@@ -61,15 +61,14 @@ func TestAskingAboutAnIssueSomewhereElseSaysNothingAboutIt(t *testing.T) {
 	})
 }
 
-// The attachment operations carry REQ-70's control, and nothing exercised the
-// layer that carries it.
+// The fetch and redact operations carry REQ-70's control; this pins who
+// reaches each.
 //
-// The store below is well covered — readability against the issue, the
-// embargo, the administrator-only redaction — but the two operations that
-// reach it had no test at all: not their path, not their operation id, and no
-// row in the authorization matrix. A handler passing the wrong subject, or
-// dropping the error from the fetch, would break the one control AGENTS.md
-// singles out with a green suite.
+// The store below is covered on its own — readability against the issue, the
+// embargo, the administrator-only redaction — so this covers the layer above
+// it: a handler passing the wrong subject, or dropping the error from the
+// fetch, would break the one control AGENTS.md singles out with the store's
+// tests still green.
 func TestWhoMayFetchAndRedactAnAttachment(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)

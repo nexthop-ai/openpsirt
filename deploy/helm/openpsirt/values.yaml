@@ -37,8 +37,8 @@ tmp:
   sizeLimit: 3Gi
 
 image:
-  # Published by the release workflow, one image per tag. While the repository
-  # is private this needs a pull secret your cluster can use; see
+  # Published by the release workflow, one image per tag. Where the registry
+  # asks for credentials this needs a pull secret your cluster can use; see
   # imagePullSecrets below. The image is single-architecture: `linux/amd64`.
   #
   # To run an untagged build, build an image from the repository, push it
@@ -111,8 +111,8 @@ auth:
   # request claims its host is. Required once any provider is configured.
   #
   # A bare host is refused at startup. With no scheme there is no host to read,
-  # so the same-origin check on every state-changing browser request fell back
-  # to the address the request itself claimed.
+  # and the same-origin check on every state-changing browser request would
+  # fall back to the address the request itself claims.
   baseURL: ""
 
   # Sign-in through an OpenID Connect provider. Leave issuer empty to skip.

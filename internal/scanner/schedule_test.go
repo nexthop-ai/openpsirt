@@ -37,9 +37,9 @@ func (f *runFixture) queued(t *testing.T) int {
 	n, err := f.db.NewSelect().Model((*queue.Job)(nil)).
 		Where(`"kind" = ?`, queue.Scan).
 		Where(`"reference" = ?`, strconv.FormatInt(f.build, 10)).
-		// Wrapped, because two arguments to one placeholder binds the first
-		// and drops the second: this counted pending work alone, and every
-		// assertion built on it read a running job as an absent one.
+		// Wrapped, because two arguments to one placeholder bind the first
+		// and drop the second, and a count of pending work alone reads a
+		// running job as an absent one.
 		Where(`"state" IN (?)`, bun.List([]queue.State{queue.Pending, queue.Running})).
 		Count(t.Context())
 	if err != nil {
@@ -313,9 +313,9 @@ func TestAReplicaThatStopsDoesNotHoldTheReScansForADay(t *testing.T) {
 
 func TestAnotherProducersBacklogDoesNotStopTheAsking(t *testing.T) {
 	// The cap exists so a runaway producer cannot push everyone else's work
-	// behind its own. Counted across every kind it did the opposite: a bulk
-	// change to the assignment rules filled the queue and then refused every
-	// scan and every upload in the deployment.
+	// behind its own, so the backlog is counted per kind: counted across every
+	// kind, a bulk change to the assignment rules filling the queue would
+	// refuse every scan and every upload in the deployment.
 	eachRun(t, func(t *testing.T, f *runFixture) {
 		ctx := t.Context()
 		full := queue.New(f.db, queue.Options{

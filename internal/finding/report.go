@@ -47,8 +47,8 @@ type FlawReport struct {
 	// ProductID is the product it was reported against, which is what decides
 	// who may read it. An issue's identity spans its aliases, so the same
 	// issue appears in other products as soon as a shared name is recorded,
-	// and a report keyed on the issue alone was readable from every one of
-	// them.
+	// and a report keyed on the issue alone would be readable from every one
+	// of them.
 	ProductID int64 `bun:"product_id,notnull"`
 	// VulnerabilityID is the issue it turned out to be, where it was accepted
 	// as one. Absent is every other report: one nobody has judged, which is
@@ -68,7 +68,7 @@ type FlawReport struct {
 	// handle that is not the name on the mail.
 	Credit string `bun:"credit"`
 	// ReceivedOn is the day it arrived, which is what the embargo runs
-	// from . A day rather than a moment: the reporter is counting in days
+	// from. A day rather than a moment: the reporter is counting in days
 	// and so are we.
 	ReceivedOn *time.Time `bun:"received_on"`
 	// FoundHere is a flaw somebody here found rather than one somebody
@@ -253,8 +253,8 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "fr"."vulnerability_id"`).
 		Join(`JOIN "vulnerability" AS "ri" ON "ri"."id" = "fr"."vulnerability_id"`).
 		Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "ri"."issue_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		ColumnExpr(`"fr"."id" AS "report_id"`).
 		ColumnExpr(`MIN("fr"."reference") AS "reference"`).
@@ -273,8 +273,8 @@ func (s *Store) unacknowledgedOnIssues(ctx context.Context) ([]Unanswered, error
 		Where(kinds, kindArgs...).
 		// The product it was reported against, not every product the issue
 		// turns up in. One report is one letter to answer, and fanning it out
-		// across the products a shared name reaches told each of them about a
-		// reporter who wrote to one.
+		// across the products a shared name reaches would tell each of them
+		// about a reporter who wrote to one.
 		Where(`"st"."product_id" = "fr"."product_id"`).
 		GroupExpr(`"fr"."id", "fr"."vulnerability_id", "st"."product_id"`).
 		Scan(ctx, &rows)

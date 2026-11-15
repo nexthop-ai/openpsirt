@@ -4,7 +4,10 @@
 package vercmp
 
 import (
+	"cmp"
+	"maps"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -22,7 +25,7 @@ var pypiVersionPattern = regexp.MustCompile(
 	`^v?` +
 		`(?:(?P<epoch>[0-9]+)!)?` +
 		`(?P<release>[0-9]+(?:\.[0-9]+)*)` +
-		`(?:[-_.]?(?P<pre_l>alpha|a|beta|b|preview|pre|c|rc)[-_.]?(?P<pre_n>[0-9]+)?)?` +
+		`(?:[-_.]?(?P<pre_l>` + pypiPreSpellings() + `)[-_.]?(?P<pre_n>[0-9]+)?)?` +
 		`(?:(?:-(?P<post_n1>[0-9]+))|(?:[-_.]?(?P<post_l>post|rev|r)[-_.]?(?P<post_n2>[0-9]+)?))?` +
 		`(?P<dev>[-_.]?dev[-_.]?(?P<dev_n>[0-9]+)?)?` +
 		`(?:\+(?P<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?$`,
@@ -51,6 +54,21 @@ var pypiPreRanks = map[string]int{
 	"pre":     pypiPreRC,
 	"preview": pypiPreRC,
 	"rc":      pypiPreRC,
+}
+
+// pypiPreSpellings is the pattern's alternation of pre-release letters, read
+// from pypiPreRanks so a spelling is matched exactly when it is ranked. Sorted,
+// longest first, so the pattern is the same on every run whatever order the
+// map is read in.
+func pypiPreSpellings() string {
+	spellings := slices.Collect(maps.Keys(pypiPreRanks))
+	slices.SortFunc(spellings, func(a, b string) int {
+		return cmp.Or(len(b)-len(a), strings.Compare(a, b))
+	})
+	for i, spelling := range spellings {
+		spellings[i] = regexp.QuoteMeta(spelling)
+	}
+	return strings.Join(spellings, "|")
 }
 
 // pypiVersion is a version broken into the parts that order it.

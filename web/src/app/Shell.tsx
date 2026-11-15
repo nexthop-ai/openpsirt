@@ -702,8 +702,9 @@ function Search() {
   const [typed, setTyped] = useState("");
   const [looking, setLooking] = useState(false);
   // Said under the box when the lookup did not happen. A read that failed is
-  // not "no such issue", and falling through to the component search sent
-  // somebody to a narrowed findings list as though their issue did not exist.
+  // not "no such issue", and falling through to the component search would
+  // send somebody to a narrowed findings list as though their issue did not
+  // exist.
   const [unread, setUnread] = useState(false);
   const box = useRef<HTMLInputElement>(null);
 
@@ -784,9 +785,8 @@ function Search() {
 
 // A heading that folds the entries under it away.
 //
-// A heading rather than a control was right while the rail fit; at
-// twenty-four entries it does not, and something has to give. This is the
-// thing that gives, because a group is the unit somebody stops using for a
+// The rail unfolded is taller than a laptop window, so something has to give.
+// A heading folds, because a group is the unit somebody stops using for a
 // while — nobody declares a variant and grants a role in the same minute as
 // they triage.
 function Group({

@@ -245,7 +245,7 @@ func attachmentBaseline(t *columnTypes) []string {
 			-- What it was called when it arrived, for the disposition header.
 			-- Kept as given and never used as a path.
 			"filename"         ` + t.text + ` NOT NULL,
-			-- The type **we** decided, never the one that was uploaded.
+			-- The type we decided, never the one that was uploaded.
 			-- Stored because it is what gets served, and because
 			-- deciding it again later would apply today's allowlist to a file
 			-- accepted under an older one.

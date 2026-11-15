@@ -380,7 +380,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 			Products: []Shipped{{
 				ID: shipped, Subcomponents: []Inside{{ID: subject(row.Purl, row.Component)}},
 			}},
-			Status: "fixed",
+			Status: Fixed,
 		})
 	}
 
@@ -394,7 +394,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 			Products: []Shipped{{
 				ID: shipped, Subcomponents: []Inside{{ID: subject(row.Purl, row.Component)}},
 			}},
-			Status:          "not_affected",
+			Status:          NotAffected,
 			Justification:   known(row.Justification),
 			ImpactStatement: row.attributed(),
 		})

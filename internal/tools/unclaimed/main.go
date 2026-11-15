@@ -1,7 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-// Command unclaimed reports requirements that no design document names.
+// Command unclaimed reports requirements that no design document names, and
+// citations in the tree that name no requirement.
 //
 // The chain this repository is organized around runs one way: code satisfies a
 // design document, a design document names the requirements it implements, and
@@ -28,6 +29,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -35,6 +37,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/nexthop-ai/openpsirt/internal/tools/walk"
 )
 
 // Everything is read through the working directory as a file system rather
@@ -79,6 +83,23 @@ func main() {
 		os.Exit(2)
 	}
 
+	strays, read, err := straysInTree(string(decisions))
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "unclaimed:", err)
+		os.Exit(2)
+	}
+	if read == 0 {
+		fmt.Fprintln(os.Stderr, "unclaimed: no file was read for citations, so this checked nothing")
+		os.Exit(2)
+	}
+	if len(strays) > 0 {
+		fmt.Fprintln(os.Stderr, "decision identifiers that name no requirement:")
+		for _, stray := range strays {
+			fmt.Fprintln(os.Stderr, "  "+stray)
+		}
+		fmt.Fprintln(os.Stderr, "\nCite the REQ- row that covers the subject, or drop the citation.")
+	}
+
 	var missing []string
 	for _, id := range want {
 		if !named[canonical(id)] {
@@ -86,6 +107,9 @@ func main() {
 		}
 	}
 	if len(missing) == 0 {
+		if len(strays) > 0 {
+			os.Exit(1)
+		}
 		fmt.Printf("every one of the %d requirements is named by a design document\n",
 			len(want))
 		return
@@ -201,4 +225,59 @@ func identifiersIn(text string) map[string]bool {
 		}
 	}
 	return named
+}
+
+// The areas of the identifier scheme REQUIREMENTS.md replaced. A citation in
+// one names nothing a reader can follow.
+var retired = regexp.MustCompile(`\b(?:ACC|DAT|ING|MDL|REL)-\d+\b`)
+
+// A requirement cited anywhere.
+var cited = regexp.MustCompile(`\bREQ-\d+\b`)
+
+// straysIn is every identifier one text cites that names no row of
+// REQUIREMENTS.md: one of the retired scheme, or a requirement with no row.
+func straysIn(text string, rows map[string]bool) []string {
+	strays := retired.FindAllString(text, -1)
+	for _, id := range cited.FindAllString(text, -1) {
+		if !rows[canonical(id)] {
+			strays = append(strays, id)
+		}
+	}
+	return strays
+}
+
+// straysInTree is every stray identifier in the files git tracks, each as
+// "path: identifier", and how many files it read. Tracked rather than every
+// file on disk, because a checkout's own untracked notes are nobody's
+// citation. This tool's
+// own tests are left out, because their inputs are identifiers that name
+// nothing.
+func straysInTree(decisions string) ([]string, int, error) {
+	rows := map[string]bool{}
+	for _, match := range row.FindAllStringSubmatch(decisions, -1) {
+		rows[canonical(match[1])] = true
+	}
+	files, err := walk.Tracked()
+	if err != nil {
+		return nil, 0, err
+	}
+	var strays []string
+	read := 0
+	for _, path := range files {
+		if strings.HasPrefix(path, "internal/tools/unclaimed/") && strings.HasSuffix(path, "_test.go") {
+			continue
+		}
+		body, err := fs.ReadFile(here, path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, 0, err
+		}
+		read++
+		for _, id := range straysIn(string(body), rows) {
+			strays = append(strays, path+": "+id)
+		}
+	}
+	return strays, read, nil
 }

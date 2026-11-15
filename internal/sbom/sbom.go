@@ -62,14 +62,12 @@ type Limits struct {
 // DefaultLimits are the bounds a reader uses when given none.
 //
 // Set from what reading costs rather than from what a document looks like.
-// They were chosen as round numbers several times the largest real producer,
-// which is the right instinct and the wrong unit: measured, an edge holds
-// about half a kilobyte of heap while it is being read and a component about
-// one and a third, so the old ceilings — two million edges and a quarter of a
-// million components — accepted a document that took about 1.3 GB. A file
-// nobody could have meant was therefore guaranteed to kill the process, in the
-// background reader that runs *after* the upload was answered 202: the
-// uploader is told it worked, and the container restarts.
+// Measured, an edge holds about half a kilobyte of heap while it is being read
+// and a component about one and a third, so ceilings of two million edges and
+// a quarter of a million components admit a document taking about 1.3 GB. The
+// reader runs in the background *after* the upload is answered 202, so a
+// document past the memory it has kills the process while the uploader is
+// told it worked.
 //
 // So the budget is roughly 250 MB for one document being read, and these are
 // what fits in it. They remain several times the largest producer we have —
@@ -85,8 +83,7 @@ type Limits struct {
 // of cataloged paths, which is 260 MB if one document reached every ceiling
 // at once. No real document does — the format that catalogs paths is not the
 // one with the deepest graph — and the figure that matters is that it stays a
-// share of what the chart ships rather than several times past it, which is
-// where it was.
+// share of what the chart ships rather than several times past it.
 //
 // A file is bounded separately from a component, and measured rather than
 // assumed: a real scan catalogs 4,964 files against 89 packages on one image

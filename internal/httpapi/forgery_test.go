@@ -12,11 +12,11 @@ import (
 // The address this deployment answers on, as a browser would name it, and the
 // input to the same-origin check on every state-changing browser request.
 //
-// A configured address that yields no host falls through to origins derived
-// from the request's own Host header, so the guard echoes what the request
-// said: it still ran, still passed, and guarded nothing, while the operator
-// believed the origin was pinned. `psirt.example.com` is the form that
-// produces it, and the form the value takes in a DNS record.
+// A configured address that yields no host matches nothing. Falling through to
+// origins derived from the request's own Host header would echo what the
+// request said: the guard would run, pass and guard nothing, while the
+// operator believes the origin is pinned. `psirt.example.com` is the form that
+// yields no host, and the form the value takes in a DNS record.
 
 func TestAConfiguredAddressThatNamesNoHostMatchesNothing(t *testing.T) {
 	asked := httptest.NewRequest(http.MethodPost, "/v1/products", nil)
@@ -65,10 +65,9 @@ func TestAConfiguredAddressThatNamesNoHostMatchesNothing(t *testing.T) {
 }
 
 func TestAMisconfiguredAddressDoesNotBecomeTheRequestsOwn(t *testing.T) {
-	// The whole of the defect in one assertion: with a base configured, the
-	// request's Host must never be what the check compares against. It was,
-	// and a page on any host could then make a state-changing request that
-	// passed.
+	// With a base configured, the request's Host is never what the check
+	// compares against, or a page on any host could make a state-changing
+	// request that passes.
 	asked := httptest.NewRequest(http.MethodPost, "/v1/products", nil)
 	asked.Host = "attacker.example"
 	asked.Header.Set("Origin", "https://attacker.example")

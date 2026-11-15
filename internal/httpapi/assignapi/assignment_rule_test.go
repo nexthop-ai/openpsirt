@@ -289,13 +289,13 @@ func TestARuleSaysWhatItWouldCatchBeforeItIsSaved(t *testing.T) {
 func TestASweepDoesNotStopBecauseSomebodyTookOneRow(t *testing.T) {
 	// The batch is bounded on what it reads and the write re-checks the
 	// holder, so one assignment made by a person inside the window leaves a
-	// row of the batch already somebody's. Reading "wrote fewer than the cap"
-	// as "reached the end" therefore stopped the sweep one human action in,
-	// with the rest of the estate unrouted and the job reported successful.
+	// row of the batch already somebody's. A batch that writes fewer rows
+	// than it read is not the end of the sweep; read as the end, it would stop
+	// the sweep one human action in, with the rest of the estate unrouted and
+	// the job reported successful.
 	//
 	// A batch of two against four matching findings, one of them held: the
-	// first batch reads two and writes one, which is what the old reading
-	// called the end.
+	// first batch reads two and writes one, and the sweep goes on.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",

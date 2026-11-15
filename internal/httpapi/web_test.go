@@ -88,9 +88,9 @@ func TestAnUnknownEndpointStaysAnEndpoint(t *testing.T) {
 	handler := serving(t, built())
 	for _, path := range []string{
 		"/v1/nonesuch", "/v1",
-		// The same paths spelled the two ways the test on the raw path
-		// missed: a dot segment, and different capitals. Both named
-		// something the API owns and both were answered with the page.
+		// The same paths spelled with a dot segment and with different
+		// capitals. Both name something the API owns, so neither is answered
+		// with the page.
 		"/v1/./nonesuch", "/v1/findings/../nonesuch", "/V1/nonesuch",
 		"/Docs", "/OpenAPI.json",
 	} {

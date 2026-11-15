@@ -240,8 +240,8 @@ func productsHoldingAll(ctx context.Context, tx bun.IDB, issues []int64,
 		kinds, kindArgs := kind.Ranking.Where(`"f"."kind"`)
 		q := tx.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 			ColumnExpr(`"st"."product_id" AS "product_id"`).
 			Where(`"f"."vulnerability_id" IN (?)`, bun.List(batch)).

@@ -20,10 +20,10 @@ const justSwitchedOn = [
 
 describe("what the trend panels say", () => {
   it("says nothing about a deployment that was just switched on", () => {
-    // measured. It read "Backlog growing: new exceeded resolved in 1 of 12
-    // weeks; open up 5,803 across the range" and "Critical went 0 → 389" —
-    // both arithmetically correct, and both describing the first scan landing
-    // rather than anything about the estate.
+    // Read literally, this week says "Backlog growing: new exceeded resolved
+    // in 1 of 12 weeks; open up 5,803 across the range" and "Critical went
+    // 0 → 389": both arithmetically correct, and both describing the first
+    // scan landing rather than anything about the estate.
     expect(paceReading(justSwitchedOn)).toBe("Not enough history.");
     expect(mixReading(justSwitchedOn)).toBe("Not enough history yet.");
   });

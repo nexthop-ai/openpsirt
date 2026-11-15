@@ -12,15 +12,17 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// The three statuses a statement states, as both formats this deployment
-// publishes spell them.
+// The three statuses a statement states, in the exchange format's words, which
+// sbom names. OpenVEX writes them as they are; CSAF files each under its
+// product status list.
 const (
-	NotAffected = "not_affected"
-	Fixed       = "fixed"
-	Affected    = "affected"
+	NotAffected = string(sbom.NotAffected)
+	Fixed       = string(sbom.AlreadyFixed)
+	Affected    = string(sbom.Affected)
 )
 
 // The action an affected statement carries where the decision named none. The

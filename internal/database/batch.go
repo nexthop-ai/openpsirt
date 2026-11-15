@@ -267,7 +267,7 @@ func renumber[T any](db bun.IDB, batch []T, res sql.Result, step int64) error {
 // insert reports success.
 func InBatchesKeeping[T any](ctx context.Context, db bun.IDB, rows []T) error {
 	var key string
-	if db.Dialect().Name().String() != "pg" && db.Dialect().Name().String() != "sqlite" {
+	if name := db.Dialect().Name(); name != dialect.PG && name != dialect.SQLite {
 		table := db.Dialect().Tables().Get(reflect.TypeFor[T]())
 		if len(table.PKs) == 0 {
 			return fmt.Errorf("insert %s keeping another writer's rows: it has no key to match on", table.Name)
@@ -278,8 +278,8 @@ func InBatchesKeeping[T any](ctx context.Context, db bun.IDB, rows []T) error {
 		end := min(start+BatchSize, len(rows))
 		batch := rows[start:end]
 		insert := db.NewInsert().Model(&batch)
-		switch db.Dialect().Name().String() {
-		case "pg", "sqlite":
+		switch db.Dialect().Name() {
+		case dialect.PG, dialect.SQLite:
 			insert = insert.On("CONFLICT DO NOTHING")
 		default:
 			insert = insert.On("DUPLICATE KEY UPDATE").Set("? = ?", bun.Ident(key), bun.Ident(key))

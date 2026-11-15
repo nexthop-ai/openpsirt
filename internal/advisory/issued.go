@@ -327,9 +327,9 @@ func AnyIssuedForBranchOrTag(ctx context.Context, db bun.IDB, branchOrTagID int6
 		Join(`JOIN "advisory_issue" AS "ac" ON "ac"."advisory_id" = "ai"."advisory_id"`).
 		Join(`JOIN "vulnerability" AS "acv" ON "acv"."id" = "ac"."vulnerability_id"`).
 		Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "acv"."issue_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Where(`"tg"."branch_or_tag_id" = ?`, branchOrTagID).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Where(`"b"."branch_or_tag_id" = ?`, branchOrTagID).
 		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = "ac"."product_id"`).
 		Where(`"ac"."added_at" <= "ai"."issued_at"`).

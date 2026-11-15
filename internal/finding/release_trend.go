@@ -107,15 +107,15 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	issues := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`"tg"."branch_or_tag_id" AS "branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"b"."branch_or_tag_id" AS "branch_or_tag_id"`).
 		Join(`JOIN "component" AS "rc" ON "rc"."id" = "f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		Where(`"st"."kind" = ?`, catalog.Tag).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(kinds, kindArgs...).
-		GroupExpr(`"tg"."branch_or_tag_id", "f"."vulnerability_id", "rc"."name_folded"`)
+		GroupExpr(`"b"."branch_or_tag_id", "f"."vulnerability_id", "rc"."name_folded"`)
 	issues = scope.Narrow(onlyReadable(issues, subject, products, all))
 
 	inner := s.db.NewSelect().

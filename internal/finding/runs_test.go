@@ -406,10 +406,10 @@ func (f *fixture) productOf(t *testing.T, build int64) int64 {
 	t.Helper()
 	var productID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("\"build\" AS \"tg\"").
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id"`).
-		Where(`"tg"."id" = ?`, build).
+		Where(`"b"."id" = ?`, build).
 		Scan(t.Context(), &productID); err != nil {
 		t.Fatal(err)
 	}
@@ -421,9 +421,9 @@ func (f *fixture) branchOrTagOf(t *testing.T, build int64) int64 {
 	t.Helper()
 	var branchOrTagID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("\"build\" AS \"tg\"").
-		ColumnExpr(`"tg"."branch_or_tag_id"`).
-		Where(`"tg"."id" = ?`, build).
+		TableExpr(`"build" AS "b"`).
+		ColumnExpr(`"b"."branch_or_tag_id"`).
+		Where(`"b"."id" = ?`, build).
 		Scan(t.Context(), &branchOrTagID); err != nil {
 		t.Fatal(err)
 	}
@@ -442,8 +442,8 @@ func (f *fixture) anotherVariant(t *testing.T, name string) int64 {
 	}
 	var branchOrTagID int64
 	if err := f.db.DB.NewSelect().
-		TableExpr("\"build\" AS \"tg\"").ColumnExpr(`"tg"."branch_or_tag_id"`).
-		Where(`"tg"."id" = ?`, f.build).Scan(ctx, &branchOrTagID); err != nil {
+		TableExpr(`"build" AS "b"`).ColumnExpr(`"b"."branch_or_tag_id"`).
+		Where(`"b"."id" = ?`, f.build).Scan(ctx, &branchOrTagID); err != nil {
 		t.Fatal(err)
 	}
 	build, err := cat.BuildFor(ctx, branchOrTagID, variant.ID)
@@ -463,12 +463,12 @@ func (f *fixture) scopeOf(t *testing.T, buildID int64) finding.Scope {
 		VariantID     int64 `bun:"variant_id"`
 	}
 	if err := f.db.DB.NewSelect().
-		TableExpr("\"build\" AS \"tg\"").
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
-		ColumnExpr(`"tg"."branch_or_tag_id" AS "branch_or_tag_id"`).
-		ColumnExpr(`"tg"."variant_id" AS "variant_id"`).
-		Where(`"tg"."id" = ?`, buildID).Scan(t.Context(), &row); err != nil {
+		ColumnExpr(`"b"."branch_or_tag_id" AS "branch_or_tag_id"`).
+		ColumnExpr(`"b"."variant_id" AS "variant_id"`).
+		Where(`"b"."id" = ?`, buildID).Scan(t.Context(), &row); err != nil {
 		t.Fatalf("look up build %d: %v", buildID, err)
 	}
 	return finding.Scope{

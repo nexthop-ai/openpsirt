@@ -129,8 +129,8 @@ func (s *Store) DisclosureDeadlinesPage(ctx context.Context, subject access.Subj
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	approaching := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Where(kinds, kindArgs...).
@@ -232,7 +232,7 @@ func (s *Store) whereEmbargoed(ctx context.Context,
 		EmbargoedBuild
 	}
 	if err := approaching(s.db.NewSelect()).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
@@ -401,9 +401,9 @@ var ErrNotEmbargoed = refusal.New("nothing undisclosed here has a date to move")
 //
 // A sentinel rather than a bare error, because a second approver arriving is
 // an ordinary race — two people were sent the same queue entry — and it is a
-// conflict rather than something going wrong. Left as a plain error it reached
-// the caller as a 500, which reads as a defect in the tool and sends somebody
-// to the logs to find out that nothing was broken.
+// conflict rather than something going wrong. A plain error would reach the
+// caller as a 500, which reads as a defect in the tool and sends somebody to
+// the logs to find out that nothing was broken.
 var ErrAlreadyAgreed = refusal.New("that movement has already been agreed to")
 
 // ErrNotLater says an extension would not move the date later.
@@ -575,8 +575,8 @@ func endsAt(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64) (
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`MAX("f"."disclose_at")`).
 		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = ?`, productID).
@@ -688,11 +688,10 @@ func (s *Store) AgreeToMovement(ctx context.Context, subject access.Subject, id 
 
 // agree records one person agreeing to one movement.
 //
-// The count is read, because the WHERE below is what decides the outcome.
-// Discarded, a second person agreeing at the same moment as the first matched
-// nothing and was told they had agreed — the clause was there, the guard it
-// carries was not reported, and the two-person rule reported two agreements
-// where the record holds one.
+// The count is read, because the WHERE below is what decides the outcome. A
+// second person agreeing at the same moment as the first matches nothing and
+// is refused; told they had agreed, the two-person rule would report two
+// agreements where the record holds one.
 func agree(ctx context.Context, tx bun.IDB, id, personID int64, now time.Time) error {
 	res, err := tx.NewUpdate().Model((*Movement)(nil)).
 		Set(`"approved_by" = ?`, personID).
@@ -870,8 +869,8 @@ type Waiting struct {
 // to be theirs.
 //
 // Paged because a ceiling with no offset means what is past it cannot be read
-// through the API at all, and the total because a screen was printing the
-// length of its own page as the number of requests waiting.
+// through the API at all, and the total because the length of a page is not
+// the number of requests waiting.
 func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 	limit, offset int) ([]Waiting, int, error) {
 

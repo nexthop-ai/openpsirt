@@ -111,9 +111,9 @@
 .state.lapsed {
   --c: var(--sev-high);
 }
-/* Something that was asked for and has been done: scanned, met. Without an arm
-   of its own it inherited .state's muted default, so a build that *is* being
-   scanned read in exactly the grey a build nobody has ever scanned reads in. */
+/* Something that was asked for and has been done: scanned, met. An arm of its
+   own, because .state's muted default would draw a build that *is* being
+   scanned in exactly the grey a build nobody has ever scanned reads in. */
 .state.closed {
   --c: var(--ok);
 }
@@ -460,7 +460,7 @@ tr.row.on > td {
   font-weight: 600;
 }
 /* A chip somebody picks with, and the one picked. It stays a chip: a button
-   brings its own font, border and background, and left alone it stood a head
+   brings its own font, border and background, and left alone it stands a head
    taller than the chips beside it. */
 button.vchip {
   font: inherit;

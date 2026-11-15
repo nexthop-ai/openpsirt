@@ -43,7 +43,7 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 			What: "your decisions",
 			Header: []string{
 				"decision", "proposed", "outcome", "became", "when", "by", "by name",
-				"issue", "product", "product name", "branch_or_tag", "branch or tag name",
+				"issue", "product", "product name", core.BranchOrTagColumn, "branch or tag name",
 				"variant", "variant name", "component",
 				"rows", "issues", "occurrences", "reasoning",
 			},

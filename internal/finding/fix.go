@@ -23,11 +23,9 @@ import (
 // Upgrade is one build's commitment to move a fold.
 //
 // Keyed on the build and the fold — the source package at the version it was
-// built at — because that is the unit the work is done in. It was keyed per
-// issue and per component and per target version, so changing which version a
-// release was moving to meant rewriting every row of it, and an issue that
-// arrived overnight against the same package was not covered until somebody
-// declared it too.
+// built at — because that is the unit the work is done in. One row per build
+// and fold means a version change is one row, and a later issue on the
+// package is covered without anybody declaring it again.
 //
 // Coverage is a join, not a stamp. A finding is covered when its component
 // folds to this key in this build; nothing is written onto findings. So one row
@@ -725,12 +723,12 @@ func (s *Store) buildsOf(ctx context.Context, db bun.IDB, productID int64,
 	builds = distinct(builds)
 	var here []int64
 	err := db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`"tg"."id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"b"."id"`).
 		Where(`"st"."product_id" = ?`, productID).
-		Where(`"tg"."id" IN (?)`, bun.List(builds)).
-		OrderExpr(`"tg"."id"`).
+		Where(`"b"."id" IN (?)`, bun.List(builds)).
+		OrderExpr(`"b"."id"`).
 		Scan(ctx, &here)
 	if err != nil {
 		return nil, fmt.Errorf("check the builds named are this product's: %w", err)
@@ -760,12 +758,12 @@ func (s *Store) retired(ctx context.Context, db bun.IDB, ids []int64) (map[int64
 		Release string `bun:"release"`
 	}
 	err = db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`"tg"."id" AS "id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"b"."id" AS "id"`).
 		ColumnExpr(`"st"."name" AS "release"`).
-		Where(`"tg"."id" IN (?)`, bun.List(ids)).
-		Where(`"tg"."branch_or_tag_id" IN (?)`, bun.List(past)).
+		Where(`"b"."id" IN (?)`, bun.List(ids)).
+		Where(`"b"."branch_or_tag_id" IN (?)`, bun.List(past)).
 		Scan(ctx, &retired)
 	if err != nil {
 		return nil, fmt.Errorf("read which of these builds are out of support: %w", err)

@@ -169,7 +169,8 @@ func TestWhatTheDeploymentStatedIsHeldBackToo(t *testing.T) {
 	if got := ours.Labels(); !reflect.DeepEqual(got, []string{"acme-internal", "skunkworks"}) {
 		t.Fatalf("the labels read back as %q", got)
 	}
-	// A name stated twice in two spellings is held once.
+	// A name stated twice in two spellings is held once: the duplicates
+	// are dropped from a sorted slice.
 	twice := currency.Ourselves("", []string{"Widgets", "acme", "ACME", "widgets"})
 	if got := twice.Labels(); !reflect.DeepEqual(got, []string{"acme", "widgets"}) {
 		t.Fatalf("a name stated twice reads back as %q", got)

@@ -113,8 +113,7 @@ type Client struct {
 	HTTP *http.Client
 	// The address of each index. Fields rather than constants so a test can
 	// point them at a local server: without this the only way to exercise any
-	// of this code is to call somebody else's service, whose answers change,
-	// so in practice it was not exercised at all.
+	// of this code is to call somebody else's service, whose answers change.
 	GoProxy, NPM, PyPI, Crates, Maven, NuGet string
 }
 
@@ -314,12 +313,11 @@ func (g goProxy) Latest(ctx context.Context, name string) (Latest, error) {
 			URL string `json:"URL"`
 		} `json:"Origin"`
 	}
-	// Escaped per segment, like every other asker here. This was the one that
-	// interpolated the name raw, and a package identifier is somebody else's
-	// input: `pkg:golang/foo%3Fx=1` decodes to a name carrying a `?`, which
-	// turned the path into a query string and let an uploaded document choose
-	// part of the request. The separators that belong are kept because the
-	// split happens first.
+	// Escaped per segment, like every other asker here, because a package
+	// identifier is somebody else's input: `pkg:golang/foo%3Fx=1` decodes to a
+	// name carrying a `?`; interpolated raw, that would turn the path into a
+	// query string and let an uploaded document choose part of the request.
+	// The separators that belong are kept because the split happens first.
 	at := g.c.GoProxy + "/" + escapePath(escapeModule(name)) + "/@latest"
 	if err := g.c.get(ctx, at, &answer); err != nil {
 		return Latest{}, err

@@ -268,9 +268,8 @@ func functionBody(node ast.Node) *ast.BlockStmt {
 //
 // The whole body rather than its own statement list: a resolution inside a
 // loop over the builds a request names, or inside the branch that handles one
-// of two shapes, is a resolution like any other — and reading only the top
-// level made three of them invisible, two of which arrived in the change that
-// added this program.
+// of two shapes, is a resolution like any other, and reading only the top
+// level misses it.
 //
 // Every binding of a name, because a closure may bind the same name again and
 // the last binding read alone would decide the outer one away.
@@ -316,12 +315,12 @@ func binding(node ast.Node) (name string, call *ast.CallExpr, at token.Pos, ok b
 // derivedIn returns every name bound from the names already resolved, followed
 // to a fixed point, and for every name the resolutions it stands for.
 //
-// The hop that consumed the check. Almost every site hands the resolved
-// names straight to one of the address resolvers and then reads through what
-// that returned, so the one use this program could see was the exempt one and
-// there was nothing left to check. The build a resolver hands back stands for
-// the same permissive resolution, so it is followed as another name; so is a
-// value copied or collected from one, however many hops away.
+// Almost every site hands the resolved names straight to one of the address
+// resolvers and then reads through what that returned, so that answer is
+// followed; otherwise the one use left to see is the exempt one. The build a
+// resolver hands back stands for the same permissive resolution, so it is
+// followed as another name; so is a value copied or collected from one,
+// however many hops away.
 //
 // A call carrying the subject is where a resolved build is narrowed, so what
 // it returns is not followed. Nor is a call's error, which says whether it
@@ -530,10 +529,9 @@ func converts(call *ast.CallExpr) bool {
 // The test is deliberately narrow: the refusal stands in the function's own
 // statement list, so that it covers everything after it, and a use before it
 // is still reported. A check of the same shape nested inside another condition
-// covers only what that condition covers, which is how a collaborator received a whole build's approved
-// statements — the only subject question on that path was reached when the
-// caller asked for undisclosed work, and a caller asking for what is published
-// went past it.
+// covers only what that condition covers: a subject question reached only
+// when the caller asks for undisclosed work lets a caller asking for what is
+// published past it, with a whole build's approved statements.
 //
 // It answers, for each resolution, where the first refusal asking about it
 // stands. A refusal asks about the resolutions whose names, or names derived

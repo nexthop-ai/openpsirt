@@ -194,8 +194,8 @@ func productsHolding(ctx context.Context, db bun.IDB, vulnerabilityID int64) ([]
 	var products []int64
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id"`).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
@@ -223,7 +223,7 @@ var inThisProduct = inThisProductAs(`"build_id"`)
 // Named rather than written out, so every read that narrows a build to a
 // product asks it in one spelling.
 func inThisProductAs(column string) string {
-	return column + ` IN (SELECT "tg"."id" FROM "build" AS "tg"
-	JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
+	return column + ` IN (SELECT "b"."id" FROM "build" AS "b"
+	JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"
 	WHERE "st"."product_id" = ?)`
 }

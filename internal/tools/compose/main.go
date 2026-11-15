@@ -443,9 +443,9 @@ func compose(root component, parts []part) (*document, error) {
 	edges := map[string]map[string]bool{}
 	// The components something places, across every input rather than within
 	// one. A component described in the first document and placed by an edge
-	// in the second is placed; asking the question one document at a time
-	// answered no, and the image then claimed to contain directly what
-	// actually sits inside a binary.
+	// in the second is placed. Asked one document at a time, the answer is
+	// no, and the image claims to contain directly what actually sits inside
+	// a binary.
 	placed := map[string]bool{}
 	// The part that first described each component, which says where it
 	// hangs when nothing places it.
@@ -470,9 +470,8 @@ func compose(root component, parts []part) (*document, error) {
 				// Two producers described the same component, and what each
 				// said about it is not the same: a filesystem catalog carries
 				// the distribution's license and hashes, a module catalog
-				// carries the module's. Keeping the first copy whole and
-				// dropping the second threw away whichever producer happened
-				// to be read second.
+				// carries the module's. Both are merged, because keeping one
+				// copy whole drops whichever producer is read second.
 				merge(&components[at], c)
 			} else {
 				byIdentity[id] = len(components)

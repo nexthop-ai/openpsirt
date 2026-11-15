@@ -17,11 +17,8 @@ import (
 
 // A product's standing, per build.
 //
-// There was no page for one product. "How is SONiC doing" was five
-// requests and a spreadsheet: what is open per build, how much of it is
-// overdue, how much has been decided, when each build was last scanned. Every
-// piece existed and none of them sat together, so the question was answered by
-// somebody who already knew where to look.
+// "How is SONiC doing" in one place: what is open per build, how much of it
+// is overdue, how much has been decided, when each build was last scanned.
 
 // BuildStanding is one build of a product and how far its work has got.
 //
@@ -203,13 +200,13 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		Variant     string `bun:"variant"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		ColumnExpr(`"tg"."id" AS "build_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
+		ColumnExpr(`"b"."id" AS "build_id"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
-		Where(`"tg"."id" IN (?)`, bun.List(ids)).
+		Where(`"b"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx, &named); err != nil {
 		return nil, whole, fmt.Errorf("read the builds of this product: %w", err)
 	}

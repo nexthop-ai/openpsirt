@@ -5,10 +5,9 @@
 # failure with one command using the same versions.
 
 # bash with pipefail, because a recipe that pipes takes the *last* command's
-# status by default. "go test | tee" therefore reported the status of tee,
-# which is always 0 — so the engines gate announced "every engine ran" while
-# the suite it had just run was failing. That is the exact shape of bug the
-# gate exists to catch, in the gate itself.
+# status by default. "go test | tee" otherwise reports the status of tee,
+# which is always 0, and the engines gate announces "every engine ran" over a
+# failing suite.
 SHELL       := /usr/bin/env bash
 .SHELLFLAGS := -eo pipefail -c
 
@@ -39,8 +38,8 @@ export OPENPSIRT_TEST_TOO_OLD_URL
 export OPENPSIRT_TEST_RELAX_DURABILITY
 ENGINES_SET := $(strip $(OPENPSIRT_TEST_POSTGRES_URL)$(OPENPSIRT_TEST_MYSQL_URL)$(OPENPSIRT_TEST_MARIADB_URL))
 # Named one at a time, because "all three are missing" and "one is missing" are
-# different states and only the first used to be reported. With postgres alone
-# configured the warning stayed silent and the run tested two engines of four.
+# different states, and with postgres alone configured a run tests two engines
+# of four.
 ENGINES_MISSING := $(strip \
   $(if $(OPENPSIRT_TEST_POSTGRES_URL),,postgres) \
   $(if $(OPENPSIRT_TEST_MYSQL_URL),,mysql) \
@@ -85,8 +84,8 @@ STAMP_VERSION ?= $(VERSION)
 # recipe's text. It comes from git describe, so it is a tag name, and a tag
 # name may carry shell syntax; substituted into a recipe it would be script.
 # The shell expands $STAMPED inside the double quotes the recipes put around
-# LDFLAGS, and treats what it expands to as data. Exported by the two targets
-# that link, so nothing else pays for asking git.
+# LDFLAGS, and treats what it expands to as data. Exported by the targets that
+# link, so nothing else pays for asking git.
 build dist-binaries dist-client: export STAMPED = $(STAMP_VERSION)
 LDFLAGS       = -s -w \
 	-X '$(PKG).version=$$STAMPED' \
@@ -171,7 +170,7 @@ TEST_HALF := $(shell n=$$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/
 # record of that write, so our code reading it is checked against whatever last
 # used the memory and reported as a race.
 # Our code, the query builder and the standard library stay instrumented and
-# checked, and a race inside the translated C is the one thing no longer seen.
+# checked, and a race inside the translated C is the one thing not seen.
 # The compiler flags are not documented for this use; a Go release that
 # rejects one fails the build.
 RACE_UNWATCHED = -gcflags='modernc.org/sqlite/lib=-race=false -d=checkptr=0' \

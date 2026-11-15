@@ -16,6 +16,7 @@ import { Unread } from "../ui/Reading";
 import { UNITS, write, type Unit } from "./duration";
 import { Composer } from "./Composer";
 import { Wide } from "../ui/Wide";
+import { READING_ROLES } from "../ui/roles";
 
 // A person's own page: what they can reach, what is sent to them, and the
 // credentials they hold. The one place in the interface a person mints a token
@@ -309,9 +310,7 @@ function Tokens() {
             // Every reading role, because which it lands on is whichever its
             // owner holds — the server intersects, so naming all of them
             // narrows to reading without asking the browser who holds what.
-            ...(readOnly
-              ? { holds: ["public-read", "private-read", "security-testing-read"] as const }
-              : {}),
+            ...(readOnly ? { holds: READING_ROLES } : {}),
           },
         }),
       ),
@@ -386,7 +385,7 @@ function Tokens() {
                 <tr
                   key={`${row.name} ${row.created_at} ${i}`}
                   className="row"
-                  style={{ opacity: row.withdrawn ? 0.55 : 1 }}
+                  style={{ opacity: row.withdrawn ? "var(--dim)" : 1 }}
                 >
                   <td className="id">{row.name}</td>
                   <td>

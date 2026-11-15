@@ -187,11 +187,10 @@ func TestADistributionPackageIsNotAskedAbout(t *testing.T) {
 		r, asked := seed(t, db, []component{
 			{purl: "pkg:deb/debian/openssl@3.5.6-1"},
 			// The same thing, written the way a producer that capitalizes its
-			// type writes it. Every fixture purl was already lower case, so
-			// the LOWER() that makes the four engines agree could be removed
-			// with the suite green — and the row that got through then had no
-			// index and stuck. It behaves differently per engine without it:
-			// SQLite's LIKE is case-insensitive and PostgreSQL's is not.
+			// type writes it, so removing the LOWER() that makes the four
+			// engines agree fails here: the row that got through would have
+			// no index and stick. It behaves differently per engine without
+			// it: SQLite's LIKE is case-insensitive and PostgreSQL's is not.
 			{purl: "pkg:DEB/debian/curl@8.5.0-2"},
 			{purl: ""},
 			{purl: "pkg:cargo/serde@1.0.0"},
@@ -372,17 +371,17 @@ func TestUpstreamIsOnlyCalledSilentAfterAClearYear(t *testing.T) {
 	}
 }
 
-// The defect this exists to prevent: components whose ecosystem has no index
-// filling the window and leaving nothing asked. `due` takes the oldest 200
-// with never-asked first, so on a real image — 3,929 components in ecosystems
-// nothing asks against 3,010 that are askable — the feature asked upstream
-// about nothing at all, every cycle, for good.
+// Components whose ecosystem has no index never fill the window and leave
+// nothing asked. `due` takes the oldest 200 with never-asked first, and a real
+// image holds 3,929 components in ecosystems nothing asks against 3,010 that
+// are askable, so selecting them would ask upstream about nothing at all,
+// every cycle.
 //
-// They are not selected at all now, which is the structural form of the same
+// They are not selected at all, which is the structural form of the
 // guarantee: the window is built from the ecosystems there is an index for
 // rather than from the complement of one of them. Recording an empty answer
-// for each of them, which is what it did before, got through the backlog and
-// then spent a slot on every one of them again a month later.
+// for each of them would get through the backlog and then spend a slot on
+// every one of them again a month later.
 func TestEcosystemsWithNoIndexDoNotStarveTheQueue(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		var of []component
@@ -693,7 +692,7 @@ func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
 			},
 			// The summary is shortened and the address is not: a cut address
 			// is a different address, and this one becomes somewhere to
-			// click. The comment beside the two said both were bounded.
+			// click.
 			"enormous": {
 				Version: "2.0.0", Summary: "fine",
 				Project: "https://example.test/" + strings.Repeat("a", currency.MostAddress),
@@ -750,12 +749,12 @@ func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
 }
 
 func TestARefusalTheIndexWillRepeatDoesNotHoldTheHeadOfTheWindow(t *testing.T) {
-	// Every status but 200, 404 and 410 took the arm for a bad day: nothing
-	// was written, so the component stayed due — and the window takes the
-	// never-asked first, so the same one led every pass afterwards for ever
-	// and the components behind it were never reached. A package a registry
-	// withdrew, a region it will not serve and a request it will not accept
-	// are all of them.
+	// A refusal the index will repeat is recorded, never read as a bad day.
+	// Read as a bad day, nothing is written, so the component stays due — and
+	// the window takes the never-asked first, so the same one would lead every
+	// pass for ever and the components behind it would never be reached. A
+	// package a registry withdrew, a region it will not serve and a request it
+	// will not accept are all of them.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		r, asked := seed(t, db, []component{
 			{purl: "pkg:npm/refused@1.0.0"},
@@ -804,12 +803,10 @@ func (r refusing) Latest(_ context.Context, name string) (currency.Latest, error
 }
 
 func TestAPassThatLosesTheLeaseStopsAsking(t *testing.T) {
-	// The lease was sized from the interval between cycles, and the comment
-	// beside it stated the arithmetic that contradicts that: a pass is up to
-	// two hundred requests with a timeout each, which is far past five
-	// intervals. So a slow index handed the pass to a second replica
-	// mid-flight and both asked — the thing a lease exists to prevent, at
-	// somebody else's expense.
+	// A pass is up to two hundred requests with a timeout each, which can run
+	// far past five intervals, so the lease is taken again inside the pass. A
+	// pass that loses it stops, rather than asking beside a second replica —
+	// the thing a lease exists to prevent, at somebody else's expense.
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		var of []component

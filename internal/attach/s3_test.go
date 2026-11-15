@@ -159,7 +159,7 @@ func TestNoBucketIsNoStore(t *testing.T) {
 
 // A plaintext store takes a body it cannot rewind.
 //
-// An upload is streamed through two digests on its way in, so what reaches the
+// An upload is streamed through its digest on its way in, so what reaches the
 // client is a reader with no Seek. Over https the request carries a trailing
 // checksum, which a stream satisfies; over http the client hashes the body
 // before sending it unless told the payload is unsigned. The server here is on

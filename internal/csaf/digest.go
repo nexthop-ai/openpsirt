@@ -8,6 +8,14 @@ import (
 	"strings"
 )
 
+// The files the standard serves beside a document, under the document's own
+// name: its digests and its detached signature.
+const (
+	SHA256Suffix    = ".sha256"
+	SHA512Suffix    = ".sha512"
+	SignatureSuffix = ".asc"
+)
+
 // DigestIn is the digest a digest file beside a document states, of the size
 // given in bytes, and whether it states one.
 //

@@ -10,11 +10,8 @@ import (
 
 // Limits is what a scan file is read within.
 //
-// Each bound left unset here stays at the reader's own default rather than
-// becoming zero, which is what "all of them configurable" has to mean for a
-// deployment that wants one of them changed. Passing an empty set instead
-// leaves the reader filling every field from its defaults, and the whole
-// surface unreachable: nothing a deployment sets can lower any of them.
+// A bound left unset is zero, which the reader takes as its own default, so a
+// deployment can change one bound and leave the rest where they are.
 func (c Config) Limits() sbom.Limits {
 	return sbom.Limits{
 		MaxBytes:      int64(c.IngestMaxBytes),
@@ -27,8 +24,8 @@ func (c Config) Limits() sbom.Limits {
 	}
 }
 
-// AnalysisLimits is what an analyzer's results are read within, with each
-// bound left unset at the reader's own default.
+// AnalysisLimits is what an analyzer's results are read within. As with
+// Limits, a bound left unset is zero, which the reader takes as its default.
 func (c Config) AnalysisLimits() sarif.Limits {
 	return sarif.Limits{
 		MaxBytes:          int64(c.AnalysisMaxBytes),
@@ -48,13 +45,5 @@ func (c Config) AnalysisLimits() sarif.Limits {
 		MaxProperties:     c.AnalysisMaxProperties,
 		MaxText:           c.AnalysisMaxText,
 		MaxHeld:           c.AnalysisMaxHeld,
-	}.OrDefault()
-}
-
-// AnalysisDocuments is how many documents one analyzer upload may carry.
-func (c Config) AnalysisDocuments() int {
-	if c.AnalysisMaxDocuments > 0 {
-		return c.AnalysisMaxDocuments
 	}
-	return sarif.DefaultDocuments
 }

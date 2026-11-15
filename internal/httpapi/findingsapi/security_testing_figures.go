@@ -264,8 +264,7 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 			"in the weeks asked that were applied, not comparable or failed, and its own expected interval " +
 			"between runs on that build.\n\n" +
 			"A series is quiet when no comparable run arrived for three of its own usual gaps between applied " +
-			"runs, never under a day, once three runs were applied. Each series is judged " +
-			"on its own interval, so a quarterly series is not quiet after a week. A retired build is left " +
+			"runs, never under a day, once three runs were applied. A retired build is left " +
 			"out; a release past its end of life is listed and never quiet. Quiet first, then the longest " +
 			"silent.\n\n" +
 			"Refused to anybody who does not read security testing material in the product.",
@@ -395,7 +394,7 @@ func coverageBody(got []analysis.Analyzed, since, until time.Time) AnalysisCover
 // order coverageRows fills them. Across products, a last column names the
 // product.
 func coverageColumns() []string {
-	return []string{"branch or tag", "variant", "series", "method", "quiet", "past end of life",
+	return []string{core.BranchOrTagColumn, "variant", "series", "method", "quiet", "past end of life",
 		"last arrived", "last applied", "not comparable", "units expected", "units analyzed",
 		"last comparable", "applied runs", "not comparable runs", "failed runs", "expected days",
 		"allowed days", "silent days"}

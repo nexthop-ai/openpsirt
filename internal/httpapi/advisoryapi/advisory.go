@@ -89,13 +89,11 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		OperationID: "start-advisory", Method: http.MethodPost, Path: "/v1/advisories",
 		Summary: "Start an advisory",
 		Description: "Mints an identifier and returns the empty advisory under it.\n\n" +
-			"The identifier is minted here rather than chosen. It is what a reader cites " +
-			"the document by and what a revision of it keeps, so two advisories under one " +
-			"name is a state this has no way back from.\n\n" +
+			"The identifier is minted here and cannot be chosen. Every revision of the " +
+			"advisory keeps it.\n\n" +
 			"An advisory covers issues, which are added one at a time and each names the " +
 			"product it is covered in. Until one is added the advisory generates no " +
-			"document: the standard requires at least one vulnerability, and a document " +
-			"about nothing is not a draft of anything.\n\n" +
+			"document, because the standard requires at least one vulnerability.\n\n" +
 			"Requires a prefix configured for this deployment to mint under.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.AnyPerson, startsAdvisory, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
@@ -131,14 +129,10 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Summary: "List advisories",
 		Description: "Every advisory you may see, newest first.\n\n" +
 			"An advisory covering a product you hold nothing on is not listed, and the " +
-			"total says the same. A document is read whole or not at all: one with a " +
-			"product quietly left out reads as a complete statement about a product it " +
-			"says nothing about.\n\n" +
-			"`issues` and `products` are both given because one issue in three products " +
-			"and three issues in one are different documents, and a single count reads " +
-			"the same for each.\n\n" +
-			"`product` and `vulnerability` narrow it to what covers them, which is what a " +
-			"screen about one flaw asks before somebody starts another advisory about it.",
+			"total says the same.\n\n" +
+			"`issues` counts the issues an advisory covers and `products` the products " +
+			"they are covered in.\n\n" +
+			"`product` and `vulnerability` narrow it to the advisories covering them.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "", core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Product       string `query:"product" doc:"Only advisories covering something in this product"`
@@ -180,7 +174,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"`changed` is absent where nothing has gone out, where it covers nothing, and " +
 			"where no publisher is configured, since then there is no document to compare.\n\n" +
 			"An advisory covering a product you hold nothing on answers as one that does " +
-			"not exist. Told apart, the pair of answers says what exists.",
+			"not exist.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory" doc:"The identifier the advisory is tracked by"`
@@ -255,12 +249,10 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Path:    "/v1/advisories/{advisory}/issues",
 		Summary: "Add an issue to an advisory",
 		Description: "Names an issue in a product as covered by this advisory.\n\n" +
-			"The pair, not the issue alone: an issue in two products is two entries, " +
-			"because the releases that carry it differ and a status is stated about " +
-			"releases.\n\n" +
-			"Only a flaw recorded here. An issue a scanner reported against a third-party " +
-			"component is refused, and refused at this point rather than when the document " +
-			"is generated, so the refusal names the issue you chose.",
+			"An entry is an issue and a product, so an issue in two products is two " +
+			"entries.\n\n" +
+			"Only a flaw recorded here is accepted. An issue a scanner reported against a " +
+			"third-party component is refused, naming the issue.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.AnyPerson, namesAFlaw, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
@@ -297,9 +289,8 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Path:    "/v1/advisories/{advisory}/issues/{product}/{issue}",
 		Summary: "Take an issue off an advisory",
 		Description: "Removes one issue in one product from this advisory.\n\n" +
-			"Nothing here asks whether the advisory has gone out. An issuance records what " +
-			"went out at a moment, and editing the advisory afterwards is how the next " +
-			"revision differs from the last.",
+			"An advisory that has gone out may still be edited. The issuance keeps what " +
+			"went out, and the next revision carries the change.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.AnyPerson, namesAFlaw, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory      string `path:"advisory"`
@@ -330,10 +321,8 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"A release marked affected on the advisory is stated as known affected.\n\n" +
 			"One entry per issue and one product branch per product, so several flaws " +
 			"released together are one document on one date.\n\n" +
-			"The document is generated, not published. Nothing is sent anywhere. Recording " +
-			"that it was issued is a separate request, and what it keeps is a digest of " +
-			"what was generated, so that whether what you published is still what this " +
-			"would generate can be answered.\n\n" +
+			"The document is generated and sent nowhere. Recording that it was issued is a " +
+			"separate request, which keeps a digest of what was generated.\n\n" +
 			"The `Advisory-Edition` header names the edition the advisory pointed at before " +
 			"the document was generated, never newer than what it states; agreeing names " +
 			"the oldest edition read, as the approval says.\n\n" +
@@ -342,8 +331,7 @@ func registerAdvisory(api huma.API, in core.Deps) {
 			"document is in its life. Reaching a disclosure date discloses nothing, so " +
 			"nothing here does either.\n\n" +
 			"An advisory covering no issue is refused: the standard requires at least one. " +
-			"Requires a publisher configured for this deployment, because a document " +
-			"naming none is not a valid CSAF document.",
+			"Requires a publisher configured for this deployment.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
@@ -365,16 +353,9 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		OperationID: "list-advisory-issuances", Method: http.MethodGet,
 		Path:    "/v1/advisories/{advisory}/issuance",
 		Summary: "List the times an advisory went out",
-		Description: "What has been published for this advisory, oldest first: which " +
-			"revision, when, and what the document hashed to at the time.\n\n" +
-			"Readable without generating a document. Every issuance is in the document's " +
-			"own revision history, which is right for a reader of the document — but it " +
-			"made \"has this gone out, and is what is published still what we would " +
-			"generate\" a question you had to build a CSAF document to answer, and " +
-			"somebody deciding whether to publish a revision is asking before they " +
-			"generate anything.\n\n" +
-			"The digest is what makes the comparison possible, and it was taken from " +
-			"the document generated here rather than from anything sent.",
+		Description: "What has been published for this advisory, oldest first: the " +
+			"revision, the time, and the digest of the document generated here when it " +
+			"was recorded. Generates no document.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
@@ -404,12 +385,8 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Path:    "/v1/advisories/{advisory}",
 		Summary: "Retitle an advisory",
 		Description: "Gives the advisory a new title, as a new edition of what it says.\n\n" +
-			"Every agreement standing on the old title is taken back. A second person " +
-			"agreed to particular words, and different words are a document nobody has " +
-			"agreed to.\n\n" +
-			"Requires a triage role on every product the advisory covers, because what it " +
-			"says about one of them is part of the same document as what it says about " +
-			"another.",
+			"Every agreement standing on the old title is taken back.\n\n" +
+			"Requires a triage role on every product the advisory covers.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
@@ -504,25 +481,17 @@ func registerAdvisory(api huma.API, in core.Deps) {
 		Summary: "Record that an advisory went out",
 		Description: "Records that this advisory was published: when, by whom, and a digest " +
 			"of the document as it stands now.\n\n" +
-			"A fact about a moment rather than a derived value. What was published on a " +
-			"date cannot be worked out again once the record it came from has moved on — a " +
-			"release is added, a decision is revised, a fix lands — so if it is not written " +
-			"down when it happens it is gone.\n\n" +
-			"It is what lets a second document be a revision. Without it a second document " +
-			"cannot carry a revision history or a higher version, and both are things CSAF " +
-			"validators check; a document that fails validation is one a customer's tooling " +
-			"drops.\n\n" +
-			"The document as it goes out is kept, because it cannot be worked out again: " +
-			"what would be generated tomorrow is a different document. The digest beside " +
-			"it makes \"is what is published still what we generate\" a question with an " +
-			"answer, and it is taken from the document generated here rather than from " +
-			"anything sent — a digest of whatever a caller says answers nothing.\n\n" +
+			"Each issuance after the first is a revision: the next document carries it in " +
+			"its revision history and under a higher version.\n\n" +
+			"The document as it goes out is kept. The digest is taken from the document " +
+			"generated here, never from anything sent, and is what the advisory's `changed` " +
+			"compares against.\n\n" +
 			"Answers 409 where nobody has agreed to what the advisory says.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.AnyPerson, changesWhatItSays, core.DisclosureTriageRights()...), func(ctx context.Context, input *struct {
 		Advisory string `path:"advisory"`
 		Body     struct {
-			Summary string `json:"summary,omitempty" maxLength:"191" doc:"The revision's summary, for the document's revision history. A history whose every entry reads the same is one nobody reads"`
+			Summary string `json:"summary,omitempty" maxLength:"191" doc:"The revision's summary, for the document's revision history"`
 		}
 	}) (*struct {
 		Status int

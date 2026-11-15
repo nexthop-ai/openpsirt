@@ -174,11 +174,10 @@ type errStub string
 func (e errStub) Error() string { return string(e) }
 
 func TestEveryOperationSaysWhatItAsksFor(t *testing.T) {
-	// The rights an endpoint needs were written nowhere and lived only in the
-	// handlers, so the only way to answer "who may call this" was to read the
-	// code. Now every operation carries it — structured for a client generator
-	// or an access review, and rendered into the description for somebody
-	// reading the reference.
+	// Every operation carries the rights it needs, so "who may call this" is
+	// answered without reading the handlers — structured for a client
+	// generator or an access review, and rendered into the description for
+	// somebody reading the reference.
 	//
 	// Checked rather than trusted, because the failure is silent: an endpoint
 	// added without one is not broken, it is undocumented, and nobody notices
@@ -217,11 +216,10 @@ func TestEveryOperationSaysWhatItAsksFor(t *testing.T) {
 }
 
 func TestThePagesOwnInlineScriptIsAllowedByHashAndNothingWider(t *testing.T) {
-	// The policy said "the interface has no inline script", which was true when
-	// it was written and stopped being true when the page grew one: the snippet
-	// that reads the chosen theme before the first paint. Nothing said so —
-	// the browser refused it silently, the bundle applied the theme a moment
-	// later, and the flash the snippet exists to prevent happened every load.
+	// The page has one inline script: the snippet that reads the chosen theme
+	// before the first paint. The policy allows it by hash, because refused,
+	// the browser drops it silently, the bundle applies the theme a moment
+	// later, and the flash the snippet exists to prevent happens every load.
 	//
 	// The hash is taken from what is actually served, so a build step that
 	// changes the snippet cannot leave the policy behind.

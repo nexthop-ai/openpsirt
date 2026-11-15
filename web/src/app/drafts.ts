@@ -19,8 +19,8 @@
 //
 // And every draft has an age. Signing out clears them; a session that
 // quietly expired does not, and browser storage outlives every session and
-// needs no credential to read — so text about an undisclosed finding, written
-// on a shared machine, sat there for anybody who opened the tools. Anything
+// needs no credential to read, so text about an undisclosed finding, written
+// on a shared machine, is there for anybody who opens the tools. Anything
 // past the age below goes on the first read of a page load.
 //
 // The gap that still leaves, stated rather than glossed: a draft written and
@@ -138,8 +138,8 @@ function keysUnder(prefix: string): string[] {
   return keys;
 }
 
-// read is one stored draft, or nothing where it is unreadable or shaped the
-// way drafts were shaped before they carried a time.
+// read is one stored draft, or nothing where it is unreadable or carries no
+// time it was written.
 function read(key: string): { text: string; at: number } | null {
   try {
     const raw = window.localStorage.getItem(key);
@@ -164,12 +164,12 @@ function read(key: string): { text: string; at: number } | null {
 // as "do not keep this" — text typed before anybody is recognized has nowhere
 // safe to go.
 //
-// The identity is encoded, so the separator cannot occur inside it. An
-// identity may hold a colon — nothing refuses one — and what a draft is about
-// is colon-rich by construction, so `alice` and `alice:b` produced keys where
-// one was a prefix of the other. The sweep, which is the whole of the control
-// that takes away what is not yours, then read one person's drafts as the
-// other's and left them in the browser.
+// The identity is encoded, so the separator cannot occur inside it and one
+// identity's key is never a prefix of another's. An identity may hold a colon
+// — nothing refuses one — and what a draft is about is colon-rich by
+// construction; unencoded, `alice` and `alice:b` would give keys where one is
+// a prefix of the other, and the sweep, which is the whole of the control that
+// takes away what is not yours, would read one person's drafts as the other's.
 function keyFor(about: string | undefined): string {
   if (!about || !writer) return "";
   return PREFIX + encodeURIComponent(writer) + ":" + about;
@@ -215,9 +215,9 @@ export function restore(about: string | undefined): string {
 //
 // A draft that keeps the prose and loses the answer is half a draft. The
 // reasoning is the expensive part to retype and the outcome is the part that
-// decides what the prose is about — so an interrupted decision came back with
-// three paragraphs and no statement of what they argued for, and the person
-// had to read their own text to work out what they had meant.
+// decides what the prose is about, so an interrupted decision comes back with
+// both: paragraphs with no statement of what they argued for leave the person
+// reading their own text to work out what they meant.
 //
 // Every field the form holds, because the ones it does not keep are the ones
 // that come back empty beside a filled form and read as answered.
@@ -278,8 +278,8 @@ export function forget(about: string | undefined) {
   try {
     window.localStorage.removeItem(key);
     // Both halves, because the answer is the same draft. Cleared apart, an
-    // accepted decision left its outcome behind to be offered against the
-    // next thing decided at the same occurrence.
+    // accepted decision would leave its outcome behind to be offered against
+    // the next thing decided at the same occurrence.
     const answer = keyFor(answerAbout(about));
     if (answer) window.localStorage.removeItem(answer);
   } catch {

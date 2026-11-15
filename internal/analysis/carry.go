@@ -76,11 +76,11 @@ func carry(ctx context.Context, db bun.IDB, run *series.Run, seriesID int64, fir
 func parentBuild(ctx context.Context, db bun.IDB, buildID int64) (int64, error) {
 	var ids []int64
 	err := db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "build" AS "pt" ON "pt"."branch_or_tag_id" = "s"."parent_id" AND "pt"."variant_id" = "tg"."variant_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "pt" ON "pt"."branch_or_tag_id" = "bt"."parent_id" AND "pt"."variant_id" = "b"."variant_id"`).
 		ColumnExpr(`"pt"."id"`).
-		Where(`"tg"."id" = ?`, buildID).
+		Where(`"b"."id" = ?`, buildID).
 		Scan(ctx, &ids)
 	if err != nil {
 		return 0, fmt.Errorf("read the build this branch was cut from: %w", err)

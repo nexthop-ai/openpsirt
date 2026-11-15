@@ -250,12 +250,12 @@ type Late struct {
 // OffTheClock is the condition under which a decision standing at a finding
 // takes it off the clock, as SQL, with the values it binds.
 //
-// One spelling, because there were two. What is running out of time excluded
-// any live decision, so a proposal waiting for a second person took a finding off
-// that list for as long as it sat in the queue; what each person was holding
-// excluded nothing, so the same finding still counted as overdue against
-// whoever held it. Two screens answering "is this late" differently is the
-// kind of disagreement that gets one of them ignored.
+// Every reader asking whether a finding is late uses this one predicate, so
+// what is running out of time and what each person is holding agree on it: a
+// proposal waiting for a second person does not take a finding off one list
+// while it still counts as overdue on the other. Two screens answering "is
+// this late" differently is the kind of disagreement that gets one of them
+// ignored.
 //
 // It says what the triage package says when it asks whether a decision applies
 // to an occurrence, and nothing else: this product's decision about this issue
@@ -403,9 +403,9 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Where(kinds, kindArgs...).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-			Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+			Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			// Each row's own product rates its own findings. The list spans
@@ -422,10 +422,9 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 			Where(`"f"."due_at" <= ?`, s.now().UTC().Add(within)).
 			// Nothing the build or a supplier already argued away, and nothing
 			// a decision takes off the clock. Not merely any decision: a
-			// proposal waiting for a second person suppresses nothing, and it
-			// took findings off this list for as long as it sat in the queue —
-			// a quarter, on one — while the same findings still counted as
-			// overdue against whoever held them.
+			// proposal waiting for a second person suppresses nothing, so a
+			// finding stays on this list while it sits in the queue, as it
+			// still counts as overdue against whoever holds it.
 			Where(NotArguedAway).
 			Where("NOT "+standing, args...)
 		if !all {
@@ -455,8 +454,8 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// of it is not.
 		ColumnExpr(soleHolderExpr + ` AS "assigned_to"`).
 		// The number of groups the question has, counted over the grouped
-		// result and before the limit. A screen that counted its own page said
-		// two hundred over a list of four hundred and sixty-two.
+		// result and before the limit, because a page's own length is not the
+		// size of the list.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr(grouping).
 		// Total over the grouping, so every row has one place and a paged
@@ -670,8 +669,8 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			var moments []time.Time
 			err = s.db.NewSelect().
 				TableExpr(`"finding" AS "f"`).
-				Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+				Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 				ColumnExpr(string(database.Column(s.db, "f."+start.column))).
 				Where(kinds, kindArgs...).
 				Where(`"f"."closed_at" IS NULL`).
@@ -799,8 +798,8 @@ func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
 	if !on {
 		clocked = "NOT " + clocked
 	}
-	return `"build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
-		JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
+	return `"build_id" IN (SELECT "b"."id" FROM "build" AS "b"
+		JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"
 		JOIN "product" AS "p" ON "p"."id" = "st"."product_id"
 		WHERE "st"."product_id" = ? AND ` + clocked + `)`, append([]any{productID}, args...)
 }
@@ -892,8 +891,8 @@ func (s *Store) clearClockOn(ctx context.Context, branchesAndTags []int64, why s
 			Where(kinds, kindArgs...).
 			Where(`"closed_at" IS NULL`).
 			Where(`"due_at" IS NOT NULL`).
-			Where(`"build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
-				WHERE "tg"."branch_or_tag_id" IN (?))`, bun.List(batch)).
+			Where(`"build_id" IN (SELECT "b"."id" FROM "build" AS "b"
+				WHERE "b"."branch_or_tag_id" IN (?))`, bun.List(batch)).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("take the deadline off %s: %w", why, err)

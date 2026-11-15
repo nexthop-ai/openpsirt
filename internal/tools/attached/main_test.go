@@ -8,10 +8,10 @@ import (
 	"testing"
 )
 
-// This gate had no test, and its only consumer is a makefile line that reads
-// an exit code. An exit code cannot tell a check that found nothing from a
-// check that looked at nothing, so the detection is asked directly here: one
-// input that must be reported and one that must not, per rule.
+// The gate's only consumer is a makefile line that reads an exit code. An exit
+// code cannot tell a check that found nothing from a check that looked at
+// nothing, so the detection is asked directly here: one input that must be
+// reported and one that must not, per rule.
 
 // inPackage is what a package declares, for the cases below.
 func inPackage(names ...string) map[string]bool {
@@ -44,9 +44,8 @@ func Widen() {}
 			"",
 		},
 		{
-			// The accident this exists for, and the one the same-file test
-			// could not see: a file split leaves the block behind and the
-			// symbol it names is now declared next door.
+			// The accident this exists for: a file split leaves the block
+			// behind and the symbol it names is declared next door.
 			"a comment naming a symbol that moved to another file of the package",
 			`package p
 
@@ -83,8 +82,7 @@ func compare() {}
 			"",
 		},
 		{
-			// A verb nobody put on a list is still the convention's shape,
-			// and the list left every comment using one unread.
+			// A verb nobody put on a list is still the convention's shape.
 			"a comment whose verb is not one anybody enumerated",
 			`package p
 
@@ -229,9 +227,8 @@ var Limit = 50
 			"",
 		},
 		{
-			// Read at the group alone, every comment inside a const or var
-			// block was unread — which is where a good part of this tree's
-			// documentation is.
+			// A spec inside a const or var block carries its own doc comment,
+			// read as well as the group's.
 			"a comment on one spec inside a grouped declaration",
 			`package p
 

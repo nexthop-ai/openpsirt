@@ -95,11 +95,11 @@ func TestAProviderIsReachedOverHTTPSOnly(t *testing.T) {
 }
 
 func TestTheAddressGuardSeesAnAddressAndNotAName(t *testing.T) {
-	// The test whose absence hid a total failure. Everything else here calls
-	// Reachable() with address literals, so nothing noticed that a request
-	// through the client never got that far: a dialer is handed the
-	// *unresolved* name from the URL, and a check written against an address
-	// refuses every name — including every real provider's.
+	// A request goes through the client, because the other tests here call
+	// Reachable() with address literals. A dialer is handed the *unresolved*
+	// name from the URL, so the address check runs on the resolved address;
+	// a check written against an address before resolution refuses every
+	// name, every real provider's included.
 	//
 	// A name is what distinguishes the two. The URL below names a host rather
 	// than an address, so a guard that runs before resolution can only say

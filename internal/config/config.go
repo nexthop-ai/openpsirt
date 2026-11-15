@@ -47,11 +47,11 @@ type Config struct {
 	// finishes, and the migration itself has no bound.
 	//
 	// Bounded because an endpoint that accepts a connection and never answers
-	// — a stale load-balancer target, a paused instance — held the process for
-	// ever with no log line written and no port listening. From outside that
-	// is indistinguishable from a slow image pull, and a supervisor cannot act
-	// on it. A crash loop naming what it could not reach is the failure mode
-	// that can be.
+	// — a stale load-balancer target, a paused instance — would otherwise hold
+	// the process for ever with no log line written and no port listening.
+	// From outside that is indistinguishable from a slow image pull, and a
+	// supervisor cannot act on it. A crash loop naming what it could not reach
+	// is the failure mode that can be.
 	StartupTimeout time.Duration
 	// DatabaseURL says which database to use and how to reach it.
 	DatabaseURL string

@@ -335,7 +335,7 @@ func grouped(rows []Changed) []remediation {
 	worst := func(g remediation) int {
 		high := -1
 		for _, row := range g.rows {
-			if r := Ranks(row.Severity); r > high {
+			if r := SortRank(row.Severity, row.ScoreCenti); r > high {
 				high = r
 			}
 		}
@@ -343,7 +343,8 @@ func grouped(rows []Changed) []remediation {
 	}
 	for i := range groups {
 		sort.SliceStable(groups[i].rows, func(a, b int) bool {
-			ra, rb := Ranks(groups[i].rows[a].Severity), Ranks(groups[i].rows[b].Severity)
+			ra := SortRank(groups[i].rows[a].Severity, groups[i].rows[a].ScoreCenti)
+			rb := SortRank(groups[i].rows[b].Severity, groups[i].rows[b].ScoreCenti)
 			if ra != rb {
 				return ra > rb
 			}

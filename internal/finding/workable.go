@@ -94,7 +94,7 @@ func (w Workable) asks() bool {
 	return (len(w.Kinds) > 0 && len(w.Kinds) < 2) || (len(w.Support) > 0 && len(w.Support) < 2)
 }
 
-// narrow applies it to a query that joins build AS tg and branch_or_tag AS st.
+// narrow applies it to a query that joins build AS b and branch_or_tag AS st.
 func (w Workable) narrow(ctx context.Context, db bun.IDB, now time.Time,
 	q *bun.SelectQuery) (*bun.SelectQuery, error) {
 
@@ -119,7 +119,7 @@ func (w Workable) pastEOL(ctx context.Context, db bun.IDB, now time.Time) ([]int
 	return catalog.NewStore(db).BranchesAndTagsPastEndOfLife(ctx, now)
 }
 
-// where applies the narrowing to a query that joins build AS tg and
+// where applies the narrowing to a query that joins build AS b and
 // branch_or_tag AS st, given the releases pastEOL read.
 func (w Workable) where(q *bun.SelectQuery, past []int64) *bun.SelectQuery {
 	if len(w.Kinds) == 1 {

@@ -5,11 +5,10 @@
 
 // A year of nightly scans against this, measured rather than assumed.
 //
-// `REQUIREMENTS.md` §4 records the gap: scan files are deleted once read and
-// the interval storage was shaped so that a rebuild changing nothing writes
-// nothing, which is asserted by a test — but nobody had checked the shape after
-// a year of real nightly scans, and "the design says it should be fine" is a
-// sentence with a word doing too much work in it.
+// Scan files are deleted once read and the interval storage is shaped so that
+// a rebuild changing nothing writes nothing, which a test asserts. This checks
+// the shape after a year of nightly scans, because "the design says it should
+// be fine" is a sentence with a word doing too much work in it.
 //
 // This is behind a build tag because it is a measurement and not a gate: it
 // takes minutes, it asserts almost nothing, and its output is numbers to write
@@ -46,16 +45,11 @@ const (
 	components = 700
 	// consumers is how many containers each package sits in on average. A real
 	// image reached 241,021 occurrences from 7,035 components, so about 34.
-	//
-	// That reach was measured against the previous fixture and has not been
-	// re-measured against the current one, which describes 190 fewer
-	// components. The average is what this model uses and it is not sensitive
-	// to that difference, but the 241,021 is a figure from the older document
-	// rather than from the one in testdata now.
+	// The model uses the average, which is not sensitive to the difference
+	// between that image and the one in testdata.
 	consumers = 34
-	// issues is how many distinct vulnerabilities are open. The real image had
-	// about 2,600 across 7,374 issue-at-component rows, on the same older
-	// document as the line above.
+	// issues is how many distinct vulnerabilities are open. The same real
+	// image had about 2,600 across 7,374 issue-at-component rows.
 	issues = 260
 	// nights is how many rebuilds to simulate.
 	nights = 365
@@ -169,11 +163,10 @@ func TestMeasureAYearOfNightlyScans(t *testing.T) {
 		// A bump is permanent: a package that moved to 1.5 does not go back to
 		// 1.0 tomorrow.
 		//
-		// The first version of this slid a window and left everything outside
-		// it at 1.0, so last night's components reverted — fourteen identities
-		// changing a night where the model says seven, and a version history
-		// no build has. The numbers it produced were real measurements of
-		// twice the churn they claimed.
+		// A sliding window leaving everything outside it at 1.0 would revert
+		// last night's components — fourteen identities changing a night where
+		// the model says seven, and a version history no build has — and
+		// measure twice the churn it claims.
 		version := make([]string, components)
 		for i := range version {
 			version[i] = "1.0"

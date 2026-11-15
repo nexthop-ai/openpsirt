@@ -28,8 +28,8 @@ import (
 //
 // Not a comment on a decision, and not a decision. A comment hangs off an argument
 // somebody made, and the box for one appears only where a decision already
-// exists — so the first person to say anything had to record a decision in
-// order to say it. A note records none.
+// exists, so a note lets the first person to say anything say it without
+// recording a decision.
 //
 // Keyed on the issue and the product, the way a rating is (REQ-29), because a
 // row in the findings list is one issue at one fold and one issue is often
@@ -289,8 +289,8 @@ func noteVisibility(ctx context.Context, db bun.IDB, productID,
 	for _, v := range []access.Visibility{access.Private, access.SecurityTesting} {
 		held, err := db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			ColumnExpr(`"f"."id"`).
 			Where(finding.HeldAs(`"f"."vulnerability_id"`), vulnerabilityID).
 			Where(`"st"."product_id" = ?`, productID).

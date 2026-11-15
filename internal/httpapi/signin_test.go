@@ -265,10 +265,9 @@ func TestACallbackWithoutTheSignInThatStartedItIsRefused(t *testing.T) {
 
 func TestSomebodyWhoAuthenticatesButWasGrantedNothingGetsInNowhere(t *testing.T) {
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
-		// A distinct subject each time. Reusing one made the second case match
-		// the first person by their pinned identifier and rename them, so the
-		// stranger path was never reached and the test quietly demonstrated
-		// identity mutation while claiming to test refusal.
+		// A distinct subject each time. Reusing one would make the second case
+		// match the first person by their pinned identifier and rename them,
+		// so the stranger path would never be reached.
 		for i, who := range []string{"ungranted", "a-stranger"} {
 			r.provider.Says = &signin.Identity{Subject: fmt.Sprintf("subject-%d", i+2), Username: who}
 			rec := callback(t, r, "the-state", "a-code", true)
@@ -393,7 +392,6 @@ func hasSession(cookies []*http.Cookie) bool {
 var errClientSecretRejected = errors.New("the client secret was rejected")
 
 func TestAnIdentifierAlreadyPinnedIsNotRedeemableByAnotherName(t *testing.T) {
-	// The property the reused-subject test was standing on without checking.
 	// Somebody whose identifier is pinned is that person whatever name the
 	// provider now reports, and a different identifier reporting a pinned
 	// name is somebody else.
@@ -431,8 +429,8 @@ func TestAnIdentityTokenNamingNobodyIsRefused(t *testing.T) {
 
 func TestHowLongASignInLastsIsTheSettingAnAdministratorChanged(t *testing.T) {
 	// The setting is offered on the administration screen, so it has to be the
-	// one that decides. It was offered and read by nothing for a while, and a
-	// value somebody sets that changes nothing is worse than not offering it.
+	// one that decides: a value somebody sets that changes nothing is worse
+	// than not offering it.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		const chosen = 90 * time.Minute
 		if _, _, err := setting.NewStore(r.db.DB).Change(t.Context(),
@@ -540,12 +538,12 @@ func TestASignInWillNotSendABrowserOffThisDeployment(t *testing.T) {
 
 // A sign-in this deployment did not start is not a sign-in.
 //
-// The cookie holding the state was unsigned, and the callback compared the
-// state it was given against the state in that cookie — so somebody who can
-// write a cookie on this host could start a sign-in of their own, plant its
-// state and verifier in a victim's browser, and have the callback hand that
-// browser a session for the attacker's account. A comparison against a value
-// the other party authored is not a control.
+// The callback compares the state it is given against the state in the
+// cookie, so the cookie is signed. Unsigned, somebody who can write a cookie
+// on this host could start a sign-in of their own, plant its state and
+// verifier in a victim's browser, and have the callback hand that browser a
+// session for the attacker's account. A comparison against a value the other
+// party authored is not a control.
 func TestASignInNobodyStartedHereIsRefused(t *testing.T) {
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		forged, err := json.Marshal(map[string]any{
@@ -661,12 +659,11 @@ func TestTheCookiesABrowserHoldsAreBoundToThisHost(t *testing.T) {
 }
 
 func TestASealedSignInExpiresOnTheServerRatherThanInTheBrowser(t *testing.T) {
-	// The window was a MaxAge on the cookie and nothing else, which is a
-	// request to the browser — and the browser holding it may be the one that
-	// planted it. The payload carried no time, so the server could not tell a
-	// one-minute-old value from a one-month-old one, and the signing key is
-	// minted once and never rotated: a sealed sign-in stayed acceptable for
-	// the life of the deployment.
+	// A MaxAge on the cookie is a request to the browser — and the browser
+	// holding it may be the one that planted it. So the payload carries the
+	// time it was minted and the server enforces the window: the signing key
+	// is minted once and never rotated, so without it a sealed sign-in would
+	// stay acceptable for the life of the deployment.
 	twoSignIn(t, func(t *testing.T, r *signInReach) {
 		sealed := func(minted time.Time) string {
 			body, err := json.Marshal(map[string]any{

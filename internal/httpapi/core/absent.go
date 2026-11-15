@@ -309,11 +309,11 @@ func SeveralComponents(several *graph.Ambiguous, sayWith string) error {
 // Absent turns a store error into the right answer: the caller's own 404 for a
 // row that is not there, and a fault for a read that could not be made.
 //
-// One place, because the split made by hand at every call site is made
-// correctly at a handful of them. Elsewhere a failed read answers as an
-// authoritative negative, so a database nobody can reach tells every
-// authenticated caller that their products, builds, issues and findings do not
-// exist, with the driver's own message in some of the bodies.
+// One place, because a split made by hand at every call site goes wrong at
+// some of them. A failed read answered as an authoritative negative would tell
+// every authenticated caller of a database nobody can reach that their
+// products, builds, issues and findings do not exist, with the driver's own
+// message in some of the bodies.
 //
 // missing is the sentence for a name that reaches nothing, passed as the
 // function rather than called, so a caller cannot build one from the error.

@@ -30,7 +30,7 @@ func (f *fixture) selection(t *testing.T) triage.BulkDecisionAt {
 	in := f.build(t, f.product, "2026.03")
 	if _, err := f.db.DB.NewUpdate().TableExpr(`"branch_or_tag"`).
 		Set(`"kind" = ?`, catalog.Branch).
-		Where(`"id" = (SELECT "tg"."branch_or_tag_id" FROM "build" AS "tg" WHERE "tg"."id" = ?)`, in.build).
+		Where(`"id" = (SELECT "b"."branch_or_tag_id" FROM "build" AS "b" WHERE "b"."id" = ?)`, in.build).
 		Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}

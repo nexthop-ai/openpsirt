@@ -244,7 +244,7 @@ func registerTokens(api huma.API, in core.Deps) {
 	})
 }
 
-// narrowedToProduct spells a personal token's reach, for the trail.
+// narrowedTokenSays spells a personal token's reach, for the trail.
 func narrowedTokenSays(product string, holds []access.Role) string {
 	where := product
 	if where == "" {

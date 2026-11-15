@@ -24,9 +24,8 @@ var probeCounter atomic.Int64
 // uniqueName returns a row name no other run will collide with.
 //
 // Tests are run repeatedly against the same server — "go test -count=2", or a
-// developer with a local database — and a fixed name made the second run fail
-// on a duplicate key, with three engine failures unrelated to any change. CI
-// only survived it because its containers are fresh.
+// developer with a local database — and a fixed name fails the second run on
+// a duplicate key. A fresh container hides that.
 func uniqueName(t *testing.T) string {
 	t.Helper()
 	return fmt.Sprintf("probe-%s-%d-%d", t.Name(), time.Now().UnixNano(), probeCounter.Add(1))
@@ -34,12 +33,11 @@ func uniqueName(t *testing.T) string {
 
 // probeTable returns a table name no other run will collide with.
 //
-// The same reason as uniqueName, one level up. Three probe tables took fixed
-// names with their cleanup in t.Cleanup, which does not run when a test binary
-// is killed — so a run interrupted against a server left a table behind, and
-// the next run's CREATE failed and blamed the connection mode for it. The
-// message pointed at the setting rather than at the leftover, on three engines
-// at once.
+// The same reason as uniqueName, one level up. A probe table's cleanup is in
+// t.Cleanup, which does not run when a test binary is killed, so a run
+// interrupted against a server leaves its table behind; a fixed name would
+// fail the next run's CREATE with a message blaming the connection mode
+// rather than the leftover.
 //
 // Letters, digits and underscores only, so it needs no quoting to be legal
 // anywhere — though it is quoted at every use regardless, like everything else

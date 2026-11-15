@@ -294,7 +294,7 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 	})
 }
 
-func TestTheVersionWorthTakingCodeFindingsRatherThanTheOneThatFixedMost(t *testing.T) {
+func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
 	// Measured on the demo's kernel: of 168 open, the 6.12.100-1 release fixed
 	// 49 and the newest named, 6.12.107-1, fixed 2 — so ranked on what each
 	// release fixed, the version that closes everything sorts near the bottom
@@ -338,7 +338,7 @@ func TestTheVersionWorthTakingCodeFindingsRatherThanTheOneThatFixedMost(t *testi
 		}
 		// Furthest along first, though it fixed the fewest of its own.
 		if up[0].To != "3.9.0" {
-			t.Errorf("the list code findings with %q, want the newest version named", up[0].To)
+			t.Errorf("the list leads with %q, want the newest version named", up[0].To)
 		}
 		if up[0].FixedHere != 1 {
 			t.Errorf("3.9.0 fixed %d of its own, want one", up[0].FixedHere)
@@ -464,8 +464,9 @@ func TestAWordAnAdvisoryWroteWhereAVersionBelongsIsNotTheUpgrade(t *testing.T) {
 // ranked is a finding of a stated severity, so an ordering test can put one
 // group above another on something other than how many rows it has.
 //
-// The number as well as the word: what the severity key orders by is the
-// score, and two issues rated in words alone are a tie the tie-break decides.
+// The number as well as the word: the severity key orders by the band, then
+// by the score inside it, and two issues rated in one word alone are a tie the
+// tie-break decides.
 func ranked(id string, component graph.Described, severity string, score float64) finding.Reported {
 	one := found(id, component)
 	one.Issue.Severity = severity
@@ -511,21 +512,21 @@ func TestTheByComponentViewOrdersByWhatWasAsked(t *testing.T) {
 		// The weight, which is what this view is for and what it
 		// answers when nothing is asked.
 		if got := leader(finding.Filter{}); got != swss.Name {
-			t.Errorf("unasked, the view code findings with %q rather than the package holding the most issues", got)
+			t.Errorf("unasked, the view leads with %q rather than the package holding the most issues", got)
 		}
 		// Its reach. Three issues at one occurrence against two issues at two
 		// occurrences: a view that ignores the key answers the same as above.
 		if got := leader(finding.Filter{SortBy: finding.ByOccurrences}); got != libnl.Name {
-			t.Errorf("sort=occurrences code findings with %q rather than the package sitting at the most occurrences", got)
+			t.Errorf("sort=occurrences leads with %q rather than the package sitting at the most occurrences", got)
 		}
 		// The worst of what is open against it.
 		if got := leader(finding.Filter{SortBy: finding.BySeverity}); got != libnl.Name {
-			t.Errorf("sort=severity code findings with %q rather than the package holding the critical", got)
+			t.Errorf("sort=severity leads with %q rather than the package holding the critical", got)
 		}
 		// And the other way round, which was accepted and discarded: the
 		// caller asking for the least of something was answered with the most.
 		if got := leader(finding.Filter{SortBy: finding.ByOccurrences, Ascending: true}); got != swss.Name {
-			t.Errorf("asc=true code findings with %q, which is what descending answers", got)
+			t.Errorf("asc=true leads with %q, which is what descending answers", got)
 		}
 	})
 }
@@ -588,18 +589,83 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 
 		// Worst first unasked: the bump carrying the critical.
 		if got := leader(finding.Filter{}); got.Upstream != libnl.Name {
-			t.Errorf("unasked, the list code findings with %q rather than the bump closing the critical", got.Upstream)
+			t.Errorf("unasked, the list leads with %q rather than the bump closing the critical", got.Upstream)
 		}
 		// Most closed first when that is what was asked.
 		if got := leader(finding.Filter{PlannedUpgradeSort: finding.PlannedUpgradesByIssues}); got.Upstream != swss.Name {
-			t.Errorf("sort=issues code findings with %q rather than the bump closing the most", got.Upstream)
+			t.Errorf("sort=issues leads with %q rather than the bump closing the most", got.Upstream)
 		}
 		// And the fewest, which is the direction half of the same question.
 		if got := leader(finding.Filter{
 			PlannedUpgradeSort: finding.PlannedUpgradesByIssues, Ascending: true,
 		}); got.Upstream != libnl.Name {
-			t.Errorf("asc=true code findings with %q, which is what descending answers", got.Upstream)
+			t.Errorf("asc=true leads with %q, which is what descending answers", got.Upstream)
 		}
+	})
+}
+
+func TestThePlannedUpgradeSeverityOrderRanksAnUnratedIssueByItsScore(t *testing.T) {
+	// The severity order every list follows: an unrated issue sorts in its
+	// score's band, and below a low with no score. The row names it unrated,
+	// with its score where it has one, and never as the medium the filters
+	// fold it to.
+	listed := func(t *testing.T, f *fixture) []finding.PlannedUpgrade {
+		t.Helper()
+		upgrades, _, err := f.store.PlannedUpgrades(t.Context(), f.holding(t, access.PublicTriage),
+			f.wholeProduct(), 50, 0, finding.Filter{PlannedUpgradeSort: finding.PlannedUpgradesBySeverity})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(upgrades) != 2 {
+			t.Fatalf("%d upgrades, want two: %+v", len(upgrades), upgrades)
+		}
+		return upgrades
+	}
+	labelled := func(t *testing.T, got finding.PlannedUpgrade, severity string, score int) {
+		t.Helper()
+		if got.Severity != severity || got.ScoreCenti != score {
+			t.Errorf("%s is labelled %q at %d, want %q at %d", got.Upstream, got.Severity, got.ScoreCenti,
+				severity, score)
+		}
+	}
+	t.Run("scored", func(t *testing.T) {
+		each(t, func(t *testing.T, f *fixture) {
+			f.shipped(t, twoConsumers())
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
+				ranked("CVE-2026-1", libnl, "unknown", 9.8),
+				ranked("CVE-2026-2", swss, "high", 7.0),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			upgrades := listed(t, f)
+			if upgrades[0].Upstream != libnl.Name {
+				t.Errorf("sort=severity leads with %q rather than the bump closing the unrated 9.8",
+					upgrades[0].Upstream)
+			}
+			labelled(t, upgrades[0], finding.Unrated, 980)
+			labelled(t, upgrades[1], "high", 0)
+		})
+	})
+	t.Run("unscored", func(t *testing.T) {
+		each(t, func(t *testing.T, f *fixture) {
+			f.shipped(t, twoConsumers())
+			// The unrated 2.5 shares the low band with the low it sits
+			// beside, and the rated issue names the band.
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
+				ranked("CVE-2026-1", libnl, "unknown", 0),
+				ranked("CVE-2026-2", swss, "low", 2.0),
+				ranked("CVE-2026-3", swss, "unknown", 2.5),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			upgrades := listed(t, f)
+			if upgrades[0].Upstream != swss.Name {
+				t.Errorf("sort=severity leads with %q rather than the bump closing the low",
+					upgrades[0].Upstream)
+			}
+			labelled(t, upgrades[0], "low", 0)
+			labelled(t, upgrades[1], finding.Unrated, 0)
+		})
 	})
 }
 
@@ -653,7 +719,7 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 			fixedIn []string
 			ordered bool
 		}{
-			// Ranked: every version places, so the newest code findings and reaching it
+			// Ranked: every version places, so the newest leads and reaching it
 			// reaches what the earlier one fixed.
 			{"versions that all place", ecosystem.occurrences, true},
 			// And unranked: one entry nobody can place is not a list ordered
@@ -707,11 +773,11 @@ func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 					if !one.ordered {
 						return
 					}
-					// Ranked means the furthest along code findings, and that it
+					// Ranked means the furthest along leads, and that it
 					// reaches what the earlier release fixed as well as its
 					// own.
 					if up[0].To != ecosystem.furthest {
-						t.Errorf("the list code findings with %q, want the furthest along", up[0].To)
+						t.Errorf("the list leads with %q, want the furthest along", up[0].To)
 					}
 					if up[0].Reached != 2 {
 						t.Errorf("%q reaches %d issues, want both", up[0].To, up[0].Reached)

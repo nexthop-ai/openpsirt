@@ -35,7 +35,7 @@ type Scope struct {
 	VariantID     *int64
 }
 
-// Narrow applies the scope to a query that already joins build AS tg and
+// Narrow applies the scope to a query that already joins build AS b and
 // branch_or_tag AS st.
 //
 // Filtering on the identifiers the build already carries rather than by
@@ -47,10 +47,10 @@ func (s Scope) Narrow(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.Where(`"st"."product_id" = ?`, *s.ProductID)
 	}
 	if s.BranchOrTagID != nil {
-		q = q.Where(`"tg"."branch_or_tag_id" = ?`, *s.BranchOrTagID)
+		q = q.Where(`"b"."branch_or_tag_id" = ?`, *s.BranchOrTagID)
 	}
 	if s.VariantID != nil {
-		q = q.Where(`"tg"."variant_id" = ?`, *s.VariantID)
+		q = q.Where(`"b"."variant_id" = ?`, *s.VariantID)
 	}
 	return q
 }
@@ -80,9 +80,9 @@ func (s *Store) Builds(ctx context.Context, scope Scope) ([]int64, error) {
 // A selection that names one whole build is not narrowed by it. The
 // question these two answer is which releases to consider, and a request that
 // has already named the release has answered it. Applied anyway, the defaults —
-// branches, in support — made a tag's own findings screen report "0 of 0"
-// about a build holding twenty-five, and a release past its end of life do the
-// same: correct filters answering a question the caller did not ask.
+// branches, in support — would exclude a tag or a release past its end of
+// life, and its own findings screen would report "0 of 0": correct filters
+// answering a question the caller did not ask.
 func (s *Store) buildsWorking(ctx context.Context, scope Scope, only Workable) ([]int64, error) {
 	if scope.wholeBuild() {
 		only = Workable{}
@@ -101,10 +101,10 @@ func (s *Store) buildsIn(ctx context.Context, db bun.IDB, scope Scope,
 
 	var ids []int64
 	q := db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`"tg"."id"`).
-		OrderExpr(`"tg"."id"`)
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"b"."id"`).
+		OrderExpr(`"b"."id"`)
 	q = scope.Narrow(q)
 	if only.asks() {
 		var err error

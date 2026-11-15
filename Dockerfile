@@ -84,7 +84,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 COPY . .
 
-# The interface, which the build context no longer carries: both interface
+# The interface, which the build context does not carry: both interface
 # build directories are excluded there, because copying one in and writing over
 # it does not replace it. A chunk's name carries a content hash, so a stale
 # chunk does not collide with the new one beside it — it survives, embedded and
@@ -123,8 +123,8 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 #
 # The version is passed rather than read. A binary built here is not built
 # from a module the proxy has ever seen, so its build information records the
-# main module as "(devel)" and the document went out describing a component
-# with no version at all — the one field a scanner needs to answer whether a
+# main module as "(devel)", and the document would describe a component with
+# no version at all — the one field a scanner needs to answer whether a
 # release is affected.
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build -trimpath -o /out/compose ./internal/tools/compose
@@ -246,10 +246,9 @@ RUN apk upgrade --no-cache \
 
 # Runs as a normal user. Nothing here needs root, and a container that does not
 # need it should not have it.
-# The identifiers are pinned. Letting adduser choose meant the chart's
-# runAsUser matched only by luck, and any future package that creates a system
-# user would shift it — after which the pod runs as a different user than the
-# chart declares, silently.
+# The identifiers are pinned to the chart's runAsUser. Chosen by adduser, they
+# match it only by luck, and any package that creates a system user shifts
+# them, so the pod silently runs as a different user than the chart declares.
 RUN addgroup -g 65532 -S openpsirt \
  && adduser -u 65532 -S -G openpsirt -H -s /sbin/nologin openpsirt
 
@@ -335,9 +334,9 @@ RUN /out/syft scan dir:/rootfs \
 FROM runtime
 # Readable, like the module inventory beside it. The composer writes 0600 —
 # what the analysis gate allows a program to write — and the mode travels
-# through this copy, so shipped as written it landed root-only in an image that
-# runs as nobody: the one document saying what this image contains could not be
-# read from inside it.
+# through this copy, so it is widened here: root-only in an image that runs as
+# nobody, the one document saying what this image contains cannot be read from
+# inside it.
 COPY --from=image-inventory /image.cdx.json /usr/share/openpsirt/image.cdx.json
 
 # What this image is, in the one place a registry, a scanner and a puller can

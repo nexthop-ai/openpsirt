@@ -60,7 +60,7 @@ func TestAScansSweepClosesNoCodeFinding(t *testing.T) {
 // A decision lapses when the versions it was made about move, and a decision
 // standing over code findings alone lapses nowhere: a code finding is carried by matching, and
 // a version moving under it is not a reason to ask again.
-func TestAVersionMovingLapsesNoDecisionAboutALead(t *testing.T) {
+func TestAVersionMovingLapsesNoDecisionAboutACodeFinding(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
 		decisions := map[string]int64{}

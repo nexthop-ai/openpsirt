@@ -7,9 +7,8 @@ import "github.com/nexthop-ai/openpsirt/internal/scanner"
 
 // ScannerLimits is what one execution of the scanner is read within.
 //
-// Each bound left unset here stays at the package's own default rather than
-// becoming zero, which is what "all of them configurable" has to mean for a
-// deployment that wants one of them changed.
+// A bound left unset is zero, which the scanner takes as its own default, so a
+// deployment can change one bound and leave the rest where they are.
 func (c Config) ScannerLimits() scanner.Limits {
 	return scanner.Limits{
 		MaxOutput:     int64(c.ScannerMaxOutput),

@@ -153,8 +153,8 @@ export function BulkDecision() {
   // The selection's reach, in rows written rather than issues picked.
   //
   // The selection spans pages and a page does not, so this remembers every row
-  // it has seen rather than summing the page in hand: a selection made across
-  // two pages counted only the second and understated the write, which is the
+  // it has seen rather than summing the page in hand: counting only the page in
+  // hand understates a selection made across two pages, and this is the
   // figure the over-cap warning is read off.
   //
   // A name it has still never seen came from "select all matching", which
@@ -375,8 +375,8 @@ export function BulkDecision() {
                           </Link>{" "}
                           <Incident when={issue.incident} /> <Exploited when={issue.exploited} />
                           {/* What the issue says about itself. The screen
-                              narrows on this text and showed none of it, so a
-                              term matched rows nobody could check. */}
+                              narrows on this text, so it is shown, or a term
+                              matches rows nobody can check. */}
                           {issue.summary && <div className="hint">{issue.summary}</div>}
                         </td>
                         <td className="num">

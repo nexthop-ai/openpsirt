@@ -12,13 +12,16 @@
 // published word while the list beside it reads the product's is two answers to
 // one question.
 //
-// So the join and the two expressions live here, where neither side owns them
+// So the join and the expressions live here, where neither side owns them
 // and both may say them. The rating *row* does not: it is written and read
 // through internal/finding, which is where a rating is proposed, agreed and
 // put in force. What lives here is only the spelling a query needs.
 package rating
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // On is where a query finds the product it is asking about.
 //
@@ -100,6 +103,18 @@ var BandExpr = func() string {
 		}
 	}
 	return said + " ELSE '" + Unfolded + "' END"
+}()
+
+// Recognized is whether the rating in force is a word the fold puts in a band,
+// as a condition read off the rating joined by For. Generated from the fold,
+// so it and BandExpr agree on which words are known.
+var Recognized = func() string {
+	words := make([]string, 0, len(folds))
+	for word := range folds {
+		words = append(words, "'"+word+"'")
+	}
+	sort.Strings(words)
+	return EffectiveExpr + " IN (" + strings.Join(words, ", ") + ")"
 }()
 
 // Unfolded is the band a word folds to where the fold names no other: the

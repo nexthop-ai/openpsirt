@@ -128,9 +128,6 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 	limits := g.Limits.OrDefault()
 	out := bounded{most: limits.MaxOutput}
 	errs := trailing{most: limits.MaxComplaint}
-	// Reading the inventory from standard input rather than from a file: a
-	// component name is somebody else's text, and nothing from a scan file is
-	// ever used as a path.
 	// The inventory goes to the program's input rather than being named as a
 	// path. That is deliberate — nothing from a scan file is ever used as a
 	// path, so a component called something hostile stays data — and it is
@@ -164,8 +161,8 @@ func (g Grype) Scan(ctx context.Context, inventory io.Reader) (Result, error) {
 		return Result{}, err
 	}
 	// Its own words while succeeding, bounded the same way the failure is. A
-	// scanner writes progress to this branch or tag as well, which it suppresses when
-	// nothing is watching — as nothing is here.
+	// scanner writes progress to standard error as well, which it suppresses
+	// when nothing is watching, as nothing is here.
 	result.Caution = tail(strings.TrimSpace(errs.String()))
 	return result, nil
 }
@@ -579,7 +576,7 @@ func matchedRange(details []matchDetail) string {
 // published advisory states one weakness and a report commonly carries several,
 // so something has to say which — and taking whichever sorts first is an answer
 // with nothing behind it. The feeds say it, in the word beside each entry, and
-// it was read and dropped.
+// that word is what is read.
 //
 // It is answered apart from the list rather than by the list's order, because
 // a list cannot say "nobody said". A report that marks none is the ordinary

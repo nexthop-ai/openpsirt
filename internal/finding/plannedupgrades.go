@@ -8,10 +8,7 @@ package finding
 //
 // Two reads that are the same shape and a different question from the findings
 // list: one row per upstream bump with everything it would close, and one row
-// per component with everything open against it. They lived in read.go beside
-// the list itself, which is how a file gets to two and a half thousand lines —
-// each addition is small and beside something related, and nothing is ever the
-// one that made it too long.
+// per component with everything open against it.
 
 import (
 	"context"
@@ -64,10 +61,14 @@ type PlannedUpgrade struct {
 	// a bump is declared for releases, and the ones worth offering are the
 	// ones that have it.
 	In []Build
-	// Urgency is the worst of what it closes and Severity that as a word. A
-	// upgrade is worth doing for its worst member.
-	Urgency  int64
-	Severity string
+	// Urgency is the worst of what it closes. A upgrade is worth doing for
+	// its worst member.
+	Urgency int64
+	// Severity is the band of its worst issue, as every severity sort ranks
+	// it, or Unrated where that issue has no recognized word; ScoreCenti is
+	// then that issue's score in hundredths, zero where it has none.
+	Severity   string
+	ScoreCenti int
 	// Exploited says a feed reports somebody in the world using one of these,
 	// and Incident that somebody recorded this product being attacked
 	// through one. Different facts, so different flags: an upgrade carrying the
@@ -96,25 +97,29 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 	limit = database.AList.Of(limit)
 
 	var rows []struct {
-		Fold        string `bun:"fold"`
-		Upstream    string `bun:"upstream"`
-		From        string `bun:"shipped"`
-		To          string `bun:"fixed_in"`
-		Issues      int    `bun:"issues"`
-		Occurrences int    `bun:"places"`
-		Builds      int    `bun:"builds"`
-		Urgency     int64  `bun:"urgency"`
-		Exploited   int    `bun:"exploited"`
-		Incident    int    `bun:"incident"`
-		Worst       int    `bun:"worst"`
-		Total       int    `bun:"total"`
+		Fold         string `bun:"fold"`
+		Upstream     string `bun:"upstream"`
+		From         string `bun:"shipped"`
+		To           string `bun:"fixed_in"`
+		Issues       int    `bun:"issues"`
+		Occurrences  int    `bun:"places"`
+		Builds       int    `bun:"builds"`
+		Urgency      int64  `bun:"urgency"`
+		Exploited    int    `bun:"exploited"`
+		Incident     int    `bun:"incident"`
+		Worst        int    `bun:"worst"`
+		UnratedScore int    `bun:"unrated_score"`
+		Total        int    `bun:"total"`
 	}
 	// The worst thing in the upgrade, as a rank rather than as a word, because
-	// the four engines do not agree on how words order. Folded exactly the way
-	// the line and the deadline fold them, so an unrated issue is a medium
-	// here as it is everywhere else — which is what asking the fold rather
-	// than the raw word buys, and the ELSE below cannot fire because of it.
-	worst := "MAX(" + rankCase(rating.BandExpr, 0) + ")"
+	// the four engines do not agree on how words order: the band every
+	// severity sort ranks in, doubled, plus one where the worst issue carries
+	// a recognized word. A rated issue wins a tie with an unrated one in its
+	// band, and the low bit says which the label names. The worst unrated
+	// score is the score of the worst issue whenever that issue is unrated,
+	// since a higher unrated score could only rank higher.
+	worst := "MAX(" + severityRank + " * 2 + CASE WHEN " + rating.Recognized + " THEN 1 ELSE 0 END)"
+	unratedScore := `MAX(CASE WHEN ` + rating.Recognized + ` THEN 0 ELSE COALESCE("v"."score_centi", 0) END)`
 
 	page := s.bumps(buildIDs, visible, filter).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
@@ -130,6 +135,7 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
 		ColumnExpr(overParts.incident() + ` AS "incident"`).
 		ColumnExpr(worst + ` AS "worst"`).
+		ColumnExpr(unratedScore + ` AS "unrated_score"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// Worst first unless somebody asks otherwise, and every order is
 		// through the allowlist above: the key selects a stored expression
@@ -149,13 +155,19 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 
 	upgrades := make([]PlannedUpgrade, 0, len(rows))
 	for _, row := range rows {
-		upgrades = append(upgrades, PlannedUpgrade{
+		upgrade := PlannedUpgrade{
 			Fold:     row.Fold,
 			Upstream: row.Upstream, From: row.From, To: row.To,
 			Issues: row.Issues, Occurrences: row.Occurrences, Builds: row.Builds,
-			Urgency: row.Urgency, Severity: worstWord(row.Worst),
+			Urgency:   row.Urgency,
 			Exploited: row.Exploited == 1, Incident: row.Incident == 1,
-		})
+		}
+		if row.Worst%2 == 1 {
+			upgrade.Severity = wordAt(row.Worst / 2)
+		} else {
+			upgrade.Severity, upgrade.ScoreCenti = Unrated, row.UnratedScore
+		}
+		upgrades = append(upgrades, upgrade)
 	}
 	if err := s.namesIn(ctx, buildIDs, visible, filter, upgrades); err != nil {
 		return nil, 0, err
@@ -249,14 +261,6 @@ type Build struct {
 	Variant     string
 }
 
-// worstWord turns the rank the upgrade query folds severities to back into the
-// word, in the same four the rest of this speaks.
-//
-// Read out of the one list rather than written back out as a switch: the
-// mapping and its inverse disagreeing about a word added later is the same
-// defect twice.
-func worstWord(rank int) string { return wordAt(rank) }
-
 // namesIn fills in which component names each upgrade on the page covers.
 //
 // A second statement over the page's upgrades rather than a string aggregate in
@@ -320,9 +324,9 @@ func (s *Store) namesIn(ctx context.Context, buildIDs []int64, visible []access.
 	q := s.db.NewSelect().
 		TableExpr(`(?) AS "f"`, under).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 		ColumnExpr(FoldedOn + ` AS "fold"`).
 		ColumnExpr(`"f"."fixed_in" AS "fixed_in"`).
@@ -403,12 +407,13 @@ func (s *Store) ComponentGroups(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(overParts.incident() + ` AS "incident"`).
 		// The total rides on the page, as the findings list's does.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
-		// The issue is joined only where the order needs it, the way the
-		// findings list does it, and after the first level has grouped the
-		// occurrences to one row per issue.
+		// The issue and this product's rating of it are joined only where the
+		// order needs them, the way the findings list does it, and after the
+		// first level has grouped the occurrences to one row per issue.
 		Apply(func(q *bun.SelectQuery) *bun.SelectQuery {
 			if by, known := order[filter.SortBy]; known && by.issue {
-				return q.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`)
+				return q.Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
+					Join(rating.Here, filter.ProductID)
 			}
 			return q
 		}).
@@ -536,7 +541,8 @@ const (
 	PlannedUpgradesByUrgency PlannedUpgradeSortKey = "urgency"
 	// PlannedUpgradesBySeverity is the worst rating in the upgrade, as the band rather
 	// than the urgency — which puts what is being exploited in a band of its
-	// own above every rating.
+	// own above every rating. An unrated issue ranks as severityRank ranks it,
+	// below a rated issue in the same band.
 	PlannedUpgradesBySeverity PlannedUpgradeSortKey = "severity"
 	// PlannedUpgradesByIssues is how many distinct issues the bump closes, which is
 	// the "what should I do this afternoon" order: on a seeded image one
@@ -588,9 +594,9 @@ const byBump = "urgency DESC, issues DESC, upstream, fixed_in, fold"
 
 // plannedUpgradeSorted is how the planned-upgrade list is ordered.
 //
-// The list had no order to ask for at all, though every field worth ordering
-// by was already on the row. The ranking it has answers what should worry
-// somebody; nothing answered what to do this afternoon.
+// Any field on the row worth ordering by can be asked for. The default ranking
+// answers what should worry somebody; the others answer what to do this
+// afternoon.
 func plannedUpgradeSorted(filter Filter) string {
 	by, asked := plannedUpgradeOrder[filter.PlannedUpgradeSort]
 	if !asked {
@@ -609,9 +615,9 @@ const byWeight = `issues DESC, places DESC, "f"."component_id"`
 //
 // Weight by default, and any of the keys the findings list takes on request —
 // through the same allowlist and with the same direction, because this is the
-// same population grouped one level up. It answered two of the six and
-// discarded the direction in silence, so somebody asking which package has
-// something due this week was told which package has the most findings.
+// same population grouped one level up. The direction asked for applies to
+// every key, so somebody asking which package has something due this week is
+// told that, never which package has the most findings.
 //
 // The urgency is what is already read for the exploited flag, so asking for it
 // costs nothing: exploited ranks in a band of its own above every severity,
@@ -638,9 +644,9 @@ func componentOrder(filter Filter) string {
 // joined to it, and an issue counts once in its component's band however many
 // fixes its occurrences name. This product's rating where it has stated one,
 // which is what every other surface judges a finding by. Read without it, the
-// strip on each row drew the published rating and a product that had re-rated
-// an issue saw its own decision in the list and the world's in the bars over
-// it.
+// strip on each row would draw the published rating, and a product that had
+// re-rated an issue would see its own decision in the list and the world's in
+// the bars over it.
 //
 // Ranking by count alone is the wrong answer to the question this view asks.
 // A package with forty-four issues outranks one with three criticals, and
@@ -811,7 +817,7 @@ func candidatesFrom(found []namedFix, scheme vercmp.Scheme) []Candidate {
 	}
 
 	// Furthest along first where that can be said, so the version worth taking
-	// code findings. Ranked on what a release fixed instead, the newest lands wherever
+	// leads. Ranked on what a release fixed instead, the newest lands wherever
 	// its own count happens to put it, which on a maintained line is near the
 	// bottom.
 	sort.SliceStable(out, func(i, j int) bool {

@@ -31,20 +31,20 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 		{"f", "fs"}: "two sightings of one code finding, in the product bound",
 	},
 	"analysis/flaw.go": {
-		{"lh", "od"}: "a decision about a code finding recorded as a flaw, at its occurrence in its own product",
+		{"cff", "od"}: "a decision about a code finding recorded as a flaw, at its occurrence in its own product",
 	},
 	"analysis/state.go": {
-		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product bound",
+		{"cff", "f"}: "a code finding recorded as a flaw, at its occurrence in the product bound",
 	},
 	"finding/code_finding_flaw.go": {
-		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product bound",
+		{"cff", "f"}: "a code finding recorded as a flaw, at its occurrence in the product bound",
 	},
 	"finding/assign.go": {
-		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product of its branch or tag",
+		{"cff", "f"}: "a code finding recorded as a flaw, at its occurrence in the product of its branch or tag",
 	},
 	"finding/own_cases.go": {
-		{"lc", "lh"}: "a code finding grant and its flaw record, in the grant's product",
-		{"lc", "sf"}: "a code finding grant and its sightings, in the grant's product",
+		{"cff", "lc"}: "a code finding grant and its flaw record, in the grant's product",
+		{"lc", "sf"}:  "a code finding grant and its sightings, in the grant's product",
 	},
 	"finding/disclaim.go": {
 		{"f", "lt"}: "two rows of one build at one occurrence",
@@ -57,10 +57,10 @@ var notADecisionAtAFinding = map[string]map[[2]string]string{
 		{"f", "fs"}: "two rows of one code finding in the product bound",
 	},
 	"notify/stale.go": {
-		{"f", "lh"}: "a code finding recorded as a flaw, at its occurrence in the product of its branch or tag",
+		{"cff", "f"}: "a code finding recorded as a flaw, at its occurrence in the product of its branch or tag",
 	},
 	"triage/decision.go": {
-		{"de", "lh"}: "a decision about a code finding recorded as a flaw, at its occurrence in its own product",
+		{"cff", "de"}: "a decision about a code finding recorded as a flaw, at its occurrence in its own product",
 	},
 	"triage/reaffirm_many.go": {
 		{"de", "newer"}: "a decision against another of its product at its occurrence",

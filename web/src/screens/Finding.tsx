@@ -210,13 +210,14 @@ export function Finding() {
   // same pair are one occurrence, and the head counts what a decision covers.
   const distinct = new Set(occurrences.map((occurrence) => occurrence.occurrence)).size;
   // The decisions standing here, one representative row each, read for the
-  // reasoning and the approvals the decision row does not carry.
+  // reasoning and the approvals the decision row does not carry. Every one is
+  // read, because a decision without its card has no control to act on it.
   const standingIds = useMemo(
     () => (it?.standing ?? []).map((c) => c.decision_occurrence_id),
     [it],
   );
   const standing = useQueries({
-    queries: standingIds.slice(0, SAMPLE).map((id) => ({
+    queries: standingIds.map((id) => ({
       queryKey: ["decision-occurrence", id],
       queryFn: async () =>
         unwrap(await api.GET("/v1/decision-occurrences/{id}", { params: { path: { id } } })),
@@ -298,7 +299,7 @@ export function Finding() {
   // a decision with another decision's summary the moment one of the parallel reads
   // was slow or failed — and the summary is where the identifier the reasoning
   // editor writes to comes from, so a revision landed on the wrong decision.
-  const pairs = standingIds.slice(0, SAMPLE).flatMap((_, i) => {
+  const pairs = standingIds.flatMap((_, i) => {
     const decision = standing[i]?.data;
     return decision ? [{ decision, summary: it.standing?.[i] }] : [];
   });
@@ -376,8 +377,8 @@ export function Finding() {
           </Link>{" "}
           › <b>{it.vulnerability}</b>
         </span>
-        {/* Where this sits in the list it was opened from, and the way on
-. Absent where it was not opened from a list, because
+        {/* Where this sits in the list it was opened from, and the way on.
+            Absent where it was not opened from a list, because
             there is then no order for it to be next in. */}
         {walk && (
           <div className="walking">
@@ -535,20 +536,12 @@ export function Finding() {
         </div>
       )}
 
-      {/* Evidence on one side and the action on the other. The
-          decision form used to sit below the description, the chains, the
-          holder, the assessment and the similar decisions — about 1,550 pixels down a page running to 2,800, so
-          on an ordinary screen the thing the page is for was three
-          screens away. Neither is hidden to fix it: what is read in order
-          to decide sits beside what decides it, which is the arrangement
-          the decision form already uses inside itself. */}
-      {/* What the issue is, before anything about deciding it. It sat in the
-          narrow column beside the action, where a paragraph of a CVE
-          description runs four words to a line — and it is the thing somebody
-          reads first to work out whether the rest is worth reading. Full
-          width and first; the action is immediately under it rather than
-          three screens down, which is what keeping the primary action above
-          the fold is for. */}
+      {/* What the issue is, before anything about deciding it. It is the
+          thing somebody reads first to work out whether the rest is worth
+          reading, and in a narrow column a paragraph of a CVE description runs
+          four words to a line. Full width and first; the evidence and the
+          action follow it, ahead of the notes, the timeline and the chains,
+          which is what keeping the primary action above the fold is for. */}
       {it.description && (
         <div className="card described">
           <h3>Description</h3>
@@ -565,12 +558,10 @@ export function Finding() {
         </div>
       )}
 
-      {/* Evidence first and full width, then the form beneath it. The two
-          stood side by side, the form wide on the left and the facts narrow
-          on the right, so the facts were read in a 380-pixel column while
-          the widest thing on the screen was an empty text area. What
-          somebody does here is weigh the evidence and then act, and the
-          layout now runs in that order. */}
+      {/* Evidence first and full width, then the form beneath it. What
+          somebody does here is weigh the evidence and then act, so the layout
+          runs in that order, and the facts are never read in a narrow column
+          beside an empty text area. */}
       <div className="evidence">
         <div className="evblock">
           <h4>Severity</h4>
@@ -1154,10 +1145,10 @@ export function Finding() {
                   prefill={prefill.opening}
                   // Remounted when what is being decided changes, not only when
                   // a prefill arrives. Changing scope on a build-scoped screen
-                  // is a parameter change rather than a navigation, so the form
-                  // stayed mounted and kept the previous build's answers in its
-                  // fields — an outcome and a justification about one variant,
-                  // offered against another.
+                  // is a parameter change rather than a navigation, so a form
+                  // left mounted would keep the previous build's answers in
+                  // its fields: an outcome and a justification about one
+                  // variant, offered against another.
                   key={`${prefill.opened}:${product}:${branchOrTag}:${variant}:${vulnerability}:${component}:${version}`}
                 />
               </div>
@@ -1197,13 +1188,9 @@ export function Finding() {
         <Attachments about={{ product, vulnerability }} admin={!!who.data?.admin} />
 
         {/* Whether it has been announced, which decides which people the
-            picker is allowed to offer. It was handed `recorded` — whether a
-            person entered it rather than a scanner — so an embargoed finding
-            a scanner reported offered readers of disclosed work, whom the
-            server then refuses, and a disclosed flaw somebody recorded asked
-            for undisclosed readers and came back empty to anybody holding
-            only public triage. Two fields on one object, one letter apart in
-            meaning. */}
+            picker is allowed to offer. Keyed on `undisclosed`; `recorded` says
+            whether a person entered it rather than a scanner, a different
+            field on the same object. */}
         {/* Only where the triage pane is not drawn. There it sits at the head
             of the same pane, because triage is both questions — who is on it
             and what was decided. Here there is nothing left to decide, and
@@ -1275,11 +1262,10 @@ export function Finding() {
             undecided={undecided}
             onReuse={(reasoning, outcome, justification) => {
               startFrom({ reasoning, outcome, justification });
-              // The form, by identity. A CSS selector matched the first card
-              // inside the acting column, which is the standing decision's
-              // wherever one stands — so the act filled the form in correctly
-              // and scrolled somewhere above it, and on a long finding the
-              // form the person is now meant to submit was off screen.
+              // The form, by identity rather than position: the first card
+              // in the acting column is the standing decision's wherever one
+              // stands, and on a long finding the form the person is now
+              // meant to submit would be off screen.
               form.current?.scrollIntoView({ behavior: "smooth", block: "start" });
             }}
           />

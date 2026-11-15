@@ -238,7 +238,7 @@ a.kpi:hover {
   color: var(--muted);
 }
 /* An alert's own controls. Two buttons in a run of prose have to be told
-   apart from it and from each other: without this the batch notice offered
+   apart from it and from each other: without a margin the batch notice reads
    "Undo the batchDismiss", which is one word and not a control. */
 .alert button {
   margin-left: 10px;

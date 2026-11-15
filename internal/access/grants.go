@@ -164,10 +164,10 @@ func (s *Store) Withdraw(ctx context.Context, personID, productID int64, role Ro
 		return fmt.Errorf("withdraw %q: %w", role, err)
 	}
 	// A withdrawal that matched nothing is not a withdrawal. Answered as
-	// success, the caller wrote a trail row recording an act that did not
-	// happen, and then asked whether the person still held anything here —
-	// which, for a role they never had, came back no, and handed back every
-	// finding they were dealing with in that product.
+	// success, the caller would write a trail row recording an act that did
+	// not happen, then ask whether the person still holds anything here —
+	// which, for a role they never had, comes back no and hands back every
+	// finding they are dealing with in that product.
 	return matched(res, fmt.Sprintf("withdraw %q", role), fmt.Sprintf("they do not hold %q here", role))
 }
 
@@ -178,8 +178,9 @@ func (s *Store) Withdraw(ctx context.Context, personID, productID int64, role Ro
 // shared queue, and assigned to somebody who can no longer open it.
 func (s *Store) HoldsAnythingIn(ctx context.Context, personID, productID int64) (bool, error) {
 	// And they are still here. A departed person's grant rows are left in
-	// place deliberately, so counting them left their work with somebody who
-	// is refused at sign-in and the answer said nothing was released.
+	// place deliberately, and counting them would leave their work with
+	// somebody who is refused at sign-in while the answer says nothing was
+	// released.
 	here, err := s.here(ctx, personID)
 	if err != nil || !here {
 		return false, err

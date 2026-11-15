@@ -7,10 +7,8 @@
 
 /* ---------- who holds what, as a grid ---------- */
 
-/* Products down, capabilities across. It replaced a run of "product · role"
-   chips and a three-control form: answering "who can approve on sonic" meant
-   reading every chip on every row, and granting one thing on eight products
-   was twenty-four gestures. */
+/* Products down, capabilities across, so "who can approve on sonic" is read
+   off one column and granting one thing on eight products is eight presses. */
 .permgrid th {
   font-size: var(--step--1);
   font-weight: 600;

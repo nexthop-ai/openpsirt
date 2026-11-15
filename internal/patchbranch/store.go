@@ -75,7 +75,8 @@ func identity(repository string) string {
 }
 
 // urgency is how soon a commit is worth looking up: the worst rating among the
-// issues whose records link to it, and the score behind that rating.
+// issues whose records link to it, ranked as every severity sort ranks it, and
+// the score behind that rating.
 type urgency struct {
 	rank  int
 	score int
@@ -118,10 +119,11 @@ func linked(ctx context.Context, db bun.IDB) (map[Commit]urgency, int, error) {
 		if !ok {
 			continue
 		}
-		this := urgency{rank: finding.Ranks(row.Severity)}
+		this := urgency{}
 		if row.Score != nil {
 			this.score = *row.Score
 		}
+		this.rank = finding.SortRank(row.Severity, this.score)
 		if held, seen := out[commit]; !seen || this.above(held) {
 			out[commit] = this
 		}

@@ -70,18 +70,13 @@ func registerLabels(api huma.API, in core.Deps) {
 		OperationID: "label-finding", Method: http.MethodPut, Path: at,
 		Summary: "Label a finding",
 		Description: "Puts a free-text label on one issue in one component of this product.\n\n" +
-			"No fixed vocabulary, because none has been earned yet. A label that becomes " +
-			"universal is a signal that it should be promoted to a real concept — \"waiting on " +
-			"vendor\" is a state the tool would want to reason about rather than a string " +
-			"somebody typed.\n\n" +
-			"One issue in one component of one product, not one occurrence and not one build: " +
-			"a kernel flaw at sixty occurrences is one thing somebody is labeling, and a label is " +
-			"about the work rather than about a release.\n\n" +
+			"Labels are free text, with no fixed vocabulary.\n\n" +
+			"A label is on one issue in one component of one product, so it covers every " +
+			"occurrence and every build of it.\n\n" +
 			"Matched without regard to capitals and shown back as it was typed. Labeling what " +
 			"already carries the label succeeds and keeps the first spelling.\n\n" +
-			"Labeling is triage, so it asks for the triage right: a label changes what a " +
-			"filtered list answers, and somebody who may only read should not move work into " +
-			"or out of a saved filter.",
+			"Requires the triage right, because a label changes what a filtered list " +
+			"answers.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,
 	}, core.PerProduct, "", core.TriageRights()...), labeling(true))
 

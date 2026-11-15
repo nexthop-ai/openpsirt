@@ -221,7 +221,7 @@ func codeFindingRows(ctx context.Context, db bun.IDB, rows []analysis.QueueRow) 
 // codeFindingCells fills them.
 func codeFindingColumns() []string {
 	return []string{
-		"rule", "path", "line", "function", "message", "state", "branch_or_tag", "variant",
+		"rule", "path", "line", "function", "message", "state", core.BranchOrTagColumn, "variant",
 		"builds", "opened", "assigned_to", "assigned_to_name", "assigned_team", "occurrence", "third_party",
 		"component", "version", "on_build", "product",
 	}

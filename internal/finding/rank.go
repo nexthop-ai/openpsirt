@@ -57,9 +57,9 @@ const (
 // Rating is everything on record about an issue that decides where its
 // findings sit and how long they have.
 //
-// One type, read from the issue in one place, because the alternative is what
-// this project keeps being bitten by: the same fact spelled once at ingest and
-// again on reassessment, agreeing until one of them is changed.
+// One type, read from the issue in one place, because the alternative is the
+// same fact spelled once at ingest and again on reassessment, agreeing until
+// one of them is changed.
 type Rating struct {
 	// Published is the word the world rated it. Never overwritten by a
 	// rating of ours — a rating of ours shown where the world's goes reads
@@ -154,7 +154,7 @@ type Ranked struct {
 // spike outweighs the 2× between a medium and a critical, so mediums would
 // jump criticals constantly and on noise.
 //
-// So severity code findings and likelihood orders what is equally severe. It gives up
+// So severity leads and likelihood orders what is equally severe. It gives up
 // letting a very likely medium jump a high — on this data almost always noise,
 // and the case that actually matters, something known to be used, is a fact
 // rather than a forecast and already ranks above everything.
@@ -256,7 +256,7 @@ func SeverityScore(word string) int {
 	case "high":
 		return 800
 	case "low":
-		return 300
+		return 200
 	default:
 		return 550
 	}

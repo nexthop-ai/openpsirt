@@ -168,12 +168,11 @@ func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
 // asking reports whether this replica is the one that asks this cycle.
 //
 // The lease covers several cycles rather than one, and is taken again inside
-// the pass as well as at the top of it. Sized from the interval alone it was
-// a guess at how long a pass takes, and the arithmetic beside it said the
-// guess was wrong: a pass is 200 components of one or more requests each, with
-// a timeout on every request, which is far past five intervals. So a slow index handed the pass to a second replica
-// mid-flight and both asked — which is the thing a lease exists to prevent,
-// and the asking is at somebody else's expense.
+// the pass as well as at the top of it. A pass is 200 components of one or
+// more requests each, with a timeout on every request, which can run far past
+// five intervals. A lease that lapsed mid-pass would hand the pass to a
+// second replica while the first still asks — which is the thing a lease
+// exists to prevent, and the asking is at somebody else's expense.
 //
 // Taken again rather than sized larger, because how long a pass takes is not
 // a number anybody can name: it depends on an index this deployment does not
@@ -259,10 +258,9 @@ func (r *Refresher) Once(ctx context.Context) (int, error) {
 		// one thing the setting exists to stop.
 		on, err := r.enabled(ctx)
 		if err != nil {
-			// Reported rather than read as "turned off". A pass that stopped
-			// because it could not read the setting looked exactly like one
-			// that stopped because an operator turned it off, and neither
-			// logged anything.
+			// Reported rather than read as "turned off", so a pass that
+			// stops because it cannot read the setting is told apart from
+			// one an operator turned off.
 			return asked, fmt.Errorf("read whether asking upstream is on: %w", err)
 		}
 		if !on {

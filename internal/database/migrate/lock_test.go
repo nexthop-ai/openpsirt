@@ -334,7 +334,7 @@ func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing
 	// credentials of their own is the documented reason automatic migration
 	// can be turned off, so a runtime role granted per-table rights that omit
 	// the bookkeeping table is the ordinary arrangement rather than an exotic
-	// one — and it read as a database nobody had ever migrated.
+	// one, and it must not read as a database nobody has ever migrated.
 	engines.SkipUnless(t, database.Postgres)
 	address := os.Getenv(postgresURLEnv)
 	if address == "" {
@@ -430,19 +430,18 @@ func TestACredentialThatCannotReadTheVersionTableIsNotAnEmptyDatabase(t *testing
 }
 
 func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
-	// The other three engines take a lock in the database. SQLite could not:
-	// it migrates on one connection, which the migration itself needs, so
-	// every in-database spelling deadlocks against that — and what
-	// stood instead was a comment saying SQLite "is only ever used by a single
-	// process", enforced by one Helm template while the binary accepts a
-	// SQLite URL with a warning.
+	// Every engine excludes a second migrator. The other three take a lock in
+	// the database; SQLite cannot, because it migrates on one connection,
+	// which the migration itself needs, so every in-database spelling
+	// deadlocks against that. It takes a lock on the file instead, because a
+	// Helm template is the one thing keeping SQLite to a single process and
+	// the binary accepts a SQLite URL with a warning.
 	//
 	// Two handles rather than two processes, because the lock is on the open
 	// file description rather than on the process: two descriptors conflict
 	// whether or not they are in the same program, which is what makes this
-	// testable at all. Six processes against one file were run by hand, and
-	// went from one migrating and three failing to one migrating and the rest
-	// waiting and finding the work done.
+	// testable at all. Six processes run by hand against one file end with one
+	// migrating and the rest waiting and finding the work done.
 	path := t.TempDir() + "/locked.db"
 	first := open(t, "sqlite://"+path)
 	second := open(t, "sqlite://"+path)

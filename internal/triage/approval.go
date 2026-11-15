@@ -219,7 +219,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, decisionID
 			return err
 		}
 		reopened = nil
-		if decision.Outcome == Dismissed || decision.Outcome == NotSecurity {
+		if slices.Contains(CodeFindingOutcomesDismissing(), decision.Outcome) {
 			if err := tx.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 				ColumnExpr(`DISTINCT "de"."product_id" AS "product_id", "de"."occurrence_identity" AS "occurrence_identity"`).
 				Where(`"de"."decision_id" = ?`, decisionID).
@@ -732,8 +732,8 @@ func (s *Store) covering(ctx context.Context, subject access.Subject, ids []int6
 	covered, err := s.db.NewSelect().
 		TableExpr(finding.DecisionOccurrences).
 		Join(`JOIN "finding" AS "f" ON `+finding.DecisionOccurrenceOf("f")).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id" AND "st"."product_id" = "de"."product_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id" AND "st"."product_id" = "de"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).

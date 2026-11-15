@@ -425,8 +425,8 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	work := w.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
@@ -564,8 +564,8 @@ func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, o
 	kinds, kindArgs := kind.CodeFindings.Where(`"f"."kind"`)
 	work := w.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "team" AS "tm" ON "tm"."party_id" = "f"."assigned_to"`).
 		ColumnExpr(`"tm"."id" AS "team_id"`).
 		ColumnExpr(catalog.ShownExpr("tm")+` AS "team_shown"`).
@@ -577,8 +577,8 @@ func (w *sweep) codeFindingQueuesUntaken(ctx context.Context, since time.Time, o
 		Where(`"f"."assigned_at" IS NOT NULL`).
 		Where(`"f"."assigned_at" <= ?`, since).
 		Where(`"tm"."retired_at" IS NULL`).
-		Where(`NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
-			WHERE "lh"."product_id" = "st"."product_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`).
+		Where(`NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "cff"
+			WHERE "cff"."product_id" = "st"."product_id" AND "cff"."occurrence_identity" = "f"."occurrence_identity")`).
 		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dc"
 			WHERE "dc"."product_id" = "st"."product_id" AND "dc"."live_key" IS NOT NULL
 			AND ` + finding.DecisionOccurrenceFiledAt("dc", "f") + `)`).

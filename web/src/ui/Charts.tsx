@@ -452,10 +452,8 @@ export function Ring({ point }: { point?: Point }) {
   );
 }
 
-// The server's own shape. Restating it here is the bug this codebase has
-// already been bitten by once — a hand-copied row type compiles perfectly
-// while quietly missing whatever the server grew since it was written — and
-// it was re-introduced in the same change that declared the class fixed.
+// The server's own shape. A hand-copied row type compiles perfectly while
+// quietly missing whatever the server grew since it was written.
 export type Release = Body<"ReleaseBody">;
 
 // The open count at each build, side by side.

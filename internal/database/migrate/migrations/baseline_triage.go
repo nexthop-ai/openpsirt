@@ -67,12 +67,10 @@ func triageBaseline(t *columnTypes) []string {
 			"selected_where"   ` + t.free + ` NULL,
 			"selected_matched" INTEGER NULL,
 			"selected_named"   INTEGER NULL,
-			-- **What the claim says.** One act is one argument, so the argument
-			-- is here and not once per row underneath. It was on the row, and a
-			-- judgment reaching forty-four places was forty-four copies of one
-			-- sentence that could each be revised on their own: revising one
-			-- returned that row to the queue and left the other forty-three
-			-- saying the old thing while the claim read as agreed.
+			-- What the claim says. One act is one argument, so the argument
+			-- is here and not once per row underneath: a copy per row could be
+			-- revised on its own, returning that row to the queue while the
+			-- others said the old thing and the claim read as agreed.
 			--
 			-- Every one of these was constant across every row of every claim
 			-- in the measured deployment. Nothing has ever produced a claim
@@ -104,14 +102,14 @@ func triageBaseline(t *columnTypes) []string {
 			"mitigation"    ` + t.text + ` NULL,
 			-- Where the work is happening.
 			--
-			-- **A stored link, and nothing is sent to it.** A hand-off to a tracker was
-			-- recorded as one thing and it is two: a link has no egress at all, needs no
+			-- A stored link, and nothing is sent to it. A hand-off to a tracker is
+			-- two things: a link has no egress at all, needs no
 			-- configuration and connects a fix target declared here to the work being done
 			-- there, while the half that *sends* is an outbound request a deployment has
 			-- to decide to allow. Splitting them is what makes the cheap half
 			-- available without that decision.
 			--
-			-- **On the fix target and on the claim**, because both are things somebody
+			-- On the fix target and on the claim, because both are things somebody
 			-- does elsewhere: a target is a promise to change code and a claim is a
 			-- judgment somebody may be arguing about in a ticket.
 			"elsewhere"     ` + t.text + ` NULL,
@@ -323,8 +321,8 @@ func triageBaseline(t *columnTypes) []string {
 			-- What a bulk approval was, so undoing one is undoing a batch
 			-- rather than hunting for what it touched.
 			"batch"        ` + t.hash + ` NULL,
-			-- How many findings this claim covered **when somebody agreed to
-			-- it**.
+			-- How many findings this claim covered when somebody agreed to
+			-- it.
 			--
 			-- Recorded rather than worked out later, because a decision is a
 			-- claim about a combination of code and reaches by matching — a
@@ -409,16 +407,16 @@ func decisionV080(t *columnTypes) []string {
 
 // What a comment said before it was changed.
 //
-// **An edit overwrote and recorded only that it happened.** A reasoning's
+// An edit keeps what it replaces. A reasoning's
 // revisions are kept because an approval points at one revision of the words
 // agreed to — and a comment is part of the same record that
 // goes public at disclosure, so "what it said before" being
 // unrecoverable makes that record readable and not checkable, which is the
 // property the whole append-only history exists for.
 //
-// **The previous text, written when it is replaced**, rather than every
+// The previous text, written when it is replaced, rather than every
 // version including the current one. The comment row holds what it says now;
-// this holds what it stopped saying, which is the part that was being lost.
+// this holds what it stopped saying, which is the part an overwrite loses.
 func commentHistoryBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "claim_comment_revision" (
@@ -442,19 +440,19 @@ func commentHistoryBaseline(t *columnTypes) []string {
 
 // One person brought into one undisclosed case.
 //
-// **The grant is on the pair of product and issue**, not on the product: a
+// The grant is on the pair of product and issue, not on the product: a
 // collaborator sees that issue everywhere it sits in that product and nothing
 // else — not the rest of the embargo list, and not a count of it. The case it
 // exists for is the kernel engineer who normally sees only public findings and
 // is needed on one embargoed kernel flaw.
 //
-// **It grants reading and arguing, never approving.** Two collaborators could
+// It grants reading and arguing, never approving. Two collaborators could
 // otherwise satisfy the two people a dismissal on an embargoed finding asks for
 // with nobody accountable for the product involved, which is the rule met in
 // form and defeated in substance. Approval stays with the pool that already
 // held it, so nothing here records a capability.
 //
-// **Withdrawn rather than deleted**, like every other grant: who could see an
+// Withdrawn rather than deleted, like every other grant: who could see an
 // embargoed case, and when, is exactly the question asked afterwards. The open
 // row carries the pair again so that "one live grant per person per case" is
 // enforced by the database rather than by a check somebody remembers — nulls do

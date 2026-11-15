@@ -30,6 +30,14 @@ type Metric = {
   values: { value: string; label: string }[];
 };
 
+// The plain three-step scale an impact metric takes where its levels need no
+// more words.
+const HIGH_LOW_NONE: Metric["values"] = [
+  { value: "H", label: "High" },
+  { value: "L", label: "Low" },
+  { value: "N", label: "None" },
+];
+
 // The two metrics both generations ask the same way.
 const ATTACK_VECTOR: Metric = {
   key: "AV",
@@ -99,21 +107,13 @@ const THREE: Metric[] = [
     key: "I",
     label: "Integrity",
     help: "Data that can be changed",
-    values: [
-      { value: "H", label: "High" },
-      { value: "L", label: "Low" },
-      { value: "N", label: "None" },
-    ],
+    values: HIGH_LOW_NONE,
   },
   {
     key: "A",
     label: "Availability",
     help: "Service that can be stopped",
-    values: [
-      { value: "H", label: "High" },
-      { value: "L", label: "Low" },
-      { value: "N", label: "None" },
-    ],
+    values: HIGH_LOW_NONE,
   },
 ];
 
@@ -167,11 +167,7 @@ function impact(of: string, subject: string, what: string): Metric[] {
     key: of + letter,
     label: `${subject} ${aspect}`,
     help: `${help} in ${what}`,
-    values: [
-      { value: "H", label: "High" },
-      { value: "L", label: "Low" },
-      { value: "N", label: "None" },
-    ],
+    values: HIGH_LOW_NONE,
   }));
 }
 

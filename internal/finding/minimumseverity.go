@@ -27,8 +27,8 @@ var ranked = cvss.Bands()[1:]
 // the order a person looks for.
 //
 // Returned as a copy, because a caller ranging over the package's own slice
-// can sort it. The four appeared under seven names across the tree, and three
-// of those were this order written out by hand.
+// can sort it. It is the one spelling of this order; a copy written out by
+// hand drifts from it.
 func Bands() []string {
 	out := make([]string, 0, len(ranked))
 	for i := len(ranked) - 1; i >= 0; i-- {
@@ -69,10 +69,8 @@ func Ranks(word string) int {
 // rankCase is the severity ordering as SQL, numbered from one in ranked's
 // order, over whatever expression the caller names.
 //
-// Built from the one list rather than written out again. The order was typed
-// out three more times — twice as SQL and once as the mapping back to words —
-// and Bands' own doc already records what that cost: a word added to one copy
-// and missing from another sorts one way and filters another.
+// Built from the one list rather than written out again, because a word added
+// to one copy and missing from another sorts one way and filters another.
 //
 // The ELSE is the caller's. The cross-product list needs zero, so that the
 // sentinel for "no minimum severity" compares below every rating; a caller naming an
@@ -103,9 +101,9 @@ func wordAt(rank int) string {
 // nobody gave is called: they are the same state.
 //
 // A scanner's own "unknown", a producer's invented word, and no word at all
-// rank alike everywhere, below every band (see Ranks above). Only what a
-// reader saw differed, and it differed by screen: one row said "Unknown" and
-// the row under it said "Unrated" about the same nothing.
+// rank alike everywhere, below every band (see Ranks above), and read alike
+// on every screen, so one row does not say "Unknown" while the row under it
+// says "Unrated" about the same nothing.
 const Unrated = "unrated"
 
 // BandOf is what to call a rating when it is being counted or shown.
@@ -171,10 +169,9 @@ func MinimumSeverities() []string {
 // MinimumSeverityWord is a stored minimum severity as a word this understands, and whether it is one.
 //
 // Anything unrecognized answers NoMinimumSeverity and false. A minimum severity that cannot be
-// enforced has to read as no minimum severity at all: Hides was true for any word that was
-// neither empty nor NoMinimumSeverity, so a product set to something outside the
-// vocabulary displayed a minimum severity everywhere while every query let everything
-// through — the screens said a minimum severity was in force and nothing enforced one.
+// enforced has to read as no minimum severity at all, or a product set to something
+// outside the vocabulary would display a minimum severity everywhere while every
+// query let everything through.
 func MinimumSeverityWord(word string) (string, bool) {
 	matched := strings.ToLower(strings.TrimSpace(word))
 	if matched == "" || matched == NoMinimumSeverity {

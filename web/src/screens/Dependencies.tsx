@@ -364,8 +364,9 @@ function Whole({ who }: { who: Who | null | undefined }) {
   //
   // The version travels with the name. A build that ships one name as two
   // components refuses to answer about "that name" — rightly, since the two
-  // are two components — and the tree knows which one was clicked, so asking
-  // without it turned every such component into one nobody could look at.
+  // are two components — and the tree knows which one was clicked, so the
+  // version is sent; without it, every such component is one nobody can look
+  // at.
   function select(name: string, version = "", ecosystem = "", namespace = "") {
     // The search term survives the selection, so the list a hit was found in
     // stays on screen with the hit marked.

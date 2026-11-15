@@ -499,6 +499,13 @@ export function ByBump({
                   ) : (
                     <span className="hint">—</span>
                   )}
+                  {/* An unrated worst issue carries its score, as a finding's
+                      row does. */}
+                  {row.score ? (
+                    <span className="hint" style={{ marginLeft: 6 }}>
+                      {row.score.toFixed(1)}
+                    </span>
+                  ) : null}
                 </td>
                 <td className="num">{(row.issues ?? 0).toLocaleString()}</td>
                 <td className="hint">

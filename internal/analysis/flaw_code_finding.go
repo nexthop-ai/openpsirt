@@ -233,9 +233,9 @@ func takeFlawBack(ctx context.Context, tx bun.IDB, subject access.Subject, produ
 	}
 	if err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."id", "f"."visibility"`).
-		Where(`"s"."product_id" = ?`, productID).
+		Where(`"bt"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(kinds, kindArgs...).
@@ -342,12 +342,12 @@ func OriginOf(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`"f"."build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
+		ColumnExpr(`"f"."build_id", "bt"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
 		ColumnExpr(`"vu"."identifier" AS "rule", "ar"."path", "ar"."start_line"`).
 		ColumnExpr(state+` AS "state"`, stateArgs...).
-		Where(`"s"."product_id" = ?`, productID).
+		Where(`"bt"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, row.OccurrenceIdentity).
 		Where(reach.Full, reach.FullArgs...).
 		Where(kinds, kindArgs...).
@@ -369,11 +369,11 @@ func OriginOf(ctx context.Context, db bun.IDB, subject access.Subject, productID
 	}
 	if err := db.NewSelect().TableExpr(`"flaw_code_finding_build" AS "flb"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "flb"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`"t"."id" AS "build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant", "flb"."seen"`).
+		ColumnExpr(`"t"."id" AS "build_id", "bt"."name" AS "branch_or_tag", "va"."name" AS "variant", "flb"."seen"`).
 		Where(`"flb"."flaw_code_finding_id" = ?`, row.ID).
-		OrderExpr(`"flb"."seen" DESC, "s"."name" ASC, "va"."name" ASC`).
+		OrderExpr(`"flb"."seen" DESC, "bt"."name" ASC, "va"."name" ASC`).
 		Scan(ctx, &out.Proposed); err != nil {
 		return nil, fmt.Errorf("read the builds the flaw was proposed against: %w", err)
 	}
@@ -399,18 +399,18 @@ func noLongerDetectedFor(ctx context.Context, db bun.IDB, reach finding.CodeFind
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`"t"."id" AS "build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
+		ColumnExpr(`"t"."id" AS "build_id", "bt"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
 		ColumnExpr(`"si"."absent_run_id", "si"."fixed_run_id"`).
-		Where(`"s"."product_id" = ?`, productID).
+		Where(`"bt"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(codeFindings, codeFindingArgs...).
 		Where(reach.Full, reach.FullArgs...).
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "ef" WHERE "ef"."build_id" = "f"."build_id"
 			AND "ef"."vulnerability_id" = ? AND "ef"."closed_at" IS NULL AND `+entered+`)`,
 			append([]any{vulnerabilityID}, enteredArgs...)...).
-		OrderExpr(`"s"."name" ASC, "va"."name" ASC, "f"."id" DESC`).
+		OrderExpr(`"bt"."name" ASC, "va"."name" ASC, "f"."id" DESC`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read where the flaw's code finding is no longer detected: %w", err)
 	}

@@ -54,6 +54,32 @@ describe("the access screen", () => {
     expect(text).not.toContain("Nothing is issued.");
   });
 
+  it("dims a withdrawn credential and a role not in force by the shared dimming ratio", async () => {
+    deployment({
+      "/v1/people": {
+        data: {
+          items: [
+            {
+              identity: "alice",
+              holds: [{ product: "sonic", role: "triager", source: "assigned", effective: false }],
+            },
+          ],
+          total: 1,
+        },
+      },
+      "/v1/keys": { data: { items: [{ name: "ci", withdrawn: true }], total: 1 } },
+      "/v1/people/tokens": {
+        data: { items: [{ owner: "alice", name: "laptop", withdrawn: true }], total: 1 },
+      },
+    });
+    mount.render(screen(<Access who={admin} />));
+    await settle();
+    const dimmed = Array.from(mount.host().querySelectorAll<HTMLElement>("tr.row, .vchip"))
+      .filter((each) => each.style.opacity !== "")
+      .map((each) => each.style.opacity);
+    expect(dimmed).toEqual(["var(--dim)", "var(--dim)", "var(--dim)"]);
+  });
+
   it("says the group bindings could not be read", async () => {
     deployment({ "/v1/roles/bindings": { status: 503 } });
     mount.render(screen(<Access who={admin} />));

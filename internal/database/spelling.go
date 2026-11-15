@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect"
 )
 
 // Expr is a piece of SQL a caller composed and owns.
@@ -72,10 +73,10 @@ func Composed(sql string) Expr { return Expr(sql) }
 // query parameter except that today's callers all pass literals. Naming the
 // type is what makes that structural rather than a habit (REQ-66).
 func SecondsBetween(db bun.IDB, from, to Expr) string {
-	switch db.Dialect().Name().String() {
-	case "pg":
+	switch db.Dialect().Name() {
+	case dialect.PG:
 		return fmt.Sprintf("EXTRACT(EPOCH FROM (%s - %s))", to, from)
-	case "mysql":
+	case dialect.MySQL:
 		return fmt.Sprintf("TIMESTAMPDIFF(SECOND, %s, %s)", from, to)
 	default:
 		// SQLite keeps these as text and compares them as text, which is why
@@ -97,10 +98,10 @@ func SecondsBetween(db bun.IDB, from, to Expr) string {
 // The target is the type the schema declares for a moment on that engine, so a
 // change there is a change here.
 func AsTimestamp(db bun.IDB, expr string) string {
-	switch db.Dialect().Name().String() {
-	case "pg":
+	switch db.Dialect().Name() {
+	case dialect.PG:
 		return fmt.Sprintf("CAST(%s AS TIMESTAMPTZ)", expr)
-	case "mysql":
+	case dialect.MySQL:
 		// MariaDB takes the MySQL spelling because it takes the MySQL
 		// dialect. Neither accepts TIMESTAMP as a cast target.
 		return fmt.Sprintf("CAST(%s AS DATETIME(6))", expr)

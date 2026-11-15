@@ -50,8 +50,8 @@ func decisionStamp(t *testing.T, r *httpapitest.Reach, decision int64) int {
 // recordedAsFlaw reports whether the code finding at an occurrence was recorded as a flaw.
 func recordedAsFlaw(t *testing.T, r *httpapitest.Reach, occurrence string) bool {
 	t.Helper()
-	n, err := r.DB.DB.NewSelect().TableExpr(`"code_finding_flaw" AS "lh"`).
-		Where(`"lh"."occurrence_identity" = ?`, occurrence).Count(t.Context())
+	n, err := r.DB.DB.NewSelect().TableExpr(`"code_finding_flaw" AS "cff"`).
+		Where(`"cff"."occurrence_identity" = ?`, occurrence).Count(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

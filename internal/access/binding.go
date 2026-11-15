@@ -430,7 +430,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// column destroys the input the line above depends on next time:
 	// somebody promoted in the application who also happens to be in an
 	// admin-bound group is rewritten as derived, and losing the group then
-	// took away administration the group never gave — irrecoverably, since a
+	// takes away administration the group never gave — irrecoverably, since a
 	// switch back to direct roles clears exactly the rows marked derived.
 	derived := person.AdminDerived || (admin.administers && !person.IsAdmin)
 	if !effective {

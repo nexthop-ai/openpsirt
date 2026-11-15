@@ -70,9 +70,9 @@ type Mentionable struct {
 //
 // An administrator is not included for being one. Administering the
 // catalog is not reading its findings, which is the split the roles were
-// separated to make possible — so an administrator holding nothing on the
-// product was offered as a mention target on an undisclosed finding there,
-// and the mention itself told them a finding exists that they may not open.
+// separated to make possible. An administrator holding nothing on the product
+// is not a mention target on an undisclosed finding there, because the
+// mention itself would tell them a finding exists that they may not open.
 // One who wants to be mentionable grants themselves a read role, which is how
 // everything else here works.
 //
@@ -117,8 +117,8 @@ func (s *Store) WhoCanRead(ctx context.Context, subject Subject, productID int64
 	// column to compare against, unlike the component names that do.
 	//
 	// Escaped, because a search box is not a pattern language: a term of "%"
-	// matched every person the deployment could offer, in one request, from
-	// the picker that decides who may be named on an embargoed case.
+	// would match every person the deployment could offer, in one request,
+	// from the picker that decides who may be named on an embargoed case.
 	var found []Mentionable
 	if err := query.Scan(ctx, &found); err != nil {
 		return nil, fmt.Errorf("read who may be mentioned: %w", err)
@@ -162,10 +162,10 @@ func (s *Store) CountWhoCanRead(ctx context.Context, subject Subject, productID 
 // The resolver behind a mention, and the reason it is not the picker's query
 // with a different argument: the picker narrows by what somebody typed and
 // then takes a page, and a mention has a name in hand and needs the answer
-// for that name. Paging the picker instead answered from the
-// alphabetically-first hundred readers, so mentioning anybody sorting past
-// position one hundred reached nobody, deterministically, and the author was
-// told the name matched nobody — a failure that grows with the deployment.
+// for that name. The picker answers from the alphabetically-first page of
+// readers, so through it a mention of anybody sorting past that page would
+// reach nobody and tell the author the name matched nobody, a failure that
+// grows with the deployment.
 //
 // A name nobody holds and a name held by somebody who may not read this both
 // come back absent, and are not told apart.

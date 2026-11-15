@@ -495,16 +495,6 @@ func TestAProxyCanReportMembershipToo(t *testing.T) {
 	})
 }
 
-// Administration granted in the application survives a group that never gave
-// it.
-//
-// The column recording where administration came from was rewritten on every
-// sign-in as "whatever the groups say this time", which destroyed the input
-// the rule above it depends on: somebody promoted here who also happened to
-// be in an admin-bound group was recorded as derived, and being taken out of
-// that group then removed administration the group never granted. A switch
-// back to direct roles clears exactly the rows marked derived, so it was not
-// recoverable that way either.
 // A sign-in the mapping cannot give an account is refused as a stranger is,
 // never as a fault: asking again cannot change the answer, and a fault is
 // what tells a caller to ask again.
@@ -538,6 +528,17 @@ func TestASignInWhoseNameIsSomebodyElsesIsRefusedAsAStranger(t *testing.T) {
 	})
 }
 
+// TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt pins that
+// administration granted in the application survives a group that never gave
+// it.
+//
+// The column recording where administration came from is written as derived
+// only where a group is what made somebody an administrator. Rewritten on
+// every sign-in as "whatever the groups say this time", it would destroy the
+// input the next sign-in reads: somebody promoted here who is also in an
+// admin-bound group would be recorded as derived, and leaving that group would
+// remove administration the group never granted. A switch back to direct roles
+// clears exactly the rows marked derived, so that would not recover it either.
 func TestPromotionInTheApplicationSurvivesAGroupThatNeverGaveIt(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

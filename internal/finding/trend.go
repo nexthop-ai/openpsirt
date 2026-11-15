@@ -328,7 +328,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 }
 
 // trendNarrowing applies what every statement of a trend narrows by to a query
-// over findings under "f", "tg" and "st", with a condition on when.
+// over findings under "f", "b" and "st", with a condition on when.
 type trendNarrowing func(ctx context.Context, q *bun.SelectQuery, when string, args ...any) (*bun.SelectQuery, error)
 
 // trendNarrowing builds the narrowing: what the subject may read, the scope,
@@ -424,8 +424,8 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within 
 	when string, args ...any) ([]trendRow, error) {
 	moments := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		// The product, because the rating is this product's where it has
 		// stated one.
@@ -584,8 +584,8 @@ func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, within
 		chunk := issues[start:min(start+database.BatchSize, len(issues))]
 		q := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Join(`JOIN "component" AS "pc" ON "pc"."id" = "f"."component_id"`).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 			ColumnExpr(`"pc"."name_folded" AS "component"`).

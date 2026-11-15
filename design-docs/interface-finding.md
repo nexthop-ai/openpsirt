@@ -20,7 +20,7 @@ The finding is the working screen before a decision and after it.
 | State | Carries |
 |---|---|
 | Before a decision | What the issue is, how bad, what upstream has done, where it sits, the evidence, the assessment, the decision form |
-| After | The standing decision in its state, with outcome, justification, scope and who agreed to which revision, the acts that fit the state, and its comments at the foot of its card |
+| After | Every standing decision in its state, each on a card of its own, with outcome, justification, scope and who agreed to which revision, the acts that fit the state, and its comments at the foot of its card |
 | Under both | The dependency path in its own pane below triage; the notes on this issue in this product; one activity timeline of proposal, revisions, approvals and comments; the revision history marking which revision each approval named; earlier decisions here, offered back as "reuse this reasoning" |
 
 ### Layout

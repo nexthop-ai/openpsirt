@@ -136,11 +136,11 @@ func TestTheSurfaceIsAStandardProvider(t *testing.T) {
 			sum256 := sha256.Sum256(doc)
 			sum512 := sha512.Sum512(doc)
 			name := path[strings.LastIndex(path, "/")+1:]
-			if got := string(s.body(publish.DirectoryPath + path + publish.SHA256Suffix)); got !=
+			if got := string(s.body(publish.DirectoryPath + path + csaf.SHA256Suffix)); got !=
 				hex.EncodeToString(sum256[:])+"  "+name+"\n" {
 				t.Errorf("the SHA-256 beside %s reads %q", path, got)
 			}
-			if got := string(s.body(publish.DirectoryPath + path + publish.SHA512Suffix)); got !=
+			if got := string(s.body(publish.DirectoryPath + path + csaf.SHA512Suffix)); got !=
 				hex.EncodeToString(sum512[:])+"  "+name+"\n" {
 				t.Errorf("the SHA-512 beside %s reads %q", path, got)
 			}
@@ -197,7 +197,7 @@ func TestAReaderKeepingACopyFetchesOnlyWhatChanged(t *testing.T) {
 		}{
 			{publish.MetadataPath, false, false}, {publish.FeedPath, false, false},
 			{publish.IndexPath, false, false}, {publish.OpenVEXIndex, false, false},
-			{document, true, false}, {document + publish.SignatureSuffix, false, true},
+			{document, true, false}, {document + csaf.SignatureSuffix, false, true},
 		} {
 			first := s.get(http.MethodGet, one.path, nil)
 			tag, modified := first.Header().Get("ETag"), first.Header().Get("Last-Modified")
@@ -388,7 +388,7 @@ func TestASignedProviderSignsEveryDocument(t *testing.T) {
 		paths := strings.Fields(string(s.body(publish.IndexPath)))
 		for _, path := range paths {
 			doc := s.body(publish.DirectoryPath + path)
-			signature := s.body(publish.DirectoryPath + path + publish.SignatureSuffix)
+			signature := s.body(publish.DirectoryPath + path + csaf.SignatureSuffix)
 			if _, err := openpgp.CheckArmoredDetachedSignature(keyring, bytes.NewReader(doc),
 				bytes.NewReader(signature), nil); err != nil {
 				t.Errorf("the signature beside %s does not verify: %v", path, err)
@@ -409,7 +409,7 @@ func TestASignedProviderSignsEveryDocument(t *testing.T) {
 		}
 
 		unsigned := surfaceOver(w, 1000, nil)
-		if rec := unsigned.get(http.MethodGet, publish.DirectoryPath+paths[0]+publish.SignatureSuffix, nil); rec.Code != http.StatusNotFound {
+		if rec := unsigned.get(http.MethodGet, publish.DirectoryPath+paths[0]+csaf.SignatureSuffix, nil); rec.Code != http.StatusNotFound {
 			t.Errorf("a signature from a provider holding no key = %d, want 404", rec.Code)
 		}
 	})
@@ -461,7 +461,7 @@ func replacedKey(t *testing.T, w *world, holding, replacing string) {
 	var path string
 	for _, one := range strings.Fields(string(old.body(publish.IndexPath))) {
 		if strings.Contains(one, "/vex-") {
-			path = publish.DirectoryPath + one + publish.SignatureSuffix
+			path = publish.DirectoryPath + one + csaf.SignatureSuffix
 		}
 	}
 	if path == "" {
@@ -477,7 +477,7 @@ func replacedKey(t *testing.T, w *world, holding, replacing string) {
 	}
 	// The date a reader holds is the document's, since the signature
 	// carries none.
-	dated := old.get(http.MethodGet, strings.TrimSuffix(path, publish.SignatureSuffix), nil).
+	dated := old.get(http.MethodGet, strings.TrimSuffix(path, csaf.SignatureSuffix), nil).
 		Header().Get("Last-Modified")
 	if dated == "" {
 		t.Fatal("the document carries no date to ask by")
@@ -496,7 +496,7 @@ func replacedKey(t *testing.T, w *world, holding, replacing string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		doc := replaced.body(strings.TrimSuffix(path, publish.SignatureSuffix))
+		doc := replaced.body(strings.TrimSuffix(path, csaf.SignatureSuffix))
 		if _, err := openpgp.CheckArmoredDetachedSignature(keyring, bytes.NewReader(doc),
 			bytes.NewReader(rec.Body.Bytes()), nil); err != nil {
 			t.Errorf("the signature sent again does not verify against the new key: %v", err)
@@ -676,7 +676,7 @@ func TestAnExpiredKeyIsLoggedOnceNotPerRequest(t *testing.T) {
 			DB: w.DB.DB, Who: who, Base: base, Rate: 1000, List: true, Signer: signer,
 			Logger: slog.New(slog.NewTextHandler(&logged, nil)),
 		})}
-		path := publish.OpenVEXPath + w.Product.Name + "/" + w.Branch.Name + ".json" + publish.SignatureSuffix
+		path := publish.OpenVEXPath + w.Product.Name + "/" + w.Branch.Name + ".json" + csaf.SignatureSuffix
 		for range 3 {
 			if rec := s.get(http.MethodGet, path, nil); rec.Code != http.StatusInternalServerError {
 				t.Fatalf("GET %s past the key's expiry = %d, want 500", path, rec.Code)

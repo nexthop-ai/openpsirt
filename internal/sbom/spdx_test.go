@@ -792,9 +792,8 @@ func TestADerivationIsChargedAgainstTheClaimBound(t *testing.T) {
 }
 
 func TestWhatTheDocumentSaysItIsAboutIsBounded(t *testing.T) {
-	// A top-level array of references, read on the header pass that runs
-	// inside the upload request. It was the one array with neither a skip
-	// above it nor a bound in it.
+	// A top-level array of references is charged against the component bound
+	// on a full read and skipped on a header read.
 	doc := repeated(`{"spdxVersion": "SPDX-2.3", "documentDescribes": [`,
 		`"SPDXRef-a"`, 50, `]}`)
 

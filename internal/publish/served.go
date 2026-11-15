@@ -174,9 +174,9 @@ func AnyPublishedForVariant(ctx context.Context, db bun.IDB, variantID int64) (b
 // joins under alias. A build is named by a document only once a scan has
 // been filed against it, and the scan it names is never taken away.
 func scanned(db bun.IDB, column, alias string) *bun.SelectQuery {
-	return db.NewSelect().TableExpr(`"build" AS "tg"`).ColumnExpr("1").
-		Where(`"tg".? = ?.?`, bun.Ident(column), bun.Ident(alias), bun.Ident("id")).
-		Where(`"tg"."last_scan_id" IS NOT NULL`)
+	return db.NewSelect().TableExpr(`"build" AS "b"`).ColumnExpr("1").
+		Where(`"b".? = ?.?`, bun.Ident(column), bun.Ident(alias), bun.Ident("id")).
+		Where(`"b"."last_scan_id" IS NOT NULL`)
 }
 
 // anyPublished reports whether the read finds a row.

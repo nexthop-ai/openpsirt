@@ -184,7 +184,7 @@ func TestDiscardingLetsGoOfTheContentsAndKeepsTheRecord(t *testing.T) {
 }
 
 // A document let go while it is read runs out of parts before its size. The
-// branch or tag ends in an error rather than cleanly, so a reader does not take the
+// stream ends in an error rather than cleanly, so a reader does not take the
 // bytes it got for the whole document.
 func TestADocumentLetGoWhileItIsReadEndsShortWithAnError(t *testing.T) {
 	each(t, func(t *testing.T, s *ingest.Store, buildID int64) {

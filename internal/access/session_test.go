@@ -203,10 +203,10 @@ func TestAStrangersTokenReachesNothing(t *testing.T) {
 //
 // Group membership is read at sign-in and never again, so the lifetime *is*
 // how long somebody removed from a privileged provider group still holds what
-// that group gave them. It was clamped up from nothing and accepted anything
-// above it, so an administrator setting 8760h made every browser sign-in last
-// a year — while a personal token, the other thing somebody holds for a long
-// time, has had two ceilings all along.
+// that group gave them. A lifetime above the ceiling is refused, so an
+// administrator setting 8760h cannot make every browser sign-in last a year;
+// a personal token, the other thing somebody holds for a long time, has two
+// ceilings of its own.
 func TestASignInHasACeiling(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()

@@ -6,12 +6,11 @@
 # air gap.
 #
 # A file of its own because it shares nothing with the gate half but the names
-# of the docker and npm commands, both defined in the first fifty lines there —
-# so the half that decides whether a change may be pushed can be read without
-# the half that stands an instance up, which is six hundred lines of seeding,
-# casting and proxying.
+# of the docker and npm commands, both defined there, so the half that decides
+# whether a change may be pushed can be read without the half that stands an
+# instance up: seeding, casting and proxying.
 #
-# **The scanner bundle is here because it is built from the demo image**, which
+# The scanner bundle is here because it is built from the demo image, which
 # is what carries the scanner. It is not a demo target — `docs/configuration.md`
 # documents it for operators — and it is here rather than beside the build
 # because moving it would mean moving what it is made from.
@@ -19,8 +18,8 @@
 # Every variable these read is here too, so neither file names something the
 # other holds.
 #
-# Included by the makefile beside it, so every target here is reached the same
-# way it was: `make demo`, `make dev`, `make scanner-db`, and the rest.
+# Included by the makefile beside it; every target here is reached as
+# `make <target>`: `make demo`, `make dev`, `make scanner-db`, and the rest.
 
 .PHONY: scanner-db scanner-db-verify cve-records cve-records-verify demo demo-image demo-up demo-down demo-seed demo-vex demo-triage demo-flaw demo-analysis demo-reset demo-status upgrade-rehearsal dev dev-up dev-down dev-seed dev-reset dev-status
 
@@ -66,8 +65,8 @@ DEMO_CAST ?= 8081:ana:public-read,public-triage,approver \
 #   inventory,product,display name,branch,variant
 # The inventory is an .xz of a CycloneDX file under the SBOM package's
 # testdata. Adding a variant is adding a line — a second variant of the same
-# product is what exercises decisions carrying across variants (REL-01,
-# REL-09), which the two switch-image builds are.
+# product is what exercises decisions carrying across variants
+# (REQ-25), which the two switch-image builds are.
 DEMO_BUILDS ?= internal/sbom/testdata/switch-image.cdx.json.xz,sonic,SONiC,master,broadcom \
                internal/sbom/testdata/switch-image-mellanox.cdx.json.xz,sonic,SONiC,master,mellanox
 # The first build's fields, split: inventory, product, product name, stream
@@ -113,15 +112,15 @@ DEV_URL  := http://$(DEV_HOST):$(DEV_PORT)
 # something anybody can do anywhere rather than a page of prerequisites.
 #
 # It is the real image behind a real proxy, which is the shape a deployment
-# actually has (ACC-19, ACC-20) — not a development server standing in for one.
+# actually has (REQ-41) — not a development server standing in for one.
 demo: demo-image demo-up demo-seed demo-status
 
 # Built from the working tree, so what comes up is the change being tested.
 # The offline scanner database, as a bundle an operator carries across the gap
-# (ING-44).
+# (REQ-12).
 #
 # The scanner's vulnerability data is a hard requirement of a deployment rather
-# than a packaging consideration (ING-22): without it the application ingests
+# than a packaging consideration (REQ-12): without it the application ingests
 # and never scans. An air-gapped install cannot fetch it, and a configuration
 # variable and a paragraph of instructions somebody follows by hand is the kind
 # of requirement discovered broken by the operator who most needs it, in the
@@ -131,7 +130,7 @@ demo: demo-image demo-up demo-seed demo-status
 # here: the database format is the scanner's, and a bundle built by a different
 # version is a bundle that may not load.
 #
-# **It is verified before it is declared.** The check runs the same scanner
+# It is verified before it is declared. The check runs the same scanner
 # against the bundle with the network off and auto-update refused, which is the
 # configuration on the far side of the gap. A bundle that only exists is what
 # this target refuses to produce.
@@ -234,7 +233,20 @@ demo-image:
 
 demo-up: demo-down
 	@mkdir -p $(DEMO_DIR)/data $(DEMO_DIR)/grype $(DEMO_DIR)/repositories
-	@$(DOCKER) network create --subnet $(DEMO_SUBNET) $(DEMO_NET) >/dev/null 2>&1 || true
+	@# The proxy's address must fall inside DEMO_SUBNET, which the deployment
+	@# trusts sign-in headers from, so a network left on another range, or one
+	@# that cannot be made, stops here naming the range.
+	@if $(DOCKER) network inspect $(DEMO_NET) >/dev/null 2>&1; then \
+	  subnet=$$($(DOCKER) network inspect -f '{{range .IPAM.Config}}{{.Subnet}} {{end}}' $(DEMO_NET)); \
+	  if ! printf ' %s ' "$$subnet" | grep -qF ' $(DEMO_SUBNET) '; then \
+	    echo "  $(DEMO_NET) exists on $$subnet, not $(DEMO_SUBNET)."; \
+	    echo "  Remove it with $(DOCKER) network rm $(DEMO_NET), or set DEMO_SUBNET to one of its ranges."; \
+	    exit 1; \
+	  fi; \
+	elif ! $(DOCKER) network create --subnet $(DEMO_SUBNET) $(DEMO_NET) >/dev/null; then \
+	  echo "  could not create $(DEMO_NET) on $(DEMO_SUBNET); set DEMO_SUBNET to a free range."; \
+	  exit 1; \
+	fi
 	@# The vulnerability database is a gigabyte and does not change hourly, so
 	@# it is kept between runs. Removing it is "make demo-reset --hard", which
 	@# is deliberately not a thing: deleting .demo does it.
@@ -317,8 +329,12 @@ demo-up: demo-down
 	      '    # this deployment believes it answers.' \
 	      '    proxy_set_header Host $$http_host;' \
 	      '    proxy_set_header X-Forwarded-For $$remote_addr;' \
-	      '    client_max_body_size 256m;' \
+	      '    client_max_body_size 512m;' \
+	      '    proxy_http_version 1.1;' \
+	      '    proxy_buffering off;' \
+	      '    proxy_request_buffering off;' \
 	      '    proxy_read_timeout 300s;' \
+	      '    proxy_send_timeout 300s;' \
 	      '  }' \
 	      '}' >> $(DEMO_DIR)/proxy.conf; \
 	  done
@@ -366,7 +382,7 @@ demo-down:
 # just declared.
 #
 # Declaring a product is administration; filing a build against it and reading
-# what is open are not (ACC-64). So the bootstrap administrator grants
+# what is open are not (REQ-42). So the bootstrap administrator grants
 # themselves roles like anybody else, which is also the honest demonstration —
 # the grant is visible in the same record everyone else's is, rather than
 # implied by a flag. Idempotent, so re-seeding is not a special case.
@@ -376,9 +392,15 @@ demo-down:
 # asking, or straight to the binary with the identity in a header.
 #   $(1) the API's base URL        $(2) the headers it is reached with
 #   $(3) the origin a browser there sends   $(4) the product
+#
+# The administrator holds every per-product role the server grants; a test
+# holds DEMO_ROLES to that set.
+DEMO_ROLES := approver assigner public-read private-read security-testing-read \
+              public-triage private-triage security-testing-triage
+demo-holds = $(subst } {,}$(comma){,$(foreach role,$(DEMO_ROLES),{\"product\":\"$(1)\",\"role\":\"$(role)\"}))
 seed-grant = curl -sS --noproxy '*' -o /dev/null -w "  grant $(DEMO_USER) on $(4) %{http_code}\n" \
 	  -X POST $(2) -H "Origin: $(3)" -H 'Content-Type: application/json' \
-	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[{\"product\":\"$(4)\",\"role\":\"public-triage\"},{\"product\":\"$(4)\",\"role\":\"private-triage\"},{\"product\":\"$(4)\",\"role\":\"assigner\"},{\"product\":\"$(4)\",\"role\":\"approver\"},{\"product\":\"$(4)\",\"role\":\"security-testing-read\"},{\"product\":\"$(4)\",\"role\":\"security-testing-triage\"}]}" \
+	  -d "{\"identity\":\"$(DEMO_USER)\",\"display_name\":\"$(DEMO_USER)\",\"admin\":true,\"holds\":[$(call demo-holds,$(4))]}" \
 	  "$(1)/v1/people"
 demo-grant = $(call seed-grant,$(DEMO_URL),,$(DEMO_URL),$(1))
 
@@ -481,7 +503,7 @@ demo-seed:
 	@# The rest of the cast, with roles on every product just declared.
 	@#
 	@# Recorded rather than created on arrival: nobody appears here by having
-	@# authenticated (ACC-21), so somebody who signs in through the proxy with
+	@# authenticated (REQ-41), so somebody who signs in through the proxy with
 	@# no record is refused. The administrator records them, which is also the
 	@# honest demonstration of how access works.
 	@for entry in $(DEMO_CAST); do \
@@ -532,7 +554,7 @@ DEMO_CSV_CELLS = { buf = (open ? buf " " $$0 : $$0); t = buf; if (gsub(/"/, "", 
                      else cur = cur c } \
                    gsub(/[|]/, " ", cur); print out cur; buf = "" }
 
-# What a distribution has published, as a VEX document (REL-10, ING-42).
+# What a distribution has published, as a VEX document (REQ-31).
 #
 # Separate from the seed rather than part of it, because it is derived from
 # what the scans found and the scans run in the background: a document written
@@ -580,13 +602,13 @@ demo-vex:
 # report.
 #
 # A demo where every figure reads zero demonstrates nothing. The seed gives
-# a deployment two products, six builds and a quarter of a million findings and
+# a deployment its products and builds, a quarter of a million findings and
 # nobody who has ever decided anything — so the review queue, the record of
 # decisions, how long triage is taking, what is planned and what is being
 # backported are all empty, and the screens that exist to answer those
 # questions look broken rather than idle.
 #
-# **Recorded through the cast's own doors**, one port per person, because that
+# Recorded through the cast's own doors, one port per person, because that
 # is how this deployment authenticates: the identity is a header a proxy sets
 # and the application trusts nothing else. It is also the control this tool
 # rests on — one person proposes and a second agrees — and a demo where one
@@ -668,7 +690,7 @@ demo-triage:
 	echo "  seeded. A 422 or 409 above is this having been run before: a"; \
 	echo "  decision already stands there, which is the refusal working."
 	@# Somebody who reads nothing and holds work, which is the one shape the
-	@# cast had nobody for (ACC-75, ACC-77). An approver holds a capability
+	@# cast had nobody for (REQ-34, REQ-42). An approver holds a capability
 	@# and no read role, so what they can reach is exactly what has been
 	@# assigned to them: their assignments, and the dependency paths their own
 	@# findings sit on. Everything else in the product answers as a product
@@ -694,9 +716,9 @@ demo-triage:
 	    "$(DEMO_URL)/v1/products/$$product/branches-and-tags/$$stream/variants/$$variant/findings/$$cve/components/$$component/assignment"; \
 	fi
 
-# One flaw in what this deployment ships, recorded by hand (MDL-27 to MDL-31).
+# One flaw in what this deployment ships, recorded by hand (REQ-19).
 #
-# **Without one a whole path is undemonstrable.** A scanner's report about
+# Without one a whole path is undemonstrable. A scanner's report about
 # somebody else's component cannot be closed by a person, cannot carry a
 # reporter, has no builds to correct and is refused an advisory — which is
 # right, and it leaves the screens built for a flaw we found ourselves nothing
@@ -713,14 +735,15 @@ demo-flaw:
 	@# Nothing here refuses a second one: an identifier is minted per record,
 	@# so recording the same flaw twice files two of them. Asked first rather
 	@# than left to the reader to notice they have three.
-	@# `origin=manual` is the parameter the list declares for this. Nothing
-	@# rejects a parameter the list has not heard of, so a wrong one is
-	@# dropped, the count comes back as every finding in the product, and the
-	@# target reports "already recorded" on any deployment ever scanned.
-	@held=$$(curl -sS --noproxy '*' \
-	    "$(DEMO_URL)/v1/products/openpsirt/findings?origin=manual&limit=1" \
-	  | sed -e 's/.*"total":\([0-9]*\).*/\1/' -e 's/^{.*/0/'); \
-	if [ "$${held:-0}" != "0" ]; then \
+	@# `origin=manual` is the parameter the list declares; an undeclared one
+	@# is refused with 400. A count that cannot be read files nothing, since
+	@# filing on a failed read would record a second flaw.
+	@listed=$$(curl -fsS --noproxy '*' \
+	    "$(DEMO_URL)/v1/products/openpsirt/findings?origin=manual&limit=1") \
+	  || { echo "  could not read what is recorded; nothing filed"; exit 1; }; \
+	held=$$(printf '%s' "$$listed" | sed -n 's/.*"total":\([0-9][0-9]*\).*/\1/p'); \
+	case "$$held" in ''|*[!0-9]*) echo "  the count of recorded flaws is unreadable; nothing filed"; exit 1;; esac; \
+	if [ "$$held" != "0" ]; then \
 	  echo "  a flaw is already recorded here — nothing to do"; exit 0; \
 	fi; \
 	filed=$$(curl -sS --noproxy '*' \
@@ -779,11 +802,6 @@ demo-status:
 	@# what it takes to show a decision being agreed to: approving your own is
 	@# refused, so a single identity can propose a decision and never finish
 	@# one.
-	@#
-	@# Named without the provider, unlike the line above: the administrator is
-	@# named in configuration, where an identity says which path it arrives by,
-	@# and the cast is recorded through the API, where the identity is the bare
-	@# name and the path is recorded beside it.
 	@for entry in $(DEMO_CAST); do \
 	  port=$${entry%%:*}; rest=$${entry#*:}; who=$${rest%%:*}; roles=$${rest#*:}; \
 	  echo "       http://$(DEMO_HOST):$$port — as $$who ($$roles)"; \
@@ -869,7 +887,7 @@ dev-down:
 # The same grant the container demo makes, against the API this loop runs.
 #
 # Declaring a product is administration; filing a build against it is not
-# (ACC-64), so the bootstrap administrator holds nothing on a product until it
+# (REQ-42), so the bootstrap administrator holds nothing on a product until it
 # is granted. Without this every upload here is refused and the loop seeds
 # declared builds with no inventory in any of them — which reads as the scans
 # being slow rather than as nothing having been taken.
@@ -905,5 +923,5 @@ dev-status:
 
 
 dev-reset: dev-down
-	@rm -f $(DEV_DB)
+	@rm -f $(DEV_DB) $(DEV_DB)-wal $(DEV_DB)-shm
 	@echo "  removed $(DEV_DB)"

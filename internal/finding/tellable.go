@@ -18,8 +18,8 @@ import (
 // The people who may be told that an issue exists.
 //
 // Separate from any one act on an issue because several ask the same question
-// and each answered it differently before: a rating, a finding's detail, a
-// decision about an occurrence, a disclosure date, a fix target, an assignment.
+// and have to answer it alike: a rating, a finding's detail, a decision about
+// an occurrence, a disclosure date, a fix target, an assignment.
 // What they share is that the name in the path is a name somebody may have
 // guessed, and answering "that is not yours" differently from "there is no such
 // thing" turns any of those routes into a way to count what is being kept
@@ -42,13 +42,10 @@ var ErrUnknownIssue = refusal.New("no issue is known by that name")
 // needs to.
 //
 // The question every route shaped "this issue, at this occurrence" has to ask
-// before it answers anything at all. Those routes resolve the issue name first
-// and check the finding's visibility afterwards, so a name somebody holds and
-// a name nobody holds came back differently — which is exactly what
-// authorizing before resolving a name forbids, applied to issues rather than
-// to people. Worse, the check that came second was not always a refusal: a fix
-// build answered an empty list and an assignment answered "done" while
-// writing nothing, so two routes disclosed by succeeding.
+// before it answers anything at all, so a held and an unheld name are answered
+// alike: authorization precedes resolving the name, applied to issues rather
+// than to people. Asked second, the check need not be a refusal — an empty
+// list or a "done" that writes nothing discloses by succeeding.
 //
 // Narrowed to the product because these routes are already about one. An issue
 // that reaches this product only where the reader may not look is, for them,
@@ -130,8 +127,8 @@ func toldOfWithin(ctx context.Context, db bun.IDB, subject access.Subject,
 			q := db.NewSelect().
 				TableExpr(`"vulnerability" AS "tv"`).
 				Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "tv"."issue_id"`).
-				Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+				Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 				ColumnExpr(`DISTINCT "tv"."id"`).
 				Where(`"tv"."id" IN (?)`, bun.List(batch)).
 				Where(`"st"."product_id" = ?`, productID).

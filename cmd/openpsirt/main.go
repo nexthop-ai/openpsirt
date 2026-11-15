@@ -542,7 +542,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 		// The bounds the upload operations refuse a request by, before the
 		// background readers apply the same ones to what was taken.
 		Limits:   cfg.Limits(),
-		Analysis: cfg.AnalysisLimits(), AnalysisDocuments: cfg.AnalysisDocuments(),
+		Analysis: cfg.AnalysisLimits(), AnalysisDocuments: cfg.AnalysisMaxDocuments,
 		// The resolver reads through a store that bounds a derived grant to
 		// the session lifetime. A browser re-derives its roles at every
 		// sign-in; a personal token never signs in, so without a bound a
@@ -789,11 +789,10 @@ func openDatabase(ctx context.Context, cfg config.Config, logger *slog.Logger) (
 // schemaIsCurrent refuses to serve against a schema this build is ahead of.
 //
 // Applying migrations separately is supported and is why the setting exists.
-// It leaves a binary and a schema that move independently, and nothing
-// compared them: a build carrying a new migration started, granted
-// administrators, answered the readiness probe, and failed every request that
-// touched the new table. In a rolling deployment the probe passing is what
-// retires the last replica that worked.
+// It leaves a binary and a schema that move independently. A build carrying a
+// migration the database lacks would start, grant administrators, answer the
+// readiness probe and fail every request touching the new table; in a rolling
+// deployment the probe passing retires the last replica that works.
 //
 // Refused at startup rather than through readiness, which is where every other
 // startup condition is refused and what keeps the previous replica alive.

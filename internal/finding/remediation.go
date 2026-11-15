@@ -169,9 +169,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		until = now
 	}
 	// An absent start is the beginning, which is what a zero side of a period
-	// means and what the reports beside this one already do. Substituted with
-	// a default here, a caller asking for an end alone got a window it never
-	// asked for under a response saying the period ran from the beginning.
+	// means and what the reports beside this one do, so a zero since is left
+	// as it is.
 
 	out := &Remediation{TimeToFix: map[string]time.Duration{},
 		FromPublication: map[string]time.Duration{}, Undated: map[string]int{}}
@@ -222,8 +221,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// occurrence that is open, and a record taken back was never an occurrence.
 	closed := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`MAX("f"."closed_at") AS "closed_at"`).
@@ -288,8 +287,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 	// figures are in the same unit and can be read against each other.
 	opened := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id"`).
 		Where(counted, countedArgs...).
 		Where(kinds, kindArgs...).
@@ -349,8 +348,8 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		Join(DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f2"`).
 		Where(DecisionOccurrenceOf("f2")).
-		Join(`JOIN "build" AS "tg2" ON "tg2"."id" = "f2"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "tg2"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b2" ON "b2"."id" = "f2"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "b2"."branch_or_tag_id"`).
 		ColumnExpr(`"f2"."id" AS "finding_id"`).
 		Where(`"de"."product_id" = "st2"."product_id"`).
 		Where(`"de"."live_key" IS NOT NULL`).
@@ -365,8 +364,8 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	occurrences := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`LEFT JOIN (?) AS "answered" ON "answered"."finding_id" = "f"."id"`, answered).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).

@@ -463,9 +463,9 @@ func (s *Store) statedInProduct(ctx context.Context, buildID int64,
 			// By build first, which the node index leads with: a product
 			// has a handful of builds and the node table holds every
 			// product's history.
-			Where(`"n"."build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
-				JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
-				WHERE "st"."product_id" = ? AND "tg"."id" <> ?)`, productID, buildID).
+			Where(`"n"."build_id" IN (SELECT "b"."id" FROM "build" AS "b"
+				JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"
+				WHERE "st"."product_id" = ? AND "b"."id" <> ?)`, productID, buildID).
 			Where(`"n"."component_id" IN (?)`, bun.List(batch)).
 			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
 				return q.Where(`"n"."purl" IS NOT NULL`).

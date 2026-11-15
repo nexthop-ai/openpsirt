@@ -51,8 +51,8 @@ export type At = {
 //
 // The second is what puts an affected statement in the published document,
 // which is the only way such a flaw ever reaches a customer: no scan closes one
-// and no advisory is issued about one. Without it the field was reachable by
-// posting to the API by hand and by nothing on any screen.
+// and no advisory is issued about one. This form is how a screen reaches that
+// field.
 export function mustMitigate(outcome: string, justification: string): boolean {
   return outcome === "not-applicable" && justification === "inline_mitigations_already_exist";
 }
@@ -127,18 +127,16 @@ export type Recorded = {
   // on: it is one transaction, so there is no per-build outcome to have.
   applied: string[];
   matching: number;
-  // The outcome recorded, so a confirmation can name it. Without this every
-  // outcome that waits for a second person was called a dismissal, and a
-  // deferral is not one — it says "later", not "no".
+  // The outcome recorded, so a confirmation can name it rather than call every
+  // outcome that waits for a second person a dismissal: a deferral is not
+  // one — it says "later", not "no".
   outcome: string;
 };
 
 // The outcomes this form offers, which are not all of them: upgrading answers a
 // component and everything open on it, so it is recorded from the component's
-// own screen. The words come from the one map rather than being written here —
-// this list had its own name for the backport answer, and every screen that
-// read one back used the other, so somebody picked one word and was shown a
-// different one.
+// own screen. The words come from the one map rather than being written here,
+// so the word somebody picks is the word every screen shows back.
 //
 // "patch-needed" is the answer a version comparison cannot see: the fix is
 // carried in and the version stays where it was, so unless somebody can say so
@@ -329,9 +327,9 @@ export function Decide({
   // Unchosen lets the reason decide, which is the ordinary case.
   const [scope, setScope] = useState<Scope | "">((kept.scope as Scope | undefined) ?? "");
   // Counted from now rather than from when the rule was saved, which is the
-  // whole reason a prepared deferral is kept as a number of days. Without this
-  // one opened the form with the outcome chosen and no date, which cannot be
-  // submitted — a prefill that half-fires.
+  // whole reason a prepared deferral is kept as a number of days. A prepared
+  // deferral opens the form with its date as well as its outcome, since an
+  // outcome with no date cannot be submitted.
   const [until, setUntil] = useState(() => {
     if (!prefill?.deferDays) return kept.until ?? "";
     const day = new Date();
@@ -380,7 +378,7 @@ export function Decide({
   // for, and the server refuses one that does.
   const offerScope = outcome !== "" && outcome !== "deferred";
   // A decision that the fix is already here is a fact somebody can check against
-  // whoever packages the component, and it is required for that reason . The
+  // whoever packages the component, and it is required for that reason. The
   // server refuses it empty; asking here means the person finds out while they
   // are still looking at the tracker.
   const needsFixedVersion = outcome === "already-fixed";
@@ -532,8 +530,8 @@ export function Decide({
   const submit = useMutation({
     mutationFn: async (applied: Other[]): Promise<Recorded> => {
       // One request and one transaction, however many builds it reaches. Sent
-      // a build at a time, a refusal part-way left the decision recorded in
-      // some releases and not others — an act nobody performed.
+      // a build at a time, a refusal part-way would leave the decision
+      // recorded in some releases and not others, an act nobody performed.
       const here = unwrap(
         await api.POST(
           "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/findings/{issue}/components/{component}/decision",
@@ -675,9 +673,9 @@ export function Decide({
                 nothing about which is true here. */}
             <option value="">Say which…</option>
             {/* The label and what it says, because the choice made here is
-                what ships to a customer as our statement about their exposure
-. The token itself is on the title, for whoever is
-                checking what will be exported. */}
+                what ships to a customer as our statement about their exposure.
+                The token itself is on the title, for whoever is checking what
+                will be exported. */}
             {reasons.map((each) => (
               <option key={each.value} value={each.value} title={each.value}>
                 {each.label} — {each.means}

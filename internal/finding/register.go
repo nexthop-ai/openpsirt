@@ -99,8 +99,8 @@ type SupplierSaid struct {
 
 // Register is every known vulnerability in one build with its disposition .
 //
-// Current state, and no `as_of`. Reconstructing the view as of a past date
-// was asked for and refused: each row already carries the dates that evidence
+// Current state, and no `as_of`. The view is not reconstructed as of a past
+// date: each row already carries the dates that evidence
 // what is being checked, and a reconstruction would be a second answer about
 // the past that has to be kept honest against the first.
 //
@@ -176,9 +176,9 @@ func (s *Store) MayReadRegister(ctx context.Context, subject access.Subject, bui
 //
 // The count is not free and an export does not carry it. Counting is a
 // scan of every finding in the build, and a file is written by asking for a
-// page a thousand times — so the whole register was answering "how many are
+// page a thousand times — so counting each page would answer "how many are
 // there altogether" a thousand times to fill in a number the file has no
-// column for. The screen still asks, once, through Register.
+// column for. The screen asks, once, through Register.
 func (s *Store) RegisterPage(ctx context.Context, subject access.Subject, buildID int64,
 	only Registering, limit, offset int) ([]Disposed, error) {
 
@@ -252,8 +252,8 @@ func (s *Store) RegisterEach(ctx context.Context, subject access.Subject, buildI
 
 // registerRow is one row of the register as the statement returns it.
 //
-// Named rather than declared inside the reader, because two readers return it
-// now: the screen's page, and the walk the export makes.
+// Named rather than declared inside the reader, because two readers return
+// it: the screen's page, and the walk the export makes.
 type registerRow struct {
 	Vulnerability           string     `bun:"vulnerability"`
 	Severity                string     `bun:"severity"`
@@ -512,9 +512,8 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
 		ColumnExpr(`"f"."due_at" AS "due_at"`).
 		// The reason it closed, in both the words the tool chose and the words
-		// a person typed. A closure with no reason was refused of whoever
-		// wrote it and then readable by nobody, so the refusal was a promise
-		// the tool did not keep.
+		// a person typed. A closure with no reason is refused, so the reason
+		// given is read back here for whoever asks.
 		ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
 		ColumnExpr(`COALESCE("f"."closed_note", '') AS "closed_note"`).
 		ColumnExpr(`COALESCE("f"."unaffected_by", '') AS "unaffected_by"`).

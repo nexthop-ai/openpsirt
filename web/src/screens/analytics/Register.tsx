@@ -259,13 +259,10 @@ export function Register() {
                         </td>
                         <td>
                           {/* The row an auditor is looking for is the one
-                              every other report leaves out — and the other
-                              three states are said in words too. One arm was
-                              written and the rest fell through to the raw wire
-                              token, so a register read "waiting", "agreed" and
-                              "lapsed" in the vocabulary of the database. A
-                              fifth state still shows as it arrived, which is
-                              visible rather than blank. */}
+                              every other report leaves out, and every state is
+                              said in words. A state the table does not know
+                              shows as it arrived, which is visible rather than
+                              blank. */}
                           <RegisterState state={row.state} />
                         </td>
                         <td>
@@ -301,10 +298,10 @@ export function Register() {
                         <td>{row.due ? on(row.due) : <span className="hint">none</span>}</td>
                         <td>
                           {/* The reason as well as the date. A closure with no
-                              reason is refused of whoever writes one, and the
-                              words they typed were readable nowhere — so a
-                              person was required to say why and nobody could
-                              find out. Drawn as plain text: it goes through
+                              reason is refused of whoever writes one, so the
+                              words they typed are shown here, or a person is
+                              required to say why and nobody can find out.
+                              Drawn as plain text: it goes through
                               the submission policy on the way in, like every
                               other field a person types, and what that bounds
                               is what may be rendered rather than what must
@@ -379,8 +376,8 @@ export function Register() {
 //
 // An auditor reads shipped artifact, inventory, run, scanner and database,
 // disposition. The rows are the last link, and without this the page states
-// them with nothing behind them — while the inventory that was read is one
-// click away and was reachable from nothing.
+// them with nothing behind them, while the inventory that was read is one
+// click away.
 function MeasuredWith({
   measured,
 }: {

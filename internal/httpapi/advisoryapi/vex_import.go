@@ -102,16 +102,11 @@ func registerVexImport(api huma.API, in core.Deps) {
 			"tracking id. The publisher is the `publisher` parameter, else the one the " +
 			"document names: an OpenVEX author or a CSAF publisher name. A document naming none " +
 			"is refused unless the parameter names one.\n\n" +
-			"OpenVEX and CSAF-VEX both read. The two say the same thing in different " +
-			"shapes — one puts the status on a statement, the other in which list a product " +
-			"identifier appears in — and both become the same claim here, because what a " +
-			"publisher is saying does not depend on which file they wrote it in. Which of the " +
-			"two a document is decides itself; anything else is refused with a sentence rather " +
-			"than half-read.\n\n" +
-			"A CSAF security advisory is refused here and taken by the supplier-advisory " +
-			"endpoint instead. It is a document about somebody's own flaws, one per issue, " +
-			"and what a later upload of it replaces is the advisory of the same name rather " +
-			"than everything that publisher has said." +
+			"OpenVEX and CSAF-VEX are both read, and a statement in either becomes the same " +
+			"claim. The format is detected from the document; anything else is refused with " +
+			"a sentence and nothing of it is read.\n\n" +
+			"A CSAF security advisory is refused here; send it to the supplier-advisory " +
+			"endpoint, where a later upload replaces the advisory of the same name." +
 			"\n\nAnswers 503 with `Retry-After` when the deployment is already reading as many " +
 			"uploads as it takes at once; send again after that many seconds.",
 		Tags: []string{"Ingest"}, DefaultStatus: http.StatusCreated,

@@ -165,10 +165,8 @@ func (c *reader) spdxDocumentDescribes() error {
 		return c.b.Skip()
 	}
 	return c.b.Array(func() error {
-		// Charged as each is read. This is a top-level array, so on the header
-		// pass — which runs inside the upload request — it was the one array
-		// with neither a skip above nor a bound here, which is exactly what
-		// count's own comment says the component bound was moved to prevent.
+		// Charged as each is read: an unbounded top-level array is an
+		// unbounded walk, whatever its elements are.
 		if err := c.count(); err != nil {
 			return err
 		}

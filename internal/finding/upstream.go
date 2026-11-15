@@ -194,9 +194,9 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 		Join(`JOIN "component" AS "c" ON "c"."name_folded" = "ss"."component" AND "c"."version" = "ss"."about"`).
 		Join(`JOIN `+named+` AS "names" ON "names"."folded" = "ss"."vulnerability"`).
 		Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "names"."issue_id" AND "f"."component_id" = "c"."id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id" AND "st"."product_id" = "ss"."product_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id" AND "st"."product_id" = "ss"."product_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(WordsJoin("ss")).
 		ColumnExpr(`"ss"."id" AS "statement_id"`).

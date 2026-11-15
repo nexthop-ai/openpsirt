@@ -248,8 +248,7 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 	// own prose, written here and rendered as markdown where it is read
 	// back, so the rule that decides what a link may be and refuses raw
 	// HTML applies to it exactly as it does to the words beside it — and
-	// the bound on how long a rendered field may be comes with it, which
-	// this had none of at all.
+	// the bound on how long a rendered field may be comes with it.
 	if err := markdown.Check(in.Summary); err != nil {
 		return nil, "", err
 	}
@@ -449,11 +448,11 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		clocked, clockedArgs := catalog.OnTheClock("st", "p", now)
 		var onClock []int64
 		if err := tx.NewSelect().
-			TableExpr(`"build" AS "tg"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			TableExpr(`"build" AS "b"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
-			ColumnExpr(`"tg"."id"`).
-			Where(`"tg"."id" IN (?)`, bun.List(in.BuildIDs)).
+			ColumnExpr(`"b"."id"`).
+			Where(`"b"."id" IN (?)`, bun.List(in.BuildIDs)).
 			Where(clocked, clockedArgs...).
 			Scan(ctx, &onClock); err != nil {
 			return fmt.Errorf("read which builds carry deadlines: %w", err)
@@ -642,7 +641,7 @@ func carrying(ctx context.Context, db bun.IDB, buildID int64, in Entering) (int6
 	//
 	// The root is returned with no name. The product's name differs per
 	// variant, so an occurrence keyed on it is a different occurrence in each
-	// of them: one flaw across three variants became three occurrences and
+	// of them: one flaw across three variants would be three occurrences and
 	// three decision occurrences.
 	// The scan path collapses a root to no name for the same reason.
 	var root struct {

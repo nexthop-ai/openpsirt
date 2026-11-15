@@ -244,7 +244,7 @@ func registerLastUploadsExport(api huma.API, in core.Deps) {
 			What:  "last upload per build",
 			About: []core.Stated{{Label: "quiet after days", Value: strconv.Itoa(int(quietAfter.Hours() / 24))}},
 			Header: []string{
-				"product", "branch_or_tag", "kind", "variant",
+				"product", core.BranchOrTagColumn, "kind", "variant",
 				"last_received_at", "last_refused_at", "refused_because",
 				"quiet_days", "quiet", "out_of_support", "retired",
 			},

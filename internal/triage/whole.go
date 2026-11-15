@@ -210,8 +210,8 @@ func (s *Store) reachOf(ctx context.Context, subject access.Subject, decisionID 
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr("COUNT(DISTINCT "+finding.FoldedOn+`) AS "folds"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."component_id") AS "packages"`).
 		ColumnExpr(`COUNT(DISTINCT "f"."consumer_id") AS "consumers"`).
@@ -282,9 +282,9 @@ func (s *Store) endedParts(ctx context.Context, subject access.Subject, decision
 		// gives: SQLite otherwise starts from every finding.
 		Join(`CROSS JOIN "finding" AS "f"`).
 		Where(finding.DecisionOccurrenceFiledAt("de", "f")).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		ColumnExpr(`"de"."state" AS "state"`).
 		ColumnExpr(`MIN("st"."display_name") AS "branch_or_tag"`).
 		ColumnExpr(`MIN("va"."display_name") AS "variant"`).

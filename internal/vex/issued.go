@@ -391,7 +391,7 @@ func settledDigest(doc *Statements) (string, error) {
 // a document issued between the two would be published under a name this had
 // already said nothing was published under.
 func AnyIssuedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool, error) {
-	return anyIssuedWhere(ctx, db, `"tg"."variant_id" = ?`, variantID, "variant")
+	return anyIssuedWhere(ctx, db, `"b"."variant_id" = ?`, variantID, "variant")
 }
 
 // AnyIssuedForBranchOrTag reports whether a document has gone out for any variant of
@@ -400,20 +400,20 @@ func AnyIssuedForVariant(ctx context.Context, db bun.IDB, variantID int64) (bool
 // The release is inside the same identifier the variant is, for the same
 // reasons AnyIssuedForVariant gives.
 func AnyIssuedForBranchOrTag(ctx context.Context, db bun.IDB, branchOrTagID int64) (bool, error) {
-	return anyIssuedWhere(ctx, db, `"tg"."branch_or_tag_id" = ?`, branchOrTagID, "release")
+	return anyIssuedWhere(ctx, db, `"b"."branch_or_tag_id" = ?`, branchOrTagID, "release")
 }
 
 // AnyIssuedForProduct reports whether a document has gone out for any build of
 // one product.
 func AnyIssuedForProduct(ctx context.Context, db bun.IDB, productID int64) (bool, error) {
 	return anyIssuedWhere(ctx, db,
-		`"tg"."branch_or_tag_id" IN (SELECT "id" FROM "branch_or_tag" WHERE "product_id" = ?)`,
+		`"b"."branch_or_tag_id" IN (SELECT "id" FROM "branch_or_tag" WHERE "product_id" = ?)`,
 		productID, "product")
 }
 
 func anyIssuedWhere(ctx context.Context, db bun.IDB, where string, id int64, what string) (bool, error) {
 	issued, err := db.NewSelect().Model((*Published)(nil)).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "vi"."build_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "vi"."build_id"`).
 		Where(where, id).
 		Exists(ctx)
 	if err != nil {

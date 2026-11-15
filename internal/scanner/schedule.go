@@ -245,17 +245,17 @@ func (s *Schedule) due(ctx context.Context, every time.Duration, queued []int64)
 	before := s.now().Add(-every).Truncate(time.Microsecond)
 
 	q := s.db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		ColumnExpr(`"tg"."id"`).
+		TableExpr(`"build" AS "b"`).
+		ColumnExpr(`"b"."id"`).
 		Where(`EXISTS (SELECT 1 FROM "graph_node" AS "gn"
-			WHERE "gn"."build_id" = "tg"."id" AND "gn"."closed_scan_id" IS NULL)`).
+			WHERE "gn"."build_id" = "b"."id" AND "gn"."closed_scan_id" IS NULL)`).
 		Where(`NOT EXISTS (SELECT 1 FROM "scan_run" AS "r"
-			WHERE "r"."build_id" = "tg"."id" AND "r"."checked_scan_id" IS NULL
+			WHERE "r"."build_id" = "b"."id" AND "r"."checked_scan_id" IS NULL
 			AND "r"."started_at" >= ?)`, before).
-		OrderExpr(`"tg"."id"`).
+		OrderExpr(`"b"."id"`).
 		Limit(dueLimit)
 	if len(queued) > 0 {
-		q = q.Where(`"tg"."id" NOT IN (?)`, bun.List(queued))
+		q = q.Where(`"b"."id" NOT IN (?)`, bun.List(queued))
 	}
 
 	var due []int64

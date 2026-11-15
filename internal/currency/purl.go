@@ -48,17 +48,17 @@ func Asked(purl string) (ecosystem, name string, ok bool) {
 	// protocol requires — the module proxy keeps them, and the npm registry
 	// escapes every one, which is what a scoped package needs.
 	//
-	// An escaped separator inside a segment does not survive that, and the
-	// comment here used to claim it did. It cannot: the parts are rejoined
-	// with the character that was escaped, so nothing downstream can tell
-	// which of them was content. No ecosystem asked here has a name
+	// An escaped separator inside a segment does not survive that: the parts
+	// are rejoined with the character that was escaped, so nothing downstream
+	// can tell which of them was content. No ecosystem asked here has a name
 	// containing one — a module path's slashes are all separators and an npm
 	// scope is two segments — so the ambiguity is stated rather than solved.
 	//
 	// A segment that will not decode is a refusal rather than a segment kept
-	// raw. Kept, a malformed escape became part of the name asked about, and
-	// what came back was an answer about a different package or no package at
-	// all — recorded either way as this component's upstream version.
+	// raw. Kept, a malformed escape would become part of the name asked about,
+	// and what came back would be an answer about a different package or no
+	// package at all — recorded either way as this component's upstream
+	// version.
 	//
 	// A segment that is empty, "." or "..", decoded, is refused too: sent, a
 	// server resolving it answers about another package.

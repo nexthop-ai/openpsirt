@@ -74,9 +74,9 @@ export function Scope() {
   // the branch selects.
   //
   // The two are different questions and different cache entries, so choosing a
-  // branch switched the column to a query holding nothing and it emptied and
-  // refilled — on a selection that usually does not change the names at all.
-  // The product's own list stands in for that gap: it is a superset of any one
+  // branch switches the column to a query holding nothing until it arrives, on
+  // a selection that usually does not change the names at all. The product's
+  // own list stands in for that gap: it is a superset of any one
   // release's, so the column offers nothing the release does not have for
   // longer than the read takes, and it stops going blank in front of somebody
   // halfway through choosing.
@@ -95,11 +95,10 @@ export function Scope() {
   )?.filter((one) => !one.retired);
 
   // Applied as soon as it is chosen, at whatever level. A partial selection is
-  // a real answer now — every level offers "all" — so there is nothing to wait
-  // for. The panel stays open through the product and the branch, so that all
-  // three can be chosen in one visit; it closes on the last level, on Escape,
-  // or on a click elsewhere. Closing after every pick made choosing a build
-  // three openings of the same panel.
+  // a real answer, because every level offers "all", so there is nothing to
+  // wait for. The panel stays open through the product and the branch, so that
+  // all three can be chosen in one visit; it closes on the last level, on
+  // Escape, or on a click elsewhere.
   function apply(chosen: Scoped, close = false) {
     if (close) setOpen(false);
     remember(chosen);

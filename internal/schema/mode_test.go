@@ -26,9 +26,9 @@ const truncation = "22001"
 // the test when it is anything else.
 //
 // A refusal is one of the two correct answers here, so the insert's error is an
-// outcome rather than a failure — which is how a leftover table, a dropped
-// connection or a typo in a later edit came to read as the engine doing its
-// job. The test that pins no-silent-truncation observed nothing and passed.
+// outcome rather than a failure. Only the engine's truncation code counts as a
+// refusal; any other error fails the test, so a leftover table, a dropped
+// connection or a typo never reads as the engine doing its job.
 func refused(t *testing.T, err error) bool {
 	t.Helper()
 	if err == nil {

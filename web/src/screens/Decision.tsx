@@ -65,9 +65,9 @@ export function Decision({ who }: { who: Who }) {
   if (!it) return null;
 
   // The identity alone. A decision records who proposed it by the name they sign
-  // in under, and matching a display name as well made ownership turn on a
-  // label anybody can be given — which hid the Agree panel from somebody
-  // entitled to approve and showed Hold back to somebody who did not propose.
+  // in under; matching a display name as well would make ownership turn on a
+  // label anybody can be given, hiding the Agree panel from somebody entitled
+  // to approve and showing Hold back to somebody who did not propose.
   const mine = it.decision.proposed_by === who.identity;
   // The thing a file is attached to. Both halves have to be known: the issue
   // says which, and the product says whose, because the same identifier in two

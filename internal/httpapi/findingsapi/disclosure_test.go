@@ -13,10 +13,9 @@ import (
 )
 
 func TestAFindingSaysWhetherItIsDisclosed(t *testing.T) {
-	// Everything about disclosure existed in the API and appeared nowhere
-	// a person could see it: an undisclosed recorded flaw rendered as
-	// "Unrated · Undecided · 1 location", identical to any other row — so
-	// somebody could say something about it without ever being told not
+	// A finding says whether it is disclosed, so an undisclosed recorded flaw
+	// does not render as "Unrated · Undecided · 1 location", identical to any
+	// other row, and nobody says something about it without being told not
 	// to.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)

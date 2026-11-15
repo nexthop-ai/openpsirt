@@ -255,7 +255,7 @@ func TestAProductReadOnlyAtAnotherVisibilityAddsNothingAcrossProducts(t *testing
 		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding" AS "f"`).
 			Set(`"visibility" = ?`, access.Public).
 			Where(`"f"."kind" = ?`, kind.Analysis).
-			Where(`"f"."build_id" IN (SELECT "t"."id" FROM "build" AS "t" JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id" WHERE "s"."product_id" = ?)`, theirs.ID).
+			Where(`"f"."build_id" IN (SELECT "t"."id" FROM "build" AS "t" JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id" WHERE "bt"."product_id" = ?)`, theirs.ID).
 			Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}

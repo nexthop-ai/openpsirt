@@ -13,10 +13,10 @@ import (
 )
 
 // reserved reports whether a path belongs to this server rather than to the
-// page, whether or not anything is currently routed there.
+// page, whether or not anything is routed there.
 //
-// A list rather than a rule, and deliberately including paths nothing serves
-// today: the framework's documentation route is disabled by configuration, so
+// A list rather than a rule, and deliberately including paths nothing serves:
+// the framework's documentation route is disabled by configuration, so
 // it is unrouted — and "unrouted" is exactly what marks a path as the page's.
 // Without this, turning that route back on would be shadowed by the interface,
 // and the interface would have quietly claimed a name the server means to own.

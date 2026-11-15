@@ -12,9 +12,9 @@ import (
 	"testing"
 )
 
-// This program decides which targets `make gate` runs, and had no test at all.
-// A selection bug narrows the whole gate silently: every check it stopped
-// choosing still passes, because it is not run.
+// This program decides which targets `make gate` runs. A selection bug narrows
+// the whole gate silently: every check it stops choosing still passes, because
+// it is not run.
 //
 // Both directions per case, which is what a gate test is for — one input that
 // must reach a tier and one that must not.
@@ -223,9 +223,7 @@ func TestEverythingDelegatesToTheWholeGate(t *testing.T) {
 	// and the hazard is the reverse of the one below: reduced to a subset, the
 	// checks it stopped choosing pass by not running.
 	whole := targets(map[tier]bool{everything: true})
-	// `check-packaging` among them, because it is the one tier CI runs and
-	// the local gate did not — which is how a web build reaching outside
-	// `web/` passed every check here and failed the image.
+	// `check-packaging` among them, because nothing else builds the image.
 	for _, want := range []string{"check", "check-engines", "check-packaging"} {
 		if !slices.Contains(whole, want) {
 			t.Errorf("the everything tier chose %v, which leaves out %q", whole, want)

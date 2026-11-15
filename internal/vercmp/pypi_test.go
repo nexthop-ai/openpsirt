@@ -357,3 +357,22 @@ func TestAPyPIReleaseReadsTheSameWithTrailingZerosOrWithout(t *testing.T) {
 		bothWays(t, vercmp.PyPI, each.a, each.b, each.want)
 	}
 }
+
+func TestEveryRankedPreReleaseSpellingIsReadAtItsRank(t *testing.T) {
+	// The pattern's spellings are the ranked ones, so a spelling is matched
+	// exactly when it has a rank to read.
+	if len(vercmp.PyPIPreRanks) == 0 {
+		t.Fatal("no pre-release spellings were found, so this checked nothing")
+	}
+	for spelling, rank := range vercmp.PyPIPreRanks {
+		version := "1.0" + spelling + "1"
+		got, ok := vercmp.PyPIPreRank(version)
+		if !ok {
+			t.Errorf("%q is refused, though %q is a ranked spelling", version, spelling)
+			continue
+		}
+		if got != rank {
+			t.Errorf("%q reads at rank %d, want %d", version, got, rank)
+		}
+	}
+}

@@ -401,9 +401,9 @@ func recordedVisibility(ctx context.Context, db bun.IDB, productID int64, occurr
 		batch := occurrences[start:min(start+database.BatchSize, len(occurrences))]
 		var rows []finding.CodeFindingFlaw
 		if err := db.NewSelect().Model(&rows).
-			Column("lh.occurrence_identity", "lh.visibility").
-			Where(`"lh"."product_id" = ?`, productID).
-			Where(`"lh"."occurrence_identity" IN (?)`, bun.List(batch)).
+			Column("cff.occurrence_identity", "cff.visibility").
+			Where(`"cff"."product_id" = ?`, productID).
+			Where(`"cff"."occurrence_identity" IN (?)`, bun.List(batch)).
 			Scan(ctx); err != nil {
 			return nil, fmt.Errorf("read which of the code findings were recorded as a flaw: %w", err)
 		}

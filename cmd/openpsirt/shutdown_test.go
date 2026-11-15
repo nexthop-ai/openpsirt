@@ -14,8 +14,8 @@ func TestShutdownDoesNotWaitForever(t *testing.T) {
 	// the pool is one connection by design, so an HTTP handler running a slow
 	// statement blocks every worker behind it — and a worker that cannot get a
 	// connection cannot notice it has been asked to stop. Waiting for it then
-	// waits for the request, which is how a SIGTERM came to do nothing and the
-	// process had to be killed.
+	// waits for the request, and a SIGTERM does nothing until the process is
+	// killed.
 	var stuck sync.WaitGroup
 	stuck.Add(1)
 	// Never released, which is the case being tested.

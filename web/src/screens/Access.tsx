@@ -37,10 +37,9 @@ export function Access({ who: me }: { who: Who }) {
   const [openFor, setOpenFor] = useState("");
   const [identity, setIdentity] = useState("");
   // The label shown instead of the identity, and the address to reach them
-  // outside the application. Both are on the record and neither could be typed
-  // here: the whole mail path could never deliver to anybody recorded through
-  // this screen, and "an administrator has to record one" is what the person
-  // was told when they went looking.
+  // outside the application. Both are on the record and typed here, because
+  // the mail path delivers only to an address on the record, and this screen
+  // is where an administrator records one.
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
 
@@ -333,9 +332,9 @@ export function Access({ who: me }: { who: Who }) {
                           </span>
                         </>
                       )}
-                      {/* Who still has access is a question about the list.
-                          The date was on the person's own screen alone, so
-                          answering it meant opening every row. */}
+                      {/* Who still has access is a question about the list,
+                          so the date is on the row as well as on the
+                          person's own screen. */}
                       {person.deactivated_at && (
                         <>
                           {" "}
@@ -406,7 +405,7 @@ export function Access({ who: me }: { who: Who }) {
                             <span
                               key={`${held.everywhere ? "*" : held.product} ${held.role}`}
                               className="vchip"
-                              style={{ opacity: held.effective ? 1 : 0.55 }}
+                              style={{ opacity: held.effective ? 1 : "var(--dim)" }}
                               title={
                                 (held.source === "derived"
                                   ? "Derived from a group; withdrawn by changing the group. "
@@ -823,7 +822,7 @@ function Credentials({ me }: { me: Who }) {
                 <tr
                   key={`key ${key.name} ${key.created_at} ${i}`}
                   className="row"
-                  style={{ opacity: key.withdrawn ? 0.55 : 1 }}
+                  style={{ opacity: key.withdrawn ? "var(--dim)" : 1 }}
                 >
                   <td>
                     <span className="id">{key.name}</span>
@@ -869,7 +868,7 @@ function Credentials({ me }: { me: Who }) {
                 <tr
                   key={`token ${token.owner} ${token.name} ${token.created_at} ${i}`}
                   className="row"
-                  style={{ opacity: token.withdrawn ? 0.55 : 1 }}
+                  style={{ opacity: token.withdrawn ? "var(--dim)" : 1 }}
                 >
                   <td>
                     <span className="id">{token.name}</span>

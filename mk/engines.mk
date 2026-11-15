@@ -56,9 +56,8 @@ ENGINE_FLOOR_DATA    ?= 256m
 # behind them. This is the command to run before committing.
 #
 # The names it greps for come from the application's own enumeration rather
-# than from a list here. They were written out by hand three times, so a fifth
-# engine would not have been looked for by any of them — and a grep for
-# nothing reports the same "OK" as a grep that found nothing wrong. The empty
+# than from a list here, so an engine added to it is looked for here too: a
+# grep for nothing reports the same "OK" as a grep that found nothing wrong. The empty
 # check below is for the same reason: an enumeration that came back empty would
 # make every loop vacuous.
 #
@@ -119,7 +118,7 @@ endif
 
 # The four servers the test URLs point at, started, waited for, and written
 # into local.mk. Running against every engine is ordinary development here
-# rather than something CI does afterwards (DAT-12), so a machine that can run
+# rather than something CI does afterwards (REQ-71), so a machine that can run
 # the suite properly is one command rather than a setup document followed by
 # hand — and a document followed by hand is how three of four engines end up
 # unconfigured while the suite reports green.

@@ -39,9 +39,9 @@ const (
 	// than folded into "no fix": reporting "upstream has released nothing" on
 	// the strength of a scanner declining to answer is a claim about the world
 	// made out of a gap in a report, and it is the claim a triager would act
-	// on. Kept as a state so the rows are reachable — mapped to the empty
-	// string, they belonged to no filter value and thirteen findings on the
-	// reference image could not be listed by any of them.
+	// on. Kept as a state so the rows are reachable: mapped to the empty
+	// string, they would belong to no filter value, and the reference image
+	// holds thirteen such findings.
 	FixUnknown FixState = "unknown"
 	// FixMixed is not a state a scan reports. It is what a *group* is where its
 	// occurrences disagree, which the list has to be able to say: the list
@@ -101,9 +101,9 @@ const (
 	// it: this row closed, and the same issue is open against the new version.
 	//
 	// Told apart from Upgraded because they are opposite answers to "was this
-	// fixed". Without it a bump that resolved nothing was recorded as a fix,
-	// and the same issue appeared as fixed and as newly present in one
-	// release comparison — a document that goes to customers.
+	// fixed". Without it a bump that resolved nothing would be recorded as a
+	// fix, and the same issue would appear as fixed and as newly present in
+	// one release comparison — a document that goes to customers.
 	Superseded Closure = "superseded"
 	// Unexplained means the component is present and unchanged and the scanner
 	// stopped reporting it. It is always flagged and never suppressed.
@@ -205,11 +205,9 @@ func NeverPresent() []Closure {
 
 // Resolving is what counts as an issue actually going away.
 //
-// One list rather than three projections of it. It was a positive list of four
-// words spliced into SQL, a negative list of three in Go, and a third list of
-// the same four as a switch returning prose — none of them checked by the
-// compiler, and all three disagreeing about any closure added later. A closure
-// not named here is churn or a correction, never progress.
+// The one list of resolving closures; the SQL and the Go both read it, so
+// they cannot disagree about a closure added to it. A closure not named here
+// is churn or a correction, never progress.
 func Resolving() []Closure {
 	return []Closure{Removed, Upgraded, Revised, Patched, Fixed}
 }

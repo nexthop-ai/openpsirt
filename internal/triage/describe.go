@@ -109,9 +109,9 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		Where(finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`JOIN "product" AS "pr" ON "pr"."id" = "st"."product_id"`).
 		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 		Join(graph.StatedJoin("sun", `"f"."build_id"`, `"f"."consumer_id"`)).
@@ -192,8 +192,8 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 	}
 	if err := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
@@ -219,9 +219,9 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 	// Covered is what the decision's live rows actually match — the occurrence and
 	// both versions, as a finding asks it — rather than every occurrence the
 	// decision ever named. The occurrence-only fallback above is for naming what a
-	// lapsed decision was about; counted that way, a decision whose rows had
-	// lapsed, or which was keyed at another build's version, reported occurrences
-	// it does not cover.
+	// lapsed decision was about; counted that way, a decision whose rows have
+	// lapsed, or which is keyed at another build's version, would report
+	// occurrences it does not cover.
 	var covered []struct {
 		DecisionID  int64 `bun:"decision_id"`
 		BuildID     int64 `bun:"build_id"`
@@ -238,8 +238,8 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).

@@ -21,11 +21,11 @@ import (
 
 // One run of the scanner.
 //
-// The receipt says a run happened; nothing said what it did. A row reading
-// "scanned · 7,604 opened" is a number with no shape: opened *what*, and was
+// The receipt says a run happened; this says what it did. A row reading
+// "scanned · 7,604 opened" is a number with no shape: opened what, and was
 // any of it urgent. Somebody looking at a build that jumped by four thousand
-// overnight is asking which of them matter, and the answer was a findings list
-// with no way to narrow to that run.
+// overnight is asking which of them matter, and the findings list narrows to
+// that run.
 //
 // Read per run rather than stored. What a run opened is derived from the
 // findings that still carry its identifier, so it moves as findings are closed
@@ -161,8 +161,8 @@ func (s *Store) Ran(ctx context.Context, subject access.Subject,
 // A named type rather than a string, for the reason RatedOn is one: a
 // placeholder cannot bind a column name, so this is the value that reaches the
 // statement text, and a closure taking a bare string leaves nothing between it
-// and a name arriving from a query parameter except that today's two callers
-// pass literals (REQ-66).
+// and a name arriving from a query parameter except that its callers pass
+// literals (REQ-66).
 type runColumn string
 
 const (

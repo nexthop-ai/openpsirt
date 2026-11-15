@@ -42,12 +42,10 @@ func registerTeams(api huma.API, a core.Administering) {
 		Summary: "List teams",
 		Description: "Lists the teams work can be assigned to.\n\n" +
 			"A team holds work and grants nothing: no role, no visibility, no capability. " +
-			"One team therefore carries mixed clearance as a matter of course, and what each " +
-			"member sees of the work assigned to it is what they could see anyway.\n\n" +
-			"Names to anybody, membership to an administrator. Assigning work to a team " +
-			"means naming one, so anybody who may hand work around has to be able to see the " +
-			"names; who is on it is the same question as who is here, and that is answered " +
-			"where the rest of the record is.",
+			"What each member sees of the work assigned to it is what they could see " +
+			"anyway.\n\n" +
+			"Names are listed to anybody, since assigning work to a team means naming one. " +
+			"Membership is listed to an administrator alone.",
 		Tags: []string{"Administration"},
 	}, core.AnyPerson, "Membership is listed for an administrator; anybody else sees the names."),
 		func(ctx context.Context, _ *struct{}) (*core.ListOutput[TeamBody], error) {

@@ -202,8 +202,8 @@ func TestTheSchemeFollowsThePackageIdentifierARealScanCarries(t *testing.T) {
 }
 
 func TestADistributionUpgradeReachesWhatItLeavesBehind(t *testing.T) {
-	// The planner's own question, through the two new schemes: moving to this
-	// version also closes what these earlier ones fixed.
+	// The planner's own question, through the RPM and APK schemes: moving to
+	// this version also closes what these earlier ones fixed.
 	for _, each := range []struct {
 		scheme            vercmp.Scheme
 		candidate, wanted string

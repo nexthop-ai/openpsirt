@@ -189,7 +189,7 @@ button {
   opacity: 0.85;
 }
 .nav[disabled] {
-  opacity: 0.4;
+  opacity: var(--dim);
   cursor: not-allowed;
 }
 
@@ -630,7 +630,7 @@ button {
   border-color: var(--line);
   background: var(--surface);
   cursor: default;
-  opacity: 0.6;
+  opacity: var(--dim);
 }
 
 /* A label over a block, in the words a person would use for it. Sentence

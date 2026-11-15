@@ -154,7 +154,7 @@ func registerOutOfSupport(api huma.API, in core.Deps) {
 		out := core.Exporting{
 			What: "releases out of support",
 			Header: []string{
-				"product", "product name", "branch_or_tag", "branch or tag name", "kind", "state",
+				"product", "product name", core.BranchOrTagColumn, "branch or tag name", "kind", "state",
 				"ended_on", "inherited",
 				"ended_days", "open",
 			},

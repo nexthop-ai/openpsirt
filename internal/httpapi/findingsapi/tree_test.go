@@ -114,9 +114,9 @@ func TestATreeCountIsPerPathAndTheListItOpensAgrees(t *testing.T) {
 }
 
 func TestTheTreeIsReachedByNameAndVersionWhereANameIsNotEnough(t *testing.T) {
-	// A build ships one name at several versions, and arriving from a finding
-	// at one of them had no way to say which — the reader saw an error
-	// instead of the tree.
+	// A build ships one name at several versions, so the tree is reached by
+	// name and version from a finding at one of them; the name alone is a
+	// 409.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
 		names := catalog.NewStore(r.DB.DB)

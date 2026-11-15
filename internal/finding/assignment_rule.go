@@ -431,8 +431,8 @@ func bySource(ctx context.Context, db bun.IDB, query *bun.SelectQuery, productID
 	// component depend on which engine was running. Folded on the way in, this
 	// is an equality test and it can use the index.
 	const name = `COALESCE(NULLIF("c"."upstream_folded", ''), "c"."name_folded")`
-	const inProduct = `"n"."build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
-		JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id" WHERE "st"."product_id" = ?)`
+	const inProduct = `"n"."build_id" IN (SELECT "b"."id" FROM "build" AS "b"
+		JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id" WHERE "st"."product_id" = ?)`
 	condition, value := name+` = ?`, pattern
 	var stated []int64
 	var err error
@@ -674,9 +674,9 @@ func codeFindingsInSupport(q *bun.SelectQuery, productID int64, ended []int64) *
 func (s *Store) beneathIn(ctx context.Context, productID int64, name string) ([]int64, error) {
 	var builds []int64
 	err := s.db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`"tg"."id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"b"."id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Scan(ctx, &builds)
 	if err != nil {

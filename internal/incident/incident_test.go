@@ -860,8 +860,8 @@ func TestAWindowLimitedToProductsAppliesToThoseAlone(t *testing.T) {
 }
 
 // A blank product name in a window's list is refused as a name nobody
-// declared. Dropped, a list of nothing but blanks declared a window over every
-// product.
+// declared: dropped, a list holding only blanks would declare a window over
+// every product.
 func TestABlankProductInAWindowsListIsRefused(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		if _, err := f.store.DeclareWindow(t.Context(), f.admin, incident.WindowSaid{

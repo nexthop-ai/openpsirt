@@ -95,3 +95,28 @@ func TestABulkDecisionsCardIsCappedAttackedFirstThenWorstThenByName(t *testing.T
 			last.Vulnerability, last.Severity)
 	}
 }
+
+func TestABulkDecisionsCardRanksAnUnratedIssueByItsScore(t *testing.T) {
+	// The card's severity order is the one every severity sort follows: an
+	// unrated issue sorts in its score's band, and below a low with no score.
+	occurrencesOf, byIssue, attacked := bulkOver(
+		[]string{"unknown", "high", "unknown", "low"}, []bool{true, true, true, true})
+	scored := byIssue[1]
+	nine := 980
+	scored.ScoreCenti = &nine
+	byIssue[1] = scored
+	seven := 700
+	high := byIssue[2]
+	high.ScoreCenti = &seven
+	byIssue[2] = high
+
+	out := outliersOf(Decision{}, 1, occurrencesOf, byIssue, nil, nil, attacked)
+	var got []string
+	for _, row := range out.Rows {
+		got = append(got, row.Vulnerability)
+	}
+	want := []string{"CVE-2026-0001", "CVE-2026-0002", "CVE-2026-0004", "CVE-2026-0003"}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("the card reads %v, want the unrated 9.8 first and the unscored unrated last: %v", got, want)
+	}
+}

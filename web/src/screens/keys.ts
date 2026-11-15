@@ -3,10 +3,9 @@
 
 // Working a list from the keyboard.
 //
-// The list is where a triager spends the day, against four keys in the whole
-// application, one of them global. What is here is the smallest set that
-// makes a page of findings workable without a pointer: move, open in place,
-// close, and go to the finding itself.
+// The list is where a triager spends the day. What is here is the smallest
+// set that makes a page of findings workable without a pointer: move, open in
+// place, close, and go to the finding itself.
 //
 // Kept apart from the screen because what a key means is a rule rather than a
 // rendering, and because a rule about when a key must *not* fire is exactly

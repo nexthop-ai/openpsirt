@@ -543,7 +543,7 @@ func sharedTemplate(dir string) ([]byte, error) {
 }
 
 // templateName is the file the template is kept under: named for everything
-// its content follows from — the migrations, the widths seven of them read,
+// its content follows from — the migrations, the widths the migrations read,
 // the SQLite library that writes the file and the migration library that
 // writes its version table.
 func templateName() (string, error) {
@@ -804,8 +804,7 @@ func transient(ctx context.Context, admin *database.DB, engine database.Engine) 
 // where the standard information schema describes only the one connected to.
 //
 // LIKE narrows the question at the server; the prefix is checked again here
-// because "_" is a wildcard to LIKE and every one of these names carries four
-// of them.
+// because "_" is a wildcard to LIKE and the harness's names carry it.
 func databasesFor(ctx context.Context, admin *database.DB, engine database.Engine, prefix string) ([]string, error) {
 	query := `SELECT "schema_name" FROM "information_schema"."schemata" WHERE "schema_name" LIKE ?`
 	if engine == database.Postgres {

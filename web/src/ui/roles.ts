@@ -16,52 +16,64 @@ export type Role = Body<"GrantBody">["role"];
 // Keyed on the published roles, so a role the server adds is a compile error
 // here until it has words, and a column in the grant grid once it has. The
 // order written is the order offered.
-const WORDS: Record<Role, { label: string; means: string; grants: boolean }> = {
+const WORDS: Record<Role, { label: string; means: string; grants: boolean; reads: boolean }> = {
   "public-read": {
     label: "Read, public",
     means: "Read findings about issues that are public",
     grants: true,
+    reads: true,
   },
   "private-read": {
     label: "Read, private",
     means: "Read findings not yet announced. Public and security testing ones need their own role",
     grants: true,
+    reads: true,
   },
   "security-testing-read": {
     label: "Read, security testing",
     means:
       "Read unconfirmed analysis results, never announced. Public and private ones need their own role",
     grants: true,
+    reads: true,
   },
   "public-triage": {
     label: "Triage, public",
     means: "Decide, revise, withdraw and comment on public findings; take work nobody owns",
     grants: true,
+    reads: false,
   },
   "private-triage": {
     label: "Triage, private",
     means:
       "The same for findings not yet announced, including recording one. Public and security testing ones need their own role",
     grants: true,
+    reads: false,
   },
   "security-testing-triage": {
     label: "Triage, security testing",
     means: "The same for unconfirmed analysis results. Public and private ones need their own role",
     grants: true,
+    reads: false,
   },
   approver: {
     label: "Approver",
     means: "Agree to somebody else's decision. Never their own",
     grants: false,
+    reads: false,
   },
   assigner: {
     label: "Assigner",
     means: "Give work to somebody else, or take what they are holding",
     grants: false,
+    reads: false,
   },
 };
 
 export const ROLES = (Object.keys(WORDS) as Role[]).map((role) => ({ role, ...WORDS[role] }));
+
+// The roles that grant reading and nothing more. A read-only token holds
+// these, and the server narrows them to what its owner holds.
+export const READING_ROLES: Role[] = ROLES.filter((each) => each.reads).map((each) => each.role);
 
 // The role a word names, or nothing where it names none.
 export function roleOf(word: string): Role | undefined {

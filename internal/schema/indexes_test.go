@@ -66,9 +66,8 @@ func TestNoIndexRepeatsThePrefixOfAnother(t *testing.T) {
 		}
 
 		// A sweep that read nothing looks exactly like a sweep that found
-		// nothing wrong. The table list has a guard of its own and this did
-		// not, so introspection answering nothing ran the double loop zero
-		// times and reported the invariant held.
+		// nothing wrong, so introspection answering nothing, or answering for
+		// only some tables, fails here rather than reporting the invariant held.
 		if read == 0 || seen < len(tables) {
 			t.Fatalf("read %d indexes across %d of %d tables, so this checked nothing",
 				seen, read, len(tables))

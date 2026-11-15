@@ -210,7 +210,7 @@ func outboundBaseline(t *columnTypes) []string {
 
 // Where this deployment sends what it has to say.
 //
-// **One signed request, not an adapter each.** Nothing leaves this deployment
+// One signed request, not an adapter each. Nothing leaves this deployment
 // but mail, and every comparable tool reaches a chat channel and a tracker;
 // without one, a fix target is a wish and an approver discovers a claim by
 // opening the queue. One signed HTTP request gives Slack, Teams, a tracker
@@ -218,10 +218,10 @@ func outboundBaseline(t *columnTypes) []string {
 // which is what the channel interface was for, reached more cheaply than by
 // writing two of them.
 //
-// **Per kind**, so a deployment can send what is worth interrupting somebody
+// Per kind, so a deployment can send what is worth interrupting somebody
 // for to a paging endpoint and leave the rest in the notification area.
 //
-// **The secret is stored as it is, and that is deliberate.** Every other
+// The secret is stored as it is, and that is deliberate. Every other
 // credential here is hashed because it authenticates somebody to us;
 // this one authenticates *us* to somebody else, so it has to be recoverable to
 // sign with — the same reason a mail password is. It is never returned by any
@@ -313,15 +313,14 @@ func chatBaseline(t *columnTypes) []string {
 
 // A standing rule that hands work nobody holds to a team.
 //
-// **It matches on component identity as well as on a place in the tree.** The
+// It matches on component identity as well as on a place in the tree. The
 // upstream name is the key that matters: one rule naming a source package
-// catches every binary package built from it, wherever they sit. The earlier
-// framing had this as a subtree rule, and the case that motivates it is not a
-// subtree at all — a kernel is one source package appearing at many places
-// under many consumers, so a subtree rule would need a line per place and would
-// still miss tomorrow's.
+// catches every binary package built from it, wherever they sit. The case that
+// motivates it is not a subtree at all — a kernel is one source package
+// appearing at many places under many consumers, so a subtree rule would need a
+// line per place and would still miss tomorrow's.
 //
-// **Ordered, and the first match wins**. An unwritten precedence rule
+// Ordered, and the first match wins. An unwritten precedence rule
 // is forgettable, and the question it answers — where did this come from — is
 // asked months later by somebody who was not there. Which rule placed a finding
 // is written on the finding, the same choice already made for how a match was

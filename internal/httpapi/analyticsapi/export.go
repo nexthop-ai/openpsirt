@@ -214,7 +214,7 @@ func findingColumns() []string {
 	return []string{
 		"issue", "severity", "score", "score scheme", "exploited", "component", "version",
 		"ecosystem", "upstream fix", "packages", "consumers", "state", "opened", "due",
-		"branch_or_tag", "variant", "code finding", "path", "line", "function", "message",
+		core.BranchOrTagColumn, "variant", "code finding", "path", "line", "function", "message",
 	}
 }
 

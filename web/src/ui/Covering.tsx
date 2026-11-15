@@ -95,10 +95,10 @@ export function Covering({
     .filter((g) => g.items.some((p) => excluded.has(p.occurrence ?? "")))
     .map((g) => g.consumer);
 
-  // The rows it is given, which are the rows on screen. Handed the whole group
-  // while a filter was narrowing what was drawn, unticking a consumer showing
-  // one row excluded all forty under it — and this control is what decides
-  // what a decision covers, which is the thing the panel exists to get right.
+  // The rows it is given, which are the rows on screen: handed the whole group
+  // while a filter narrows what is drawn, unticking a consumer showing one row
+  // would exclude every row under it, and this control is what decides what a
+  // decision covers, which is the thing the panel exists to get right.
   function toggleGroup(items: Sitting[], on: boolean) {
     const next = new Set(excluded);
     for (const occurrence of items) {

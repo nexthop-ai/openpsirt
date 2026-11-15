@@ -295,7 +295,7 @@ var administrativeActs = []trailedAct{
 	},
 	{
 		// Declared with somebody on it, which is a second way onto a team and
-		// was the way that recorded nothing.
+		// is recorded like the first.
 		id: "record-team", what: "a team declared with a member", method: http.MethodPost,
 		path: "/v1/teams", body: `{"name":"kernel","members":["newcomer"]}`,
 		kind: "team", about: "kernel · newcomer",
@@ -795,9 +795,9 @@ func TestEveryRegisteredWriteIsEitherTrailedOrDeliberatelyNot(t *testing.T) {
 // row back.
 //
 // Three of the things here silently rewrite what this tool reports — the
-// deadline windows, the minimum severity, and a support date — and none of them
-// recorded who moved it. For a tool whose whole output is evidence, that is
-// the evidence being movable with nothing saying that anybody moved it.
+// deadline windows, the minimum severity, and a support date — so each records
+// who moved it. For a tool whose whole output is evidence, anything less is the
+// evidence being movable with nothing saying that anybody moved it.
 //
 // The classification above is what catches a route nobody thought about; this
 // is what catches a call that was written and does not do what it says.
@@ -1068,10 +1068,10 @@ func TestTheTrailNamesWhoChangedSomethingByTheIdentityTheySignInUnder(t *testing
 // TestTheAuditPermissionReadsTheDeploymentAndNoProduct pins both halves of
 // what it grants.
 //
-// The record proving nobody moved the goalposts was readable only by the
-// people who can move them: an auditor could read every decision and not the
+// The record proving nobody moved the goalposts is readable by more than the
+// people who can move them: an auditor reads every decision and also the
 // deadline policy those decisions were measured against, who held which role
-// when they were made, or whether any of it changed.
+// when they were made, and whether any of it changed.
 func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
@@ -1137,11 +1137,11 @@ func TestTheAuditPermissionReadsTheDeploymentAndNoProduct(t *testing.T) {
 // TestBothThingsHeldOverTheDeploymentAreRecorded pins the record against the
 // two grants it is read by.
 //
-// Written as arms of one switch, a request granting both recorded one of them,
-// and the audit permission's arm never ran at all — so the one grant that
-// opens the change log was the change that log did not hold. The table above
-// classifies by operation, and both of these are a *field* on a route already
-// listed as trailed, which is why neither had coverage.
+// A request granting both records both; written as arms of one switch, the
+// audit permission's arm would never run, and the one grant that opens the
+// change log would be the change that log does not hold. The table above
+// classifies by operation, and both of these are a field on a route already
+// listed as trailed, so the table alone does not reach them.
 func TestBothThingsHeldOverTheDeploymentAreRecorded(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
@@ -1296,8 +1296,8 @@ func TestNoActHandsItsRecordsFailureToTheCaller(t *testing.T) {
 // carries no length on any route here, and an issue is looked up through a
 // normalization that keeps only its first 191 runes — so what resolved and
 // what was typed are not the same string, and a record composed from what was
-// typed is unbounded. Now that the record is written inside the act, that is
-// the act refused rather than a row quietly missing.
+// typed is unbounded. The record is written inside the act, so that is the
+// act refused rather than a row quietly missing.
 //
 // Shown with capitals, which is the small case of the same thing: the lookup
 // folds them and the stored name does not have them.

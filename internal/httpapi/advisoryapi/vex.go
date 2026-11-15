@@ -128,16 +128,11 @@ func registerVEX(api huma.API, in core.Deps) {
 			"and a digest of the document as it stands now. Answers with the document " +
 			"that was recorded, which is the one to send: it carries the version it is " +
 			"recorded under, and a document generated before recording may not.\n\n" +
-			"A fact about a moment rather than a derived value. What was published on a date " +
-			"cannot be worked out again once a decision is withdrawn or revised or a " +
-			"scan closes a finding.\n\n" +
-			"It is what the document's version counts. A document is assembled from what " +
-			"stands now and holds no history of its own, so without this every generation is " +
-			"the first revision of something, and a reader keeping documents by their " +
-			"identifier cannot tell which supersedes which.\n\n" +
-			"The digest is taken from the document generated here rather than from anything " +
-			"sent: a digest of whatever a caller says answers nothing. The public document, " +
-			"never the preview that includes work nobody has announced.",
+			"Each issuance is what the document's version counts, so a later document " +
+			"supersedes this one under the same identifier.\n\n" +
+			"The digest is taken from the public document generated here, never from " +
+			"anything sent and never from the preview that includes work nobody has " +
+			"announced.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusCreated,
 	}, core.PerProduct, "The document is this deployment's word to a customer. The second pair of "+
 		"eyes on each statement it carries was taken when the decision was approved.",

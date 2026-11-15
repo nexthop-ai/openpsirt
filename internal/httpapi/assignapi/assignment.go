@@ -244,13 +244,10 @@ func registerAssigning(api huma.API, in core.Deps) {
 		Path:    "/v1/people/{identity}/assignments/hand-back",
 		Summary: "Hand back everything one person is dealing with",
 		Description: "Returns all their open findings and vulnerability reports to the unassigned " +
-			"lists. For when somebody " +
-			"has left.\n\n" +
-			"Nothing tells this software that somebody has gone — membership is read at sign-in, " +
-			"and a person who has left never signs in again. So this is an action an " +
-			"administrator takes rather than something that happens on its own, and until it is " +
-			"taken their work is in no list at all: not in the shared one because it is assigned, " +
-			"and not in anybody's own because they are not here.\n\n" +
+			"lists. For when somebody has left.\n\n" +
+			"Nothing does this on its own: membership is read at sign-in, and a person who " +
+			"has left never signs in again. Until it is done their work stays assigned to " +
+			"them and is in no unassigned list.\n\n" +
 			"Send `to` instead to hand it to a named person rather than to nobody. That is " +
 			"refused with 422 where they hold no role in a product any of the work is in, have " +
 			"been deactivated, or may not read the visibility some of it sits at.",
@@ -321,15 +318,12 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 		Description: "Returns open findings with no assignee, across every product you can see, " +
 			"most urgent first. Static analysis code findings are included where you read them, one item " +
 			"per code finding, with `occurrence` set.\n\n" +
-			"Deliberately not scoped to one product: work falling between people is exactly what " +
-			"hides when every screen shows one product and nobody looks at the others.\n\n" +
-			"One item per issue in a component in a product, not one per build. The same code " +
-			"built as several variants is one piece of work — a decision is keyed on the product " +
-			"and the code rather than on the build, so answering it once answers every build " +
-			"holding the same versions. `builds` says how many that is. Where two builds ship " +
-			"different versions of the component they are different work and appear separately.\n\n" +
+			"One item per issue in a component in a product, covering every build that holds " +
+			"the same versions, since one decision answers them all. `builds` says how many " +
+			"that is. Two builds shipping different versions of the component appear " +
+			"separately.\n\n" +
 			"`family` keeps dependency findings or code findings alone, and `total` then counts that " +
-			"family: a rule at a place and an advisory at a component are different units.",
+			"family.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		core.ScopeQuery
@@ -471,13 +465,8 @@ func registerAssignmentReading(api huma.API, in core.Deps) {
 			"`reports` counts the open vulnerability reports each holds, in the products where " +
 			"you read reports; somebody holding only reports is listed with no findings.\n\n" +
 			"Counted in pieces of work — an issue in a component in a product, or one static " +
-			"analysis code finding — which is the unit the list behind each person is in. `occurrences` says how many findings those " +
-			"cover: one flaw in a kernel is one thing to answer and can be dozens of rows to " +
-			"write.\n\n" +
-			"The number worth watching is not how many findings exist but how many are waiting " +
-			"behind somebody: an idle account holding nothing is harmless, and work stuck behind " +
-			"a person who has gone is the problem — nothing tells this software that somebody " +
-			"has left.",
+			"analysis code finding — which is the unit the list behind each person is in. " +
+			"`occurrences` says how many findings those cover.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `query:"product" doc:"Limit to work held in one product, by name. Empty means every product you can see; a name you cannot see is refused rather than answered empty"`

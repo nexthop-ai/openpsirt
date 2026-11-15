@@ -26,10 +26,9 @@ type Release struct {
 	// at there.
 	//
 	// Not a row count. Rows are occurrences, and a component reached twenty
-	// ways carries the same issue twenty times — counting them reported
-	// 241,161 for a build every other screen reports at 7,546. The trend chart
-	// made exactly this mistake and its comment records the fix; this is the
-	// same lesson arriving in a second place.
+	// ways carries the same issue twenty times — counting them reports
+	// 241,161 for a build every other screen reports at 7,546. The trend
+	// chart also counts one per issue at a component.
 	Open int
 	// BySeverity is that total split the four ways everything else here ranks
 	// by, folded through the one expression the line and the deadline use so a
@@ -81,8 +80,8 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."build_id" AS "build_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		Where(`"st"."product_id" = ?`, productID).
@@ -92,9 +91,9 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 	pairs = inOneProduct(pairs, subject, productID, all)
 	inner := s.db.NewSelect().
 		TableExpr(`(?) AS "grouped"`, pairs).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "grouped"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "grouped"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
 		Join(rating.Here, productID).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
@@ -133,15 +132,15 @@ func (s *Store) Releases(ctx context.Context, subject access.Subject,
 		Variant     string `bun:"variant"`
 	}
 	builds := s.db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"st"."kind" AS "kind"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`EXISTS (SELECT 1 FROM "scan_run" AS "sr"
-			WHERE "sr"."build_id" = "tg"."id" AND "sr"."finished_at" IS NOT NULL)`).
+			WHERE "sr"."build_id" = "b"."id" AND "sr"."finished_at" IS NOT NULL)`).
 		OrderExpr(`"st"."name", "va"."name"`)
 	if err := builds.Scan(ctx, &scanned); err != nil {
 		return nil, fmt.Errorf("read which builds have been scanned: %w", err)

@@ -17,10 +17,10 @@ import (
 func (s *Store) ProductOf(ctx context.Context, buildID int64) (int64, error) {
 	var productID int64
 	err := s.db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id"`).
-		Where(`"tg"."id" = ?`, buildID).
+		Where(`"b"."id" = ?`, buildID).
 		Scan(ctx, &productID)
 	if err != nil {
 		return 0, missingOr(err, fmt.Sprintf("build %d", buildID),

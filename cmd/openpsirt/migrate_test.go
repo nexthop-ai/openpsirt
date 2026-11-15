@@ -20,12 +20,11 @@ import (
 
 func TestServingIsRefusedWhenTheSchemaIsBehindThisBuild(t *testing.T) {
 	// Applying migrations separately is supported and is the whole reason the
-	// setting exists. What it leaves is a binary and a schema that move
-	// independently, and nothing compared them: a build carrying a new
-	// migration started, granted administrators, answered the readiness probe
-	// — which is a bare ping — and failed every request that touched the new
-	// table. In a rolling deployment, the probe passing is what retires the
-	// last replica that still worked.
+	// setting exists. It leaves a binary and a schema that move independently.
+	// A build carrying a migration the database lacks would start, grant
+	// administrators, answer the readiness probe — a bare ping — and fail every
+	// request touching the new table; in a rolling deployment the probe passing
+	// retires the last replica that works.
 	//
 	// Two engines, because nothing here varies by engine and the version is
 	// read through the same portable path on all four.

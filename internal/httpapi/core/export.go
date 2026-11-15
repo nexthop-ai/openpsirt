@@ -126,6 +126,11 @@ type Stated struct {
 // under.
 const triagedAtOrAbove = "triaged at or above"
 
+// BranchOrTagColumn heads the column naming a row's branch or tag, in every
+// export that carries one. The JSON form keys it with underscores, as it does
+// every column.
+const BranchOrTagColumn = "branch or tag"
+
 // TriagedAtOrAbove is the minimum severity a file of findings was read at, as
 // the file states it: the severity, or everything where none hides anything.
 func TriagedAtOrAbove(floor finding.MinimumSeverity) Stated {
@@ -146,8 +151,8 @@ func TriagedEachAtItsOwn() Stated {
 // was taken, whatever narrowed it, and the request that produced it.
 //
 // The first two are written here rather than asked of every caller. An export
-// that cannot say what it is and when it was taken is not evidence, and nine
-// files each stating it their own way is nine chances for one of them not to.
+// that cannot say what it is and when it was taken is not evidence, and every
+// file stating it its own way is another chance for one of them not to.
 func preamble(out Exporting, now time.Time, asked string) []Stated {
 	said := make([]Stated, 0, len(out.About)+3)
 	if out.What != "" {

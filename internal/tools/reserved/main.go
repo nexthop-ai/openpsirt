@@ -48,7 +48,7 @@
 // arguments after a builder method's SQL are values, which are free to be a
 // word the schema has a column of.
 //
-// Deliberately crude, like the two gates beside it: it reads the source as
+// Deliberately crude, like the gates beside it: it reads the source as
 // text rather than parsing SQL, because SQL is what is inside the strings and
 // there is no parser here for four dialects of it. It errs toward saying
 // nothing — an alias built by concatenation is invisible to it — which is the
@@ -149,7 +149,7 @@ var aliased = regexp.MustCompile(`\balias:([A-Za-z_][A-Za-z0-9_]*)`)
 // writing is the query builder's methods that take SQL as text.
 //
 // Matched by name rather than by resolving the type, which is the same
-// crudeness the two gates beside this one accept: something else with a method
+// crudeness the gates beside this one accept: something else with a method
 // called Where is read as SQL and reports a word it should not. That direction
 // is the safe one — it can only ask somebody to rename a thing — and the
 // alternative is a type checker in a program whose whole job is to grep.
@@ -337,8 +337,8 @@ func assembledFrom(arg ast.Expr) string {
 // Deliberately more than any one run would produce: a variable assigned in one
 // arm and appended to in another yields both here, and the engine sees one of
 // them. Reading too much can only report a name that is written somewhere in
-// this function, which is a name somebody wrote bare either way — and reading
-// too little is what left three assembled clauses unread.
+// this function, which is a name somebody wrote bare either way, and reading
+// too little leaves an assembled clause unread.
 //
 // Everything the statement pass has already read is left out, so a clause
 // written whole and then handed over as a variable is one defect and not two.

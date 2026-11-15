@@ -124,12 +124,12 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 	}
 	err = s.db.NewSelect().
 		TableExpr(`"branch_or_tag" AS "st"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."branch_or_tag_id" = "st"."id"`).
+		Join(`JOIN "build" AS "b" ON "b"."branch_or_tag_id" = "st"."id"`).
 		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		Where(`"st"."parent_id" = ?`, branchOrTagID).
-		Where(`"tg"."variant_id" = ?`, variantID).
+		Where(`"b"."variant_id" = ?`, variantID).
 		Where(`EXISTS (SELECT 1 FROM "scan_run" AS "sr"
-			WHERE "sr"."build_id" = "tg"."id" AND "sr"."finished_at" IS NOT NULL)`).
+			WHERE "sr"."build_id" = "b"."id" AND "sr"."finished_at" IS NOT NULL)`).
 		OrderExpr(`"st"."created_at" DESC, "st"."id" DESC`).
 		Limit(1).
 		Scan(ctx, &release)
@@ -167,14 +167,14 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	kinds, args := kind.Statistics.Where(`"f"."kind"`)
 	pairs := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"st"."product_id" = ?`, productID).
-		Where(`"tg"."branch_or_tag_id" = ?`, branchOrTagID).
-		Where(`"tg"."variant_id" = ?`, variantID).
+		Where(`"b"."branch_or_tag_id" = ?`, branchOrTagID).
+		Where(`"b"."variant_id" = ?`, variantID).
 		Where(kinds, args...).
 		GroupExpr(`"f"."vulnerability_id", "f"."component_id"`)
 	pairs = floor.narrow(inOneProduct(pairs, subject, productID, all))
@@ -210,8 +210,8 @@ func (s *Store) standing(ctx context.Context, subject access.Subject,
 	if err := s.db.NewSelect().
 		TableExpr(`"branch_or_tag" AS "st"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = ?`, variantID).
-		Join(`LEFT JOIN "build" AS "tg" ON "tg"."branch_or_tag_id" = "st"."id" AND "tg"."variant_id" = "va"."id"`).
-		ColumnExpr(`COALESCE("tg"."id", 0) AS "build_id"`).
+		Join(`LEFT JOIN "build" AS "b" ON "b"."branch_or_tag_id" = "st"."id" AND "b"."variant_id" = "va"."id"`).
+		ColumnExpr(`COALESCE("b"."id", 0) AS "build_id"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(catalog.ShownExpr("st")+` AS "branch_or_tag_name"`).
 		ColumnExpr(`"st"."kind" AS "kind"`).

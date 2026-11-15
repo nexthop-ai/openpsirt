@@ -263,9 +263,10 @@ func (f Filter) flagColumns(q *bun.SelectQuery) *bun.SelectQuery {
 	standingHere, inForce := InForce()
 	return q.
 		// Waiting, and standing: the row's own count requires the live key
-		// and this did not, so a decision proposed and then withdrawn put its
-		// group in the waiting bucket while the row drew no state word at
-		// all. Both are the same question and have to be the same condition.
+		// and so does this, or a decision proposed and then withdrawn would
+		// put its group in the waiting bucket while the row draws no state
+		// word at all. Both are the same question and have to be the same
+		// condition.
 		// A proposal that needs nobody is in force rather than waiting, and
 		// counts with the agreed ones, as the row's own counts do.
 		ColumnExpr(`MAX(CASE WHEN "de"."state" = ? AND "de"."needs_approval" = ? AND "de"."live_key" IS NOT NULL`+

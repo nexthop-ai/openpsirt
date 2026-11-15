@@ -3,9 +3,8 @@ name: CI
 # bash with pipefail everywhere. GitHub's default shell is `bash -e`, which
 # takes the *last* command's status in a pipeline — so `go test | tee` reports
 # tee's status, which is always 0. The engine guards below pipe into tee, and
-# without this they announce success over a failing suite. Measured, not
-# assumed: the local gate had the same hole and passed a deliberately broken
-# test.
+# without this they announce success over a failing suite; a deliberately
+# broken test passes without it.
 defaults:
   run:
     shell: bash -euo pipefail {0}
@@ -32,20 +31,18 @@ concurrency:
 jobs:
   # Everything that needs the Go toolchain, in one job.
   #
-  # This was six jobs — build and test, the interface, static analysis,
-  # vulnerabilities and licenses, the OpenAPI document, and the bill of
-  # materials. Five of them declared nothing but a checkout and a Go setup
-  # before running a make target: same runner image, same toolchain, same
-  # module cache, no services and no conditions. So they were six clones and
-  # six toolchain restores to run one machine's worth of work.
+  # Build and test, the interface, static analysis, vulnerabilities and
+  # licenses, the OpenAPI document and the bill of materials each need a
+  # checkout and a Go setup before a make target, and nothing else: same
+  # runner image, same toolchain, same module cache, no services and no
+  # conditions. As separate jobs they are a clone and a toolchain restore each
+  # for one machine's worth of work.
   #
-  # **What it runs is the command a developer runs.** `make check` is defined
-  # as everything CI checks, and `make gate full` is `make check &&
-  # make check-engines`. Naming the targets separately here is how the two
-  # drifted: CI was running neither `reserved`, nor `readable`, nor
-  # `pins-check`, all three of which `make check` has run for as long as it has
-  # existed. A gate nobody notices is missing is the failure `check-engines`
-  # was written to prevent, one level up.
+  # What it runs is the command a developer runs. `make check` is defined as
+  # everything CI checks, and `make gate full` is `make check && make
+  # check-engines`. Targets named separately here drift from `make check`, and
+  # a gate nobody notices is missing is the failure `check-engines` exists to
+  # prevent, one level up.
   checks:
     name: Build, test and check
     runs-on: ubuntu-latest
@@ -217,7 +214,7 @@ jobs:
         # Deliberately one target rather than a list of them. "make check" is
         # the definition of what CI checks, so a target added to it is run
         # here without anybody remembering to add a step, which is the half
-        # that had already gone wrong three times over.
+        # that drifts when targets are listed.
         #
         # It covers: the linter (which is also the vet),
         # unreachable exported code, decisions no design document names,
@@ -340,14 +337,13 @@ jobs:
   # The two below are not steps of the job above, and each for a reason of
   # its own rather than for tidiness.
   #
-  # A third was here: dependency review, the action applying the license
-  # policy to what a pull request adds. It needs GitHub Advanced Security on
-  # a private repository, which is a paid add-on nothing else in this
-  # organization buys, and it could never be run locally — so what it checked
-  # is now checked by "make licenses" and "make web-audit", which the job
-  # above runs along with everything else. REQ-75 asks for a finding that
-  # reproduces locally with one documented command, and the action was the
-  # one gate that could not.
+  # Dependency review, the action applying the license policy to what a pull
+  # request adds, is not one of them. It needs GitHub Advanced Security on a
+  # private repository, which is a paid add-on nothing else in this
+  # organization buys, and it cannot be run locally, so what it would check is
+  # checked by "make licenses" and "make web-audit", which the job above runs
+  # along with everything else. REQ-75 asks for a finding that reproduces
+  # locally with one documented command, and the action cannot.
 
   image:
     name: Container image and chart
@@ -374,10 +370,8 @@ jobs:
           # nothing but that branch.
           cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,mode=max' || '' }}
       # The same checks the local target runs, against the image just built.
-      # Written twice they drifted: the image's scanner was checked here and
-      # not there, the chart's refusal to render without a database there and
-      # not here, and the messages had come to differ — so whichever a
-      # developer ran, some of the guards went unexercised.
+      # Written twice, the checks drift apart, and whichever a developer runs
+      # leaves some of the guards unexercised.
       - name: Everything check-packaging checks
         run: make check-packaging CHECK_IMAGE=openpsirt:ci
 

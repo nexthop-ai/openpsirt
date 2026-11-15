@@ -85,9 +85,9 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Where(kinds, kindArgs...).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-			Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+			Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
@@ -98,7 +98,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 
 	total, err := s.db.NewSelect().
 		TableExpr(`(?) AS "sightings"`, narrow(s.db.NewSelect()).
-			ColumnExpr(`DISTINCT "st"."product_id", "tg"."id", "f"."component_id"`)).
+			ColumnExpr(`DISTINCT "st"."product_id", "b"."id", "f"."component_id"`)).
 		Count(ctx)
 	if err != nil {
 		return nil, 0, 0, fmt.Errorf("count where this issue sits: %w", err)
@@ -150,13 +150,11 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	// so that column is not read and not computed.
 	err = decisionCounts(sightings, `"st"."product_id"`, nil,
 		decisionWaiting, decisionApproved, decisionLapsed).
-		// Grouped on the component itself, not on its name. The total beside
-		// this list counts one sighting per component, and a build that ships
-		// two versions of a name — which is ordinary — folded them into one
-		// row here while the total counted both, so a page of nine rows said
-		// ten. Folding them was wrong on its own terms too: the row carries
-		// one version and one fix version, and two versions of a name are two
-		// different pieces of work.
+		// Grouped on the component itself, not on its name, so each row and
+		// the total beside this list count one sighting per component
+		// version. A build shipping two versions of a name is ordinary, and
+		// the row carries one version and one fix version: two versions of a
+		// name are two different pieces of work.
 		// The name and version the build stated are grouped on as well, one
 		// value each for a component in a build.
 		GroupExpr(`"p"."name", "p"."display_name", "st"."name", "va"."name", "c"."name", "c"."version", "c"."id", `+

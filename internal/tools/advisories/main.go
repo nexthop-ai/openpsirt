@@ -8,9 +8,9 @@
 // modules, npm's audit report for what the interface installs. An advisory is
 // present when the base was already affected by it: the version the base's
 // go.mod requires, or for the standard library the Go release the base's
-// Dockerfile builds with, falls in the advisory's affected ranges, or npm's
-// audit of the base's lockfile reports the same advisory against the same
-// package.
+// Dockerfile builds with, falls in the advisory's affected ranges and a scan
+// of the base reaches it, or npm's audit of the base's lockfile reports the
+// same advisory against the same package.
 // Everything else is introduced — including an advisory the base was not
 // affected by at all, and one against a dependency the base does not have. A
 // bump that fixes one advisory and not another therefore introduces nothing,
@@ -24,11 +24,12 @@
 //
 // Usage:
 //
-//	advisories go  -- <govulncheck -format json ...>
+//	advisories go  -- <govulncheck -format json {packages}>
 //	advisories npm -- <npm audit --json>    run in web/, and in the base's copy
 package main
 
 import (
+	"archive/tar"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -415,6 +416,10 @@ func base(root, ref string) (string, error) {
 // output reads. govulncheck's JSON mode exits zero whatever it finds, so any
 // other exit is the scan failing, whatever it printed before it did.
 func scan(kind, dir string, command []string) ([]byte, error) {
+	command, err := withPackages(dir, command)
+	if err != nil {
+		return nil, err
+	}
 	//nolint:gosec // G204: the scanner command the makefile passes
 	cmd := exec.Command(command[0], command[1:]...)
 	cmd.Dir = dir
@@ -425,6 +430,45 @@ func scan(kind, dir string, command []string) ([]byte, error) {
 		return nil, fmt.Errorf("%s: %w\n%s", strings.Join(command, " "), err, stderr.String())
 	}
 	return out, nil
+}
+
+// packagesArg stands in a scanner command for the module's packages in the
+// directory scanned. The base's checkout lists its own: a package the change
+// adds is not there to scan.
+const packagesArg = "{packages}"
+
+// withPackages is the command with packagesArg replaced by every package of
+// the module in dir, leaving out what lies under node_modules, which is the
+// interface's installed dependencies and not this module's code. The rule is
+// the makefile's PACKAGES, read here because the base's checkout lists its
+// own.
+func withPackages(dir string, command []string) ([]string, error) {
+	at := slices.Index(command, packagesArg)
+	if at < 0 {
+		return command, nil
+	}
+	goCommand := os.Getenv("GO")
+	if goCommand == "" {
+		goCommand = "go"
+	}
+	list := exec.Command(goCommand, "list", "./...") //nolint:gosec // G204: the go command the makefile names
+	list.Dir = dir
+	var stderr bytes.Buffer
+	list.Stderr = &stderr
+	out, err := list.Output()
+	if err != nil {
+		return nil, fmt.Errorf("listing the packages in %s: %w\n%s", dir, err, stderr.String())
+	}
+	var packages []string
+	for _, pkg := range strings.Fields(string(out)) {
+		if !strings.Contains(pkg, "/node_modules/") {
+			packages = append(packages, pkg)
+		}
+	}
+	if len(packages) == 0 {
+		return nil, fmt.Errorf("%s holds no packages, so a scan would check nothing", dir)
+	}
+	return slices.Concat(command[:at], packages, command[at+1:]), nil
 }
 
 func describe(a advisory) string {
@@ -472,7 +516,8 @@ var errFailed = errors.New("introduced advisories")
 
 // checkGo scans the working tree and asks the base about each finding: its
 // go.mod for modules, and its Dockerfile's Go release for the standard
-// library.
+// library. A finding the base held a version of is present only where a scan
+// of the base reaches it too.
 func checkGo(root string, command []string, commit string) ([]advisory, func(advisory) bool, error) {
 	out, err := scan("go", root, command)
 	if err != nil {
@@ -505,7 +550,132 @@ func checkGo(root string, command []string, commit string) ([]advisory, func(adv
 		func(a advisory) bool { return a.Name == stdlib }) {
 		return nil, nil, fmt.Errorf("the Dockerfile at %s names no golang release this reads", commit)
 	}
-	return found.found, goAffectedBefore(found, held), nil
+	affected := goAffectedBefore(found, held)
+	if !slices.ContainsFunc(found.found, affected) {
+		return found.found, affected, nil
+	}
+	reached, err := goReachedAt(root, command, commit)
+	if err != nil {
+		return nil, nil, err
+	}
+	return found.found, func(a advisory) bool { return affected(a) && reached[a.ID+" "+a.Name] }, nil
+}
+
+// goReachedAt scans the base in a copy of its tree of its own and returns
+// each advisory it reaches, by identifier and module. A version the base held
+// is present only where the base also called what the advisory affects: a
+// change making a vulnerable symbol reachable introduces it.
+func goReachedAt(root string, command []string, commit string) (map[string]bool, error) {
+	parent, err := os.MkdirTemp("", "advisories-")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = os.RemoveAll(parent) }()
+	dir := filepath.Join(parent, "base")
+	if err := extract(root, commit, dir); err != nil {
+		return nil, fmt.Errorf("write the tree of %s to scan it: %w", commit, err)
+	}
+	out, err := scan("go", dir, command)
+	if err != nil {
+		return nil, fmt.Errorf("scanning %s: %w", commit, err)
+	}
+	was, err := goFindings(bytes.NewReader(out))
+	if err != nil {
+		return nil, fmt.Errorf("scanning %s: %w", commit, err)
+	}
+	reached := map[string]bool{}
+	for _, a := range was.found {
+		reached[a.ID+" "+a.Name] = true
+	}
+	return reached, nil
+}
+
+// extract writes the tree at commit into dir, from git archive, touching
+// nothing in the repository itself. Writes go through dir as a root, so no
+// entry lands outside it.
+func extract(root, commit, dir string) error {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return err
+	}
+	into, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = into.Close() }()
+	//nolint:gosec // G204: a commit git merge-base named
+	archive := exec.Command("git", "-C", root, "archive", "--format=tar", commit)
+	var stderr bytes.Buffer
+	archive.Stderr = &stderr
+	stream, err := archive.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := archive.Start(); err != nil {
+		return err
+	}
+	written := writeTree(into, tar.NewReader(stream))
+	if written != nil {
+		// Nothing reads the rest of the stream, so git blocks on a full pipe
+		// and Wait never returns unless the process is stopped.
+		// git's own line, where it wrote one, says why the stream stopped.
+		_ = archive.Process.Kill()
+		_ = archive.Wait()
+		if said := strings.TrimSpace(stderr.String()); said != "" {
+			return fmt.Errorf("%w\n%s", written, said)
+		}
+		return written
+	}
+	if err := archive.Wait(); err != nil {
+		return fmt.Errorf("git archive: %w\n%s", err, stderr.String())
+	}
+	return written
+}
+
+// writeTree writes each directory, file and link a tar stream holds under
+// into, with the file's executable bit kept.
+func writeTree(into *os.Root, stream *tar.Reader) error {
+	for {
+		header, err := stream.Next()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		name := filepath.FromSlash(strings.TrimSuffix(header.Name, "/"))
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := into.MkdirAll(name, 0o750); err != nil {
+				return err
+			}
+		case tar.TypeSymlink:
+			if err := into.MkdirAll(filepath.Dir(name), 0o750); err != nil {
+				return err
+			}
+			if err := into.Symlink(header.Linkname, name); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := into.MkdirAll(filepath.Dir(name), 0o750); err != nil {
+				return err
+			}
+			mode := os.FileMode(0o640)
+			if header.Mode&0o111 != 0 {
+				mode = 0o750
+			}
+			file, err := into.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(file, stream) //nolint:gosec // G110: this repository's own tree
+			if closed := file.Close(); err == nil {
+				err = closed
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 // lockOnly is the audit command reading a lockfile alone. Presence is decided

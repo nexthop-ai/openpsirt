@@ -39,7 +39,7 @@ type Statement struct {
 	// the four fold differently outside ASCII, and asking them to would
 	// make whether a statement attaches to a finding depend on which one
 	// is running. It also leaves the index over these columns usable,
-	// which wrapping them in a function did not.
+	// which wrapping them in a function would defeat.
 	Publisher     string `bun:"publisher,notnull"`
 	Vulnerability string `bun:"vulnerability,notnull"`
 	Purl          string `bun:"purl"`
@@ -221,14 +221,15 @@ func Sources() []string {
 // depend on it: what a caller may narrow a list by, and which of them offers a
 // prefill.
 func VexStatuses() []string {
-	return []string{"not_affected", "affected", "fixed", "under_investigation"}
+	return []string{string(sbom.NotAffected), string(sbom.Affected), string(sbom.AlreadyFixed),
+		string(sbom.UnderInvestigation)}
 }
 
 // BuildSayings are what the build's own claims say about an open finding, in
 // the format's vocabulary. A claim that the shipped code is fixed closes every
 // finding it covers, so it is never one an open finding is narrowed by.
 func BuildSayings() []string {
-	return []string{"not_affected", "affected", "under_investigation"}
+	return []string{string(sbom.NotAffected), string(sbom.Affected), string(sbom.UnderInvestigation)}
 }
 
 // OutcomesOffered are the outcomes a publisher's statement can prefill.
@@ -257,16 +258,16 @@ func OutcomesOffered() []string {
 // help.
 func (s Statement) Prefills() (outcome string, offers bool) {
 	switch s.Status {
-	case "not_affected":
+	case string(sbom.NotAffected):
 		// The one status that *is* a claim of non-applicability, and the
 		// justification is the publisher's own term from the same vocabulary
 		// ours uses.
 		return OutcomeNotApplicable, true
-	case "affected":
+	case string(sbom.Affected):
 		// They say it applies and they are not fixing it here, which is a
 		// will-not-fix in our vocabulary and never a dismissal.
 		return OutcomeWontFix, true
-	case "fixed":
+	case string(sbom.AlreadyFixed):
 		return OutcomeAlreadyFixed, true
 	}
 	// Under investigation offers nothing: it is a publisher saying they do not
@@ -589,8 +590,8 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	// Asked about the issue rather than about the product, because what comes
 	// back is narrowed to this issue's names and this component — it is
 	// evidence for the one finding, and a collaborator brought in on that
-	// finding is who it is for. Asked product-wide, the detail route answered
-	// a fault for the one row their grant exists to let them open.
+	// finding is who it is for. Asked product-wide, the detail route would
+	// answer a fault for the one row their grant exists to let them open.
 	if _, err := access.ReadableOn(subject, productID, vulnerabilityID); err != nil {
 		return nil, err
 	}
@@ -716,9 +717,10 @@ func placedAbove(one Statement, above []graph.Component) bool {
 // The stored name is the short one, because that is what a component in the
 // graph is called and matching on anything else would match nothing. A short
 // name is not a package, though: two registries and two namespaces hold
-// different packages under one, so a publisher's statement about
-// `pkg:npm/@acme/parser` was shown against every component called `parser`,
-// from anywhere, with that publisher's name on it.
+// different packages under one, so matched on the short name alone, a
+// publisher's statement about `pkg:npm/@acme/parser` would be shown against
+// every component called `parser`, from anywhere, with that publisher's name
+// on it.
 //
 // Compared in the type and the namespace, never the version: a statement says
 // which versions it is about in its own terms, and this only asks whether the

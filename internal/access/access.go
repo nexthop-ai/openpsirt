@@ -248,9 +248,9 @@ type Subject struct {
 	scope *Scope
 	// unnarrowed is the deployment itself rather than anybody in it: the
 	// background passes that report on the tool, which answer nobody and
-	// are never reachable from a request. It is what an administrator used
-	// to be relied on for, and separating the two is what let an
-	// administrator stop holding every role.
+	// are never reachable from a request. It is kept apart from an
+	// administrator, so that administering does not mean holding every
+	// role.
 	unnarrowed bool
 	// delegated says this subject arrived on a credential its owner minted
 	// rather than by signing in. What it may reach is already bounded by the
@@ -495,9 +495,9 @@ func NewPipeline(id int64, name string, scope Scope) Subject {
 // than anything about what those products hold. Every such use carries a
 // sentence saying what it is for, and a use that cannot write one is a use
 // that should be asking a subject instead. An administrator's subject does not
-// stand here: it stopped meaning "sees everything" when it stopped meaning
-// "holds every role", and the two are different questions with only one of
-// them about a person.
+// stand here: administering does not mean holding every role, so it does not
+// mean seeing everything, and the two are different questions with only one
+// of them about a person.
 //
 // It holds no role, so it triages, approves and decides nothing. What it may
 // do is read, which is all these passes ask for.

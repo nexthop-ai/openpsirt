@@ -47,10 +47,10 @@ func deadlines(t *testing.T, r *httpapitest.Reach) {
 }
 
 // A promise to act past the deadline the finding already has defers the worst
-// thing it covers, so a second person agrees. Recorded from a finding the gate
-// had no deadline to measure against at all: the occurrence resolution never
-// carried one, so every backport recorded here stood the moment it was
-// written, suppressed the finding, and appeared in no review queue.
+// thing it covers, so a second person agrees. Recorded from a finding, the
+// gate measures against the deadline the occurrence carries; without one a
+// backport recorded here would stand the moment it was written, suppress the
+// finding, and appear in no review queue.
 func TestAPromisePastTheDeadlineTheFindingHasIsGated(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := r.Scanned(t)
@@ -94,8 +94,8 @@ func TestAPromiseInsideTheDeadlineTheFindingHasStandsOnItsOwn(t *testing.T) {
 
 // With nothing the act covers carrying a deadline, there is no date the
 // promise can be inside, so the exemption has nothing to measure against and a
-// second person agrees. A product below its own minimum severity was the one place
-// a promise could hide a finding for years on one signature.
+// second person agrees. Otherwise a product below its own minimum severity
+// would let a promise hide a finding for years on one signature.
 func TestAPromiseCoveringWorkWithNoDeadlineIsGated(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := r.Scanned(t)

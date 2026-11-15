@@ -3,6 +3,8 @@
 
 package ingest
 
+import "github.com/nexthop-ai/openpsirt/internal/series"
+
 // UploadType is one kind of document a build or its product is sent. Each
 // arrives at a path of its own, because each takes a different body and
 // answers a different receipt.
@@ -46,4 +48,30 @@ const (
 // UploadStatuses is every status an upload may hold.
 func UploadStatuses() []UploadStatus {
 	return []UploadStatus{UploadInProgress, UploadCompleted, UploadFailed, UploadRefused}
+}
+
+// Upload is an inventory's progress as an upload's status. A progress this
+// does not name reads as failed, never as a status outside the vocabulary.
+func (p Progress) Upload() UploadStatus {
+	switch p {
+	case Reading, Scanning:
+		return UploadInProgress
+	case Scanned:
+		return UploadCompleted
+	default:
+		return UploadFailed
+	}
+}
+
+// RunUpload is a static analysis run's status as an upload's status. A status
+// this does not name reads as failed, never as one outside the vocabulary.
+func RunUpload(s series.Status) UploadStatus {
+	switch s {
+	case series.Queued, series.Waiting:
+		return UploadInProgress
+	case series.Applied, series.Superseded:
+		return UploadCompleted
+	default:
+		return UploadFailed
+	}
 }

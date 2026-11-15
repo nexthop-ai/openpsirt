@@ -172,8 +172,9 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		until = s.now().UTC()
 	}
 	// An absent start is the beginning, which is what a zero side of a period
-	// means. Substituted with a default, a caller asking for an end alone got
-	// a window it never asked for under a response saying otherwise.
+	// means, so it is left zero: substituted with a default, a caller asking
+	// for an end alone would get a window it never asked for under a response
+	// saying otherwise.
 	out := Measures{Since: since, Until: until}
 
 	// The two spans, read as their endpoints. One query rather than two,
@@ -191,9 +192,9 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 	// alone reaches other products' findings and findings this reader may not
 	// see; and moving either condition to WHERE would turn the outer join into
 	// an inner one and flatten the figures the LEFT JOIN is there to keep.
-	sameProduct := `AND EXISTS (SELECT 1 FROM "build" AS "tg"
-			JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
-			WHERE "tg"."id" = "f"."build_id" AND "st"."product_id" = "de"."product_id")`
+	sameProduct := `AND EXISTS (SELECT 1 FROM "build" AS "b"
+			JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"
+			WHERE "b"."id" = "f"."build_id" AND "st"."product_id" = "de"."product_id")`
 	kinds, onArgs := kindsOf(kind.Statistics, "f")
 	sameProduct += " AND " + kinds
 	mayRead, readArgs := readableFindingsOn(subject, "f", `"de"."product_id"`)

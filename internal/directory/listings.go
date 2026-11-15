@@ -56,7 +56,7 @@ func (w *Writer) listings(ctx context.Context, published []entry) error {
 // exists.
 func (w *Writer) feed(listed []csaf.Listed) csaf.Feed {
 	return csaf.FeedOf(csaf.FeedName(w.who.Prefix), csaf.FeedTitle(w.who.Name, travels),
-		w.who.At(feedFile), w.who.At, []csaf.Beside{{Rel: "hash", Suffix: hashSuffix}}, listed)
+		w.who.At(feedFile), w.who.At, []csaf.Beside{{Rel: "hash", Suffix: csaf.SHA256Suffix}}, listed)
 }
 
 // described is the provider's description of itself. Nothing here is
