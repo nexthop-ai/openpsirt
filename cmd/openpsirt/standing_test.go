@@ -391,6 +391,34 @@ func TestAStuckPassHoldsBackOnlyThePasses(t *testing.T) {
 		if s.starts.Load() != 1 {
 			t.Error("the passes started again while a stopped one was still running")
 		}
+		// A standing moving back and forth faster than the grace never
+		// restarts the count toward it.
+		flapping := time.NewTicker(300 * time.Millisecond)
+		defer flapping.Stop()
+		var err error
+		deadline := time.After(30 * time.Second)
+		for stopped, standing := false, schema.Changes; !stopped; {
+			select {
+			case err = <-s.done:
+				stopped = true
+			case <-flapping.C:
+				select {
+				case s.standings <- sighting{standing: standing, applied: 47, carried: 47}:
+				case err = <-s.done:
+					stopped = true
+				case <-deadline:
+					t.Fatal("an instance whose stopped pass never ended had not stopped within 30s of flapping")
+				}
+				if standing == schema.Changes {
+					standing = schema.Serves
+				} else {
+					standing = schema.Changes
+				}
+			case <-deadline:
+				t.Fatal("an instance whose stopped pass never ended had not stopped within 30s of flapping")
+			}
+		}
+		s.done <- err
 		select {
 		case err := <-s.done:
 			s.done <- err

@@ -263,3 +263,36 @@ func TestALookWaitsForABusyPool(t *testing.T) {
 		t.Fatalf("a look past a pool busy for longer than its questions take: %v at %d, %v", changing, applied, err)
 	}
 }
+
+// No record of a change is written during the notice, so a process killed
+// while it waits, with nothing changed, leaves none.
+func TestNoRecordIsWrittenDuringTheNotice(t *testing.T) {
+	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
+		ctx := t.Context()
+		migrating := open(t, address)
+		recordTable(t, migrating)
+		lock, err := acquire(ctx, migrating)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = lock.release(context.Background()) }()
+		waiting, stop := context.WithCancel(ctx)
+		ended := make(chan error, 1)
+		go func() {
+			_, err := beginChange(waiting, migrating, lock, slog.New(slog.DiscardHandler), 1, 2, time.Minute)
+			ended <- err
+		}()
+		time.Sleep(500 * time.Millisecond)
+		var rows int
+		if err := migrating.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+ChangeTable+`"`).Scan(&rows); err != nil {
+			t.Fatal(err)
+		}
+		if rows != 0 {
+			t.Errorf("%d records were written during the notice", rows)
+		}
+		stop()
+		if err := <-ended; err == nil {
+			t.Error("an upgrade stopped during the notice reported going on")
+		}
+	})
+}

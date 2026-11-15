@@ -131,7 +131,7 @@ setting.
 
 | Setting | Effect |
 |---|---|
-| `strategy` | `Recreate` by default, so every pod of the earlier release stops before a pod of this one starts. With `RollingUpdate`, an earlier pod stops serving once a new pod starts changing the schema and exits once the schema is past its own, so an upgrade that changes the schema is an outage either way |
+| `strategy` | `Recreate` by default, so every pod of the earlier release stops before a pod of this one starts. With `RollingUpdate`, an earlier pod stops serving once a new pod starts changing the schema and exits once the schema is past its own, so an upgrade that changes the schema is an outage either way. A pod of a release whose [upgrade note](configuration.md#from-v0120) says it serves through another's upgrade does not stop, so scale to zero first |
 | `autoMigrate` | `true` by default: the schema is upgraded at startup. With `false`, run `openpsirt migrate up` before the upgrade |
 | `helm upgrade --timeout` | `helm upgrade --wait` gives up after five minutes, and `--atomic` then rolls back, which stops a migration part way. Pass a `--timeout` longer than the longest migration the [upgrade notes](configuration.md#upgrading) name. `kubectl rollout status` reports the progress deadline exceeded after ten minutes while `/healthz` still answers, and the migration carries on |
 

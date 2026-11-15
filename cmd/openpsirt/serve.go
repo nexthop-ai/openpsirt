@@ -401,6 +401,8 @@ type sighting struct {
 	standing schema.Standing
 	// applied is the version applied, and carried the one this build carries.
 	applied, carried int64
+	// failed is whether the standing is a look that failed, read as Changes.
+	failed bool
 }
 
 // lookBeforeServing looks at the schema once more just before the router
@@ -434,7 +436,8 @@ func watchSchema(logger *slog.Logger, look func(context.Context) (schema.Standin
 	return func(ctx context.Context) <-chan sighting {
 		seen := make(chan sighting)
 		go func() {
-			last, failing := schema.Serves, false
+			last := sighting{standing: schema.Serves}
+			failing := false
 			tick := time.NewTicker(every)
 			defer tick.Stop()
 			for {
@@ -457,12 +460,13 @@ func watchSchema(logger *slog.Logger, look func(context.Context) (schema.Standin
 				default:
 					failing = false
 				}
-				if standing == last {
+				now := sighting{standing: standing, applied: applied, carried: carried, failed: failing}
+				if now.standing == last.standing && now.failed == last.failed {
 					continue
 				}
-				last = standing
+				last = now
 				select {
-				case seen <- sighting{standing: standing, applied: applied, carried: carried}:
+				case seen <- now:
 				case <-ctx.Done():
 					return
 				}
@@ -532,7 +536,7 @@ serving:
 		case <-ctx.Done():
 			break serving
 		case <-drained:
-			drained = nil
+			drained, stalled = nil, nil
 			if halted && !paused {
 				restart()
 			}
@@ -544,7 +548,6 @@ serving:
 		case seen := <-standings:
 			switch seen.standing {
 			case schema.Changes:
-				stalled = nil
 				if !halted {
 					stopRunning()
 					drained = ended(workers)
@@ -555,8 +558,12 @@ serving:
 				}
 				server.pause()
 				paused = true
-				logger.Warn("another instance is changing the schema: not serving until it is this build's",
-					"applied", seen.applied, "carried", seen.carried)
+				if seen.failed {
+					logger.Warn("could not look at the schema: not serving until a look succeeds")
+				} else {
+					logger.Warn("another instance is changing the schema: not serving until it is this build's",
+						"applied", seen.applied, "carried", seen.carried)
+				}
 			case schema.Serves:
 				if !paused {
 					continue
@@ -566,7 +573,9 @@ serving:
 				logger.Info("the schema is this build's again: serving", "version", seen.applied)
 				if drained == nil {
 					restart()
-				} else {
+				} else if stalled == nil {
+					// Counted from the first time it serves again, so a
+					// standing moving back and forth never restarts it.
 					stalled = time.After(cfg.ShutdownGrace)
 				}
 			case schema.Superseded, schema.Behind:
