@@ -527,6 +527,7 @@ func TestASignInWillNotSendABrowserOffThisDeployment(t *testing.T) {
 			{"a bare host", "elsewhere.example"},
 			{"a relative path that climbs out", "..%2F..%2Fsomewhere"},
 			{"an address with a host and a leading slash", "%2F%2Fuser%40elsewhere.example%2F"},
+			{"a path that does not parse", "%2F%25zz"},
 		} {
 			where := signedInFrom(t, r, "?return="+hostile.given)
 			if where != "/" {
