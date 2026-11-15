@@ -17,8 +17,8 @@ import (
 // exist, for a person holding nothing on the product and for a pipeline
 // credential scoped to another one.
 //
-// Verified by deleting the `!subject.Sees(productID)` refusal in Of: both
-// subjects then read the scan.
+// Verified by deleting the `mayRead` refusal in Of: both subjects then read
+// the scan.
 func TestAScanInAnUnseenProductAnswersAsNoScan(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()

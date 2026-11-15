@@ -164,11 +164,10 @@ func TestADigestWithNothingToSayIsNotAMessage(t *testing.T) {
 }
 
 func TestEveryKindOfNotificationHasASubjectOfItsOwn(t *testing.T) {
-	// The table is hand-maintained over a closed vocabulary with nothing
-	// asserting that the two agree, and it was one row short. The kind it was
-	// missing shipped under the generic fallback — and it is the one whose
-	// whole purpose is a specific sentence, so a destination subscribed to it
-	// alone received an alert indistinguishable from any other.
+	// The table is hand-maintained over a closed vocabulary, and this is what
+	// asserts that the two agree. A kind missing from it goes out under the
+	// generic fallback, so a destination subscribed to that kind alone
+	// receives an alert indistinguishable from any other.
 	for _, kind := range Kinds() {
 		got := Compose(Notification{Kind: kind}, "https://psirt.example.test")
 		if got.Subject == "" {

@@ -172,8 +172,9 @@ func (s *Store) Measure(ctx context.Context, subject access.Subject, only Measur
 		until = s.now().UTC()
 	}
 	// An absent start is the beginning, which is what a zero side of a period
-	// means. Substituted with a default, a caller asking for an end alone got
-	// a window it never asked for under a response saying otherwise.
+	// means, so it is left zero: substituted with a default, a caller asking
+	// for an end alone would get a window it never asked for under a response
+	// saying otherwise.
 	out := Measures{Since: since, Until: until}
 
 	// The two spans, read as their endpoints. One query rather than two,

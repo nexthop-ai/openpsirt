@@ -102,8 +102,7 @@ func (s *Store) Effort(ctx context.Context, subject access.Subject, only Measuri
 			// Joined rather than asked as a subquery in the select list. The
 			// same expression in the list and in the grouping is refused outright
 			// by MySQL and MariaDB under ONLY_FULL_GROUP_BY, because it reads
-			// columns the grouping does not carry — so the report answered on two
-			// engines and was a 500 on the other two.
+			// columns the grouping does not carry.
 			//
 			// An occurrence sits in as many builds as hold it, so this multiplies the
 			// rows. Every figure below counts distinct identifiers for that

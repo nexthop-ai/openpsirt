@@ -20,8 +20,8 @@ import (
 func TestSomebodyJustAddedIsNotAlreadyAbsent(t *testing.T) {
 	// The threshold runs from when somebody was added where they have never
 	// signed in. Compared against the moment alone, an administrator adding a
-	// colleague and assigning them something raises an alert about them in the
-	// same breath — which is what happened, and an existing test caught it.
+	// colleague and assigning them something would raise an alert about them
+	// in the same breath.
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		db := w.DB
 		ctx := t.Context()

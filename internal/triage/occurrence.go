@@ -97,8 +97,8 @@ type DecisionOccurrence struct {
 // Revision is one statement of the reasoning behind a decision.
 //
 // Hung off the decision rather than off its rows, because one act is one
-// argument. A copy per occurrence is a copy that can be revised on its own, which
-// left forty-three rows saying the old thing under a decision that read as agreed.
+// argument. A copy per occurrence is a copy that can be revised on its own,
+// leaving rows saying the old thing under a decision that reads as agreed.
 type Revision struct {
 	bun.BaseModel `bun:"table:decision_revision,alias:dr"`
 
@@ -123,8 +123,8 @@ type Approval struct {
 	// WithdrawnBy is who took the agreement back, which is not who gave it.
 	//
 	// A proposer revising their own decision withdraws every agreement standing
-	// on the old words. With only the approver recorded, the queue reported
-	// that back to the proposer as somebody else having undone their
+	// on the old words. With only the approver recorded, the queue would
+	// report that back to the proposer as somebody else having undone their
 	// agreement.
 	WithdrawnBy *int64  `bun:"withdrawn_by"`
 	Batch       *string `bun:"batch"`
@@ -210,9 +210,8 @@ func (s *Store) At(moment time.Time) *Store {
 // ErrAlreadyInTransaction is returned when a write entry point is called on a
 // store that is already inside a transaction.
 //
-// One sentence rather than thirteen copies of it: written out at every entry
-// point, the assertion refuses in its own words and the copies drift — two of
-// them say something else.
+// One sentence rather than a copy at every entry point, where each assertion
+// refuses in its own words and the copies drift.
 var ErrAlreadyInTransaction = errors.New("this store is already inside a transaction")
 
 // pool is the handle a write opens its transaction on.
@@ -819,8 +818,8 @@ func (p Proposal) valid(now time.Time) error {
 	if !p.Outcome.Commits() && p.CommittedTo != nil {
 		return refusal.Errorf("%q promises no work, so there is no date for it to land on", p.Outcome)
 	}
-	// A date already past is not a date. Nothing here checked, and the two
-	// dates fail in opposite directions: a deferral until last year takes the
+	// A date already past is not a date, and the two dates fail in opposite
+	// directions: a deferral until last year takes the
 	// occurrence's live key so nobody else may decide there, suppresses nothing,
 	// and lands in the review queue already run out — a work item the tool
 	// made for itself. A promise to act by last year is worse, because the
@@ -984,9 +983,9 @@ func occurrencesOf(proposals []Proposal) []Occurrence {
 // the read — the original refusal stands, because a message naming a decision
 // that is no longer there is worse than one naming none.
 //
-// Written four times, in three files, the wording drifts by a word at each:
-// the same refusal reads "here" from one path and "at one of these occurrences"
-// from another for the same act on one occurrence.
+// One spelling of the refusal for every write path, so the same act on one
+// occurrence reads alike from each; written at each path, the wording drifts
+// by a word, "here" from one and "at one of these occurrences" from another.
 func (s *Store) alreadyDecided(ctx context.Context, err error, occurrences []Occurrence) error {
 	if !errors.Is(err, ErrAlreadyDecided) {
 		return err

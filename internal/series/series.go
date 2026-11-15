@@ -5,8 +5,8 @@
 // a product runs the same way on every build, each run of it against a
 // build, and what each run saw and did not see.
 //
-// Built for any kind whose producer sends results that way. Static analysis
-// is the first.
+// It serves any kind whose producer sends results that way; static analysis
+// is the one that does.
 package series
 
 import (

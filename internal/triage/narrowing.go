@@ -16,12 +16,10 @@ import (
 
 // The reach of each role: reading, arguing and agreeing.
 //
-// Every visibility rule this package enforces, in one file. They were spread
-// through the proposal writer, which is where the first caller of each was:
-// the file that decides whether somebody may see a decision is the file a
-// reviewer checks REQ-42 and REQ-43 against, and scrolling past three hundred
-// lines of write path to find it is how a rule gets checked once and then
-// taken on trust.
+// Every visibility rule this package enforces, in one file: the file that
+// decides whether somebody may see a decision is the file a reviewer checks
+// REQ-42 and REQ-43 against, and a rule found by scrolling past a write path
+// is a rule checked once and then taken on trust.
 
 // ErrNotTheirs is returned when somebody reaches for a decision about a
 // product they may not triage.
@@ -43,9 +41,8 @@ func mayDecide(subject access.Subject, productID int64, visibility access.Visibi
 
 // mayApprove reports whether a subject may agree to somebody else's decision.
 //
-// Approving is not deciding, and requiring the triage role for it made the
-// approver capability decorative: somebody granted exactly the right to
-// approve could not approve anything. It is a capability rather than a grant
+// Approving is not deciding, so the triage role is not required for it:
+// somebody granted exactly the right to approve can approve. It is a capability rather than a grant
 // of visibility, so it is asked alongside whether they may read the finding —
 // otherwise handing somebody the ability to approve hands them everything
 // there is to approve.
@@ -287,10 +284,10 @@ func readsAll(subject access.Subject, productID int64, visibilities []access.Vis
 // readableOn is readable with the case grant asked beside the product-wide
 // question.
 //
-// The list narrowing already asks it, so a collaborator's own case appeared
-// among the decisions and every route that reads one of them by identifier
-// refused it: listed and then not there, which reads as a fault rather than as
-// a rule. The grant is the pair of a product and an issue, so it needs the
+// The list narrowing already asks it, so a collaborator's own case appears
+// among the decisions, and every route that reads one of them by identifier
+// asks it too: listed and then not there reads as a fault rather than as a
+// rule. The grant is the pair of a product and an issue, so it needs the
 // issue, which a row carries and a bare product-and-visibility rule cannot
 // see.
 func readableOn(subject access.Subject, productID, vulnerabilityID int64,

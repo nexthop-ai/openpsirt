@@ -162,10 +162,10 @@ type Sweeper struct {
 	name   string
 }
 
-// NewSweeper is the sweep as a deployment runs it, taking its bound from the
-// deployment's settings: a pass too big holds a connection through the whole
-// of it, and one too small leaves a fifty-thousand-finding product re-queuing
-// twenty-five times.
+// NewSweeper is the sweep as a deployment runs it. Each pass reads its bound
+// from the deployment's settings (Once): a pass too big holds a connection
+// through the whole of it, and one too small leaves a fifty-thousand-finding
+// product re-queuing twenty-five times.
 func NewSweeper(db *database.DB, q *queue.Queue, logger *slog.Logger, name string) *Sweeper {
 	return &Sweeper{db: db, queue: q, logger: logger, name: name}
 }

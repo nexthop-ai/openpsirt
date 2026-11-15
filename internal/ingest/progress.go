@@ -352,10 +352,9 @@ func (s *Store) claims(ctx context.Context, buildID int64,
 	filed = kept
 
 	// The runs newest first by when they finished, which is the order the
-	// uploads are already in. Sorted here rather than by the engine: the
-	// caller holds them in identifier order because that is the order the page
-	// reads them in, and an ordering that answers one question is not the one
-	// that answers the other.
+	// uploads are already in. Only a finished run is attributed, and the walk
+	// below depends on this order, so it is sorted here rather than taken on
+	// trust from the caller.
 	order := make([]int, 0, len(runs))
 	for i := range runs {
 		if runs[i].FinishedAt != nil {

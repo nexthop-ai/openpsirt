@@ -69,7 +69,7 @@ type LastUpload struct {
 	// OutOfSupport says this build's release has gone out of support. It is
 	// reported rather than left out, because "not scanned, and that is
 	// fine" and "not listed" are different answers and only one of them is
-	// true .
+	// true.
 	//
 	// Not the same as taken out of use, which is RetiredFromUse below. A date
 	// says support ended and hides nothing; retiring says the build is not

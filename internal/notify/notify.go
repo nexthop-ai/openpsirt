@@ -57,10 +57,8 @@ type Kind string
 
 // Kinds is every kind of notification, in the order they are declared.
 //
-// Named so that the tables keyed on a kind can be checked against it. There
-// was no enumeration, and the table of subject lines was one row short: the
-// kind it was missing shipped under the generic fallback, and it is the one
-// kind whose whole purpose is a specific sentence.
+// Named so that the tables keyed on a kind can be checked against it: a kind
+// missing from the table of subject lines goes out under the generic fallback.
 func Kinds() []Kind {
 	return []Kind{
 		Assigned, Mentioned, SentBack, BuildQuiet, HoldingAbsent,
@@ -175,7 +173,7 @@ const (
 	// anything is not the tool's answer to give.
 	ResponseWindowPassed Kind = "response-window-passed"
 
-	// The four things that are wrong because nothing has happened.
+	// The things that are wrong because nothing has happened.
 	//
 	// Conditions, and they have to be: what is wrong is the absence of an
 	// event, which is the one thing no message driven by an event can ever
@@ -203,7 +201,7 @@ const (
 	// one team at a time.
 	QueueUntaken Kind = "queue-untaken"
 
-	// The two outcomes a proposer is told about. Events, because each is a
+	// The outcomes a proposer is told about. Events, because each is a
 	// thing that happened; the rest of what becomes of a decision is on their
 	// own view of it, which is where approval staying silent's silence
 	// holds.
@@ -263,8 +261,8 @@ const (
 	// audience apart from anybody it names, who is told of the mention.
 	ReportNoted Kind = "report-noted"
 
-	// The two conditions about the deployment rather than about anybody's
-	// work. Both are a report that has to come back empty, asked as a
+	// The conditions about the deployment rather than about anybody's
+	// work. Each is a report that has to come back empty, asked as a
 	// condition instead — because a report that is empty every time is one
 	// nobody opens, and mailing it on a schedule cannot tell "the control
 	// held" from "the job did not run".
@@ -274,6 +272,7 @@ const (
 	// what was known a month ago, and a finding that newer data would have
 	// opened simply has not.
 	VulnerabilityDataStale Kind = "vulnerability-data-stale"
+
 	// InventoryMoved is an upload that changed more of a build's contents
 	// than this deployment expects one to.
 	//
@@ -1080,11 +1079,9 @@ func (s *Store) Acknowledge(ctx context.Context, subject access.Subject, id int6
 	// the same answer on purpose.
 	//
 	// That holds only because the update does not also require it to be
-	// unread. With that condition, acknowledging something twice reported
-	// zero and was refused — so a second click, or a click racing the
-	// button that clears everything, answered "no notification of yours by
-	// that number" about one plainly theirs. Acknowledging is idempotent
-	// instead.
+	// unread, so acknowledging twice succeeds: a second click, or a click
+	// racing the button that clears everything, is never answered "no
+	// notification of yours by that number" about one plainly theirs.
 	n, err := database.Affected(res)
 	if err != nil {
 		return fmt.Errorf("acknowledge that notification: %w", err)
@@ -1118,7 +1115,7 @@ func (s *Store) AcknowledgeAll(ctx context.Context, subject access.Subject) (int
 
 // Concerning names the finding a notification is about.
 //
-// Identifiers rather than names, for two reasons that both bit. A name is
+// Identifiers rather than names, for two reasons. A name is
 // spelled differently depending on where it is read — the path a request names
 // a product by is not the display name a query returns — so keying on one and
 // looking up by the other never matches, and the digest silently repeats
@@ -1127,7 +1124,7 @@ func (s *Store) AcknowledgeAll(ctx context.Context, subject access.Subject) (int
 // overflow a bounded column on every engine but SQLite, where the write fails
 // and the person is told nothing at all.
 //
-// Assignment covers every build of a product holding the same component , so
+// Assignment covers every build of a product holding the same component, so
 // the build is deliberately not part of it: being told about one build and
 // asked about another is the same piece of work.
 func Concerning(productID, vulnerabilityID, componentID int64) string {

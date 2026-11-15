@@ -219,9 +219,9 @@ func (s *Store) Describe(ctx context.Context, subject access.Subject, occurrence
 	// Covered is what the decision's live rows actually match — the occurrence and
 	// both versions, as a finding asks it — rather than every occurrence the
 	// decision ever named. The occurrence-only fallback above is for naming what a
-	// lapsed decision was about; counted that way, a decision whose rows had
-	// lapsed, or which was keyed at another build's version, reported occurrences
-	// it does not cover.
+	// lapsed decision was about; counted that way, a decision whose rows have
+	// lapsed, or which is keyed at another build's version, would report
+	// occurrences it does not cover.
 	var covered []struct {
 		DecisionID  int64 `bun:"decision_id"`
 		BuildID     int64 `bun:"build_id"`

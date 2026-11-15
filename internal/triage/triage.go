@@ -56,8 +56,8 @@ const (
 	// The case is a distribution's package: a backported patch does not
 	// move the upstream version, so a scanner comparing a published
 	// identifier against an upstream range fires whether or not whoever
-	// packages it has already dealt with it. None of the other four says
-	// this. It is not "does not affect us" — the code is there and it was
+	// packages it has already dealt with it. No other outcome says this.
+	// It is not "does not affect us" — the code is there and it was
 	// affected — and the exchange format keeps the two apart as well, with
 	// a status of its own rather than a reason under "not affected".
 	AlreadyFixed Outcome = finding.OutcomeAlreadyFixed
@@ -239,8 +239,8 @@ func (o Outcome) Commits() bool { return o == UpgradeNeeded || o == PatchNeeded 
 
 // Dated reports whether this outcome stores a date.
 //
-// Three of them do: a deferral says when somebody will look again, and the two
-// that promise to act say when the work will be done. It is not the same
+// A deferral and the two promises do: a deferral says when somebody will look
+// again, and the two that promise to act say when the work will be done. It is not the same
 // question as Commits — a deferral's date is a review date rather than a
 // commitment — and the difference matters where what is being asked is whether
 // an outcome makes a statement about the future at all.
@@ -249,7 +249,7 @@ func (o Outcome) Dated() bool { return o.Commits() || o == Deferred }
 // StandsAtAnyVersion reports whether a decision with this outcome keeps applying
 // when the code under it moves.
 //
-// One outcome does. Identity is structural and expiry is version-based, and
+// Among the vulnerability outcomes, Mismatched does. Identity is structural and expiry is version-based, and
 // neither reaches into the other: a decision that the match itself is wrong is
 // about the first, so the second has nothing to say about it. Every other
 // outcome is a decision made under the versions it was made against, and a
@@ -267,10 +267,9 @@ func (o Outcome) StandsAtAnyVersion() bool {
 func (o Outcome) AboutALead() bool { return slices.Contains(CodeFindingOutcomes(), o) }
 
 // NeedsJustification reports whether this outcome says which recognized reason
-// applies, which is a decision two of them make.
+// applies, which a decision that something is not the problem here makes.
 //
-// Both are decisions that something is not the problem here, and which reason
-// applies is the whole of what each says. The rest are decisions about priority
+// Which reason applies is the whole of what such a decision says. The rest are decisions about priority
 // or about work, and a reason on one of those states something the decision does
 // not make.
 //

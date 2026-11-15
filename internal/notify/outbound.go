@@ -293,9 +293,8 @@ func unsettled(q *bun.SelectQuery, to Outbound) *bun.SelectQuery {
 			`AND ("settled"."sent_at" IS NOT NULL OR "settled"."attempts" >= ?))`,
 			to.ID, "", "", tries)
 	// The kind is an equality test, which is what normalizing it on the way in
-	// is for. Filtered after the limit instead, a destination configured for
-	// one kind wedged behind two hundred rows of another exactly as a
-	// destination taking everything did.
+	// is for. Filtered before the limit, so a destination configured for one
+	// kind is never held behind rows of another.
 	if to.Kind != Everything {
 		q = q.Where(`"nt"."kind" = ?`, to.Kind)
 	}
@@ -970,8 +969,8 @@ func (s *Store) RetireDestination(ctx context.Context, subject access.Subject,
 // the whole URL, redacting only a password in the userinfo — so the path
 // survives, and for Slack and for Teams the path is the credential. That text
 // is stored on the delivery and answered back by the endpoint that lists
-// destinations, so the first failure re-published the secret the address field
-// is careful not to return.
+// destinations, so the path is removed, or the first failure republishes the
+// secret the address field is careful not to return.
 //
 // The host is left in place. An operator reading "why is this failing" needs to
 // know which destination it is about, and the host is the part that says so

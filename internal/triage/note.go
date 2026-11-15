@@ -28,8 +28,8 @@ import (
 //
 // Not a comment on a decision, and not a decision. A comment hangs off an argument
 // somebody made, and the box for one appears only where a decision already
-// exists — so the first person to say anything had to record a decision in
-// order to say it. A note records none.
+// exists, so a note lets the first person to say anything say it without
+// recording a decision.
 //
 // Keyed on the issue and the product, the way a rating is (REQ-29), because a
 // row in the findings list is one issue at one fold and one issue is often

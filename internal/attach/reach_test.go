@@ -69,7 +69,7 @@ func TestAnIssuesFilesAreListedOnlyToWhoeverMayReadIt(t *testing.T) {
 // first would make the refusal a directory of what exists.
 //
 // Verified by deleting the `subject.Kind != access.Person ||
-// !subject.Sees(named.ID)` arm in Issue: the answer stays the same, because
+// !subject.Reaches(named.ID)` arm in Issue: the answer stays the same, because
 // the reach check after the lookup refuses too, and the statement against the
 // vulnerability table is what fails the test.
 func TestAnUnseenProductIsRefusedBeforeTheIssueIsLookedUp(t *testing.T) {
