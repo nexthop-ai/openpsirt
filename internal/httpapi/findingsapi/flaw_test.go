@@ -15,6 +15,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/findingsapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
@@ -726,6 +727,101 @@ func TestAWithdrawnDismissalNobodyAgreedToTellsNobody(t *testing.T) {
 		}
 		if got := toldOf(t, r, "code-finding-handler", "code-finding-reopened"); len(got) != 0 {
 			t.Errorf("a security testing triager was told %q of a dismissal that never held the code finding out; want nothing", got)
+		}
+	})
+}
+
+// confirmedAs remembers the seeded code finding's prefix, src, as confirmed
+// as a component, as an earlier flaw record would have.
+func confirmedAs(t *testing.T, r *httpapitest.Reach, component string) {
+	t.Helper()
+	ctx := t.Context()
+	mine, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "mine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var by int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"person"`).ColumnExpr(`MIN("id")`).Scan(ctx, &by); err != nil {
+		t.Fatal(err)
+	}
+	row := map[string]any{
+		"product_id": mine.ID, "prefix": "src", "prefix_identity": "src", "under": "src/", "under_length": 4,
+		"component": component, "ecosystem": "deb", "namespace": "debian",
+		"confirmed_by": by, "confirmed_at": time.Now().UTC(),
+	}
+	if _, err := r.DB.DB.NewInsert().Model(&row).TableExpr(`"code_finding_component"`).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestARecordAsFlawOfferNamesTheBuildsLackingAComponentAndTheBuildsNeverAnalyzed(t *testing.T) {
+	// The seeded build, where the code finding was seen, holds zlib and not
+	// openssl; mellanox holds openssl and was never analyzed.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		r.Inventoried(t, "mellanox", "inventory-mellanox", map[string]string{"openssl": "3.0.11"})
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
+			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
+			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
+		}
+		confirmedAs(t, r, "openssl")
+
+		var offer findingsapi.FlawOfferBody
+		httpapitest.Read(t, r, "code-finding-handler", codeFindingAt(occurrence)+"/flaw", &offer)
+		first := offer.Suggestions[0]
+		if first.From != "confirmed" || first.Component != "openssl" {
+			t.Fatalf("offered %+v first; want openssl, as src was confirmed", first)
+		}
+		seeded := []core.BuildNamed{{BranchOrTag: "master", Variant: "broadcom"}}
+		if !slices.Equal(first.Lacking, seeded) {
+			t.Errorf("openssl is lacking in %+v; want the seeded build, which holds no openssl", first.Lacking)
+		}
+		if want := []core.BuildNamed{{BranchOrTag: "master", Variant: "mellanox"}}; !slices.Equal(first.Unanalyzed, want) {
+			t.Errorf("openssl is unanalyzed in %+v; want %+v", first.Unanalyzed, want)
+		}
+		for _, s := range offer.Suggestions[1:] {
+			if len(s.Lacking) != 0 {
+				t.Errorf("the suggestion %+v is lacking in builds; want only openssl lacking", s)
+			}
+		}
+	})
+}
+
+func TestARecordAsFlawProposesTheBuildsNeverAnalyzedAsUnseen(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		occurrence := httpapitest.SeededCodeFinding(t, r)
+		r.Inventoried(t, "mellanox", "inventory-mellanox", map[string]string{"zlib": "1.3"})
+		if got := httpapitest.AsPerson(t, r, "security-testing-triager", http.MethodPost, codeFindingAt(occurrence)+"/decision",
+			`{"outcome":"confirmed","reasoning":"p leaks on the early return"}`); got.Code != http.StatusCreated {
+			t.Fatalf("confirming answered %d: %s", got.Code, got.Body)
+		}
+		confirmedAs(t, r, "zlib")
+		got := httpapitest.AsPerson(t, r, "code-finding-handler", http.MethodPost, codeFindingAt(occurrence)+"/flaw",
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"component":"zlib","summary":"p leaks"}`)
+		if got.Code != http.StatusCreated {
+			t.Fatalf("the flaw record answered %d: %s", got.Code, got.Body)
+		}
+		var proposed []struct {
+			BuildID int64 `bun:"build_id"`
+			Seen    bool  `bun:"seen"`
+		}
+		if err := r.DB.DB.NewSelect().TableExpr(`"flaw_code_finding_build" AS "flb"`).
+			ColumnExpr(`"flb"."build_id", "flb"."seen"`).OrderExpr(`"flb"."build_id"`).
+			Scan(ctx, &proposed); err != nil {
+			t.Fatal(err)
+		}
+		broadcom := r.BuildOf(t, httpapitest.SeededBuild)
+		mellanox := r.BuildOf(t, httpapitest.Build{Product: "mine", BranchOrTag: "master", Variant: "mellanox"})
+		want := map[int64]bool{broadcom: true, mellanox: false}
+		if len(proposed) != len(want) {
+			t.Fatalf("the flaw proposed %+v; want the seeded build seen and mellanox unseen", proposed)
+		}
+		for _, p := range proposed {
+			if seen, ok := want[p.BuildID]; !ok || seen != p.Seen {
+				t.Errorf("the flaw proposed build %d seen %v; want the seeded build %d seen and mellanox %d unseen",
+					p.BuildID, p.Seen, broadcom, mellanox)
+			}
 		}
 	})
 }
