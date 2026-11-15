@@ -441,7 +441,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 			var person *access.Account
 			var added bool
 			var flaw string
-			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 				var name string
 				var err error
 				if h, name, err = changing(ctx, tx, at, input.Occurrence); err != nil {
@@ -507,7 +507,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 			if err != nil {
 				return nil, err
 			}
-			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 				h, name, err := changing(ctx, tx, at, input.Occurrence)
 				if err != nil {
 					return err
@@ -518,7 +518,7 @@ func registerCodeFindingCollaborators(api huma.API, in core.Deps, a core.Adminis
 					return err
 				}
 				switch err := rights.RemoveFromCodeFinding(ctx, at.named.ProductID, h.OccurrenceIdentity, person.ID,
-					at.subject.ID); {
+					at.subject.ID, time.Now().UTC()); {
 				case errors.Is(err, access.ErrNothingMatched):
 					return huma.Error404NotFound("they do not hold this code finding")
 				case err != nil:

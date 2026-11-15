@@ -353,7 +353,7 @@ func (w *sweep) criticalOnReleases(ctx context.Context) (map[int64][]Holds, erro
 		Undisclosed     bool  `bun:"undisclosed"`
 		Exploited       bool  `bun:"exploited"`
 	}
-	undisclosed, private := access.AnyWithheld(`"f"."visibility"`)
+	undisclosed, private := access.AnyWithheld(access.FindingVisibility())
 	err := findingsWith(w.db.NewSelect(), true).
 		ColumnExpr(undisclosed+` AS "undisclosed"`, private).
 		ColumnExpr(`MAX(CASE WHEN "f"."urgency_exploited" THEN 1 ELSE 0 END) = 1 AS "exploited"`).

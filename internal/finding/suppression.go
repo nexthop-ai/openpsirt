@@ -309,7 +309,7 @@ func openClaims(ctx context.Context, db bun.IDB, buildID int64, at graph.Moment)
 	// recorded should not depend on what a map felt like doing.
 	var rows []Claim
 	err := db.NewSelect().Model(&rows).
-		ColumnExpr("sup.*").
+		ColumnExpr(`"sup".*`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "sup"."build_id"`).
 		Join(`JOIN "scan" AS "latest" ON "latest"."id" = "t"."last_scan_id"`).
 		Join(`LEFT JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).

@@ -11,6 +11,11 @@ func SetClock(q *Queue, now func() time.Time) {
 	q.now = now
 }
 
+// Bounds is the set of bounds a queue runs on, unset ones filled in.
+func Bounds(q *Queue) Options {
+	return q.opts
+}
+
 // SetLeaseClock replaces the leases' idea of now, for tests that decide when a
 // lease has lapsed rather than waiting for it to.
 func SetLeaseClock(l *Leases, now func() time.Time) {

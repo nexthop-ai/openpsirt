@@ -1909,6 +1909,8 @@ export interface paths {
          * Create an API key
          * @description Creates a credential a build may send scans with, and returns its secret. The secret is shown once and stored hashed: a credential store that can hand back what it holds gives up every pipeline's key with a copy of the database.
          *
+         *     Takes a name, a product, and optionally a branch or tag and a variant. A request carrying a field only the answer holds, such as `secret`, `withdrawn`, `created_at`, `last_used_at` or `product_name`, is refused with 422: send it without them.
+         *
          *     Requires a session. A credential cannot create another, and a key created by one would outlive it.
          *
          *     Requires: administrator
@@ -10713,7 +10715,7 @@ export interface components {
              * @enum {string}
              */
             status: "in-progress" | "completed" | "failed" | "refused";
-            /** @description Who uploaded it: a person by sign-in identity, or an API key by name. Absent where a feed fetched it */
+            /** @description Who uploaded it, by sign-in identity. Absent where a feed fetched it */
             uploaded_by?: string;
             /** @description Their display name, where it differs from their identity */
             uploaded_by_name?: string;
@@ -12021,12 +12023,6 @@ export interface components {
             namespace: string;
         };
         KeyBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/KeyBody.json
-             */
-            readonly $schema?: string;
             /** @description Optionally, the one release it may send for */
             branch_or_tag?: string;
             /** @description The date it was issued. A pipeline key does not expire, so this is the only thing that dates it */
@@ -12045,6 +12041,22 @@ export interface components {
             variant?: string;
             /** @description Whether it has been withdrawn */
             withdrawn?: boolean;
+        };
+        KeyRequest: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/KeyRequest.json
+             */
+            readonly $schema?: string;
+            /** @description Optionally, the one release it may send for */
+            branch_or_tag?: string;
+            /** @description The credential's purpose, stored in lower case and matched without regard to capitals */
+            name: string;
+            /** @description The product it may send scans for, by the name that addresses it. Always required */
+            product: string;
+            /** @description Optionally, the one variant it may send for */
+            variant?: string;
         };
         LapsedApprovalBody: {
             approved_at: string;
@@ -19796,7 +19808,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["KeyBody"];
+                "application/json": components["schemas"]["KeyRequest"];
             };
         };
         responses: {

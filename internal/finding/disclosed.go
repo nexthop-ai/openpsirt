@@ -147,7 +147,7 @@ func undisclosedHere(ctx context.Context, db bun.IDB, productID, vulnerabilityID
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "places")).
+		ColumnExpr(access.PrivateCountAs(access.FindingVisibility(), "places")).
 		ColumnExpr(`COUNT(CASE WHEN "f"."visibility" = ? THEN 1 END) AS "public"`, access.Public).
 		// The open ones decide whenever one is held: open occurrences with no
 		// date beside a closed one dated are an issue with no date.

@@ -316,11 +316,6 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, decisionI
 			return refusal.Errorf("that decision is %s, and only a promised upgrade or patch has a "+
 				"date to move", decision.Outcome)
 		}
-		for _, row := range rows {
-			if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-				return ErrNotTheirs
-			}
-		}
 		moving := strings.TrimSpace(to)
 		switch {
 		case decision.Outcome == UpgradeNeeded && moving == "":
@@ -401,7 +396,9 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, decisionI
 // regate works out whether a changed promise needs a second person, from what
 // the decision covers rather than from what it covered when it was made.
 //
-// The occurrences come from the decision's own rows. An upgrade's builds come from the
+// The occurrences come from the decision's own rows, of which there is at
+// least one: the caller read them through decisionRows, which refuses a
+// decision covering nothing. An upgrade's builds come from the
 // commitments it wrote, which are what says where the promise applies. A
 // patch writes none, so its builds are the ones holding an open finding the
 // decision covers now, by the match that names the builds a queue card lists. The
@@ -410,9 +407,6 @@ func (s *Store) Repromise(ctx context.Context, subject access.Subject, decisionI
 func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 	subject access.Subject, decision Decision, rows []DecisionOccurrence, by time.Time) (bool, error) {
 
-	if len(rows) == 0 {
-		return true, nil
-	}
 	var buildIDs []int64
 	if decision.Outcome == UpgradeNeeded {
 		if err := tx.NewSelect().Table("upgrade").

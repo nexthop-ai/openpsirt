@@ -304,7 +304,7 @@ func (s *Store) fixesOf(ctx context.Context, subject access.Subject,
 	}
 	if err := s.db.NewSelect().
 		Model((*Fix)(nil)).
-		ColumnExpr("ef.*").
+		ColumnExpr(`"ef".*`).
 		ColumnExpr(`"st"."name" AS "release"`).
 		ColumnExpr(`"st"."display_name" AS "release_display"`).
 		ColumnExpr(`"st"."released_on" AS "released_on"`).

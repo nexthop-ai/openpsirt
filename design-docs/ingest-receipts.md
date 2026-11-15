@@ -141,7 +141,7 @@ taken or turned away.
 | Rule | Reason |
 |---|---|
 | A product's VEX documents and supplier advisories are each listed, every arrival newest first | |
-| A row names a person by identity and display name, a key by name, or the supplier | |
+| A row names a person by identity and display name, or the supplier | |
 | The newest taken upload of a document is current: a VEX document by publisher and identifier, or an advisory by publisher and name | It is what stands |
 | Read by a person who may know the product exists, decided in the store; a key reads none | |
 

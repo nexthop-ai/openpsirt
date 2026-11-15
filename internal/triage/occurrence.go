@@ -1095,7 +1095,7 @@ func (s *Store) disclosedSince(ctx context.Context, rows []DecisionOccurrence) e
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private")).
+		ColumnExpr(access.PrivateCountAs(access.FindingVisibility(), "private")).
 		Where(`"st"."product_id" IN (?)`, bun.List(keysOf(products))).
 		Where(`"f"."vulnerability_id" IN (?)`, bun.List(keysOf(issues))).
 		Apply(ofKinds(kind.Triage, "f")).

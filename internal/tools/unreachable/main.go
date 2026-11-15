@@ -414,15 +414,16 @@ func exportedIn(d ast.Decl) []string {
 	return nil
 }
 
-// satisfiesSomething covers the names a standard interface calls, and the
-// query hooks the database library calls. The runtime or that library calls
-// them, and nothing written here does.
+// satisfiesSomething covers the names a standard interface calls, the query
+// hooks the database library calls, and the schema hook the API library
+// calls. The runtime or those libraries call them, and nothing written here
+// does.
 func satisfiesSomething(name string) bool {
 	switch name {
 	case "Error", "String", "Unwrap", "Is", "As",
 		"MarshalJSON", "UnmarshalJSON", "MarshalText", "UnmarshalText",
 		"ServeHTTP", "Read", "Write", "Close", "Len", "Less", "Swap",
-		"BeforeQuery", "AfterQuery":
+		"BeforeQuery", "AfterQuery", "TransformSchema":
 		return true
 	}
 	return false

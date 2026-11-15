@@ -145,10 +145,7 @@ type csafReader struct {
 	// groups is what each product group holds. A flag, a remediation or a
 	// threat names the products it is about by identifier or by group, and
 	// the two mean the same thing.
-	groups map[string][]string
-	// defined is which products the branch being walked has defined, so the
-	// branch that names a version can reach them once it closes.
-	defined  []string
+	groups   map[string][]string
 	claims   []*claimed
 	statuses map[string]Status
 	// charged is every identifier this document has made the reader hold: a
@@ -367,13 +364,11 @@ func (r *csafReader) productTree() error {
 	return r.b.Object(func(key string) error {
 		switch key {
 		case "branches":
-			return r.branches()
+			_, err := r.branches()
+			return err
 		case "full_product_names":
 			return r.b.Array(func() error {
-				id, err := r.product()
-				if id != "" {
-					r.defined = append(r.defined, id)
-				}
+				_, err := r.product()
 				return err
 			})
 		case "relationships":
@@ -523,8 +518,12 @@ func (r *csafReader) relationship() error {
 // the format promises that a branch names itself before it names what is
 // inside it. The innermost version wins: an inner branch fills its products
 // first, and an outer one only fills what is still empty.
-func (r *csafReader) branches() error {
-	return r.b.Array(func() error {
+//
+// It answers which products the branches defined, so the branch above can
+// name their version.
+func (r *csafReader) branches() ([]string, error) {
+	var defined []string
+	err := r.b.Array(func() error {
 		var (
 			category string
 			name     string
@@ -541,8 +540,8 @@ func (r *csafReader) branches() error {
 				name = value
 				return err
 			case "branches":
-				defined, err := r.branchesDefining()
-				within = append(within, defined...)
+				inner, err := r.branches()
+				within = append(within, inner...)
 				return err
 			case "product":
 				id, err := r.product()
@@ -566,19 +565,9 @@ func (r *csafReader) branches() error {
 				}
 			}
 		}
-		r.defined = append(r.defined, within...)
+		defined = append(defined, within...)
 		return nil
 	})
-}
-
-// branchesDefining walks a nested set of branches and answers which products
-// it defined, so the branch above can name their version.
-func (r *csafReader) branchesDefining() ([]string, error) {
-	was := r.defined
-	r.defined = nil
-	err := r.branches()
-	defined := r.defined
-	r.defined = was
 	return defined, err
 }
 

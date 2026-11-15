@@ -405,6 +405,47 @@ func Affected(res sql.Result) (int64, error) {
 	return n, nil
 }
 
+// ErrInsideTransaction refuses a write that has to run outside a transaction.
+var ErrInsideTransaction = errors.New("this write runs outside a transaction")
+
+// UpdateElseInsert writes a note kept as one row per key: update the row the
+// key matches, and insert it where none does. Two writers inserting together
+// meet on the key's unique constraint: the winner's note stands, the loser's
+// is dropped, and the loser reports success, since the two notes are of the
+// same moment.
+//
+// An update and then an insert, rather than an upsert: there is no portable
+// spelling of one, two of the four engines want ON CONFLICT and the other two
+// ON DUPLICATE KEY UPDATE. The update first, because a note written once is
+// nearly always written again.
+//
+// A transaction is refused, since a refused insert ends a PostgreSQL
+// transaction and the next statement fails far from the cause. The statements
+// are built from the handle given, so the handle is the one that runs them.
+func UpdateElseInsert(ctx context.Context, db bun.IDB,
+	update func(bun.IDB) *bun.UpdateQuery, insert func(bun.IDB) *bun.InsertQuery) error {
+
+	switch db.(type) {
+	case bun.Tx, *bun.Tx:
+		return ErrInsideTransaction
+	}
+	res, err := update(db).Exec(ctx)
+	if err != nil {
+		return err
+	}
+	changed, err := Affected(res)
+	if err != nil {
+		return err
+	}
+	if changed > 0 {
+		return nil
+	}
+	if _, err := insert(db).Exec(ctx); err != nil && !IsDuplicate(err) {
+		return err
+	}
+	return nil
+}
+
 // MovedAll reads an update that matched on what the transaction read. Fewer
 // rows than want means some moved since, which is a lost race the retry
 // helper takes again. A failure to read the count is wrapped in doing.

@@ -85,7 +85,7 @@ describe("code findings over time", () => {
       "semgrep/default: not comparable, analyzed fewer units than expected (2 builds)",
     );
     expect(rows[0]).not.toContain("cppcheck");
-    expect(mount.host().querySelectorAll(".chart .mark").length).toBe(1);
+    expect(mount.host().querySelectorAll(".chart .stepmark").length).toBe(1);
   });
 
   it("names its table's steps as days by default", async () => {

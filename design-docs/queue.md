@@ -108,7 +108,7 @@ timeout, so several renewals may fail before the claim is at risk.
 | A ceiling reached is logged at the level an operator sees | The worker is not coming back, and nothing else says so |
 | It is recorded as this job's failed attempt, never a handover | Nobody else holds the job, and counting it eventually fails a job that wedges every worker |
 | A killed subprocess is given a delay to release its pipes | A helper it spawned can hold a pipe open, and waiting on the copy blocks past the deadline, which is how a worker wedges |
-| Zero is no ceiling, for a caller whose work has no upper bound | No caller here builds a queue that way: every bound comes from a setting, which refuses zero |
+| The claim timeout, the heartbeat and the ceiling are positive; the queue has no mode without a heartbeat or a ceiling. The start-up check refuses zero for each. Configuration fills every unset setting with its default before that check. A queue built in code with one of the three unset fills it in, the heartbeat and ceiling in the defaults' proportion to the claim timeout, and a set the start-up check refuses is never built. Its attempts, backlog and backoff are taken as given | Zero reads as unset, as it does for every setting; a default heartbeat beside a short claim timeout hands running work to a second worker |
 
 ## Passes on a timer
 
@@ -193,7 +193,7 @@ administrator sets, and the caller is told to retry.
 |---|---|
 | The first five are read from the environment at start | The settings store reads the database, so the queue reading it inverts that import. A change needs a restart |
 | Queue depth is a stored setting | Its refusal lands on a build server |
-| Zero or negative is refused | The rule every setting is held to, so "no ceiling" cannot be asked for from the environment |
+| Zero or negative is refused | The rule every setting is held to |
 | The process refuses to start when the heartbeat is not shorter than the claim timeout, or the hold ceiling not larger, naming the pair | The first hands running work to a second worker; the second cancels normal work. Both would read as a fault in the work |
 | The defaults live where the queue is built, and the configuration reference prints them | One spelling. The chart carries none; a deployment wanting one sets the environment variable |
 

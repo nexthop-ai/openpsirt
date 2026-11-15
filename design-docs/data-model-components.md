@@ -110,6 +110,7 @@ or `pkg:golang/github.com/sonic-net/`.
 | A prefix ending on `/` takes every package under the path; any other takes that package alone | `pkg:golang/go.opentelemetry.io/otel` is a package of its own beside `otel/trace`, and `pkg:github/sonic-net/sonic-swss` takes neither `sonic-swss-common` nor a component with no identifier |
 | The package is tested in the application on each row read. A statement reading components only to choose among them is narrowed by the prefix's type, bound and escaped | No stored column holds an identifier reduced and folded this way for a statement to compare |
 | The burndown, a subtree started at a package and the findings list's package filter choose through this one rule | |
+| Every read over the findings list's filter resolves the components its prefix chooses before the list is narrowed; narrowing an unresolved prefix is a programming error and fails the request | An unresolved choice reads as an empty one, and an empty list with nothing saying why is a wrong answer |
 | A prefix with no `pkg:` scheme, or nothing past the type, is refused | |
 | A bare name chooses by name, at any version, in every ecosystem | The answer names each ecosystem the name matched |
 

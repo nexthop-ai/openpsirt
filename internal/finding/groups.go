@@ -395,7 +395,7 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	if len(buildIDs) == 0 {
 		return nil, 0, nil
 	}
-	if err := s.decidedIssuesFor(ctx, &filter, []int64{productID}, false); err != nil {
+	if err := s.prepare(ctx, &filter, []int64{productID}, false); err != nil {
 		return nil, 0, err
 	}
 
@@ -829,7 +829,7 @@ func groupDecorations(q *bun.SelectQuery) *bun.SelectQuery {
 		// sort after "public", so a maximum of the word answers "public" for
 		// a mixed group. The four engines do not agree on a boolean aggregate
 		// either, and counting is the same question asked portably.
-		ColumnExpr(access.AnyPrivateAs(`"f"."visibility"`, "undisclosed")).
+		ColumnExpr(access.AnyPrivateAs(access.FindingVisibility(), "undisclosed")).
 		ColumnExpr(`MIN("f"."disclose_at") AS "disclose_at"`).
 		// Both ends of what the occurrences say, because a group whose
 		// occurrences disagree is what FixMixed is for and a minimum alone

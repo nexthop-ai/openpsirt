@@ -409,7 +409,7 @@ func configure(ctx context.Context, cfg config.Config, logger *slog.Logger) (con
 	// ceiling would be killed mid-run on every attempt and the job would fail
 	// with nothing saying why, so the two are compared where both are in hand
 	// rather than left to a documentation row.
-	if queueing.MaxHold > 0 && cfg.ScannerTimeout >= queueing.MaxHold {
+	if cfg.ScannerTimeout >= queueing.MaxHold {
 		return configured{}, fmt.Errorf(
 			"OPENPSIRT_SCANNER_TIMEOUT is %s, which is not below the %s a worker may hold "+
 				"one job for — a scan allowed to run that long is killed before it finishes",

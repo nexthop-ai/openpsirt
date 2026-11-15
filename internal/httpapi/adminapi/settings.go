@@ -486,7 +486,7 @@ func registerSettings(api huma.API, in core.Deps) {
 		// moving the same setting at once both read the original, and the
 		// second writes a prior value into an append-only trail that nothing
 		// ever held.
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			settings := in.Settings(tx)
 			before, had, err := settings.Change(ctx, input.Name, value)
 			if err != nil {

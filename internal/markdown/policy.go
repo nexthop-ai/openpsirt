@@ -54,14 +54,9 @@ func allowedScheme(scheme string) bool {
 // operation's description carry.
 func SchemesSaid() string { return either(linkSchemes[:]) }
 
-// either joins a list as a sentence offering any one of it.
+// either joins a list as a sentence offering any one of it. Its callers pass
+// fixed lists of at least two.
 func either(words []string) string {
-	switch len(words) {
-	case 0:
-		return ""
-	case 1:
-		return words[0]
-	}
 	return strings.Join(words[:len(words)-1], ", ") + " or " + words[len(words)-1]
 }
 

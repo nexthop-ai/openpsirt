@@ -86,11 +86,6 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, decisionID i
 	if err != nil {
 		return Revised{}, err
 	}
-	for _, row := range rows {
-		if !mayDecideOn(subject, row.ProductID, row.VulnerabilityID, row.Visibility) {
-			return Revised{}, ErrNotTheirs
-		}
-	}
 
 	var latest int64
 	if err := s.db.NewSelect().Model((*Revision)(nil)).

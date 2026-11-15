@@ -117,7 +117,7 @@ func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 		// table's rules live.
 		address := outward.Normalized(input.Body.URL)
 		var row *supplier.Feed
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			// Resolved inside the act it names, so a rename or a retirement
 			// committing between the two is what a retry reads.
 			by, product, err := core.AdministeredProduct(ctx, in, tx, input.Product)
@@ -167,7 +167,7 @@ func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 		Name    string `path:"name"`
 	}) (*struct{}, error) {
 		in := core.Of(ctx, in)
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			// Resolved inside the act it names, so a rename committing
 			// between the two is what a retry reads.
 			by, product, err := core.AdministeredProduct(ctx, in, tx, input.Product)

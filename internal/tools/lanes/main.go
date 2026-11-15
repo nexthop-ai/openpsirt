@@ -34,7 +34,8 @@ const sqlPackage = "database/sql"
 
 // listed is one line per package "go list -test" reports: its import path, a
 // tab, and its dependencies separated by spaces. A test binary's main package
-// is the one whose path ends in ".test" and carries no variant suffix.
+// is the one whose path ends in ".test"; a variant ends in its bracketed binary
+// name, as "pkg [pkg.test]".
 const listed = "{{.ImportPath}}\t{{join .Deps \" \"}}"
 
 // goCommand is the go command make passes in GO, or go from the path where
@@ -84,7 +85,7 @@ func servers(listing io.Reader) (picked []string, examined int, err error) {
 			return nil, 0, fmt.Errorf("a line of the listing has no tab: %q", scan.Text())
 		}
 		pkg, isBinary := strings.CutSuffix(path, ".test")
-		if !isBinary || strings.Contains(path, " ") {
+		if !isBinary {
 			continue
 		}
 		examined++

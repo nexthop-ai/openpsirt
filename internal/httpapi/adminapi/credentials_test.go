@@ -61,6 +61,24 @@ func TestAnIngestKeyIsCreatedWithItsScope(t *testing.T) {
 	})
 }
 
+// A key being created states its name and reach alone. The secret, the
+// dates and the withdrawal are the answer's, so a request naming one is
+// refused rather than taken and ignored.
+func TestAKeyRequestStatingWhatOnlyTheAnswerCarriesIsRefused(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		for _, field := range []string{
+			`"secret":"chosen"`, `"withdrawn":true`, `"created_at":"2020-01-01"`,
+			`"last_used_at":"2020-01-01"`, `"product_name":"Mine"`,
+		} {
+			made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/keys",
+				`{"name":"nightly-mine","product":"mine",`+field+`}`)
+			if made.Code != http.StatusUnprocessableEntity {
+				t.Errorf("a key request stating %s answered %d: %s", field, made.Code, made.Body.String())
+			}
+		}
+	})
+}
+
 // A key's name is typed by an administrator to make it and again to withdraw
 // it, so it is one name in any capitals: stored folded, refused as taken in
 // other capitals, and withdrawn by any spelling of it.

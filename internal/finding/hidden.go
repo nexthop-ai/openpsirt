@@ -35,7 +35,7 @@ func (s *Store) Hidden(ctx context.Context, subject access.Subject, scope Scope,
 	if len(buildIDs) == 0 {
 		return 0, nil
 	}
-	if err := s.decidedIssuesFor(ctx, &below, []int64{productID}, false); err != nil {
+	if err := s.prepare(ctx, &below, []int64{productID}, false); err != nil {
 		return 0, err
 	}
 	rows := rowsOn(s.db, buildIDs, visible, filter.OpenOn)

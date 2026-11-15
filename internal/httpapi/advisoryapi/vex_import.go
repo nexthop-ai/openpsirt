@@ -19,7 +19,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
-	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -40,41 +39,6 @@ type StatementsTakenBody struct {
 	Recorded   int    `json:"recorded" doc:"Statements taken from it"`
 	Superseded int    `json:"superseded" doc:"Statements set aside rather than deleted: those the earlier revision of this document made and this one does not, and the publisher's older statements about a product and issue this document states newer"`
 	Digest     string `json:"digest" doc:"The document's digest, which is how a revision is noticed later"`
-}
-
-// uploaded streams one third party's document past a digest, parses it with
-// read, and answers the digest of the bytes that arrived.
-//
-// Read as a stream, digested as it goes, and never held whole. Read into
-// memory it is held twice — the growing buffer and then a copy of it to parse
-// from — which is about two and a half times the limit, against a container
-// that ships with less than that: an administrator importing a large vendor
-// document gets the process killed rather than an answer. The scan upload
-// streams a document of the same size past the same digest and holds none of
-// it.
-//
-// Read one byte past the limit, so a document over it is refused as too large
-// rather than cut off and reported as malformed — and so the digest recorded
-// is over what arrived rather than over the part that fitted.
-//
-// The parser reads to the end of the file: whitespace after the document is
-// read and anything else is refused. So a document it takes has passed
-// through the digest whole.
-func uploaded(in core.Deps, file huma.FormFile, read func(io.Reader) error) (string, error) {
-	most := in.Limits.OrDefault().MaxBytes
-	digest := sha256.New()
-	counted := &docread.Counting{R: io.TeeReader(io.LimitReader(file, most+1), digest)}
-	err := read(counted)
-	// Asked before the parse error, because a document cut off at the limit
-	// fails as malformed and the honest answer is its size.
-	if counted.N > most {
-		return "", huma.Error413RequestEntityTooLarge(fmt.Sprintf(
-			"that document is larger than the %d bytes this deployment reads", most))
-	}
-	if err != nil {
-		return "", core.Asked(in.Logger, err)
-	}
-	return hex.EncodeToString(digest.Sum(nil)), nil
 }
 
 func registerVexImport(api huma.API, in core.Deps) {
@@ -110,103 +74,67 @@ func registerVexImport(api huma.API, in core.Deps) {
 			"\n\nAnswers 503 with `Retry-After` when the deployment is already reading as many " +
 			"uploads as it takes at once; send again after that many seconds.",
 		Tags: []string{"Ingest"}, DefaultStatus: http.StatusCreated,
-		// A published document is somebody else's output arriving over a link
-		// we do not control, exactly as a scan file is, and this is the first
-		// place it can be stopped. Without it huma's default does not apply —
-		// it is not consulted for multipart at all — so the whole body is
-		// spooled to disk before any of this endpoint's own checks run.
 		MaxBodyBytes: core.MaxUpload(in.Limits),
-		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
-			Limit:   core.Fixed(core.MaxUpload(in.Limits)),
-			Refused: turnedAwayBeforeReading(in, finding.FromVex),
-		})},
+		Middlewares:  suppliedForm(api, in, finding.FromVex),
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product   string `path:"product"`
 		Publisher string `query:"publisher" maxLength:"191" doc:"The publisher, in place of the one the document names. Required where the document names none. At most 191 characters"`
 		RawBody   huma.MultipartFormFiles[statementParts]
 	}) (*struct{ Body StatementsTakenBody }, error) {
-		in := core.Of(ctx, in)
-		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
+		named := strings.TrimSpace(attach.Visible(input.Publisher))
+		took, err := takeSupplied(ctx, core.Of(ctx, in), input.Product,
+			input.RawBody.Data().Statements, finding.FromVex,
+			func(r io.Reader, lim sbom.Limits) (suppliedDocument, error) {
+				said, err := sbom.ReadStatements(r, lim)
+				return suppliedDocument{
+					Publisher: said.Publisher, Identifier: said.Identifier,
+					SaidAt: said.SaidAt, Claims: said.Claims,
+				}, err
+			},
+			func(from *finding.Supplied) error {
+				// The publisher is the key a later upload supersedes on, and
+				// it is an indexed column of a fixed width. Refused rather
+				// than shortened: two publishers agreeing for the width of the
+				// column would collapse into one, and the later upload would
+				// set aside statements it has nothing to do with.
+				//
+				// The request names it first, so one publisher's documents
+				// can be kept apart by release; else the document's own
+				// author. The file name never stands in: two publishers'
+				// files of one name would set aside each other's statements,
+				// and a revision under a new name would set aside nothing.
+				if named != "" {
+					from.Publisher = named
+				}
+				// What a later upload replaces is a revision of the same
+				// document: the publisher and the document's own identifier,
+				// matched exactly, because it is read out of the document
+				// every time. One longer than the column is held as its
+				// digest: an OpenVEX identifier is an IRI of any length, and a
+				// revision states the same one, so its digest keys it as well.
+				if utf8.RuneCountInString(from.Identifier) > finding.MostDocumentName {
+					sum := sha256.Sum256([]byte(from.Identifier))
+					from.Identifier = "sha256:" + hex.EncodeToString(sum[:])
+				}
+				if from.Publisher == "" {
+					return huma.Error422UnprocessableEntity(
+						"the document names no publisher; name it with ?publisher=")
+				}
+				if utf8.RuneCountInString(from.Publisher) > finding.MostPublisher {
+					return huma.Error422UnprocessableEntity(fmt.Sprintf(
+						"who published it is longer than the %d characters this records; "+
+							"name it with ?publisher=", finding.MostPublisher))
+				}
+				return nil
+			},
+			func(from finding.Supplied) string { return "VEX statements from " + from.Publisher })
 		if err != nil {
-			return nil, err
-		}
-
-		file := input.RawBody.Data().Statements
-		// Every refusal past this point is recorded against the product, as
-		// far as the document had been read.
-		from := finding.Supplied{
-			Source: finding.FromVex, Document: documentName(file.Filename), Arrived: &finding.Arrival{},
-		}
-		var said sbom.Statements
-		digest, err := uploaded(in, file, func(r io.Reader) error {
-			var err error
-			said, err = sbom.ReadStatements(r, in.Limits.OrDefault())
-			return err
-		})
-		if err != nil {
-			turnedAway(ctx, in, by, product.ID, from, err)
-			return nil, err
-		}
-		from.Digest = digest
-
-		// The publisher is the key a later upload supersedes on, and it is
-		// an indexed column of a fixed width. Refused rather than shortened:
-		// two publishers agreeing for the width of the column would collapse
-		// into one, and the later upload would set aside statements it has
-		// nothing to do with.
-		//
-		// The request names it first, so one publisher's documents can be
-		// kept apart by release; else the document's own author. The file
-		// name never stands in: two publishers' files of one name would set
-		// aside each other's statements, and a revision under a new name
-		// would set aside nothing. The document's name has nothing else
-		// guarding its width.
-		//
-		// Either way it is shown wherever the evidence is, so it is held
-		// without the characters that reorder or hide text.
-		publisher := strings.TrimSpace(attach.Visible(input.Publisher))
-		if publisher == "" {
-			publisher = strings.TrimSpace(attach.Visible(said.Publisher))
-		}
-		from.Publisher = publisher
-		// What a statement stating no time of its own was made at, which
-		// orders it against the publisher's other documents.
-		from.SaidAt = said.SaidAt
-		// What a later upload replaces is a revision of the same document:
-		// the publisher and the document's own identifier. Held without
-		// characters that reorder or hide text, as the publisher is, and then
-		// matched exactly, because it is read out of the document every time.
-		// One longer than the column is held as its digest: an OpenVEX
-		// identifier is an IRI of any length, and a revision states the same
-		// one, so its digest keys it as well.
-		from.Identifier = strings.TrimSpace(attach.Visible(said.Identifier))
-		if utf8.RuneCountInString(from.Identifier) > finding.MostDocumentName {
-			sum := sha256.Sum256([]byte(from.Identifier))
-			from.Identifier = "sha256:" + hex.EncodeToString(sum[:])
-		}
-		if publisher == "" {
-			refused := huma.Error422UnprocessableEntity(
-				"the document names no publisher; name it with ?publisher=")
-			turnedAway(ctx, in, by, product.ID, from, refused)
-			return nil, refused
-		}
-		if utf8.RuneCountInString(publisher) > finding.MostPublisher {
-			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
-				"who published it is longer than the %d characters this records; "+
-					"name it with ?publisher=", finding.MostPublisher))
-			turnedAway(ctx, in, by, product.ID, from, refused)
-			return nil, refused
-		}
-		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, from, said.Claims,
-			"VEX statements from "+publisher)
-		if err != nil {
-			turnedAway(ctx, in, by, product.ID, from, err)
 			return nil, err
 		}
 
 		return &struct{ Body StatementsTakenBody }{Body: StatementsTakenBody{
-			Publisher: publisher, Recorded: recorded, Superseded: superseded,
-			Digest: digest,
+			Publisher: took.From.Publisher, Recorded: took.Recorded, Superseded: took.Superseded,
+			Digest: took.From.Digest,
 		}}, nil
 	})
 }
@@ -239,7 +167,7 @@ func recordSupplied(ctx context.Context, in core.Deps, by access.Subject, produc
 	if err := finding.EnsureStatementsLock(ctx, in.DB); err != nil {
 		return 0, 0, core.NotRecorded(in.Log(), err)
 	}
-	if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+	if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 		in := core.Of(ctx, in)
 		if err := finding.TakeStatements(ctx, tx); err != nil {
 			return core.NotRecorded(in.Logger, err)

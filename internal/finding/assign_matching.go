@@ -92,7 +92,7 @@ func (s *Store) AssignMatching(ctx context.Context, subject access.Subject, scop
 		}
 		// Inside the attempt, like the builds: the issues are read from the
 		// decision occurrences as they stand when this attempt runs.
-		if err := inner.decidedIssuesFor(ctx, &narrowed, []int64{productID}, false); err != nil {
+		if err := inner.prepare(ctx, &narrowed, []int64{productID}, false); err != nil {
 			return err
 		}
 

@@ -95,8 +95,10 @@ func TestTwoRefusalsRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = first.Rollback() }()
-		if err := ingest.NewStore(first).Refused(ctx, sender,
-			ingest.Refusal{BuildID: build, Reason: "first"}); err != nil {
+		// The first is written as a row, since the write refuses to run inside
+		// a transaction and the transaction is what holds its row unseen.
+		if _, err := first.NewInsert().Model(&ingest.Refusal{BuildID: build,
+			At: time.Now().UTC().Truncate(time.Microsecond), Reason: "first"}).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		second := make(chan error, 1)

@@ -10,7 +10,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
@@ -25,7 +24,7 @@ type DocumentUploadBody struct {
 	Identifier     string            `json:"identifier,omitempty" doc:"The name the publisher gave the document. Absent for a VEX document stating none"`
 	Document       string            `json:"document" doc:"The file name it was uploaded as, or the address a supplier feed fetched it from"`
 	Digest         string            `json:"digest,omitempty" doc:"SHA-256 of what arrived. Absent where it was turned away before it was read whole"`
-	UploadedBy     string            `json:"uploaded_by,omitempty" doc:"Who uploaded it: a person by sign-in identity, or an API key by name. Absent where a feed fetched it"`
+	UploadedBy     string            `json:"uploaded_by,omitempty" doc:"Who uploaded it, by sign-in identity. Absent where a feed fetched it"`
 	UploadedByName string            `json:"uploaded_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	FetchedBy      string            `json:"fetched_by,omitempty" doc:"The supplier whose feed fetched it. Absent where somebody uploaded it"`
 	Recorded       int               `json:"recorded" doc:"Statements it recorded"`
@@ -119,52 +118,39 @@ func documentsOf(in core.Deps, source string) func(context.Context, *documentsIn
 	}
 }
 
-// senders is the names of the people and keys that uploaded a page of
-// documents.
-type senders struct {
-	people map[int64][2]string
-	keys   map[int64]string
-}
+// senders is the identities and display names of the people who uploaded a
+// page of documents. Only a person uploads one: every upload route refuses any
+// other credential, and a document a feed fetched records the feed instead.
+type senders map[int64][2]string
 
-// named is a sender's identity and display name, or a key's name. A sender
-// that cannot be read back names nobody.
+// named is a sender's identity and display name. A sender that cannot be read
+// back, or is not a person, names nobody.
 func (s senders) named(credential string) (string, string) {
-	switch kind, id, ok := access.SenderOf(credential); {
-	case !ok:
+	kind, id, ok := access.SenderOf(credential)
+	if !ok || kind != access.Person {
 		return "", ""
-	case kind == access.Pipeline:
-		return s.keys[id], ""
-	default:
-		return s.people[id][0], s.people[id][1]
 	}
+	return s[id][0], s[id][1]
 }
 
 // sendersOf reads who uploaded each of a page of documents.
 func sendersOf(ctx context.Context, in core.Deps, held []finding.Upload) (senders, error) {
-	var people, keys []int64
+	var people []int64
 	for _, u := range held {
 		if u.Credential == nil {
 			continue
 		}
-		switch kind, id, ok := access.SenderOf(*u.Credential); {
-		case !ok:
-		case kind == access.Pipeline:
-			keys = append(keys, id)
-		default:
+		if kind, id, ok := access.SenderOf(*u.Credential); ok && kind == access.Person {
 			people = append(people, id)
 		}
 	}
-	out := senders{people: map[int64][2]string{}}
 	who, err := core.WhoSigned(ctx, in.DB.DB, people)
 	if err != nil {
-		return senders{}, err
+		return nil, err
 	}
+	out := senders{}
 	for _, id := range people {
-		out.people[id] = [2]string{who.Identity(id), who.Label(id)}
-	}
-	out.keys, err = database.NamesByID(ctx, in.DB.DB, `"api_key"`, `"name"`, keys)
-	if err != nil {
-		return senders{}, err
+		out[id] = [2]string{who.Identity(id), who.Label(id)}
 	}
 	return out, nil
 }

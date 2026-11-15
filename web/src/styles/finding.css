@@ -517,7 +517,7 @@
   color: var(--ink);
   font-weight: 600;
 }
-.version.agreed .words {
+.version.agreed .revtext {
   background: var(--ok-wash);
 }
 .version .tagline {

@@ -258,9 +258,9 @@ func TestAnUploadShedAtTheSimultaneousLimitIsNotRecordedAsRefused(t *testing.T) 
 	})
 }
 
-// An upload's sender reads back as a key's name where a key is recorded, as
-// a person where a person is, and as nobody where the credential is one
-// nothing spells. No route takes a document from a key, so the key's
+// An upload's sender reads back as a person where a person is recorded, and
+// as nobody for any other credential: a key's, which no upload route accepts,
+// or one nothing spells. No route takes a document from a key, so the key's
 // credential is written straight to the row.
 func TestAnUploadsSenderIsNamedByTheKindOfCredentialRecorded(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
@@ -297,7 +297,7 @@ func TestAnUploadsSenderIsNamedByTheKindOfCredentialRecorded(t *testing.T) {
 		for _, each := range vex.Items {
 			got[each.Publisher] = each.UploadedBy + "|" + each.UploadedByName
 		}
-		want := map[string]string{"debian": "admin|" + httpapitest.ShownAs("admin"), "ubuntu": "nightly|", "suse": "|"}
+		want := map[string]string{"debian": "admin|" + httpapitest.ShownAs("admin"), "ubuntu": "|", "suse": "|"}
 		if len(got) != len(want) {
 			t.Fatalf("the uploads read as %v, want %v", got, want)
 		}

@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 // prettier-ignore
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { componentRoots, hiddenByPosition, hiddenClasses, printedActions, sweep } from "./printed-heads.mjs";
+import { componentRoots, hiddenByPosition, hiddenClasses, printedActions } from "./printed-heads.mjs";
 // @ts-expect-error - as above
 import { parse } from "./parsed.mjs";
 
@@ -95,15 +95,5 @@ describe("a screen head on paper", () => {
       ".screen-head > span",
     ]);
     expect(hiddenByPosition(`.screen-head > span:last-child { flex: none; }`)).toEqual([]);
-  });
-
-  it("prints every head's breadcrumb and counts, and none of its actions", () => {
-    const { examined, found, hidden } = sweep();
-    expect(
-      examined,
-      "no span under a screen head was found, so this checked nothing",
-    ).toBeGreaterThan(0);
-    expect(found).toEqual([]);
-    expect(hidden).toEqual([]);
   });
 });

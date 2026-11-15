@@ -339,6 +339,23 @@ func neededByEach(states []DecisionStanding) (string, []any, bool) {
 	return "(" + strings.Join(conditions, " OR ") + ")", args, true
 }
 
+// prepare resolves every set a filter narrows by that is read before the list
+// is: the components its package identifier chooses, the components a build
+// stated under the names it asks for, and the issues a group passing it can be
+// filed under. All is every product. Every read over a Filter calls it once its
+// products are known; narrowing a filter naming a package identifier it never
+// resolved fails the read (errUnprepared), since an unresolved set reads as an
+// empty one and answers nothing.
+func (s *Store) prepare(ctx context.Context, filter *Filter, products []int64, all bool) error {
+	if err := s.purlComponentsFor(ctx, filter, products, all); err != nil {
+		return err
+	}
+	if err := s.statedNamesFor(ctx, filter, products, all); err != nil {
+		return err
+	}
+	return s.decidedIssuesFor(ctx, filter, products, all)
+}
+
 // decidedIssuesFor sets the issues a group passing the filter can be filed
 // under, where the filter needs a decision to pass: the issues of the decision
 // occurrences in these products meeting decisionNeeded. All is every product.
@@ -358,12 +375,6 @@ func neededByEach(states []DecisionStanding) (string, []any, bool) {
 // or one holding its key. Only the decided occurrences are read among them (see
 // decidedBeside).
 func (s *Store) decidedIssuesFor(ctx context.Context, filter *Filter, products []int64, all bool) error {
-	if err := s.purlComponentsFor(ctx, filter, products, all); err != nil {
-		return err
-	}
-	if err := s.statedNamesFor(ctx, filter, products, all); err != nil {
-		return err
-	}
 	needed, args := filter.decisionNeeded()
 	into := &filter.decidedIssues
 	if needed == "" {
@@ -558,8 +569,8 @@ func statedAs(ctx context.Context, db bun.IDB, products []int64, all bool,
 
 // purlComponentsFor sets the components a filter's package identifier
 // chooses, among those holding a finding in these products. All is every
-// product. Read with every other set a filter is resolved to before the list
-// is, so each read that prepares a filter resolves it.
+// product. A resolved set is never nil, so narrowing tells a filter that was
+// never prepared from one whose identifier chose nothing.
 //
 // The type narrows the statement, bound and escaped; the package is tested on
 // each identifier read, as the burndown tests it, since no stored column

@@ -19,6 +19,10 @@ package bound
 
 import "unicode/utf8"
 
+// MostReason is how many bytes a record of a refused or failed upload keeps of
+// what its sender was told.
+const MostReason = 2000
+
 // Head keeps the first most bytes, cut on a character boundary.
 //
 // The partial character is at the end, so the trim goes backward, and only as

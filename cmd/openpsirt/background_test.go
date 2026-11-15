@@ -41,6 +41,7 @@ var alwaysRuns = []string{
 // optional is every pass that runs only where what it works on is configured.
 var optional = []string{
 	"send mail",
+	"send digests",
 	"send what is owed to chat",
 	"sweep unattached files",
 	"write the published advisory directory",
@@ -51,7 +52,7 @@ var optional = []string{
 
 // sharedBy is every pass struct field that runs more than one pass, and how
 // many.
-var sharedBy = map[string]int{"assigning": 2}
+var sharedBy = map[string]int{"assigning": 2, "post": 2}
 
 func TestWhatADeploymentWithNothingConfiguredStillRuns(t *testing.T) {
 	running := named((passes{}).loops())
@@ -119,7 +120,7 @@ func TestEveryPassFieldRunsAPass(t *testing.T) {
 	if got := len(everythingConfigured(t).loops()); got != want {
 		t.Errorf("a deployment with every pass configured runs %d passes, and its %d fields run %d", got, fields, want)
 	}
-	// The fields whose absence stops a pass are the optional ones, one each.
+	// The fields whose absence stops a pass run the optional ones.
 	nothing := len((passes{}).loops())
 	guarded := 0
 	for i := range fields {
@@ -127,7 +128,7 @@ func TestEveryPassFieldRunsAPass(t *testing.T) {
 		if added == 0 {
 			continue
 		}
-		guarded++
+		guarded += added
 		// A guarded field runs the passes it adds, one unless listed.
 		name := reflect.TypeFor[passes]().Field(i).Name
 		if runs := max(sharedBy[name], 1); added != runs {
@@ -135,7 +136,7 @@ func TestEveryPassFieldRunsAPass(t *testing.T) {
 		}
 	}
 	if guarded != len(optional) {
-		t.Errorf("%d fields are guarded by being configured, and %d passes are listed as optional", guarded, len(optional))
+		t.Errorf("%d passes are guarded by being configured, and %d are listed as optional", guarded, len(optional))
 	}
 }
 

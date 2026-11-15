@@ -208,6 +208,7 @@ GET /v1/analysis-coverage?weeks=13
 | A reader of security testing material in no product is answered with nothing counted | An empty set is an answer |
 | A pipeline key is refused 403 | It sends scans and reads nothing |
 | Each finding counts at its own product's visibilities, bound per product in the data layer, and each figure checks the reader on every product before reading (REQ-43) | A disclosed code finding counts where the reader reads disclosed work beside security testing material, and nowhere else |
+| Time to fix, precision, code findings by release and a component's counts answer one product, and refuse a scope across products to every reader in the data layer | Read as one product, the scope names none |
 | A decision, a suppression rule and an end of life are each worked out in the finding's own product | They belong to one product |
 | Each count and list is the sum or merge of each product's own figure, row for row | One population split by product; series identity is a product's, so no occurrence is in two products |
 | Counts are the queue's counts with no row built | A count needs no page; counts across two products took 112 ms on PostgreSQL, 1.23 s on MySQL and 862 ms on MariaDB (`design-docs/analysis-measurements.md` § Figures across products) |

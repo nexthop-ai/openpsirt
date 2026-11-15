@@ -129,6 +129,7 @@ decision.
 | Every moment goes through one renderer, and a test refuses an API body carrying a time value for the encoder | |
 | A moment not known is left out, its field optional, never the year 1 or an empty string | |
 | A published document states its dates as its format requires, in UTC | |
+| Recording a person and creating a key take a request type of their own, holding what the caller decides, so a field only the answer carries, such as a secret, a date or a state, is refused | One type for both directions publishes the answer's fields as accepted, and the request is taken with them ignored |
 
 ## Addresses and labels
 

@@ -113,6 +113,31 @@ func TestALongReasonIsRecordedCutWhereACharacterStarts(t *testing.T) {
 	})
 }
 
+// A refusal may quote what it refused, so a NUL or a byte that is not UTF-8 in
+// its reason is cleaned rather than failing the write on a strict engine.
+func TestAReasonQuotingABinaryDocumentIsRecorded(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		f := fixture.New(t, db)
+		build := f.Build.ID
+		store := series.NewStore(db.DB)
+		if err := store.Refused(ctx, series.Refusal{BuildID: build, Kind: kind.Analysis,
+			Series: "nightly", Reason: "unreadable near \x00 and \xff"}); err != nil {
+			t.Fatalf("a reason quoting a binary document was not recorded: %v", err)
+		}
+		got, err := store.RefusalsOf(ctx, everything, f.Product.ID, build, kind.Analysis, access.SecurityTesting)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 1 {
+			t.Fatalf("recorded %d refusals, want 1", len(got))
+		}
+		if !utf8.ValidString(got[0].Reason) || strings.ContainsRune(got[0].Reason, 0) {
+			t.Errorf("recorded %q, want the reason with its NUL dropped and its invalid byte replaced", got[0].Reason)
+		}
+	})
+}
+
 func TestTwoRefusalsOfASeriesRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 	// The second finds no row to replace and inserts after the first has.
 	// The series' refusal is recorded either way, so that is not a failure.
@@ -125,8 +150,11 @@ func TestTwoRefusalsOfASeriesRacingToWriteAreOneRecordedRefusal(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = first.Rollback() }()
-		if err := series.NewStore(first).Refused(ctx, series.Refusal{BuildID: build, Kind: kind.Analysis,
-			Series: "nightly", Reason: "first"}); err != nil {
+		// The first is written as a row, since the write refuses to run inside
+		// a transaction and the transaction is what holds its row unseen.
+		if _, err := first.NewInsert().Model(&series.Refusal{BuildID: build, Kind: kind.Analysis,
+			Series: "nightly", SeriesFolded: "nightly", At: time.Now().UTC().Truncate(time.Microsecond),
+			Reason: "first"}).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		second := make(chan error, 1)

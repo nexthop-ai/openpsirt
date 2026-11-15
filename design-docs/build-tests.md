@@ -166,7 +166,7 @@ The database and the slot's lock share one name.
 
 | Part of the name | Reason |
 |---|---|
-| A hash of the migration sources' fingerprint | Below 1.0 a schema change edits a migration and the version does not move |
+| A hash of the migration sources' fingerprint, which leaves out the package's test files | Below 1.0 a schema change edits a migration and the version does not move; a test file builds no schema |
 | The slot's number | Binaries running at once hold different databases |
 | Neither the package nor the checkout | Any binary of the same migrations takes a freed slot with its database |
 

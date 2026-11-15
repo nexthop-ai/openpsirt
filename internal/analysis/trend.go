@@ -107,17 +107,12 @@ type Trended struct {
 func Trend(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	since time.Time, step time.Duration, steps int) (*Trended, error) {
 
-	if err := scope.mayCount(subject, "trend the code findings"); err != nil {
-		return nil, err
-	}
+	// The window reads no name, so it is refused before any is resolved.
 	if err := finding.TrendWindow(step, steps); err != nil {
 		return nil, err
 	}
-	visible, err := scope.visible(subject)
+	scope, visible, err := scope.authorized(ctx, db, subject, "trend the code findings")
 	if err != nil {
-		return nil, err
-	}
-	if scope, err = scope.resolved(ctx, db); err != nil {
 		return nil, err
 	}
 	until := since.Add(time.Duration(steps) * step)

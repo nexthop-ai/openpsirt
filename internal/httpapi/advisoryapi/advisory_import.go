@@ -8,12 +8,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"unicode/utf8"
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -61,85 +59,55 @@ func registerAdvisoryImport(api huma.API, in core.Deps) {
 			"\n\nAnswers 503 with `Retry-After` when the deployment is already reading as many " +
 			"uploads as it takes at once; send again after that many seconds.",
 		Tags: []string{"Ingest"}, DefaultStatus: http.StatusCreated,
-		// A published document is somebody else's output arriving over a link
-		// we do not control, exactly as a scan file is, and this is the first
-		// place it can be stopped. Without it huma's default does not apply —
-		// it is not consulted for multipart at all — so the whole body is
-		// spooled to disk before any of this endpoint's own checks run.
 		MaxBodyBytes: core.MaxUpload(in.Limits),
-		Middlewares: huma.Middlewares{core.BoundedForm(api, in, core.Admission{
-			Limit:   core.Fixed(core.MaxUpload(in.Limits)),
-			Refused: turnedAwayBeforeReading(in, finding.FromAdvisory),
-		})},
+		Middlewares:  suppliedForm(api, in, finding.FromAdvisory),
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
 		RawBody huma.MultipartFormFiles[advisoryParts]
 	}) (*struct{ Body AdvisoryTakenBody }, error) {
-		in := core.Of(ctx, in)
-		by, product, err := core.AdministeredProduct(ctx, in, in.Handle(), input.Product)
+		var title string
+		took, err := takeSupplied(ctx, core.Of(ctx, in), input.Product,
+			input.RawBody.Data().Advisory, finding.FromAdvisory,
+			func(r io.Reader, lim sbom.Limits) (suppliedDocument, error) {
+				advisory, err := sbom.ReadAdvisory(r, lim)
+				title = advisory.Title
+				return suppliedDocument{
+					Publisher: advisory.Publisher, Identifier: advisory.Identifier,
+					SaidAt: advisory.SaidAt, Claims: advisory.Claims,
+				}, err
+			},
+			func(from *finding.Supplied) error {
+				// Both names are part of the key a later upload supersedes
+				// on, and both are stored in a column of a fixed width.
+				// Refused rather than shortened: two advisories agreeing for
+				// the width of the column would collapse into one, and a
+				// revision of one would set aside claims it has nothing to do
+				// with. Taken from the document rather than from the request,
+				// because a security advisory names its publisher and its own
+				// identifier and is not a conforming advisory without them.
+				if utf8.RuneCountInString(from.Publisher) > finding.MostPublisher {
+					return huma.Error422UnprocessableEntity(fmt.Sprintf(
+						"who published it is longer than the %d characters this records",
+						finding.MostPublisher))
+				}
+				if utf8.RuneCountInString(from.Identifier) > finding.MostDocumentName {
+					return huma.Error422UnprocessableEntity(fmt.Sprintf(
+						"the name the publisher gave it is longer than the %d characters this records",
+						finding.MostDocumentName))
+				}
+				return nil
+			},
+			func(from finding.Supplied) string {
+				return "Advisory " + from.Identifier + " from " + from.Publisher
+			})
 		if err != nil {
-			return nil, err
-		}
-
-		file := input.RawBody.Data().Advisory
-		// Every refusal past this point is recorded against the product, as
-		// far as the document had been read.
-		from := finding.Supplied{
-			Source: finding.FromAdvisory, Document: documentName(file.Filename), Arrived: &finding.Arrival{},
-		}
-		var advisory sbom.Advisory
-		digest, err := uploaded(in, file, func(r io.Reader) error {
-			var err error
-			advisory, err = sbom.ReadAdvisory(r, in.Limits.OrDefault())
-			return err
-		})
-		if err != nil {
-			turnedAway(ctx, in, by, product.ID, from, err)
-			return nil, err
-		}
-		from.Digest = digest
-
-		// Both names are part of the key a later upload supersedes on, and
-		// both are stored in a column of a fixed width. Refused rather than
-		// shortened: two advisories agreeing for the width of the column would
-		// collapse into one, and a revision of one would set aside claims it
-		// has nothing to do with.
-		//
-		// Taken from the document rather than from the request, because a
-		// security advisory names its publisher and its own identifier and is
-		// not a conforming advisory without them. Both are shown wherever the
-		// evidence is, so they are held without the characters that reorder
-		// or hide text.
-		advisory.Publisher = strings.TrimSpace(attach.Visible(advisory.Publisher))
-		advisory.Identifier = strings.TrimSpace(attach.Visible(advisory.Identifier))
-		from.Publisher, from.Identifier = advisory.Publisher, advisory.Identifier
-		from.SaidAt = advisory.SaidAt
-		if utf8.RuneCountInString(advisory.Publisher) > finding.MostPublisher {
-			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
-				"who published it is longer than the %d characters this records",
-				finding.MostPublisher))
-			turnedAway(ctx, in, by, product.ID, from, refused)
-			return nil, refused
-		}
-		if utf8.RuneCountInString(advisory.Identifier) > finding.MostDocumentName {
-			refused := huma.Error422UnprocessableEntity(fmt.Sprintf(
-				"the name the publisher gave it is longer than the %d characters this records",
-				finding.MostDocumentName))
-			turnedAway(ctx, in, by, product.ID, from, refused)
-			return nil, refused
-		}
-
-		recorded, superseded, err := recordSupplied(ctx, in, by, product.Name, from, advisory.Claims,
-			"Advisory "+advisory.Identifier+" from "+advisory.Publisher)
-		if err != nil {
-			turnedAway(ctx, in, by, product.ID, from, err)
 			return nil, err
 		}
 
 		return &struct{ Body AdvisoryTakenBody }{Body: AdvisoryTakenBody{
-			Publisher: advisory.Publisher, Identifier: advisory.Identifier,
-			Title: advisory.Title, Recorded: recorded, Superseded: superseded,
-			Digest: digest,
+			Publisher: took.From.Publisher, Identifier: took.From.Identifier,
+			Title: title, Recorded: took.Recorded, Superseded: took.Superseded,
+			Digest: took.From.Digest,
 		}}, nil
 	})
 }

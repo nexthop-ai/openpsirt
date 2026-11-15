@@ -182,6 +182,7 @@ func scoreFour(vector string, given map[string]string) (*Scored, error) {
 	}
 	return &Scored{
 		Vector: vector, ScoreCenti: int(math.Round(score * 100)), Severity: BandOf(score),
+		metrics: given,
 	}, nil
 }
 

@@ -576,7 +576,7 @@ func (s *Store) RulingBy(ctx context.Context, subject access.Subject,
 
 // named selects a ruling with the name of its product.
 func named(q *bun.SelectQuery) *bun.SelectQuery {
-	return q.ColumnExpr("rr.*").
+	return q.ColumnExpr(`"rr".*`).
 		ColumnExpr(`"p"."name" AS "product"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "rr"."product_id"`)
 }

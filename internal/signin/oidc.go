@@ -317,9 +317,8 @@ func text(claim any) string {
 // Anything else yields nothing, which is the safe direction: missing or
 // unreadable membership means no roles, never unrestricted.
 func groups(claim any) []string {
+	// Claims are decoded from JSON, so a list arrives as []any.
 	switch value := claim.(type) {
-	case []string:
-		return trimmed(value)
 	case string:
 		return trimmed([]string{value})
 	case []any:

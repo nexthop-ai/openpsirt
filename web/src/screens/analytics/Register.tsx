@@ -53,10 +53,6 @@ export function Register() {
     branch_or_tag: at.branch_or_tag ?? "",
     variant: at.variant ?? "",
   };
-  // Back to the first page whenever the build changes. The offset is in the
-  // query key, so carrying page nine onto a build with two pages asks for rows
-  // that are not there — and the empty answer draws as "nothing is known about
-  // this build yet", with the footer inside the rows branch and so no way back.
   const [params, setParams] = useSearchParams();
   // The narrowing on the register. In the address, so a narrowed register
   // is something somebody sends rather than describes, and so the file beside
@@ -75,6 +71,10 @@ export function Register() {
     ...(standing ? { standing: "open" as const } : {}),
     ...(closedBy.length > 0 ? { closed_because: closedBy } : {}),
   };
+  // Back to the first page whenever the build changes. The offset is in the
+  // query key, so carrying page nine onto a build with two pages asks for rows
+  // that are not there — and the empty answer draws as "nothing is known about
+  // this build yet", with the footer inside the rows branch and so no way back.
   const showing = `${where.product}\u0000${where.branch_or_tag}\u0000${where.variant}\u0000${params.toString()}`;
   const [shown, setShown] = useState(showing);
   if (shown !== showing) {
@@ -433,11 +433,6 @@ function MeasuredWith({
   );
 }
 
-// The decision standing at one occurrence, in the words and colors every screen
-// draws a state with. A register is read by somebody checking the record
-// against what shipped, so a column of wire tokens is the tool showing its
-// storage rather than answering; a state the table does not know is still
-// shown as it arrived.
 // The closures listed on their own, and what each is called on the screen.
 const CLOSED_BY = ["unaffected", "disclaimed"] as const;
 type ClosedBy = (typeof CLOSED_BY)[number];
@@ -477,6 +472,11 @@ function recordLine(line: {
   return `${line.entry}: ${line.version} unaffected`;
 }
 
+// The decision standing at one occurrence, in the words and colors every screen
+// draws a state with. A register is read by somebody checking the record
+// against what shipped, so a column of wire tokens is the tool showing its
+// storage rather than answering; a state the table does not know is still
+// shown as it arrived.
 function RegisterState({ state }: { state?: string }) {
   return state ? <span className={`state ${drawn(state)}`}>{said(state)}</span> : null;
 }

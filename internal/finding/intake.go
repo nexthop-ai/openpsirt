@@ -201,23 +201,7 @@ func (s *Store) ReportBy(ctx context.Context, subject access.Subject,
 	if err := mayReadReports(subject, productID); err != nil {
 		return nil, ErrNoSuchReport
 	}
-	row := new(FlawReport)
-	err := s.db.NewSelect().Model(row).
-		// Against the stored form, which is the minted one: a reference is
-		// uppercase by construction, so the value typed is folded to match
-		// rather than the column being compared loosely. The engines default
-		// differently on that, and a folded value compares the same under
-		// any of them.
-		Where(`"fr"."reference" = ?`, foldReference(reference)).
-		Where(`"fr"."product_id" = ?`, productID).
-		Scan(ctx)
-	switch {
-	case database.IsNoRows(err):
-		return nil, ErrNoSuchReport
-	case err != nil:
-		return nil, fmt.Errorf("read a report: %w", err)
-	}
-	return row, nil
+	return reportIn(ctx, s.db, productID, reference)
 }
 
 // foldReference is a report's name as it is stored and compared.

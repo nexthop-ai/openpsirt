@@ -6,10 +6,12 @@ package assignapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -506,6 +508,38 @@ func TestDeclaringOneTeamTwiceAtOnceIsOneDeclaration(t *testing.T) {
 				t.Fatalf("retiring %s answered %d: %s", name, got.Code, got.Body.String())
 			}
 			declareAtOnce(name)
+		}
+	})
+}
+
+// The ceiling on members is the one constant, refused before anything is
+// written: no team is declared by a request naming one member too many.
+func TestATeamNamingTooManyMembersIsRefusedBeforeItIsDeclared(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		members := make([]string, access.MostTeamMembers+1)
+		for i := range members {
+			members[i] = "reader"
+		}
+		body, err := json.Marshal(map[string]any{"name": "crowded", "members": members})
+		if err != nil {
+			t.Fatal(err)
+		}
+		refused := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams", string(body))
+		if refused.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("a team naming %d members answered %d: %s",
+				len(members), refused.Code, refused.Body.String())
+		}
+		if want := strconv.Itoa(access.MostTeamMembers); !strings.Contains(refused.Body.String(), want) {
+			t.Errorf("the refusal does not name the ceiling %s: %s", want, refused.Body.String())
+		}
+		var listed struct {
+			Items []struct {
+				Name string `json:"name"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "admin", "/v1/teams", &listed)
+		if len(listed.Items) != 0 {
+			t.Errorf("a refused request declared %+v", listed.Items)
 		}
 	})
 }

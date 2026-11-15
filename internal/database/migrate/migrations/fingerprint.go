@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"strings"
 	"sync"
 
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
@@ -34,34 +35,43 @@ var (
 
 // Fingerprint identifies this migration set by what it contains.
 //
-// The same bytes give the same value on every machine and every run: the files
-// are read in name order and hashed with their names, so adding, removing or
-// editing one changes it. It is not a version — nothing orders two of these —
-// and nothing about the running application depends on it. It exists for the
-// test harness, which keeps a migrated database between runs and needs to know
-// whether the migrations that built it are the ones in hand.
+// The same bytes give the same value on every machine and every run: the
+// non-test files are read in name order and hashed with their names, so
+// adding, removing or editing one changes it. It is not a version — nothing
+// orders two of these — and nothing about the running application depends on
+// it. It exists for the test harness, which keeps a migrated database between
+// runs and needs to know whether the migrations that built it are the ones in
+// hand.
 func Fingerprint() (string, error) {
 	fingerprintOnce.Do(func() {
-		names, err := fs.Glob(sources, "*.go")
-		if err != nil {
-			fingerprintErr = err
-			return
-		}
-		// Glob answers in lexical order, which is what makes the hash the same
-		// on two machines; sorting again would only hide it if that changed.
-		sum := sha256.New()
-		for _, name := range names {
-			content, err := sources.ReadFile(name)
-			if err != nil {
-				fingerprintErr = fmt.Errorf("read %s: %w", name, err)
-				return
-			}
-			_, _ = fmt.Fprintf(sum, "%s\x00%d\x00", name, len(content))
-			_, _ = sum.Write(content)
-		}
-		fingerprint = hex.EncodeToString(sum.Sum(nil))
+		fingerprint, fingerprintErr = fingerprintOf(sources)
 	})
 	return fingerprint, fingerprintErr
+}
+
+// fingerprintOf hashes the migration sources in fsys, leaving out test files:
+// a test builds no schema, and a test-only edit would otherwise rename every
+// cached test database on every engine.
+func fingerprintOf(fsys fs.FS) (string, error) {
+	names, err := fs.Glob(fsys, "*.go")
+	if err != nil {
+		return "", err
+	}
+	// Glob answers in lexical order, which is what makes the hash the same
+	// on two machines; sorting again would only hide it if that changed.
+	sum := sha256.New()
+	for _, name := range names {
+		if strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		content, err := fs.ReadFile(fsys, name)
+		if err != nil {
+			return "", fmt.Errorf("read %s: %w", name, err)
+		}
+		_, _ = fmt.Fprintf(sum, "%s\x00%d\x00", name, len(content))
+		_, _ = sum.Write(content)
+	}
+	return hex.EncodeToString(sum.Sum(nil)), nil
 }
 
 var (

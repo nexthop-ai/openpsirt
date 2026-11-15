@@ -275,7 +275,8 @@ func TestWorkStoppedAtTheCeilingSettlesAsAFailure(t *testing.T) {
 func TestAStaleClaimIsTakenOverByAnotherWorker(t *testing.T) {
 	// A worker that dies mid-job would otherwise strand the work for ever.
 	opts := queue.DefaultOptions()
-	opts.ClaimTimeout = time.Millisecond
+	// The heartbeat and ceiling unset follow the claim timeout down.
+	opts.ClaimTimeout, opts.Heartbeat, opts.MaxHold = time.Millisecond, 0, 0
 	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
 		first := claimed(t, q, "ingest", "abandoned", "worker-that-dies")
@@ -309,7 +310,8 @@ func TestWorkWhoseWorkerKeepsDyingFails(t *testing.T) {
 	// else as work somebody is doing.
 	opts := queue.DefaultOptions()
 	opts.MaxAttempts = 3
-	opts.ClaimTimeout = time.Millisecond
+	// The heartbeat and ceiling unset follow the claim timeout down.
+	opts.ClaimTimeout, opts.Heartbeat, opts.MaxHold = time.Millisecond, 0, 0
 	each(t, opts, func(t *testing.T, db *database.DB, q *queue.Queue) {
 		ctx := t.Context()
 		if _, err := q.Add(ctx, "scan", "kills-its-worker"); err != nil {
@@ -367,7 +369,8 @@ func TestABacklogCountsWorkHeldByAWorkerThatStopped(t *testing.T) {
 	// queue in the middle of a reclaim cycle holds every row in the running
 	// state, and counting only what is pending reports that as nothing to do.
 	opts := queue.DefaultOptions()
-	opts.ClaimTimeout = time.Millisecond
+	// The heartbeat and ceiling unset follow the claim timeout down.
+	opts.ClaimTimeout, opts.Heartbeat, opts.MaxHold = time.Millisecond, 0, 0
 	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
 		if _, err := q.Add(ctx, "ingest", "held-by-nobody"); err != nil {
@@ -902,7 +905,8 @@ func TestTheBurialPassKeepsGoingUntilItIsStopped(t *testing.T) {
 	// after its first pass: the second job stays claimed until the deadline.
 	opts := queue.DefaultOptions()
 	opts.MaxAttempts = 1
-	opts.ClaimTimeout = time.Millisecond
+	// The heartbeat and ceiling unset follow the claim timeout down.
+	opts.ClaimTimeout, opts.Heartbeat, opts.MaxHold = time.Millisecond, 0, 0
 	each(t, opts, func(t *testing.T, db *database.DB, q *queue.Queue) {
 		ctx, stop := context.WithCancel(t.Context())
 		defer stop()
@@ -1013,7 +1017,7 @@ func TestWorkThatNeverReturnsGivesUpItsClaimAtTheCeiling(t *testing.T) {
 	// silent, and this worker is not silent.
 	opts := queue.DefaultOptions()
 	opts.Heartbeat = time.Millisecond
-	opts.MaxHold = 10 * time.Minute
+	opts.MaxHold = opts.ClaimTimeout + 10*time.Minute
 	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
 		ctx := t.Context()
 		// The clock moves while the renewals are running, so it is read from
@@ -1040,29 +1044,61 @@ func TestWorkThatNeverReturnsGivesUpItsClaimAtTheCeiling(t *testing.T) {
 	})
 }
 
-func TestAClaimWithNoCeilingIsRenewedForAsLongAsTheWorkRuns(t *testing.T) {
-	// The other half of the pair. Zero is no ceiling, which is what a caller
-	// whose work has no upper bound of its own asks for — and a ceiling that
-	// fires anyway would cut legitimate work off mid-run.
-	opts := queue.DefaultOptions()
-	opts.Heartbeat = time.Millisecond
-	opts.MaxHold = 0
-	each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
-		ctx := t.Context()
-		moment := moving(t, q, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC))
-		job := claimed(t, q, "ingest", "unbounded", "patient")
+// A zero heartbeat or hold ceiling reads as unset, as every setting does: the
+// claim is renewed on the default and the work runs on, rather than the
+// renewal panicking on a zero interval or the work cancelled at its first tick.
+func TestAZeroHeartbeatOrCeilingReadsAsUnset(t *testing.T) {
+	for name, opts := range map[string]queue.Options{
+		"heartbeat": func() queue.Options { o := queue.DefaultOptions(); o.Heartbeat = 0; return o }(),
+		"ceiling": func() queue.Options {
+			o := queue.DefaultOptions()
+			o.Heartbeat, o.MaxHold = time.Millisecond, 0
+			return o
+		}(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			each(t, opts, func(t *testing.T, _ *database.DB, q *queue.Queue) {
+				moment := moving(t, q, time.Date(2026, 9, 3, 12, 0, 0, 0, time.UTC))
+				job := claimed(t, q, "ingest", "unset-"+name, "steady")
+				working, release := q.Holding(t.Context(), job.ID, "steady", quiet())
+				moment(time.Minute)
+				time.Sleep(50 * time.Millisecond)
+				if err := working.Err(); err != nil {
+					t.Errorf("work under a zero %s was stopped: %v", name, context.Cause(working))
+				}
+				if lost := release(); lost != nil {
+					t.Errorf("stopping the renewals reported %v", lost)
+				}
+			})
+		})
+	}
+}
 
-		working, release := q.Holding(ctx, job.ID, "patient", quiet())
-		moment(24 * time.Hour)
-		// Long enough for many ticks at a millisecond apiece.
-		time.Sleep(50 * time.Millisecond)
-		if err := working.Err(); err != nil {
-			t.Errorf("work with no ceiling was stopped anyway: %v", context.Cause(working))
+// A claim timeout given alone sets the unset heartbeat and ceiling in the
+// defaults' proportion to it, so the claim is renewed before it goes stale
+// and the ceiling is above it.
+func TestUnsetBoundsFollowTheClaimTimeout(t *testing.T) {
+	for _, claim := range []time.Duration{2 * time.Minute, 3 * time.Hour} {
+		got := queue.Bounds(queue.New(nil, queue.Options{ClaimTimeout: claim}))
+		if got.Heartbeat >= claim || got.MaxHold <= claim {
+			t.Errorf("a claim timeout of %s ran on a heartbeat of %s and a ceiling of %s",
+				claim, got.Heartbeat, got.MaxHold)
 		}
-		if lost := release(); lost != nil {
-			t.Errorf("stopping the renewals reported %v", lost)
+	}
+	if got, want := queue.Bounds(queue.New(nil, queue.Options{})), queue.DefaultOptions(); got.ClaimTimeout != want.ClaimTimeout ||
+		got.Heartbeat != want.Heartbeat || got.MaxHold != want.MaxHold {
+		t.Errorf("no bounds ran on %+v, where the defaults are %+v", got, want)
+	}
+}
+
+// A set of bounds Check refuses is not built into a queue.
+func TestAQueueIsNotBuiltOnBoundsCheckRefuses(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("a heartbeat no shorter than the claim timeout made a queue")
 		}
-	})
+	}()
+	queue.New(nil, queue.Options{ClaimTimeout: time.Minute, Heartbeat: time.Minute})
 }
 
 // moving gives a queue a clock that can be moved on while its renewals are
@@ -1101,20 +1137,26 @@ func TestBoundsThatCannotWorkTogetherAreRefusedAtStartup(t *testing.T) {
 		t.Errorf("the refusal does not name the setting: %v", err)
 	}
 
+	for name, unset := range map[string]func(*queue.Options){
+		"QUEUE_CLAIM_TIMEOUT": func(o *queue.Options) { o.ClaimTimeout = 0 },
+		"QUEUE_HEARTBEAT":     func(o *queue.Options) { o.Heartbeat = 0 },
+		"QUEUE_MAX_HOLD":      func(o *queue.Options) { o.MaxHold = 0 },
+	} {
+		zero := sound
+		unset(&zero)
+		if err := zero.Check(); err == nil {
+			t.Errorf("a zero %s was accepted", name)
+		} else if !strings.Contains(err.Error(), name) {
+			t.Errorf("the refusal of a zero %s does not name it: %v", name, err)
+		}
+	}
+
 	cutOffTooSoon := sound
 	cutOffTooSoon.MaxHold = sound.ClaimTimeout
 	if err := cutOffTooSoon.Check(); err == nil {
 		t.Error("a hold ceiling no larger than the claim timeout was accepted")
 	} else if !strings.Contains(err.Error(), "QUEUE_MAX_HOLD") {
 		t.Errorf("the refusal does not name the setting: %v", err)
-	}
-
-	// Zero is what a caller with no upper bound of its own states, and it is
-	// not a pair to compare.
-	noCeiling := sound
-	noCeiling.MaxHold = 0
-	if err := noCeiling.Check(); err != nil {
-		t.Errorf("work stated as having no ceiling was refused: %v", err)
 	}
 }
 

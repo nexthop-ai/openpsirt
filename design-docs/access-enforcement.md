@@ -94,7 +94,7 @@ querying.
 | Whether somebody may read; whether they may triage | One question each, asked in one place on the subject |
 | Whether any row of a group is undisclosed | The private rows counted and compared with zero |
 | Whether any row's detail stays inside the deployment | The rows that are not public, counted. An outbound message asks it before naming an issue |
-| A visibility column | Compared for equality, never ordered, and a test fails an ordering over one anywhere in the source |
+| A visibility column | Compared for equality, never ordered, and a test fails an ordering over one anywhere in the source. Named by a type whose values only access supplies, the finding's and the decision occurrence's, since it is spliced into the statement; the type's empty value names nothing and is refused (REQ-66) |
 
 | Question | Asked at |
 |---|---|

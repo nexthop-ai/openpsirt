@@ -188,8 +188,8 @@ func (s *Store) CountPlannedUpgrades(ctx context.Context, subject access.Subject
 }
 
 // listedIn authorizes a grouped list and resolves the builds it covers, then
-// narrows the filter to the issues decided in its product. No builds is an
-// empty list, and nothing more is read.
+// prepares the filter in its product. No builds is an empty list, and nothing
+// more is read.
 func (s *Store) listedIn(ctx context.Context, subject access.Subject, scope Scope,
 	filter *Filter) ([]access.Visibility, []int64, error) {
 
@@ -197,7 +197,7 @@ func (s *Store) listedIn(ctx context.Context, subject access.Subject, scope Scop
 	if err != nil || len(buildIDs) == 0 {
 		return nil, nil, err
 	}
-	if err := s.decidedIssuesFor(ctx, filter, []int64{productID}, false); err != nil {
+	if err := s.prepare(ctx, filter, []int64{productID}, false); err != nil {
 		return nil, nil, err
 	}
 	return visible, buildIDs, nil

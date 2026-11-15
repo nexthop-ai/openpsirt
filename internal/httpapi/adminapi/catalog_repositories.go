@@ -95,7 +95,7 @@ func registerCatalogRepositories(api huma.API, d core.Declaring) {
 		if err := stated.Valid(); err != nil {
 			return nil, huma.Error422UnprocessableEntity(err.Error())
 		}
-		return &struct{}{}, core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		return &struct{}{}, core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			_, product, err := core.ProductIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err

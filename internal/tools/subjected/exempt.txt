@@ -243,7 +243,8 @@ notify.Lapses A background pass: the scanner and the analyzer tell the people wh
 notify.Movements A background pass: the ingest reader tells who needs to hear what an upload changed.
 notify.Post.Digests A background pass: the mail sweep sends each person's digest, assembled with that person's own subject.
 notify.Post.Once A background pass: one cycle of the mail sweep.
-notify.Post.Run A background pass: the mail sweep sends notifications and digests on a schedule.
+notify.Post.Run A background pass: the mail sweep sends the notifications mailed as they happen on a schedule.
+notify.Post.RunDigests A background pass: the digest sweep sends each person's daily digest on a schedule.
 notify.Signal.Once A background pass: one cycle of the outbound signal sweep.
 notify.Signal.Run A background pass: the outbound signal sweep delivers webhooks on a schedule.
 notify.Store.Reconcile A background pass: the watch reconciles a person's standing conditions against what is being said.

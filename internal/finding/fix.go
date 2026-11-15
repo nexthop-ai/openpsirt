@@ -545,9 +545,7 @@ func (s *Store) packagesIn(ctx context.Context, buildID int64,
 
 // holder is who carries a fold's work, where one party carries all of it.
 type holder struct {
-	party       *int64
-	occurrences int
-	held        int
+	party *int64
 }
 
 // heldPerFold reads who is carrying what is still open under each fold.
@@ -596,7 +594,7 @@ func (s *Store) heldPerFold(ctx context.Context, buildID int64,
 	}
 	out := make(map[string]holder, len(rows))
 	for _, row := range rows {
-		one := holder{occurrences: row.Occurrences, held: row.Held}
+		var one holder
 		if row.Held == row.Occurrences && row.Least != nil && row.Most != nil && *row.Least == *row.Most {
 			one.party = row.Least
 		}

@@ -68,7 +68,7 @@ func registerKeys(api huma.API, a core.Administering) {
 		out.Body.Items = make([]KeyBody, 0, len(keys))
 		for _, key := range keys {
 			body := KeyBody{
-				Name: key.Name, Withdrawn: key.RevokedAt != nil,
+				KeyRequest: KeyRequest{Name: key.Name}, Withdrawn: key.RevokedAt != nil,
 				CreatedAt: core.Stamp(key.CreatedAt),
 			}
 			// The address, because create-key resolves this field through
@@ -119,16 +119,19 @@ func registerKeys(api huma.API, a core.Administering) {
 		Description: "Creates a credential a build may send scans with, and returns its secret. " +
 			"The secret is shown once and stored hashed: a credential store that can hand back " +
 			"what it holds gives up every pipeline's key with a copy of the database.\n\n" +
+			"Takes a name, a product, and optionally a branch or tag and a variant. A request " +
+			"carrying a field only the answer holds, such as `secret`, `withdrawn`, `created_at`, " +
+			"`last_used_at` or `product_name`, is refused with 422: send it without them.\n\n" +
 			"Requires a session. A credential cannot create another, and a key created by " +
 			"one would outlive it.",
 		Tags: []string{"Administration"}, DefaultStatus: http.StatusCreated,
 	}, core.DeploymentWide, ""), func(ctx context.Context, in *struct {
-		Body KeyBody
+		Body KeyRequest
 	}) (*core.DeclaredOutput[KeyBody], error) {
 		a := a.In(ctx)
 		var name, secret string
 		var resolved KeyBody
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			// The names the request resolved to, not the ones it typed: one
 			// product spelled two ways in the trail is two products to
 			// anybody searching it.
@@ -190,8 +193,9 @@ func registerKeys(api huma.API, a core.Administering) {
 			return nil, err
 		}
 		return core.Answer(true, KeyBody{
-			Name: name, Product: resolved.Product, BranchOrTag: resolved.BranchOrTag,
-			Variant: resolved.Variant, Secret: secret,
+			KeyRequest: KeyRequest{Name: name, Product: resolved.Product,
+				BranchOrTag: resolved.BranchOrTag, Variant: resolved.Variant},
+			Secret: secret,
 		}), nil
 	})
 
@@ -205,7 +209,7 @@ func registerKeys(api huma.API, a core.Administering) {
 		Name string `path:"name"`
 	}) (*struct{}, error) {
 		a := a.In(ctx)
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err

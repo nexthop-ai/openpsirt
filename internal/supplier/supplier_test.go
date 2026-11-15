@@ -4,6 +4,7 @@
 package supplier_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -268,6 +269,29 @@ func TestASupplierNeverReadIsDueAndOneJustReadIsNot(t *testing.T) {
 		}
 		if len(due) != 1 {
 			t.Fatalf("a supplier read a day ago is due %d times", len(due))
+		}
+	})
+}
+
+// Which suppliers are due is administration: a person without it is refused,
+// and an administrator reads the same list the pass does.
+func TestWhichSuppliersAreDueIsReadOnlyByAnAdministrator(t *testing.T) {
+	each(t, func(t *testing.T, f *configured) {
+		ctx := t.Context()
+		store := supplier.NewStore(f.db.DB)
+		if _, err := store.Add(ctx, f.admin, f.product, "SUSE", described); err != nil {
+			t.Fatal(err)
+		}
+		before := time.Now().UTC().Add(time.Hour)
+		if due, err := store.Due(ctx, f.anybody, before); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("a person who does not administer read %d due suppliers (%v), want a refusal", len(due), err)
+		}
+		due, err := store.Due(ctx, f.admin, before)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(due) != 1 {
+			t.Errorf("an administrator read %d due suppliers, want 1", len(due))
 		}
 	})
 }

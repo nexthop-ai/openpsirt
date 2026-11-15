@@ -146,7 +146,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 		// The names the product and the team resolved to, which is what the
 		// listing answers with.
 		var productName, teamName string
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			if _, _, err := core.Administerable(ctx, a, tx); err != nil {
 				return err
 			}
@@ -228,7 +228,7 @@ func registerOutbound(api huma.API, in core.Deps, a core.Administering) {
 		if err != nil {
 			return nil, err
 		}
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			if _, _, err := core.Administerable(ctx, a, tx); err != nil {
 				return err
 			}

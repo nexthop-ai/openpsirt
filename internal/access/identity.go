@@ -142,9 +142,6 @@ func (s *Store) claim(ctx context.Context, personID int64, username string) erro
 		}
 		return nil
 	}
-	if !database.IsNoRows(err) {
-		return fmt.Errorf("read who %q authorizes: %w", username, err)
-	}
 
 	claim := &Identity{
 		PersonID: personID, Username: username,

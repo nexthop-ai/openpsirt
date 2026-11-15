@@ -59,12 +59,9 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 			Vulnerability string `path:"issue"`
 		}) (*core.ListOutput[CollaboratorBody], error) {
 			in := core.Of(ctx, in)
-			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
+			_, product, issue, err := privateCaseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err
-			}
-			if !subject.Reads(access.Private, product) {
-				return nil, core.NoSuchFinding()
 			}
 			people, err := access.NewStore(in.DB.DB).OnCase(ctx, product, issue)
 			if err != nil {
@@ -100,17 +97,14 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 		}) (*struct{}, error) {
 			a := a.In(ctx)
 			in := core.Of(ctx, in)
-			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
+			subject, product, issue, err := privateCaseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err
-			}
-			if !subject.Reads(access.Private, product) {
-				return nil, core.NoSuchFinding()
 			}
 			var person *access.Account
 			var added bool
 			var named, issued string
-			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 				// Asked again where the grant is written, and this answer
 				// decides: an issue that left the product since the early
 				// refusal is refused as absent.
@@ -189,14 +183,11 @@ func registerCollaborators(api huma.API, in core.Deps, a core.Administering) {
 		}) (*struct{}, error) {
 			a := a.In(ctx)
 			in := core.Of(ctx, in)
-			subject, product, issue, err := caseAt(ctx, in, input.Product, input.Vulnerability)
+			subject, product, issue, err := privateCaseAt(ctx, in, input.Product, input.Vulnerability)
 			if err != nil {
 				return nil, err
 			}
-			if !subject.Reads(access.Private, product) {
-				return nil, core.NoSuchFinding()
-			}
-			if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+			if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 				named, issued, err := namedCase(ctx, in, tx, product, issue)
 				if err != nil {
 					return err
@@ -287,6 +278,22 @@ func caseAt(ctx context.Context, in core.Deps, product, vulnerability string) (
 	access.Subject, int64, int64, error) {
 
 	return caseAtHolding(ctx, in, product, vulnerability, false)
+}
+
+// privateCaseAt resolves a case for the routes managing who is on it, and
+// answers "no such finding" to anybody who does not read private findings on
+// its product. A collaborator reaches the issue and still manages nobody.
+func privateCaseAt(ctx context.Context, in core.Deps, product, vulnerability string) (
+	access.Subject, int64, int64, error) {
+
+	subject, productID, issueID, err := caseAt(ctx, in, product, vulnerability)
+	if err != nil {
+		return access.Subject{}, 0, 0, err
+	}
+	if !subject.Reads(access.Private, productID) {
+		return access.Subject{}, 0, 0, core.NoSuchFinding()
+	}
+	return subject, productID, issueID, nil
 }
 
 // namedCase is the subject of a case, as the record writes it: the names the

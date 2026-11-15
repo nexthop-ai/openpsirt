@@ -14,10 +14,10 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 )
 
-// Changing runs one administrative act and the record of it in one
-// transaction.
+// Changing runs one administrative act in one transaction, which the act's
+// record joins: the act calls Noted inside it.
 //
-// A failure to record fails the act. Both are one change: a setting moved with
+// So a failure to record fails the act. Both are one change: a setting moved with
 // nobody recorded as having moved it is exactly the state REQ-22 says the
 // record exists to prevent, and it is reachable by a write that succeeds
 // beside a record that does not. Answering with an error invites a retry,
@@ -25,7 +25,7 @@ import (
 //
 // The act is written against the transaction rather than against the handle,
 // so everything it decides from is read inside it (REQ-71).
-func Changing(ctx context.Context, db *database.DB, logger *slog.Logger,
+func Changing(ctx context.Context, db *database.DB,
 	do func(ctx context.Context, tx bun.Tx) error) error {
 
 	return database.InTransaction(ctx, db.DB, do)

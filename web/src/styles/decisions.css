@@ -177,9 +177,6 @@
   flex-direction: column;
   gap: 3px;
 }
-.sheet > footer .btn.ghost kbd.onbtn {
-  color: inherit;
-}
 
 /* ---------- the finding after a decision is recorded ---------- */
 

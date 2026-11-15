@@ -377,7 +377,7 @@ function Column({
               </span>
               <span className="why">
                 {row.because && (
-                  <span className={row.because === "patched" ? "mark patched" : "mark"}>
+                  <span className={row.because === "patched" ? "because patched" : "because"}>
                     {own(WENT, row.because) ?? row.because}
                   </span>
                 )}

@@ -237,19 +237,15 @@ func registerSecurityTestingFigures(api huma.API, in core.Deps) {
 
 	covered := func(ctx context.Context, input *AnalysisCoverageAsked) ([]analysis.Analyzed, time.Time, time.Time, error) {
 		in := core.Of(ctx, in)
-		subject, scope, err := (CodeFindingNarrowing{BranchOrTag: input.BranchOrTag, Variant: input.Variant}).
-			selected(ctx, in, input.Product)
+		subject, scope, err := figuresScoped(ctx, in, input.Product, CodeFindingNarrowing{
+			BranchOrTag: input.BranchOrTag, Variant: input.Variant,
+			Series: input.Series, Method: input.Method,
+		}, "read the analysis coverage")
 		if err != nil {
 			return nil, time.Time{}, time.Time{}, err
 		}
-		if err := analysis.MayCount(subject, *scope.ProductID, "read the analysis coverage"); err != nil {
-			return nil, time.Time{}, time.Time{}, core.Refused(in.Logger, err, "cannot read the analysis coverage")
-		}
 		since, until := weeksEnding(input.Weeks)
-		out, err := analysis.CoverageOf(ctx, in.DB.DB, subject, analysis.Scope{
-			ProductID: *scope.ProductID, BranchOrTagID: scope.BranchOrTagID, VariantID: scope.VariantID,
-			Series: strings.TrimSpace(input.Series), Method: analysis.Method(input.Method),
-		}, since, until, time.Now().UTC())
+		out, err := analysis.CoverageOf(ctx, in.DB.DB, subject, scope, since, until, time.Now().UTC())
 		if err != nil {
 			return nil, since, until, core.Refused(in.Logger, err, "the analysis coverage could not be read")
 		}

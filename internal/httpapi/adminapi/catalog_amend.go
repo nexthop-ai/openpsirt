@@ -68,7 +68,7 @@ func registerVariantEdits(api huma.API, d core.Declaring) {
 		// name resolved inside it. Renaming and reclassifying apart leaves the
 		// first standing when the second fails, and the answer would describe
 		// a state the database does not hold.
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, variant, err := core.VariantIn(ctx, d, tx, in.Product, in.Variant)
 			if err != nil {
 				return err
@@ -176,7 +176,7 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 			return nil, huma.Error400BadRequest(
 				"say what to change: the name, the displayed name, or both")
 		}
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
@@ -279,7 +279,7 @@ func registerCatalogAmends(api huma.API, d core.Declaring) {
 		if name == "" {
 			return nil, huma.Error400BadRequest("say what to call it")
 		}
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag)
 			if err != nil {
 				return err
@@ -343,7 +343,7 @@ func retireRow(ctx context.Context, d core.Declaring, noun string,
 	if err := core.Administrating(ctx); err != nil {
 		return nil, err
 	}
-	if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+	if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 		about, retire, err := find(ctx, in, tx)
 		if err != nil {
 			return err

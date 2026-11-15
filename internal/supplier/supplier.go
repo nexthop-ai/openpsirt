@@ -188,9 +188,9 @@ func (s *Store) Due(ctx context.Context, subject access.Subject, before time.Tim
 // pass takes minutes and a supplier withdrawn during one is a request leaving
 // this deployment that somebody thought they had stopped. Answers nothing where
 // the source has been withdrawn or its product taken out of use.
-func (s *Store) Standing(ctx context.Context, db bun.IDB, id int64) (*Feed, error) {
+func (s *Store) Standing(ctx context.Context, id int64) (*Feed, error) {
 	row := new(Feed)
-	q := db.NewSelect().Model(row).Where(`"sp"."id" = ?`, id).Where(`"sp"."retired_at" IS NULL`)
+	q := s.db.NewSelect().Model(row).Where(`"sp"."id" = ?`, id).Where(`"sp"."retired_at" IS NULL`)
 	switch err := inUse(q).Scan(ctx); {
 	case errors.Is(err, sql.ErrNoRows):
 		return nil, nil

@@ -47,9 +47,6 @@ func Register(api huma.API, in core.Deps) {
 	})
 	registerAdministration(api, core.Administering{
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,
-		Findings: func() *finding.Store {
-			return finding.NewStore(in.DB.DB)
-		},
 		Settings: in.Settings,
 	})
 	// One person, whole: the grants in force, the grants withdrawn, their part

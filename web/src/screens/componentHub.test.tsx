@@ -196,7 +196,7 @@ describe("the component screen's security testing", () => {
       mount.host().querySelector('svg[aria-label^="Code findings not fixed from 4 to 3"]'),
     ).not.toBeNull();
     expect(mount.host().querySelector('svg[aria-label^="Open findings"]')).toBeNull();
-    expect(mount.host().querySelector(".chart .mark title")?.textContent).toBe(
+    expect(mount.host().querySelector(".chart .stepmark title")?.textContent).toBe(
       "clang-tidy/default: new version from 18.1 to 19.1",
     );
     expect(hrefOf("Code findings over time →")).toBe(

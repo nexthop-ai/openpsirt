@@ -48,7 +48,7 @@ func TestTheDetectorFindsAVisibilityWordOrderedOver(t *testing.T) {
 			t.Errorf("%s was not reported", spelling)
 		}
 	}
-	expr, _ := access.AnyPrivate(`"f"."visibility"`)
+	expr, _ := access.AnyPrivate(access.FindingVisibility())
 	if got := visibilityOrderedOver("b.go", expr); len(got) != 0 {
 		t.Errorf("the one spelling was reported as %v", got)
 	}
@@ -61,9 +61,21 @@ func TestWhetherAnyRowIsUndisclosedIsNeverAskedByOrderingTheWords(t *testing.T) 
 	// that decide whether an outbound message may name the issue.
 	//
 	// The whole module is read, so a query under cmd/ is held to it too.
+	var found []string
+	everyGoSource(t, func(path, source string) {
+		found = append(found, visibilityOrderedOver(path, source)...)
+	})
+	for _, at := range found {
+		t.Errorf("%s orders the visibility word; ask access.AnyPrivate instead", at)
+	}
+}
+
+// everyGoSource hands visit every Go source of the module but its tests, so a
+// query under cmd/ is held to a rule too.
+func everyGoSource(t *testing.T, visit func(path, source string)) {
+	t.Helper()
 	root := filepath.Join("..", "..")
 	examined := 0
-	var found []string
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -84,7 +96,7 @@ func TestWhetherAnyRowIsUndisclosedIsNeverAskedByOrderingTheWords(t *testing.T) 
 			return err
 		}
 		examined++
-		found = append(found, visibilityOrderedOver(path, string(source))...)
+		visit(path, string(source))
 		return nil
 	})
 	if err != nil {
@@ -93,23 +105,20 @@ func TestWhetherAnyRowIsUndisclosedIsNeverAskedByOrderingTheWords(t *testing.T) 
 	if examined == 0 {
 		t.Fatal("no Go source was found, so this checked nothing")
 	}
-	for _, at := range found {
-		t.Errorf("%s orders the visibility word; ask access.AnyPrivate instead", at)
-	}
 }
 
-func TestACountIsAskedOnlyOfAVisibilityColumn(t *testing.T) {
-	const hostile = "f.visibility; DROP TABLE finding"
+// The empty visibility column names nothing, so asking an aggregate of it is
+// refused rather than written into a statement no engine parses.
+func TestAnAggregateOfNoVisibilityColumnPanics(t *testing.T) {
 	for name, ask := range map[string]func(){
-		"PrivateCount":           func() { access.PrivateCount(hostile) },
-		"WithheldCount":          func() { access.WithheldCount(hostile) },
-		"WithheldCountAs":        func() { access.WithheldCountAs(hostile, "withheld") },
-		"SecurityTestingCountAs": func() { access.SecurityTestingCountAs(hostile, "testing") },
+		"PrivateCount":           func() { access.PrivateCount(access.VisibilityColumn{}) },
+		"WithheldCount":          func() { access.WithheldCount(access.VisibilityColumn{}) },
+		"SecurityTestingCountAs": func() { access.SecurityTestingCountAs(access.VisibilityColumn{}, "n") },
 	} {
 		t.Run(name, func(t *testing.T) {
 			defer func() {
 				if recover() == nil {
-					t.Error("a column that is not a visibility was accepted into the statement")
+					t.Error("an aggregate of no column was written")
 				}
 			}()
 			ask()
@@ -119,8 +128,10 @@ func TestACountIsAskedOnlyOfAVisibilityColumn(t *testing.T) {
 
 func TestAPrivateCountIsSelectedOnlyUnderAPlainName(t *testing.T) {
 	for name, ask := range map[string]func(){
-		"PrivateCountAs": func() { access.PrivateCountAs(`"f"."visibility"`, `x", "y`) },
-		"AnyPrivateAs":   func() { access.AnyPrivateAs(`"f"."visibility"`, `x", "y`) },
+		"PrivateCountAs":         func() { access.PrivateCountAs(access.FindingVisibility(), `x", "y`) },
+		"AnyPrivateAs":           func() { access.AnyPrivateAs(access.FindingVisibility(), `x", "y`) },
+		"WithheldCountAs":        func() { access.WithheldCountAs(access.FindingVisibility(), `x", "y`) },
+		"SecurityTestingCountAs": func() { access.SecurityTestingCountAs(access.FindingVisibility(), `x", "y`) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			defer func() {
@@ -131,7 +142,7 @@ func TestAPrivateCountIsSelectedOnlyUnderAPlainName(t *testing.T) {
 			ask()
 		})
 	}
-	if expr, _ := access.PrivateCountAs(`"f"."visibility"`, "private_rows"); !strings.HasSuffix(expr, ` AS "private_rows"`) {
+	if expr, _ := access.PrivateCountAs(access.FindingVisibility(), "private_rows"); !strings.HasSuffix(expr, ` AS "private_rows"`) {
 		t.Errorf("a plain name was selected as %s", expr)
 	}
 }
