@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import { useSearchParams } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { answer, location, mounted, screen, serve, settle } from "../test/mount";
 import { Saved } from "./Saved";
 import { PUBLISHED } from "../test/outcomes";
@@ -15,8 +15,6 @@ function Picking() {
   const [, setParams] = useSearchParams();
   return <Saved onBuild={false} onPicked={(next) => setParams(next)} />;
 }
-
-afterEach(() => vi.restoreAllMocks());
 
 // A controlled select moved the way a person moves it.
 function pick(select: HTMLSelectElement, value: string) {

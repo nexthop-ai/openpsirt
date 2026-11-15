@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AuditLog, CHANGES_MOST, changeKind, outcomesSaid, periodSent } from "./AuditLog";
 import { classesOf } from "../ui/outcomes";
 import { PUBLISHED } from "../test/outcomes";
@@ -12,8 +12,6 @@ import { api } from "../api/client";
 import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("the change history on the audit log", () => {
   it("is neither asked for nor drawn for a reader who neither administers nor audits", async () => {

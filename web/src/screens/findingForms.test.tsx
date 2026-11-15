@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { milderThan, startingRating } from "./FindingAssess";
 import { References } from "./FindingEvidence";
 import { Incident } from "./FindingIncident";
@@ -10,8 +10,6 @@ import { screen, mounted } from "../test/mount";
 import { FLOORS } from "../ui/severities";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("rating an issue ourselves", () => {
   it("opens on a word the form offers", () => {

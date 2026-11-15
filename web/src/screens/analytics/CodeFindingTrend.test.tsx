@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { CodeFindingTrend } from "./CodeFindingTrend";
 import { client, mounted, screen, serve, settle } from "../../test/mount";
 
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
-
 const TREND = "/v1/products/{product}/code-finding-trend";
 
 const POINT = (at: string, notFixed: number, opened: number, fixed: number) => ({

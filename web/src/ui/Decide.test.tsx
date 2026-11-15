@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Decide, type At } from "./Decide";
 import { accept, client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
 import { PUBLISHED } from "../test/outcomes";
@@ -10,8 +10,6 @@ import { PUBLISHED } from "../test/outcomes";
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
-
 const at: At = {
   product: "sonic",
   branch_or_tag: "master",

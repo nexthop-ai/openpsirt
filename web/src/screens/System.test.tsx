@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { System } from "./System";
 import {
   accept,
@@ -16,8 +16,6 @@ import {
 import { only, press } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const READS: Record<string, Answer> = {
   "/v1/vulnerability-data": {

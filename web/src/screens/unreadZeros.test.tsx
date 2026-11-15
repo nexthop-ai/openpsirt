@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import type { Who } from "../app/session";
 import { client, mounted, screen, serve, settle } from "../test/mount";
 import { reaching, readingDependencies } from "../test/reach";
@@ -40,7 +40,6 @@ import { CodeFindingSeries } from "./analytics/CodeFindingSeries";
 const mount = mounted();
 
 afterEach(() => {
-  vi.restoreAllMocks();
   window.sessionStorage.clear();
 });
 

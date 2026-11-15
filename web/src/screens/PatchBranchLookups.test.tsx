@@ -1,14 +1,12 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { PatchBranchLookups } from "./PatchBranchLookups";
 import { mounted, screen, serve, settle } from "../test/mount";
 import { press, type Init } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const repo = (url: string, of: Record<string, unknown>) => ({
   url,

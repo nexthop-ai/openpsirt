@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { readingDependencies } from "../test/reach";
 import { Findings } from "./Findings";
 import { answer, location, mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const me = {
   identity: "ana",

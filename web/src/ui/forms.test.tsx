@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act, useState } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { belongTo, keep } from "../app/drafts";
 import { Carried } from "./Carried";
 import { consumersOf, type Sitting } from "./Covering";
@@ -17,8 +17,6 @@ import { pasted } from "./Words";
 import { screen, serve, settle, mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 // A date this many days from today, as the form takes one.
 const out = (days: number) => {

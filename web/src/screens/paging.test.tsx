@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DisclosureDeadlines } from "./DisclosureDeadlines";
 import { Assignments } from "./Assignments";
 import { location, screen, serve, settle, mounted } from "../test/mount";
@@ -11,8 +11,6 @@ import { readingDependencies } from "../test/reach";
 // A list narrowed or switched starts at its own beginning, and a page past the
 // end of a list says how to get back rather than that the list is empty.
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 // A reader of dependency findings, who sees who else holds them.
 const me = {

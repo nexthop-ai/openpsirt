@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Branches } from "./Branches";
 import { button, change, press } from "../test/controls";
 import { answer, mounted, screen, serve, settle, type Sent } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const ADDRESS = "/products/sonic/branches-and-tags";
 const PATTERN = "/products/:product/branches-and-tags";

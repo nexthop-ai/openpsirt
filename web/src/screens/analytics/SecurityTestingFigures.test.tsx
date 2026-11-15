@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { type ReactElement } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { AnalysisCoverage } from "./AnalysisCoverage";
 import { AnalyzerPrecision } from "./AnalyzerPrecision";
 import { CodeFindingsByRelease } from "./CodeFindingsByRelease";
@@ -12,8 +12,6 @@ import { client, mounted, screen, serve, settle } from "../../test/mount";
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
-
 const wait = (count: number, median: number, tier?: string) => ({
   tier,
   count,

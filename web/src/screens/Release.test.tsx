@@ -1,14 +1,12 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Release } from "./Release";
 import { screen, serve, settle, mounted } from "../test/mount";
 import type { Init } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("a release", () => {
   it("says its variants could not be read rather than that nothing was filed", async () => {

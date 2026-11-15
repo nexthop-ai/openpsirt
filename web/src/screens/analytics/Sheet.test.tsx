@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { mounted, screen, serve, settle } from "../../test/mount";
 import { readingDependencies } from "../../test/reach";
 import { Effort } from "./Effort";
@@ -11,8 +11,6 @@ import { Sheet } from "./Sheet";
 import { windowStart } from "./Window";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const printed = () => mount.host().querySelector(".printhead p")?.textContent ?? "";
 

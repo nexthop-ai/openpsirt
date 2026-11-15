@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { Findings } from "./Findings";
 import { IssueAdvisory } from "./IssueAdvisory";
@@ -10,8 +10,6 @@ import { readingDependencies } from "../test/reach";
 import { screen, serve, settle, mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const ok = (data: unknown, status = 200) => ({
   data,

@@ -1,15 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { useApproveDecision, useRejectDecision, useSplitDecision } from "./decisions";
 import { acted as shared } from "../test/acted";
 import { EVERY_DECISION_KEY } from "../test/decisionKeys";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 // Each hook is drawn and pressed through a real query client, so a hook that
 // stops calling the shared set of decision keys, or calls it before the request

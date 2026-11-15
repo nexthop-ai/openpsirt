@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Teams } from "./Teams";
 import { Person } from "./Person";
 import { act } from "react";
@@ -9,8 +9,6 @@ import { handedBack } from "../api/intake";
 import { answer, client, screen, serve, settle, mounted, watchInvalidations } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 function deployment(admin: boolean) {
   serve((path) => {

@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act, useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Weaknesses } from "./Weaknesses";
 import { mounted, screen, serve, settle } from "../test/mount";
 import { change } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 function Host({ start = [] as string[] }) {
   const [chosen, setChosen] = useState(start);

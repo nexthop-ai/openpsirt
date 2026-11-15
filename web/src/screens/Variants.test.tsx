@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Variants } from "./Variants";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
 import { change, labeled, only, press } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const ITEMS = [
   { name: "arm", open: 3 },

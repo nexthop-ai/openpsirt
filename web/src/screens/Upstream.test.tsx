@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { UpstreamDrawer } from "./Upstream";
 import { UpstreamOffers } from "./QueueOffers";
 import { UpstreamSaid } from "../ui/UpstreamSaid";
 import { accept, answer, mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const ADDRESS = "https://psirt.example.org/.well-known/csaf/provider-metadata.json";
 

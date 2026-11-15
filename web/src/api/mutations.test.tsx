@@ -1,15 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { useComment, useEditComment, useEditNote, useRevise, useWithdraw } from "./mutations";
 import { acted } from "../test/acted";
 import { EVERY_DECISION_KEY } from "../test/decisionKeys";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("an edit to a decision, once it lands", () => {
   it("revising the reasoning sends it to the decision named and moves every decision read", async () => {

@@ -1,15 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { CodeFindingSeries } from "./CodeFindingSeries";
 import { client, mounted, screen, serve, settle } from "../../test/mount";
 
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
-
 const COUNTS = "/v1/products/{product}/code-finding-series";
 
 async function drawn(readsSecurityTesting: boolean) {

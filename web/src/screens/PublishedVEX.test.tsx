@@ -1,14 +1,12 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { PublishedVEX } from "./PublishedVEX";
 import { accept, location, mounted, screen, serve, settle } from "../test/mount";
 import { only, press, type Init } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const ISSUANCE =
   "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/vex/issuance";

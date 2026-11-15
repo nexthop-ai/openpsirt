@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   useAgree,
   useMarkRelease,
@@ -15,8 +15,6 @@ import { acted } from "../test/acted";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 // Everything a change to an advisory moves.
 const EVERY_ADVISORY_KEY = [

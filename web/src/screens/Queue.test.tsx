@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Queue } from "./Queue";
 import { stillPicked } from "./useSelection";
 import { Product } from "./Product";
@@ -13,8 +13,6 @@ import { belongTo } from "../app/drafts";
 import { FLOORS } from "../ui/severities";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const exports = () =>
   Array.from(mount.host().querySelectorAll<HTMLAnchorElement>("a")).filter((each) =>

@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Weaknesses as Named } from "./Weakness";
 import { Weaknesses as Picker } from "./Weaknesses";
 import { mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const LONG =
   "Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution')";

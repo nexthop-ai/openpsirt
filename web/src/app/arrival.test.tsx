@@ -3,13 +3,11 @@
 
 import { act, useEffect } from "react";
 import { MemoryRouter, useNavigate, type NavigateFunction } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mounted } from "../test/mount";
 import { TO_THE_TOP, useTopOnArrival } from "./arrival";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const held: { go: NavigateFunction } = { go: () => undefined };
 const go: NavigateFunction = ((to: never, options?: never) =>

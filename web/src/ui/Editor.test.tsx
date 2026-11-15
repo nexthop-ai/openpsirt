@@ -3,7 +3,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { act, useState } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { belongTo } from "../app/drafts";
 import { Editor } from "./Editor";
@@ -17,8 +17,6 @@ beforeEach(() => {
   window.localStorage.clear();
   belongTo("oidc:ana");
 });
-
-afterEach(() => vi.restoreAllMocks());
 
 function type(field: HTMLTextAreaElement | null, value: string) {
   if (!field) throw new Error("no such field");

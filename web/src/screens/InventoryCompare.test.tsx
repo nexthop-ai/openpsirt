@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { InventoryCompare } from "./InventoryCompare";
 import { location, mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const PAIR = "from=4.2&from_variant=x86&to=4.3&to_variant=x86";
 

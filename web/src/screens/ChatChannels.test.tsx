@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ChatChannels } from "./ChatChannels";
 import { change, press } from "../test/controls";
 import { accept, answer, mounted, screen, serve, settle, type Sent } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 function serving(items: unknown[] = []) {
   serve((path) => (path === "/v1/outbound" ? { data: { items } } : undefined));

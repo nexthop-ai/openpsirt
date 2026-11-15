@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { api } from "../api/client";
 import { Access } from "./Access";
@@ -19,8 +19,6 @@ import {
 } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const admin: Who = {
   identity: "root",

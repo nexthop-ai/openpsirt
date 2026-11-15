@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EndOfLife } from "../ui/EndOfLife";
 import { Branches } from "./Branches";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 function type(field: HTMLInputElement | null, value: string) {
   if (!field) throw new Error("no such field");

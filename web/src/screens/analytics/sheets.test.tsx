@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { Backlog } from "./Backlog";
 import { Burndown } from "./Burndown";
 import { Compliance } from "./Compliance";
@@ -15,8 +15,6 @@ import { change } from "../../test/controls";
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
-
 // The scope the tab remembers, which is what a report reads when its own
 // address names none.
 function scoped(at: Record<string, string>) {

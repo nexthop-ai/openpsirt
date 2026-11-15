@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { mounted, screen, serve, settle } from "../test/mount";
 import { UploadDrawer } from "./Upload";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 // A controlled select moved the way a person moves it.
 function pick(select: HTMLSelectElement, value: string) {

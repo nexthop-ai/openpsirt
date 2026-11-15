@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RuleForm } from "./ReportRuling";
 import { accept, mounted, screen, serve, settle } from "../test/mount";
 import { change, pick, press } from "../test/controls";
 import { belongTo } from "../app/drafts";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 // A controlled field changed the way a person changes it.
 function type(field: HTMLInputElement, value: string) {

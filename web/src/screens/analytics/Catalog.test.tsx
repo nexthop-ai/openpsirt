@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { location, mounted, screen, serve, settle } from "../../test/mount";
 import { onAskForScope } from "../../app/scope";
 import { Scope } from "../../app/Scope";
@@ -10,10 +10,6 @@ import { Catalog } from "./Catalog";
 import { Report } from "./Report";
 
 const mount = mounted();
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 // The control a catalog row draws for its name.
 function row(name: string): HTMLElement {

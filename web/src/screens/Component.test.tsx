@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { belongTo } from "../app/drafts";
 import { Component } from "./Component";
 import { button, change, press } from "../test/controls";
@@ -24,8 +24,6 @@ beforeEach(() => {
   window.localStorage.clear();
   belongTo("oidc:ana");
 });
-
-afterEach(() => vi.restoreAllMocks());
 
 const PATTERN = "/products/:product/components/:component";
 

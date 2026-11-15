@@ -23,7 +23,6 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllEnvs();
-  vi.restoreAllMocks();
 });
 
 function type(field: HTMLInputElement | HTMLTextAreaElement | null, value: string) {

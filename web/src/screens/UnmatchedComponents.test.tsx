@@ -1,14 +1,12 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { UnmatchedComponents } from "./UnmatchedComponents";
 import { location, mounted, screen, serve, settle } from "../test/mount";
 import { press, type Init } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const ROUTE =
   "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/unmatched-components";

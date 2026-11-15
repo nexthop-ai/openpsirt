@@ -1,14 +1,12 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { SuppressionRules } from "./SuppressionRules";
 import { accept, mounted, screen, serve, settle } from "../test/mount";
 import { change, labeled, press } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const RULES = [
   {

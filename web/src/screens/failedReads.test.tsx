@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import type { Who } from "../app/session";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Uploads } from "./Uploads";
 import { InventoryCompare } from "./InventoryCompare";
 import { Incidents } from "./Incidents";
@@ -21,8 +21,6 @@ import { readingDependencies } from "../test/reach";
 // their main list. Drawn as its empty answer, a failure states something
 // nobody computed.
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const BUILD = "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant";
 

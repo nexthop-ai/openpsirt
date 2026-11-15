@@ -1,14 +1,12 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Branch } from "./Branch";
 import { mounted, screen, serve, settle, type Answer } from "../test/mount";
 import type { Init } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 // The list of lines answers a retired one only when asked to include them, as
 // the server does.

@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { useHandOver } from "./findingsHandover";
 import { listQuery, type Row } from "./list";
 import { client, mounted, screen, settle, watchInvalidations } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("handing rows over", () => {
   let seen: ReturnType<typeof useHandOver> | undefined;

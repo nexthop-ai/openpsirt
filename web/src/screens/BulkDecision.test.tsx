@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { BulkDecision } from "./BulkDecision";
 import { ROUTES, bulkDecisionAt } from "../app/routes";
 import { mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const ISSUES =
   "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/components/{component}/issues";

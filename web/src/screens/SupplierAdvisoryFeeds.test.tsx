@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SupplierAdvisoryFeeds, KNOWN_SUPPLIERS } from "./SupplierAdvisoryFeeds";
 import { api } from "../api/client";
 import { accept, screen, serve, settle, mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 // The panel with a product picked and the add form open, over a product that
 // already reads the given suppliers.

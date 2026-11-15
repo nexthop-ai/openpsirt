@@ -1,14 +1,12 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { AffectedBuilds } from "./FindingBuilds";
 import { button, change, press, tick } from "../test/controls";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const releases = [
   { branch_or_tag: "master", variant: "broadcom", kind: "branch" },

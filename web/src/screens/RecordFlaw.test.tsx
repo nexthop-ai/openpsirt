@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { belongTo } from "../app/drafts";
 import { RecordFlaw, unpicked } from "./RecordFlaw";
 import { button, change, pick, press, tick } from "../test/controls";
@@ -15,8 +15,6 @@ beforeEach(() => {
   window.sessionStorage.clear();
   belongTo("oidc:ana");
 });
-
-afterEach(() => vi.restoreAllMocks());
 
 // Somebody who may record a flaw at either visibility in sonic.
 function serving(rights: { may_hide: boolean; triages_public: boolean }) {
