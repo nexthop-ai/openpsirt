@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -705,6 +706,103 @@ func TestCodeFindingsByReleaseFollowTheTagsInOrder(t *testing.T) {
 		httpapitest.Read(t, r, "security-testing-reader", releasesOf+"?releases=2", &got)
 		if len(got.Releases) != 2 || got.Releases[0].BranchOrTag != "v1.1" {
 			t.Errorf("the newest two are %+v; want v1.1 and v1.2", got.Releases)
+		}
+	})
+}
+
+// analyzedAt ships a build of the seeded product holding nothing but its
+// root, declaring its branch or tag and variant where they are new, and
+// applies one run of a series to it.
+func analyzedAt(t *testing.T, r *httpapitest.Reach, b httpapitest.Build, as catalog.Kind, series, doc string) {
+	t.Helper()
+	ctx := t.Context()
+	names := catalog.NewStore(r.DB.DB)
+	mine, err := names.ProductByName(ctx, "mine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := names.BranchOrTagByName(ctx, mine.ID, b.BranchOrTag); err != nil {
+		if _, err := names.DeclareBranchOrTag(ctx, mine.ID, b.BranchOrTag, as, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := names.VariantByName(ctx, mine.ID, b.Variant); err != nil {
+		if _, err := names.DeclareVariant(ctx, mine.ID, b.Variant, true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root := graph.Described{Purl: "pkg:generic/mine-" + b.BranchOrTag + "-" + b.Variant + "@1.0",
+		Name: "mine-" + b.Variant, Version: "1.0"}
+	_, scan := r.Shipped(t, b, "analyzed-"+b.BranchOrTag+"-"+b.Variant, graph.Snapshot{Root: root})
+	if err := ingest.NewStore(r.DB.DB).Made(ctx, scan, 1, 1, root.Name); err != nil {
+		t.Fatal(err)
+	}
+	httpapitest.ApplyRunAt(t, r, b, series, time.Now().UTC().Add(-time.Hour), doc)
+}
+
+// Coverage keeps the series on the builds a branch or tag, a variant, a
+// series and a method name, one narrowing at a time.
+func TestAnalysisCoverageNarrowsToWhatIsAsked(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		codeql := httpapitest.OtherToolRun("codeql", "overflow", "787", "src/x.c", 5)
+		analyzedAt(t, r, httpapitest.SeededBuild, catalog.Branch, "clang-tidy/default", httpapitest.CodeFindingRun(true))
+		analyzedAt(t, r, httpapitest.Build{Product: "mine", BranchOrTag: "master", Variant: "mellanox"},
+			catalog.Branch, "codeql/default", codeql)
+		analyzedAt(t, r, httpapitest.Build{Product: "mine", BranchOrTag: "v1.0", Variant: "broadcom"},
+			catalog.Tag, "codeql/default", codeql)
+
+		for query, want := range map[string]string{
+			"":                       "master/broadcom/clang-tidy/default master/mellanox/codeql/default v1.0/broadcom/codeql/default",
+			"?branch_or_tag=v1.0":    "v1.0/broadcom/codeql/default",
+			"?variant=mellanox":      "master/mellanox/codeql/default",
+			"?series=CodeQL/Default": "master/mellanox/codeql/default v1.0/broadcom/codeql/default",
+			"?method=sast":           "master/broadcom/clang-tidy/default master/mellanox/codeql/default v1.0/broadcom/codeql/default",
+		} {
+			var got struct {
+				Items []struct {
+					BranchOrTag string `json:"branch_or_tag"`
+					Variant     string `json:"variant"`
+					Series      string `json:"series"`
+				} `json:"items"`
+			}
+			httpapitest.Read(t, r, "security-testing-reader", coverageOf+query, &got)
+			listed := make([]string, 0, len(got.Items))
+			for _, each := range got.Items {
+				listed = append(listed, each.BranchOrTag+"/"+each.Variant+"/"+each.Series)
+			}
+			slices.Sort(listed)
+			if strings.Join(listed, " ") != want {
+				t.Errorf("coverage%s lists %q; want %q", query, listed, want)
+			}
+		}
+	})
+}
+
+// The release line keeps the tags a variant, a series and a method name
+// analyzed, one narrowing at a time.
+func TestCodeFindingsByReleaseNarrowToWhatIsAsked(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		analyzedAt(t, r, httpapitest.Build{Product: "mine", BranchOrTag: "v1.0", Variant: "broadcom"},
+			catalog.Tag, "codeql/default", httpapitest.OtherToolRun("codeql", "overflow", "787", "src/x.c", 5))
+		analyzedAt(t, r, httpapitest.Build{Product: "mine", BranchOrTag: "v1.1", Variant: "mellanox"},
+			catalog.Tag, "cppcheck/default", httpapitest.OtherToolRun("cppcheck", "overflow", "120", "src/c.c", 4))
+
+		for query, want := range map[string]string{
+			"":                       "v1.0 v1.1",
+			"?variant=mellanox":      "v1.1",
+			"?series=CodeQL/Default": "v1.0",
+			"?method=sast":           "v1.0 v1.1",
+		} {
+			var got releasesRead
+			httpapitest.Read(t, r, "security-testing-reader", releasesOf+query, &got)
+			listed := make([]string, 0, len(got.Releases))
+			for _, each := range got.Releases {
+				listed = append(listed, each.BranchOrTag)
+			}
+			slices.Sort(listed)
+			if strings.Join(listed, " ") != want {
+				t.Errorf("the releases%s are %q; want %q", query, listed, want)
+			}
 		}
 	})
 }
