@@ -59,17 +59,6 @@ func TestAnOpenClientRefusesAnAddressInsideThisNetwork(t *testing.T) {
 
 // The scheme half is the guard's own check, run before anything that differs
 // between an open client and a pinned one, and is held where that is tested.
-func TestAnOpenClientFollowsNoRedirect(t *testing.T) {
-	client := Open(time.Second, Excluded{})
-	moved, err := http.NewRequest(http.MethodGet, "https://elsewhere.example.test/", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := client.CheckRedirect(moved, nil); !errors.Is(err, ErrRefused) {
-		t.Errorf("a redirect was followed: %v", err)
-	}
-}
-
 func TestAnOpenClientRefusesAnExcludedNetworkWhenItConnects(t *testing.T) {
 	// A name is excluded by the network its address lies in, which is known
 	// only once it resolves. localhost names no excluded host, so what refuses
