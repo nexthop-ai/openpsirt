@@ -174,11 +174,12 @@ func TestWhatIsApproachingDisclosureIsAnsweredOnlyToWhoMaySeeIt(t *testing.T) {
 				DiscloseAt    string `json:"disclose_at"`
 				Passed        bool   `json:"passed"`
 			} `json:"items"`
+			Total int `json:"total"`
 		}
 		httpapitest.Read(t, r, "private-triage", "/v1/disclosure-deadlines?within=365", &listed)
-		if len(listed.Items) != 1 {
-			t.Fatalf("%d findings are approaching disclosure for somebody who may see them",
-				len(listed.Items))
+		if len(listed.Items) != 1 || listed.Total != 1 {
+			t.Fatalf("%d findings of %d are approaching disclosure for somebody who may see them, want 1 of 1",
+				len(listed.Items), listed.Total)
 		}
 		if listed.Items[0].DiscloseAt == "" {
 			t.Error("the row does not say when the embargo ends")
@@ -192,10 +193,12 @@ func TestWhatIsApproachingDisclosureIsAnsweredOnlyToWhoMaySeeIt(t *testing.T) {
 				Items []struct {
 					Vulnerability string `json:"vulnerability"`
 				} `json:"items"`
+				Total int `json:"total"`
 			}
 			httpapitest.Read(t, r, who, "/v1/disclosure-deadlines?within=365", &theirs)
-			if len(theirs.Items) != 0 {
-				t.Errorf("%s was shown %d undisclosed findings", who, len(theirs.Items))
+			if len(theirs.Items) != 0 || theirs.Total != 0 {
+				t.Errorf("%s was shown %d undisclosed findings and a total of %d",
+					who, len(theirs.Items), theirs.Total)
 			}
 		}
 	})
