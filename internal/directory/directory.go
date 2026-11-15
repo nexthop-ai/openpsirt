@@ -37,6 +37,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/background"
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
@@ -63,9 +64,6 @@ const (
 	indexFile    = "index.txt"
 	changesFile  = "changes.csv"
 	feedFile     = "feed-tlp-white.json"
-	// hashSuffix is appended to a document's own filename, which is what
-	// says which file a hash is of.
-	hashSuffix = ".sha256"
 )
 
 // Config is what the directory says about itself beyond who wrote it.
@@ -341,7 +339,7 @@ func (w *Writer) document(ctx context.Context, one entry) error {
 	if err := w.put(ctx, one.Path, one.Body, "application/json"); err != nil {
 		return err
 	}
-	return w.put(ctx, one.Path+hashSuffix, checksum(one), "text/plain; charset=utf-8")
+	return w.put(ctx, one.Path+csaf.SHA256Suffix, checksum(one), "text/plain; charset=utf-8")
 }
 
 // checksum is the hash file's contents.

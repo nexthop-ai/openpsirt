@@ -828,8 +828,8 @@ var algorithms = []struct {
 	suffix string
 	sum    func() hash.Hash
 }{
-	{".sha256", sha256.New},
-	{".sha512", sha512.New},
+	{csaf.SHA256Suffix, sha256.New},
+	{csaf.SHA512Suffix, sha512.New},
 }
 
 // digests remembers, across one pass over one publisher, which digest file

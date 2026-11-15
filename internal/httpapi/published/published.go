@@ -199,9 +199,9 @@ func (s *server) find(ctx context.Context, path, asked string) (*file, error) {
 		suffix string
 		answer func(*file) (*file, error)
 	}{
-		{publish.SHA256Suffix, func(f *file) (*file, error) { return digestFile(f, path, sha256Of), nil }},
-		{publish.SHA512Suffix, func(f *file) (*file, error) { return digestFile(f, path, sha512Of), nil }},
-		{publish.SignatureSuffix, func(f *file) (*file, error) { return s.signature(f, asked) }},
+		{csaf.SHA256Suffix, func(f *file) (*file, error) { return digestFile(f, path, sha256Of), nil }},
+		{csaf.SHA512Suffix, func(f *file) (*file, error) { return digestFile(f, path, sha512Of), nil }},
+		{csaf.SignatureSuffix, func(f *file) (*file, error) { return s.signature(f, asked) }},
 	} {
 		if named, ok := strings.CutSuffix(path, beside.suffix); ok {
 			document, err := s.document(ctx, now, named)
@@ -336,10 +336,10 @@ func (s *server) feed(v *view) (*file, error) {
 		return nil, publish.ErrNotPublished
 	}
 	beside := []csaf.Beside{
-		{Rel: "hash", Suffix: publish.SHA256Suffix}, {Rel: "hash", Suffix: publish.SHA512Suffix},
+		{Rel: "hash", Suffix: csaf.SHA256Suffix}, {Rel: "hash", Suffix: csaf.SHA512Suffix},
 	}
 	if s.Signer != nil {
-		beside = append(beside, csaf.Beside{Rel: "signature", Suffix: publish.SignatureSuffix})
+		beside = append(beside, csaf.Beside{Rel: "signature", Suffix: csaf.SignatureSuffix})
 	}
 	at := func(path string) string { return s.Base + publish.DirectoryPath + path }
 	return jsonFile(csaf.FeedOf(csaf.FeedName(s.Who.Prefix),

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -251,15 +252,15 @@ func TestADocumentThatFailsItsChecksIsNotTaken(t *testing.T) {
 		break_ func(w *world, path string)
 	}{
 		{"served with no digest", func(w *world, path string) {
-			w.server.drop(path + publish.SHA256Suffix)
-			w.server.drop(path + publish.SHA512Suffix)
+			w.server.drop(path + csaf.SHA256Suffix)
+			w.server.drop(path + csaf.SHA512Suffix)
 		}},
 		{"served with no signature", func(w *world, path string) {
-			w.server.drop(path + publish.SignatureSuffix)
+			w.server.drop(path + csaf.SignatureSuffix)
 		}},
 		{"signed by another key", func(w *world, path string) {
 			other := otherSignature(w.t)
-			w.server.change(path+publish.SignatureSuffix, func([]byte) []byte { return other })
+			w.server.change(path+csaf.SignatureSuffix, func([]byte) []byte { return other })
 		}},
 	} {
 		t.Run(c.what, func(t *testing.T) {

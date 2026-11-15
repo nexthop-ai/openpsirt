@@ -115,8 +115,8 @@ var algorithms = []struct {
 	suffix string
 	sum    func() hash.Hash
 }{
-	{".sha256", sha256.New},
-	{".sha512", sha512.New},
+	{csaf.SHA256Suffix, sha256.New},
+	{csaf.SHA512Suffix, sha512.New},
 }
 
 // errNoDigest says no digest is served beside a document.
@@ -166,7 +166,7 @@ var errUnsigned = unreadable{err: refusal.New("that document carries no signatur
 func checkSignature(ctx context.Context, client *http.Client, address string, body []byte,
 	keyring openpgp.EntityList) error {
 
-	signature, err := fetch(ctx, client, address+".asc", mostSignatureBytes, nil)
+	signature, err := fetch(ctx, client, address+csaf.SignatureSuffix, mostSignatureBytes, nil)
 	var refused unreadable
 	switch {
 	case errors.As(err, &refused):

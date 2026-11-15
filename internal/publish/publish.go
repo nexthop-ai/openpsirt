@@ -61,13 +61,6 @@ const (
 	OpenVEXIndex = OpenVEXPath + "index.txt"
 )
 
-// The files served beside every document, under the document's own name.
-const (
-	SHA256Suffix    = ".sha256"
-	SHA512Suffix    = ".sha512"
-	SignatureSuffix = ".asc"
-)
-
 // Document is one published document, holding the revision a reader is handed
 // now.
 type Document struct {

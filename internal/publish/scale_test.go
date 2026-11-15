@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -139,7 +140,7 @@ func TestMeasurePublishedDocumentsOfARealImage(t *testing.T) {
 		one := strings.Fields(string(s.body(publish.IndexPath)))[0]
 		t.Logf("answering the feed: %v; the provider description: %v; one document: %v; "+
 			"its digest: %v", answered(publish.FeedPath), answered(publish.MetadataPath),
-			answered(publish.DirectoryPath+one), answered(publish.DirectoryPath+one+publish.SHA256Suffix))
+			answered(publish.DirectoryPath+one), answered(publish.DirectoryPath+one+csaf.SHA256Suffix))
 		t.Logf("%d issue-at-component pairs per build, two builds, %d agreed not to apply", len(reported), decided)
 		t.Logf("first pass: %d documents written in %s; a pass over nothing moved: %d revised in %s",
 			first.Revised, firstTook, again.Revised, againTook)
