@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
+// prettier-ignore
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { componentRoots, hiddenByPosition, printedActions, sweep } from "./printed-heads.mjs";
+import { componentRoots, hiddenByPosition, hiddenClasses, printedActions, sweep } from "./printed-heads.mjs";
 // @ts-expect-error - as above
 import { parse } from "./parsed.mjs";
 
@@ -28,7 +29,7 @@ describe("a screen head on paper", () => {
     const found = read(`const x = <div className="screen-head"><h2>T</h2>
       {ok && (<span><button>Go</button></span>)}
       {ok ? <span className="noprint"><a href="/">CSV</a></span> : null}</div>;`);
-    expect(found).toEqual({ examined: 2, found: ["x.tsx:2"] });
+    expect(found).toEqual({ examined: 4, found: ["x.tsx:2"] });
   });
 
   it("reports an action a component draws at its root under a head", () => {
@@ -58,9 +59,35 @@ describe("a screen head on paper", () => {
       declared,
     );
     expect(found).toEqual({
-      examined: 4,
+      examined: 13,
       found: ["ui/parts.tsx:1", "ui/parts.tsx:3", "ui/parts.tsx:4"],
     });
+  });
+
+  it("reports an action drawn straight under a head, inside another element, or by a mapped list", () => {
+    const found = read(`const x = <div className="screen-head">
+      <Link className="btn" to="/new">Record</Link>
+      <div className="titlerow"><h2>T</h2><Link className="btn" to="/a">Open</Link></div>
+      <div className="seg">{steps.map((s) => (<button key={s}>{s}</button>))}</div>
+      <div className="titlerow"><h2>U</h2><span className="noprint"><button>Go</button></span></div>
+      <Link className="btn noprint" to="/kept">Kept</Link></div>;`);
+    expect(found.found).toEqual(["x.tsx:2", "x.tsx:3", "x.tsx:4"]);
+  });
+
+  it("passes an action inside a class the print sheet hides", () => {
+    const found = printedActions(
+      "x.tsx",
+      parse(
+        `const x = <div className="screen-head"><div className="walking"><button>Next</button></div></div>;`,
+        "x.tsx",
+      ),
+      new Map(),
+      ["noprint", "walking"],
+    );
+    expect(found.found).toEqual([]);
+    expect(
+      hiddenClasses(`@media print { .walking, .noprint, .head > span { display: none; } }`),
+    ).toEqual(["walking", "noprint"]);
   });
 
   it("reports a print rule hiding every span under a head", () => {

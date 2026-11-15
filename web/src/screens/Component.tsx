@@ -218,7 +218,7 @@ export function Component() {
         <div className="titlerow">
           <h2 className="id">{here.source}</h2>
           {action && (
-            <Link className="btn" to={action.to}>
+            <Link className="btn noprint" to={action.to}>
               {action.label}
             </Link>
           )}

@@ -554,6 +554,7 @@ export function Marks({
           {mayMark && (
             <button
               type="button"
+              className="noprint"
               aria-label={`Remove label ${label}`}
               title={`Remove label ${label}`}
               disabled={busy}
@@ -566,7 +567,7 @@ export function Marks({
       ))}
       {mayMark &&
         (adding ? (
-          <span className="marking">
+          <span className="marking noprint">
             <Suggest
               id="label-with"
               label="Add a label"
@@ -599,7 +600,7 @@ export function Marks({
             </button>
           </span>
         ) : (
-          <button type="button" className="mark add" onClick={() => setAdding(true)}>
+          <button type="button" className="mark add noprint" onClick={() => setAdding(true)}>
             + Label
           </button>
         ))}

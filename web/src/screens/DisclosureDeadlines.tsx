@@ -205,7 +205,10 @@ export function DisclosureDeadlines() {
             flaw from outside starts a date; the other way is a decision from
             outside ruled a duplicate, which is made on the report. */}
         {mayRecord && (
-          <Link className="btn" to={recordFlawAt(scope.product ?? "", undefined, "outside")}>
+          <Link
+            className="btn noprint"
+            to={recordFlawAt(scope.product ?? "", undefined, "outside")}
+          >
             Record a reported flaw
           </Link>
         )}

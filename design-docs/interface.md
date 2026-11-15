@@ -167,7 +167,7 @@ one it is a wrong answer.
 | A page at or past the end of its list says it holds nothing and of how many; Previous goes to the last page holding rows | A bulk act shrinks the list under the page somebody is on |
 | A set written back whole is read whole first; the affected-build editor reads its builds in one read, and refuses to edit rather than editing part | The server closes everything absent from the list sent |
 | A printed sheet prints only once every figure has arrived | It stamps the moment it was taken |
-| A printed screen keeps its head's title, breadcrumb and counts; what is pressed there is marked to stay off paper, and a web test fails a button or link under a head that is not, drawn always, on a condition or by a component | A known vulnerability scan is named only in its breadcrumb |
+| A printed screen keeps its head's title, breadcrumb and counts; what is pressed there is marked to stay off paper, and a web test fails a button or a link drawn as one anywhere under a head, drawn always, on a condition, in a list or by a component, that no element of a class the print sheet hides holds | A known vulnerability scan is named only in its breadcrumb |
 | A failed identity read is not "signed out" | With one provider the sign-in screen forwards straight to it |
 | What the server said is shown; where it said nothing, the status is | HTTP/2 carries no reason phrase |
 | One component draws a read's three arms: waiting, the loading line; failed, what the server said; answered, the screen, its empty state included | A screen drawn through it cannot show "none" for an unanswered read |

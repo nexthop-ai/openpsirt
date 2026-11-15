@@ -51,7 +51,7 @@ export function StepSwitch({
   onStep: (step: TrendStep) => void;
 }) {
   return (
-    <div className="seg" role="group" aria-label="Step">
+    <div className="seg noprint" role="group" aria-label="Step">
       {(["day", "week"] as const).map((each) => (
         <button key={each} type="button" aria-pressed={step === each} onClick={() => onStep(each)}>
           {each === "day" ? "Daily" : "Weekly"}
