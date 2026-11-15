@@ -187,10 +187,12 @@ func keysOf(running map[string]bool) []string {
 	return out
 }
 
-// TestAnUnknownSubcommandIsRefused pins the one that silently started a server.
+// TestAnUnknownSubcommandIsRefused pins that a word the binary does not know
+// is refused rather than served.
 //
 // `openpsirt migrat` — a typo in a job meant to apply migrations and nothing
-// else — fell through to serving, against whatever schema was there.
+// else — would otherwise fall through to serving, against whatever schema is
+// there.
 func TestAnUnknownSubcommandIsRefused(t *testing.T) {
 	quiet, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
 	if err != nil {
