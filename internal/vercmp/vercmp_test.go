@@ -131,18 +131,6 @@ func TestWhatCannotBeOrderedIsRefusedRatherThanGuessedAt(t *testing.T) {
 		{vercmp.Semantic, "1.0.0", "not-a-version"},
 		// An ecosystem whose algorithm is not written here.
 		{vercmp.Unordered, "1.0", "2.0"},
-		// Nothing to compare.
-		{vercmp.Debian, "", "1.0"},
-		// A word an advisory wrote where a version belongs. The comparison
-		// answers for any pair of strings, which reads as a scheme that never
-		// fails: a letter outranks a digit, so "unfixed" sorts above every
-		// real release and is recommended as the upgrade.
-		{vercmp.Debian, "unfixed", "1.0-1"},
-		{vercmp.Debian, "TBD", "1.0-1"},
-		{vercmp.Debian, "see the advisory", "1.0-1"},
-		// An upstream version begins with a digit, which is Debian policy's
-		// own rule and what separates a version from a word.
-		{vercmp.Debian, "v1.0-1", "1.0-1"},
 		// An epoch is digits or it is not an epoch, and an empty one is not
 		// digits.
 		{vercmp.Debian, "next:1.0-1", "1.0-1"},
@@ -428,10 +416,10 @@ func TestAlpineReadsAVersionOrRefusesTheWholeString(t *testing.T) {
 }
 
 func TestADistributionVersionThatIsNotOneIsRefused(t *testing.T) {
-	// Both distribution comparisons answer for any two strings, which reads as
-	// a scheme that never fails. What an advisory wrote where a version
-	// belongs then outranked every real release, because a letter sorts above
-	// a digit.
+	// A distribution comparison answers for any two strings, which reads as a
+	// scheme that never fails, so what is not a version is refused before it
+	// is compared: what an advisory wrote where a version belongs would
+	// outrank every real release, because a letter sorts above a digit.
 	for _, scheme := range []vercmp.Scheme{vercmp.RPM, vercmp.Debian, vercmp.APK} {
 		refused(t, scheme,
 			"", "  ",
