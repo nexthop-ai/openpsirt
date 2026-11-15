@@ -237,12 +237,14 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 		if err != nil {
 			return startupFailed(err, "preparing to watch the schema", cfg)
 		}
-		server, err := listen(cfg, logger, handler)
+		if err := lookBeforeServing(startup, watcher.Look); err != nil {
+			return startupFailed(err, "checking the schema before serving", cfg)
+		}
+		// Opened answering as upgrading, so no request reaches the router
+		// before a phase that a pause ends.
+		server, err := listen(cfg, logger, httpapi.Upgrading())
 		if err != nil {
 			return err
-		}
-		if err := lookBeforeServing(startup, watcher.Look); err != nil {
-			return server.abandon(cfg, logger, startupFailed(err, "checking the schema before serving", cfg))
 		}
 		server.answer(handler)
 		serving = true

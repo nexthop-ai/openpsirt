@@ -183,8 +183,17 @@ func TestAFailedUpgradeKeepsServingInstancesPausedWhereItLeftThePartChanged(t *t
 
 		end := begin()
 		changingWithin(t, observer, true, "while the upgrade changes the schema")
-		end(errors.New("a statement failed"))
 		partChanged := engine == database.MySQL || engine == database.MariaDB
+		// Elsewhere the lock ends with the transaction, a killed process
+		// included, so a row would outlive a schema left whole.
+		var rows int
+		if err := migrating.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+ChangeTable+`"`).Scan(&rows); err != nil {
+			t.Fatal(err)
+		}
+		if (rows > 0) != partChanged {
+			t.Errorf("an upgrade under way wrote %d records; want one only where a failure leaves the schema part changed", rows)
+		}
+		end(errors.New("a statement failed"))
 		changingWithin(t, observer, partChanged, "after the upgrade failed")
 
 		end = begin()

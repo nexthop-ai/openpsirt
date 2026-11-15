@@ -213,3 +213,23 @@ func TestTheFileLockIsNeverTakenThroughALink(t *testing.T) {
 		t.Error("the migration lock was taken on a named pipe")
 	}
 }
+
+// The schema change lock file is readable by every user whatever the umask of
+// the process that creates it, so a server running as another user can look.
+func TestTheChangeLockFileIsReadableByEveryUserUnderAnyUmask(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "umask.db"+changeSuffix)
+	previous := syscall.Umask(0o077)
+	release, err := changeFile(t.Context(), path, slog.New(slog.DiscardHandler))
+	syscall.Umask(previous)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = release(context.Background()) }()
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != changeMode {
+		t.Errorf("the change lock file was created %v under umask 077, want %v", info.Mode().Perm(), changeMode)
+	}
+}

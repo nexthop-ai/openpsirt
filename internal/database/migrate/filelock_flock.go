@@ -107,6 +107,25 @@ func releaseFile(file *os.File, what string) unlock {
 	}
 }
 
+// changeMode is the schema change lock file's mode: readable by every user.
+const changeMode os.FileMode = 0o644
+
+// readableByAll gives the schema change lock file changeMode where it lacks
+// it.
+func readableByAll(file *os.File) error {
+	info, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("read the schema change lock beside the database: %w", err)
+	}
+	if info.Mode().Perm() == changeMode {
+		return nil
+	}
+	if err := file.Chmod(changeMode); err != nil {
+		return fmt.Errorf("make the schema change lock beside the database readable by every user: %w", err)
+	}
+	return nil
+}
+
 // changeEvery is how long taking the schema change lock waits between tries.
 const changeEvery = 10 * time.Millisecond
 
@@ -119,10 +138,15 @@ const changeEvery = 10 * time.Millisecond
 // the wait is logged about once every waitLogEvery.
 //
 // The file holds nothing, and any process that may serve the database reads
-// it, whichever user applies the migrations.
+// it, whichever user applies the migrations. Its mode is set after opening,
+// since the process's umask narrows the mode a file is created with.
 func changeFile(ctx context.Context, path string, logger *slog.Logger) (unlock, error) {
-	file, err := openLockFile(path, "schema change lock", 0o644)
+	file, err := openLockFile(path, "schema change lock", changeMode)
 	if err != nil {
+		return nil, err
+	}
+	if err := readableByAll(file); err != nil {
+		_ = file.Close()
 		return nil, err
 	}
 	since := time.Now()

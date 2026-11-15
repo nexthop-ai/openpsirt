@@ -136,11 +136,10 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger, notice time.D
 // outstanding it takes nothing, and removes any record the version applied
 // has reached.
 //
-// The record is removed when the upgrade succeeds, and on an engine whose
-// schema changes roll back with their transaction. On MySQL and MariaDB an
-// upgrade ending any other way leaves the schema part changed, so the record
-// stays, and every serving instance stays paused, until an upgrade reaches
-// the version it names or the backup is restored.
+// The record is written on MySQL and MariaDB alone, and removed when the
+// upgrade succeeds. An upgrade ending any other way leaves the schema part
+// changed, so the record stays, and every serving instance stays paused,
+// until an upgrade reaches the version it names or the backup is restored.
 //
 // A release of the lock that fails is logged: the migration lock's release
 // follows on the same session, and reports a session lost part way.
@@ -182,7 +181,7 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 		return nil, err
 	}
 	stop := func(failed error) {
-		partChanged := failed != nil && (db.Server.Engine == database.MySQL || db.Server.Engine == database.MariaDB)
+		partChanged := failed != nil && partChanges(db.Server.Engine)
 		if partChanged {
 			logger.Warn("the schema is left part changed, so every serving instance stays paused " +
 				"until an upgrade succeeds or the backup taken before it is restored")
@@ -204,11 +203,21 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 	return stop, nil
 }
 
+// partChanges reports whether an upgrade on engine that fails part way leaves
+// the schema part changed: MySQL and MariaDB commit each data-definition
+// statement alone. Elsewhere the change lock and the migration's transaction
+// end together, whether the process fails or is killed, so the lock alone
+// says the schema is changing and no record is written.
+func partChanges(engine database.Engine) bool {
+	return engine == database.MySQL || engine == database.MariaDB
+}
+
 // ChangeTable is the record an upgrade keeps while it changes the schema,
 // which a release's migration makes and this reads and writes.
 const ChangeTable = "schema_change"
 
 // recordChange writes the record of an upgrade changing the schema to target,
+// on an engine where a failed upgrade leaves the schema part changed and
 // where the database has the table for it: a database the release that made
 // the table has not yet upgraded has none.
 //
@@ -216,6 +225,9 @@ const ChangeTable = "schema_change"
 // process ended after its last migration, or by a removal that failed, stops
 // counting once the version applied reaches it.
 func recordChange(ctx context.Context, db *database.DB, target int64) error {
+	if !partChanges(db.Server.Engine) {
+		return nil
+	}
 	there, err := tableExists(ctx, db, ChangeTable)
 	if err != nil || !there {
 		return err
