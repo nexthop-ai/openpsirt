@@ -84,3 +84,24 @@ func TestATrendAskedInWeeksAndDaysIsRefused(t *testing.T) {
 		}
 	})
 }
+
+// A trend asked in weeks has a point per week, the last of them counting
+// what is open now.
+func TestATrendInWeeksEndsWithWhatIsOpenNow(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		var trend struct {
+			Items []struct {
+				At   string `json:"at"`
+				Open int    `json:"open"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "reader", "/v1/trend?weeks=4", &trend)
+		if len(trend.Items) != 4 {
+			t.Fatalf("asked for four weeks and got %d points", len(trend.Items))
+		}
+		if trend.Items[3].Open == 0 {
+			t.Error("the trend ends with nothing open, but something is")
+		}
+	})
+}
