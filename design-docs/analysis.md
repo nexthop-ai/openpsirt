@@ -115,7 +115,7 @@ and entries are bounded across the upload as memory: placed results take about
 | A path outside the checkout drops its result, counted | |
 | A result repeating another on rule, path, line, column and message is dropped, counted | clang repeats a header per unit |
 | Whole-file contents, fixes and markdown messages are left out of every record, counted | |
-| A markdown-only message is reduced to the words it shows: no markers, links and images as their words, escapes and references resolved in one pass (`\&lt;` is `&lt;`), code as written, no raw HTML | It is shown encoded and is part of matching |
+| A markdown-only message is reduced to the words it shows: no markers, links and images as their words, escapes and references resolved in one pass (`\&lt;` is `&lt;`), code as written, no raw HTML, a table one row a line, its cells joined by a vertical bar with a space either side | It is shown encoded and is part of matching |
 | The source root is used at the door, never stored | It is a build-host path |
 
 ## Run parameters
