@@ -212,11 +212,10 @@ func newReader(r io.Reader, lim Limits, headerOnly bool) *reader {
 // and the whole point of it is that the contents cost a walk rather than a
 // structure per component.
 //
-// The cost is the duplicate-identifier refusal, which a header read no
-// longer makes: a document carrying one is answered 202 and fails later in the
-// background reader. That is already how the other two formats behave, and a
-// fault reported at two different times depending on which format a build
-// emits is the worse of the two.
+// The cost is the duplicate-identifier refusal, which a header read does not
+// make: a document carrying one is answered 202 and fails later in the
+// background reader. Every format behaves that way, because a fault reported
+// at two different times depending on which format a build emits is worse.
 func (c *reader) bind(ref string, described graph.Described) error {
 	if c.headerOnly {
 		return nil

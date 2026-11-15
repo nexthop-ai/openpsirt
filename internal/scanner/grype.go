@@ -576,7 +576,7 @@ func matchedRange(details []matchDetail) string {
 // published advisory states one weakness and a report commonly carries several,
 // so something has to say which — and taking whichever sorts first is an answer
 // with nothing behind it. The feeds say it, in the word beside each entry, and
-// it was read and dropped.
+// that word is what is read.
 //
 // It is answered apart from the list rather than by the list's order, because
 // a list cannot say "nobody said". A report that marks none is the ordinary

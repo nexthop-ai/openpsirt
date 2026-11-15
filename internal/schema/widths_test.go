@@ -21,10 +21,9 @@ func TestProducerSuppliedTextIsNotBoundedByAColumn(t *testing.T) {
 	// merely unusual value into a failure of the whole scan that carried it —
 	// which is indistinguishable from a product that stopped having problems.
 	//
-	// Two of the four engines gave this class a 64 KB type while giving the
-	// operator-typed class beside it 16 MB, which is the inversion of what the
-	// two are declared to mean: typed text is at least bounded at submission,
-	// and this is not bounded anywhere.
+	// A 64 KB type for this class beside 16 MB for the operator-typed class
+	// inverts what the two are declared to mean: typed text is at least
+	// bounded at submission, and this is not bounded anywhere.
 	//
 	// A hundred kilobytes because it is past the smaller type and nowhere near
 	// the larger, so this fails on exactly the engines that get it wrong.

@@ -52,11 +52,8 @@ type Fault struct {
 	err error
 }
 
-// Unwrap answers the sentinel a fault carries, so errors.Is can match it.
-//
-// ErrTooLong was exported — which announces exactly that — and formatted into
-// a string with no wrapping, so no caller could ever match it. An exported
-// sentinel nothing can use as one is a contract stated and not kept.
+// Unwrap answers the sentinel a fault carries, so errors.Is matches it
+// through a fault, ErrTooLong included.
 func (f Fault) Unwrap() error { return f.err }
 
 // Refused marks a fault as a sentence for whoever wrote the text.

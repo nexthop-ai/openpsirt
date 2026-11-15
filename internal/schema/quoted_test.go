@@ -23,12 +23,8 @@ var bareAfter = regexp.MustCompile(`(?i)\b(TABLE|INDEX|CONSTRAINT|REFERENCES)\s+
 // excluded are the ones that open a table constraint, or continue the
 // declaration above, rather than naming a column.
 //
-// Every name in the body, not only the one that opens a line. Requiring a
-// line start and trailing whitespace read a table declaration, where each
-// column is on its own line, and nothing else — an index body is
-// `("kind", "at")` on one line, so an unquoted column there was matched by
-// neither this nor bareAfter, which is precisely what the helper below says is
-// covered.
+// Every name in the body, not only the one that opens a line: an index body is
+// `("kind", "at")` on one line, and an unquoted column there is matched here.
 var bareColumn = regexp.MustCompile(
 	`(?i)(?:^|[(,])\s*(?:(CONSTRAINT|PRIMARY|UNIQUE|FOREIGN|CHECK|REFERENCES|ON|DEFAULT|NOT|NULL)\b|([A-Za-z_][A-Za-z0-9_]*)\s*(?:[\s,)]|$))`)
 
@@ -172,7 +168,7 @@ func TestEveryIdentifierInTheSchemaIsQuoted(t *testing.T) {
 			t.Fatalf("reading the schema: %v", err)
 		}
 		// A test that read nothing is a test that passed for the wrong
-		// reason, which is the shape this whole finding is about.
+		// reason.
 		if read < 30 {
 			t.Fatalf("only %d objects were read back, so this checked almost nothing", read)
 		}

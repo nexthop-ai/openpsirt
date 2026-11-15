@@ -37,11 +37,10 @@ type Result struct {
 	Reported        []finding.Reported
 	// Caution is what the scanner said while succeeding.
 	//
-	// Read only on failure it discards the case that matters: a run that
-	// answers and warns that its answer is coarse. Told
-	// to match Go binaries carrying no function symbols it says so and falls
-	// back to module granularity, which can report a component as affected
-	// when the vulnerable function is not linked in. That qualifies every
-	// finding the run produced and reached nobody.
+	// It is read on success as well as failure, because a run that answers
+	// can warn that its answer is coarse. Told to match Go binaries carrying
+	// no function symbols it says so and falls back to module granularity,
+	// which can report a component as affected when the vulnerable function
+	// is not linked in. That qualifies every finding the run produced.
 	Caution string
 }

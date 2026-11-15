@@ -45,10 +45,9 @@ func VocabularyOverlap() map[string][]string {
 // TopLevelKeys is every key the vocabularies claim, by vocabulary name.
 //
 // Exported so a test can say that each one is recorded as a path the reader
-// acts on. The record is maintained by hand and four of these sat in it as
-// skipped while the reader read them — an entry that says "we chose not to
-// read this" is indistinguishable from one that says "we never knew it was
-// there", which is what the record exists to tell apart.
+// acts on. The record is maintained by hand, and an entry marked skipped that
+// the reader reads makes "we chose not to read this" indistinguishable from
+// "we never knew it was there", which is what the record exists to tell apart.
 func TopLevelKeys() map[string][]string {
 	keys := map[string][]string{}
 	for _, v := range vocabularies {
