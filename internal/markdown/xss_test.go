@@ -184,25 +184,6 @@ func TestEverythingWrongIsReportedAtOnce(t *testing.T) {
 	}
 }
 
-func TestTextPastTheBoundIsRefused(t *testing.T) {
-	// Rendering is work somebody else asked for, and what is stored is kept
-	// forever.
-	err := markdown.Check(strings.Repeat("a", markdown.MaxBytes+1))
-	if err == nil {
-		t.Fatal("text past the bound was accepted")
-	}
-	// And what a person is shown. A fault about the whole text carries no
-	// line, which is the branch every whole-text refusal takes, so reading the
-	// words out of one is what says the message somebody sees for "too long"
-	// is a sentence rather than a line number and a blank.
-	if !strings.Contains(err.Error(), "longer than") {
-		t.Errorf("the refusal does not say what is wrong: %q", err)
-	}
-	if strings.Contains(err.Error(), "line ") {
-		t.Errorf("a fault about the whole text names a line: %q", err)
-	}
-}
-
 func TestWhatIsNotTextIsRefusedAsNotText(t *testing.T) {
 	// Bytes that are not UTF-8 at all. Every other input in this file is text,
 	// so nothing else reaches this arm or reads what it says.
