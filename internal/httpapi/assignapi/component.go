@@ -239,10 +239,10 @@ type PlannedUpgradeBody struct {
 // registerPlanUpgrade records moving a component as the answer to what is
 // open.
 //
-// The act the component screen exists for. It replaces declaring a planned upgrade:
-// the same thing, recorded as a decision with the version and the date as its
-// payload rather than as a record beside one, so what somebody decided and
-// what a release is waiting on cannot come to disagree.
+// The act the component screen exists for. A planned upgrade is recorded as a
+// decision with the version and the date as its payload rather than as a
+// record beside one, so what somebody decided and what a release is waiting on
+// cannot come to disagree.
 func registerPlanUpgrade(api huma.API, in core.Deps) {
 	huma.Register(api, core.Requiring(huma.Operation{
 		OperationID: "plan-upgrade", Method: http.MethodPost,

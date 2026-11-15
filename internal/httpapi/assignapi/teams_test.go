@@ -385,11 +385,11 @@ func TestATeamQueueAndItsCountsAreNarrowedPerMember(t *testing.T) {
 }
 
 func TestTakingSomebodyOffATeamTheyAreNotOnRecordsNothing(t *testing.T) {
-	// The fifth write that takes access away, and it read what it matched the
-	// way the other four now do. Membership is what routes an undisclosed
-	// finding to somebody, so a trail row saying a membership ended is a
-	// record of who stopped being able to receive them — and answered as
-	// success, one was written for a membership that never existed.
+	// A write that takes access away reads what it matched, like every other.
+	// Membership is what routes an undisclosed finding to somebody, so a trail
+	// row saying a membership ended is a record of who stopped being able to
+	// receive them — and answered as success, one would be written for a
+	// membership that never existed.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
 			`{"name":"kernel","members":["reader"]}`); made.Code != http.StatusCreated {
@@ -414,12 +414,13 @@ func TestTakingSomebodyOffATeamTheyAreNotOnRecordsNothing(t *testing.T) {
 }
 
 func TestAnActThatCouldNotFinishLeavesNothingBehind(t *testing.T) {
-	// Two acts, each written as a statement per part. Declaring a team and
-	// putting people on it left the team standing with whoever came before the
-	// name that failed; recording somebody and granting them roles left the
+	// Two acts, each written as a statement per part, each in one
+	// transaction. Partly applied, declaring a team and putting people on it
+	// would leave the team standing with whoever came before the name that
+	// failed, and recording somebody and granting them roles would leave the
 	// person and the roles named before the product that is not there. The
 	// caller is told nothing happened either way, so the administrator sends
-	// the corrected request again and grants the first ones twice.
+	// the corrected request again and would grant the first ones twice.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 

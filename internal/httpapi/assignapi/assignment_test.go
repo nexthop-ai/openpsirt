@@ -87,8 +87,7 @@ func TestSomethingUndisclosedReachesOnlyWhoMayReadIt(t *testing.T) {
 	// to anybody holding public reading there: the announcement an embargo
 	// exists to prevent, sent by the act of assigning it.
 	//
-	// The assignment itself is now refused for the same population, which
-	// a capability without a read role settled after this was written: an
+	// The assignment itself is refused for the same population, because an
 	// assignment carries visibility of what was assigned, so handing an
 	// embargoed finding to somebody cleared for nothing embargoed would
 	// make the assignment the disclosure. The check on this channel stays
@@ -397,10 +396,11 @@ func TestHandingWorkBackToYourselfDoesNotNeedTheRightToGiveItAway(t *testing.T) 
 // TestATeamsQueueCanBeOpened pins the list behind a team's own number.
 //
 // Auto-assignment and an assignment naming a team both put work into a team's
-// queue, and the totals list said the team was holding it. Nothing could open
-// it: the drill-down resolved an identity, so a team's name matched nobody and
-// the screen answered "they are not holding anything" over work it had just
-// counted. Worse than an absent view, because it answered.
+// queue, and the totals list says the team is holding it, so the drill-down
+// opens a team as well as a person. Resolving an identity alone, a team's name
+// would match nobody and the screen would answer "they are not holding
+// anything" over work it had just counted — worse than an absent view,
+// because it answers.
 func TestATeamsQueueCanBeOpened(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
@@ -458,8 +458,8 @@ func TestATeamsQueueCanBeOpened(t *testing.T) {
 // Deactivating somebody again hands back whatever they still hold.
 //
 // The hand-back runs after the deactivation commits, so a failure there leaves
-// work with somebody who has left. Asking again found nothing to deactivate
-// and returned before handing anything back, so the work stayed held.
+// work with somebody who has left. Asking again finds nothing to deactivate
+// and still hands back what they hold.
 func TestDeactivatingAgainHandsBackWhatIsStillHeld(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		ctx := t.Context()
