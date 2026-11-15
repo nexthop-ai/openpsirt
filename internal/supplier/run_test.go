@@ -381,3 +381,62 @@ func TestTheBoundOnOneCycleIsTheSameWhicheverWayTheFeedIsOrdered(t *testing.T) {
 func byteName(i int) string {
 	return "/" + strings.Repeat("a", 1+i/26) + string(rune('a'+i%26)) + ".json"
 }
+
+func TestAPassThatLosesTheLeaseBetweenSuppliersReadsNoMore(t *testing.T) {
+	// The lease is asked for again between suppliers. Lost there, the pass
+	// stops, and the supplier after it is left to the replica holding it.
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.publishes("/2026/EL-10.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0010", "libnl-3-200", "3.7.1", "CVE-2026-9334"))
+		store, _, pass := passOver(t, f, p, "one")
+		// A second supplier, described at a second address on the same host.
+		const mirror = "/mirror/provider-metadata.json"
+		p.documents[mirror] = `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":"` +
+			p.server.URL + `/feed.json"}]}}]}`
+		second, err := store.Add(ctx, f.by, f.product, "Example Linux mirror", p.server.URL+mirror)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*supplier.Feed)(nil)).
+			Set(`"caught_up_to" = ?`, long).Where(`"id" = ?`, second.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		// Another replica takes the lease as the first supplier's document is
+		// fetched, the way one does once this replica's lapses.
+		leases := queue.NewLeases(f.db.DB)
+		taken := false
+		p.asking = func(path string) {
+			if path != "/2026/EL-10.json" || taken {
+				return
+			}
+			taken = true
+			if err := leases.Release(ctx, supplier.FetchLease, "one"); err != nil {
+				t.Error(err)
+			}
+			if mine, err := leases.Take(ctx, supplier.FetchLease, "two", time.Hour); err != nil || !mine {
+				t.Errorf("the second replica could not take the lease: %v (%v)", mine, err)
+			}
+		}
+
+		took, err := pass.Once(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !taken || took.Documents != 1 {
+			t.Fatalf("read %+v, want the first supplier's one document", took)
+		}
+		described := 0
+		for _, path := range p.asked {
+			if path == "/.well-known/csaf/provider-metadata.json" || path == mirror {
+				described++
+			}
+		}
+		if described != 1 {
+			t.Errorf("%d suppliers were reached, want the one read before the lease was lost: %v",
+				described, p.asked)
+		}
+	})
+}
