@@ -4,6 +4,7 @@
 package finding_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -142,24 +143,33 @@ func TestANoteSaysHowManyFixesItLeftOutAndNeverWhich(t *testing.T) {
 	}
 }
 
-func TestTheSameComparisonRendersTheSameDocumentTwice(t *testing.T) {
-	// A release note that reorders between reads is one nobody can diff, and
-	// the map iteration underneath is not ordered.
-	comparison := &finding.Comparison{
-		Fixed: []finding.Changed{
-			{Vulnerability: "CVE-2026-9", Component: "a", Severity: "low",
-				Because: finding.Upgraded},
-			{Vulnerability: "CVE-2026-1", Component: "b", Severity: "critical",
-				Because: finding.Upgraded},
-			{Vulnerability: "CVE-2026-5", Component: "c", Severity: "critical",
-				Because: finding.Upgraded},
-		},
+func TestTheSameFixesInAnyOrderRenderTheSameDocument(t *testing.T) {
+	// A release note that reorders with the order its rows were read in is
+	// one nobody can diff. Every tie is here: two groups of equal worst rank
+	// in different components, two upgrades of one component to different
+	// versions, and two issues of equal rank in one group.
+	fixed := []finding.Changed{
+		{Vulnerability: "CVE-2026-9", Component: "a", Severity: "low",
+			Because: finding.Upgraded},
+		{Vulnerability: "CVE-2026-1", Component: "b", Severity: "critical",
+			Because: finding.Upgraded},
+		{Vulnerability: "CVE-2026-5", Component: "c", Severity: "critical",
+			Because: finding.Upgraded},
+		{Vulnerability: "CVE-2026-7", Component: "d", Severity: "high",
+			Because: finding.Upgraded, FromVersion: "1.0", MovedTo: "1.2"},
+		{Vulnerability: "CVE-2026-8", Component: "d", Severity: "high",
+			Because: finding.Upgraded, FromVersion: "1.0", MovedTo: "1.1"},
+		{Vulnerability: "CVE-2026-3", Component: "e", Severity: "medium",
+			Because: finding.Upgraded},
+		{Vulnerability: "CVE-2026-2", Component: "e", Severity: "medium",
+			Because: finding.Upgraded},
 	}
-	first := finding.Notes(about("2.4.0"), comparison)
-	for range 5 {
-		if again := finding.Notes(about("2.4.0"), comparison); again != first {
-			t.Fatalf("the document changed between runs:\n%s\n---\n%s", first, again)
-		}
+	reversed := slices.Clone(fixed)
+	slices.Reverse(reversed)
+
+	first := finding.Notes(about("2.4.0"), &finding.Comparison{Fixed: fixed})
+	if again := finding.Notes(about("2.4.0"), &finding.Comparison{Fixed: reversed}); again != first {
+		t.Errorf("the document changed with the order of its rows:\n%s\n---\n%s", first, again)
 	}
 	// Worst first, so somebody reading from the top reads the worst first.
 	if strings.Index(first, "CVE-2026-1") > strings.Index(first, "CVE-2026-9") {

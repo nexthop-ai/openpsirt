@@ -4,11 +4,13 @@
 package finding_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -316,16 +318,9 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 		}
 
 		// And a third person agreeing is told it has already been agreed to,
-		// and the date does not move again.
-		//
-		// This is the read's answer, not the write's. The row is read
-		// before the update and the second agreement is refused there. What
-		// the update's own `approved_at IS NULL` clause guards is the race —
-		// two people agreeing between that read and that write — and the
-		// count it produces is now reported rather than discarded, which is
-		// what makes the clause say something. Forcing that interleave needs
-		// the barrier `internal/catalog/race_test.go` is written against, and
-		// is not covered here.
+		// and the date does not move again. The read refuses this one; the
+		// write's own refusal, for two agreements racing between that read
+		// and the write, is TestAnAgreementThatLostTheRaceIsRefused.
 		third := f.someoneElse(t, access.PrivateTriage)
 		if _, err := f.store.AgreeToMovement(t.Context(), third, long.ID); !errors.Is(
 			err, finding.ErrAlreadyAgreed) {
@@ -333,6 +328,61 @@ func TestAShortExtensionStandsAndALongOneWaits(t *testing.T) {
 		}
 		if got := f.endsAt(t, issue); !got.Equal(now.Add(28 * 24 * time.Hour)) {
 			t.Errorf("a second agreement moved the embargo again, to %s", got)
+		}
+	})
+}
+
+// Two people agreeing to one waiting movement at once: the one whose write
+// lands second matched nothing, because the first already recorded the
+// agreement, and is told so rather than told it agreed. The date moves once.
+func TestAnAgreementThatLostTheRaceIsRefused(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		issue := f.embargoed(t, who)
+		was := f.endsAt(t, issue)
+		long, err := f.store.Extend(t.Context(), who, f.productID, issue,
+			was.Add(60*24*time.Hour), "Upstream has not answered.")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !long.NeedsApproval {
+			t.Fatal("sixty days stood on one person's say-so, so nothing waits to be agreed to")
+		}
+
+		first := f.holder(t, "first@example.com", access.PrivateTriage)
+		second := f.holder(t, "second@example.com", access.PrivateTriage)
+		// The rival agrees after the movement is read and before this
+		// agreement writes it, so the read saw it waiting and only the
+		// write can tell.
+		hooked, rival := dbtest.RivalAfterRead(t, f.db, "disclosure_movement", "disclosure_movement",
+			5*time.Second, func() error {
+				_, err := f.store.AgreeToMovement(context.Background(), first, long.ID)
+				return err
+			})
+		if _, err := finding.NewStore(hooked).AgreeToMovement(t.Context(), second, long.ID); !errors.Is(
+			err, finding.ErrAlreadyAgreed) {
+			t.Errorf("the agreement that lost the race answered %v, want ErrAlreadyAgreed", err)
+		}
+		if err := rival(); err != nil {
+			t.Fatalf("the rival agreement: %v", err)
+		}
+
+		moved, err := f.store.Movements(t.Context(), who, f.productID, issue)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var agreed *finding.Movement
+		for i := range moved {
+			if moved[i].ID == long.ID {
+				agreed = &moved[i]
+			}
+		}
+		if agreed == nil || agreed.ApprovedBy == nil || *agreed.ApprovedBy != first.ID {
+			t.Errorf("the movement reads %+v, want it agreed to by the rival", agreed)
+		}
+		if got := f.endsAt(t, issue); !got.Equal(was.Add(60 * 24 * time.Hour)) {
+			t.Errorf("the embargo ends %s, want %s", got, was.Add(60*24*time.Hour))
 		}
 	})
 }

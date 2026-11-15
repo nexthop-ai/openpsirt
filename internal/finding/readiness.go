@@ -70,6 +70,10 @@ type Readiness struct {
 // built.
 const NothingScannedYet = "nothing has been scanned here yet"
 
+// NoScannedRelease is what readiness says of a scanned branch with no scanned
+// release cut from it and built the same way.
+const NoScannedRelease = "no scanned release from this branch"
+
 // ReadyFor compares a branch's current state against the last release cut from
 // it, built the same way.
 //
@@ -133,7 +137,7 @@ func (s *Store) ReadyFor(ctx context.Context, subject access.Subject,
 		return nil, fmt.Errorf("read the last release cut from this branch: %w", err)
 	}
 	if release.BranchOrTagID == 0 {
-		out.Why = "no scanned release from this branch"
+		out.Why = NoScannedRelease
 		return out, nil
 	}
 
