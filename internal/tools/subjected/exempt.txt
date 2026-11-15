@@ -313,6 +313,7 @@ setting.Store.Days Not varying by reader: a deployment setting read as whole day
 setting.Store.Duration Not varying by reader: a deployment setting read as a duration.
 setting.Store.FormerNames A background pass: startup reports settings still held under a former name.
 setting.Store.Get Not varying by reader: a deployment setting.
+setting.Store.Mode Not varying by reader: the deployment's role mode, read per request.
 setting.Store.SetIfAbsent Not varying by reader: the deployment's sign-in key, minted once by whichever process asks first.
 setting.Store.Switch Not varying by reader: whether a deployment switch is on.
 setting.Store.Word Not varying by reader: a deployment setting read as one of a few words.

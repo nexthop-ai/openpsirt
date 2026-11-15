@@ -10,6 +10,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -306,6 +307,28 @@ func TestARenamedSettingIsReadInOneStatement(t *testing.T) {
 		}
 		if count.n != 1 {
 			t.Errorf("a renamed setting was read in %d statements", count.n)
+		}
+	})
+}
+
+// The role mode is read at each use, and a read that fails answers with the
+// mode that derives nothing: a store that cannot answer must not keep deriving
+// roles from groups somebody turned off.
+func TestARoleModeThatCannotBeReadDerivesNothing(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		store := setting.NewStore(db.DB)
+		if _, _, err := store.Change(t.Context(), setting.RoleMode, string(access.GroupBound)); err != nil {
+			t.Fatal(err)
+		}
+		mode := store.Mode()
+		if got := mode(t.Context()); got != access.GroupBound {
+			t.Fatalf("a stored mode read as %q", got)
+		}
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if got := mode(t.Context()); got != access.Direct {
+			t.Errorf("a mode that could not be read answered %q, want %q", got, access.Direct)
 		}
 	})
 }

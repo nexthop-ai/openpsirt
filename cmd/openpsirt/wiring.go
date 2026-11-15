@@ -22,7 +22,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 	"github.com/nexthop-ai/openpsirt/internal/signin"
 	"github.com/nexthop-ai/openpsirt/internal/signing"
 )
@@ -199,22 +198,6 @@ func signInProviders(ctx context.Context, cfg config.Config, logger *slog.Logger
 	}
 
 	return providers, nil
-}
-
-// roleMode reads where roles come from, per request.
-//
-// Read rather than held because replicas restart one at a time, and the one
-// that applied configuration last is what every replica has to answer by. A
-// read that fails answers with the mode that derives nothing, which is the
-// safe direction.
-func roleMode(settings *setting.Store) func(context.Context) access.Mode {
-	return func(ctx context.Context) access.Mode {
-		stored, _, err := settings.Get(ctx, setting.RoleMode)
-		if err != nil {
-			return access.Direct
-		}
-		return access.AsMode(stored)
-	}
 }
 
 // mailChannel is the channel an operator configured, or nothing.

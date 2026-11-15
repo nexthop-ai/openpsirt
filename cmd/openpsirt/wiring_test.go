@@ -17,12 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
 	"github.com/nexthop-ai/openpsirt/internal/config"
-	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 func discard() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
@@ -149,28 +145,6 @@ func TestAWorkerThatStopsWhenSignalledLeavesACleanExit(t *testing.T) {
 	if err := signalled(t, func(ctx context.Context) { <-ctx.Done() }); err != nil {
 		t.Errorf("a server whose worker stopped answered %v", err)
 	}
-}
-
-// The role mode is read at each use, and a read that fails answers with the
-// mode that derives nothing: a store that cannot answer must not keep deriving
-// roles from groups somebody turned off.
-func TestARoleModeThatCannotBeReadDerivesNothing(t *testing.T) {
-	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
-		store := setting.NewStore(db.DB)
-		if _, _, err := store.Change(t.Context(), setting.RoleMode, string(access.GroupBound)); err != nil {
-			t.Fatal(err)
-		}
-		mode := roleMode(store)
-		if got := mode(t.Context()); got != access.GroupBound {
-			t.Fatalf("a stored mode read as %q", got)
-		}
-		if err := db.Close(); err != nil {
-			t.Fatal(err)
-		}
-		if got := mode(t.Context()); got != access.Direct {
-			t.Errorf("a mode that could not be read answered %q, want %q", got, access.Direct)
-		}
-	})
 }
 
 // No mail configured is no channel: an interface holding nothing, not one
