@@ -202,12 +202,8 @@ func (v *Vulnerabilities) merging(ctx context.Context, rows []int64, names []str
 	if err != nil {
 		return 0, fmt.Errorf("take the issues a report named together: %w", err)
 	}
-	taken, err := database.Affected(res)
-	if err != nil {
-		return 0, fmt.Errorf("take the issues a report named together: %w", err)
-	}
-	if taken != int64(len(rows)) {
-		return 0, database.ErrGoAgain
+	if err := database.MovedAll(res, len(rows), "take the issues a report named together"); err != nil {
+		return 0, err
 	}
 	var held []Vulnerability
 	if err := v.db.NewSelect().Model(&held).

@@ -152,20 +152,7 @@ func seedReplacedV0110(t *testing.T, db *database.DB) inventoriesV0110 {
 	t.Helper()
 	ctx := t.Context()
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
-	exec := func(t *testing.T, query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
-	id := func(t *testing.T, query string) int64 {
-		t.Helper()
-		var out int64
-		if err := db.DB.NewRaw(query).Scan(ctx, &out); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-		return out
-	}
+	exec, id := seedSQL(ctx, db)
 	exec(t, `INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, "p", "P", at)
 	product := id(t, `SELECT MAX("id") FROM "product"`)
 	exec(t, `INSERT INTO "branch_or_tag" ("product_id", "name", "display_name", "kind", "created_at")

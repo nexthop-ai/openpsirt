@@ -159,6 +159,10 @@ connected to the database, and then applies the schema. Until it serves:
 A second process started while one applies the schema waits for it, answers
 the same way, and logs about once a minute which process holds the migration
 lock. Where the holder stops part way, the waiter applies the schema itself.
+The lock is the server's own, so any account on a MySQL or MariaDB server,
+or any role allowed to connect to the PostgreSQL database, can take it and
+hold every start behind it. The waiter's log line names that connection; end
+it to let the start go on.
 
 A check on `/readyz` that ends the process ends a long migration part way, and
 the next process starts it again from the beginning. An AWS Application Load
@@ -1400,6 +1404,7 @@ from, and every section after it.
 | Back the database up | It is the only way back to the earlier release: a database is only ever upgraded, and this release refuses to start against a database a later one upgraded. On MySQL and MariaDB it is also what recovers an upgrade that fails part way |
 | Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. With `strategy.type: RollingUpdate`, scale the deployment to zero first. An upgrade can drop and reshape tables the earlier release reads and writes, so a replica left serving fails on them |
 | Deploy this release | It migrates at startup, answering its health check on `/healthz` meanwhile ([Health checks](#health-checks)). With `autoMigrate: false`, run `openpsirt migrate up` first |
+| Watch the log while it migrates | A schema change waits three seconds at a time for a table another session holds, and tries again with no total limit, logging `a migration is waiting for a table something else holds` with every other session holding a transaction open. A wait logged again and again names the session to end |
 
 Going back to the earlier release is restoring that backup and deploying the
 earlier release against it. Every release before this one starts against a

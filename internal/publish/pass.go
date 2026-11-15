@@ -329,12 +329,9 @@ func (s *Store) revise(ctx context.Context, productID int64, one Generated,
 		if err != nil {
 			return fmt.Errorf("publish the %s about %s: %w", one.Kind, one.Subject, err)
 		}
-		n, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("publish the %s about %s: %w", one.Kind, one.Subject, err)
-		}
-		if n == 0 {
-			return fmt.Errorf("publish the %s about %s: %w", one.Kind, one.Subject, database.ErrGoAgain)
+		if err := database.MovedAll(res, 1,
+			fmt.Sprintf("publish the %s about %s", one.Kind, one.Subject)); err != nil {
+			return err
 		}
 		revised = true
 		return nil
@@ -383,14 +380,7 @@ func (s *Store) unchanged(ctx context.Context, tx bun.IDB, was *Document, status
 	if err != nil {
 		return fmt.Errorf("publish the %s about %s again: %w", was.Kind, was.Subject, err)
 	}
-	n, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("publish the %s about %s again: %w", was.Kind, was.Subject, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("publish the %s about %s again: %w", was.Kind, was.Subject, database.ErrGoAgain)
-	}
-	return nil
+	return database.MovedAll(res, 1, fmt.Sprintf("publish the %s about %s again", was.Kind, was.Subject))
 }
 
 // withdraw stops a document being served, where the product has nothing to say

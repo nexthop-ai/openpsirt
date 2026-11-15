@@ -266,6 +266,45 @@ func TestAClaimIsJudgedOnceAndSaysWhoJudgedIt(t *testing.T) {
 	})
 }
 
+// Whether the judge may be told of the issue is asked again where the
+// judgment is written, and that one decides: an issue put out of the judge's
+// reach after the early refusal is refused, and the report is left unjudged.
+func TestAJudgmentIsRefusedWhereTheIssueLeftReachBeforeItWasWritten(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		row, err := f.store.Record(t.Context(), who, f.productID,
+			finding.NewReport{ReportedProblem: "Reachable when asked, gone when written."})
+		if err != nil {
+			t.Fatal(err)
+		}
+		issue := f.anIssueHere(t, who, "A flaw that moves to security testing mid-flight.")
+		racing := finding.NewStore(f.db.DB)
+		moved := false
+		racing.JudgingAfter(func() {
+			if _, err := f.db.NewRaw(`UPDATE "finding" SET "visibility" = ? WHERE "vulnerability_id" = ?`,
+				access.SecurityTesting, issue).Exec(t.Context()); err != nil {
+				t.Errorf("move the issue out of reach: %v", err)
+			}
+			moved = true
+		})
+		if _, err := racing.JudgeAsIssue(t.Context(), who, f.productID, row.Reference,
+			issue); !errors.Is(err, finding.ErrNoSuchIssueHere) {
+			t.Errorf("judging toward an issue gone out of reach was answered %v", err)
+		}
+		if !moved {
+			t.Fatal("the early refusals refused, so nothing moved between them and the write")
+		}
+		left, err := f.store.ReportBy(t.Context(), who, f.productID, row.Reference)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if left.VulnerabilityID != nil {
+			t.Errorf("the report was judged as evidence for issue %d", *left.VulnerabilityID)
+		}
+	})
+}
+
 func TestAClaimCannotBePointedAtAnIssueTheJudgeCannotBeToldOf(t *testing.T) {
 	// Resolving first and refusing after would make the refusal informative:
 	// an identifier nobody has filed and one filed on work this person cannot

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -408,6 +409,54 @@ func TestAStaleDatabaseThatWillNotDropLeavesTheLeaseStanding(t *testing.T) {
 			if err != nil || !slices.Contains(dropped, stale.key) {
 				t.Errorf("the clean dropped %v, want the template %s among them: %v", dropped, stale.key, err)
 			}
+		}
+	})
+}
+
+// The clean writes a database's name into its statements between quotes, so
+// only a name this harness could have made reaches them. One another account
+// made under the prefix is left.
+func TestTheCleanDropsOnlyANameTheHarnessMakes(t *testing.T) {
+	for _, name := range []string{slotName(harnessPrefix, "schema", 3), harnessPrefix + "pkg_01_ab12"} {
+		if !harnessMade(name) {
+			t.Errorf("%q was read as a name the harness never makes", name)
+		}
+	}
+	for _, name := range []string{harnessPrefix + `x" WITH OWNER "y`, harnessPrefix + "X", harnessPrefix + "a-b",
+		harnessPrefix + "a`b"} {
+		if harnessMade(name) {
+			t.Errorf("%q was read as a name the harness makes", name)
+		}
+	}
+}
+
+// A database under the prefix whose name the harness never makes is left by
+// the clean, which says so, rather than dropped through a statement its name
+// is written into.
+func TestTheCleanLeavesANameTheHarnessNeverMakes(t *testing.T) {
+	forEachServer(t, func(t *testing.T, engine database.Engine, base string) {
+		ctx := t.Context()
+		admin := Open(t, base)
+		namespace := slotSpace(t, engine)
+		dropAfter(t, admin, engine, namespace)
+		foreign := namespace + "by-hand"
+		if _, err := admin.ExecContext(ctx, `CREATE DATABASE "`+foreign+`"`); err != nil {
+			t.Fatalf("make %s: %v", foreign, err)
+		}
+
+		dropped, _, err := dropUnheld(ctx, engine, base, namespace, nil, true)
+		if err == nil || !strings.Contains(err.Error(), "not a name this harness makes") {
+			t.Errorf("the clean answered %v, want it to say it left %s", err, foreign)
+		}
+		if slices.Contains(dropped, foreign) {
+			t.Errorf("the clean dropped %s, a name the harness never makes", foreign)
+		}
+		left, err := databasesFor(ctx, admin, engine, namespace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(left, foreign) {
+			t.Errorf("the server no longer holds %s, so the clean dropped it", foreign)
 		}
 	})
 }

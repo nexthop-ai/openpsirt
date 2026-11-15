@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/uptrace/bun"
 
@@ -29,6 +30,11 @@ import (
 // leaves part of it applied and the version unrecorded; a backup taken before
 // is what recovers it.
 //
+// On PostgreSQL and SQLite an upgrade whose statement waited out its bound on
+// a lock, or was ended as a deadlock, is rolled back, and run again after a
+// pause, until it runs or is stopped (waits.go). MySQL and MariaDB try the
+// statement again where it stands.
+//
 // SQLite changes a table's shape by building a replacement and dropping the
 // original, which is refused while foreign keys are enforced and a table
 // points at it. The setting is ignored inside a transaction, so it is made
@@ -38,7 +44,7 @@ import (
 // of it. A pool of one is not enough: the pool closes a connection past its
 // lifetime as it comes back, and the transaction then opens on a fresh one
 // with foreign keys enforced.
-func inV020(ctx context.Context, sqldb *sql.DB, run func(context.Context, bun.Tx) error) (err error) {
+func inV020(ctx context.Context, sqldb *sql.DB, run func(context.Context, bun.Tx) error) error {
 	engine := migrate.EngineFrom(ctx)
 	db, err := database.Query(sqldb, engine)
 	if err != nil {
@@ -50,6 +56,22 @@ func inV020(ctx context.Context, sqldb *sql.DB, run func(context.Context, bun.Tx
 		}
 		return foreignKeysHold(ctx, engine, tx)
 	}
+	since := time.Now()
+	for attempt := 1; ; attempt++ {
+		err := upgradeOnce(ctx, db, engine, body)
+		if err == nil || retriesInPlace(engine) || !database.LockWaitEnded(err) || ctx.Err() != nil {
+			return err
+		}
+		if stopped := waitOut(ctx, sqldb, attempt, since, err); stopped != nil {
+			return fmt.Errorf("%w: %w", err, stopped)
+		}
+	}
+}
+
+// upgradeOnce runs one attempt at a release's upgrade, in a transaction, and
+// on SQLite on one connection with foreign keys suspended (inV020).
+func upgradeOnce(ctx context.Context, db *bun.DB, engine database.Engine,
+	body func(context.Context, bun.Tx) error) (err error) {
 	if engine != database.SQLite {
 		return db.RunInTx(ctx, nil, body)
 	}
@@ -525,21 +547,11 @@ func (u *upgrader) hasColumn(table, column string) (bool, error) {
 		columns, err := u.sqliteColumns(table)
 		return columns[column], err
 	}
-	query := `SELECT 1 FROM "information_schema"."columns"
-		WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "column_name" = ?`
+	query := postgresColumnProbe
 	if u.engine != database.Postgres {
-		query = `SELECT 1 FROM "information_schema"."COLUMNS"
-			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ? LIMIT 1`
+		query = mysqlColumnProbe
 	}
-	var probe int
-	err := u.tx.QueryRowContext(u.ctx, query, table, column).Scan(&probe)
-	if database.IsNoRows(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("ask whether %s has column %s: %w", table, column, err)
-	}
-	return true, nil
+	return exists(u.ctx, u.tx, fmt.Sprintf("%s has column %s", table, column), query, table, column)
 }
 
 // dropDefault drops a column's default on the three servers where it holds
@@ -551,13 +563,9 @@ func (u *upgrader) dropDefault(table, column string) error {
 	if u.engine == database.SQLite {
 		return nil
 	}
-	query := `SELECT 1 FROM "information_schema"."columns"
-		WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "column_name" = ?
-		AND "column_default" IS NOT NULL`
+	query := postgresColumnProbe + ` AND "column_default" IS NOT NULL`
 	if u.engine != database.Postgres {
-		query = `SELECT 1 FROM "information_schema"."COLUMNS"
-			WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "COLUMN_NAME" = ?
-			AND "COLUMN_DEFAULT" IS NOT NULL LIMIT 1`
+		query = mysqlColumnProbe + ` AND "COLUMN_DEFAULT" IS NOT NULL`
 	}
 	held, err := exists(u.ctx, u.tx, fmt.Sprintf("%s.%s has a default", table, column), query, table, column)
 	if err != nil || !held {

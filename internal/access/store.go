@@ -288,12 +288,9 @@ func (s *Store) move(ctx context.Context, existing *Account, admin, audits *bool
 		if err != nil {
 			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, err)
 		}
-		n, err := database.Affected(result)
-		if err != nil {
-			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, err)
-		}
-		if n == 0 {
-			return fmt.Errorf("record that %q %s: %w", existing.Identity, flag.what, database.ErrGoAgain)
+		if err := database.MovedAll(result, 1,
+			fmt.Sprintf("record that %q %s", existing.Identity, flag.what)); err != nil {
+			return err
 		}
 		*flag.held = *flag.asked
 	}
@@ -507,14 +504,7 @@ func (s *Store) SetDisplayName(ctx context.Context, personID int64, from, to str
 	if err != nil {
 		return fmt.Errorf("record the name of person %d: %w", personID, err)
 	}
-	n, err := database.Affected(result)
-	if err != nil {
-		return fmt.Errorf("record the name of person %d: %w", personID, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("record the name of person %d: %w", personID, database.ErrGoAgain)
-	}
-	return nil
+	return database.MovedAll(result, 1, fmt.Sprintf("record the name of person %d", personID))
 }
 
 // SetDigest records what somebody asked to be sent.

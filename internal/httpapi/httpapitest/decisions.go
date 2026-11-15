@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -309,7 +311,7 @@ func (r *Reach) StandsOn(t *testing.T, vulnerability string) (string, string) {
 func (r *Reach) Aged(t *testing.T, decision int64, column string, when time.Time) {
 	t.Helper()
 	if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
-		Set(column+" = ?", when).
+		Set("? = ?", bun.Ident(column), when).
 		Where(`"decision_id" = ?`, decision).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}

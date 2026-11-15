@@ -189,7 +189,7 @@ func (s *Store) Mint(ctx context.Context, subject access.Subject, who publisher.
 		// can be asked to agree to. Without it the title would sit nowhere
 		// until the first edit, and an approval would have no edition to
 		// name.
-		edition, err := openEdition(ctx, tx, made.ID, subject.ID, title, minted)
+		edition, err := openEdition(ctx, tx, made.ID, 0, subject.ID, title, minted)
 		if err != nil {
 			return err
 		}
@@ -322,6 +322,10 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 
 	var added time.Time
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		highest, err := s.mayEdit(ctx, tx, subject, row, "name a flaw on an advisory")
+		if err != nil {
+			return err
+		}
 		added = s.now().UTC().Truncate(time.Microsecond)
 		// Asked inside the transaction, because the unique constraint is what
 		// actually decides it and a count read outside describes a database
@@ -357,9 +361,9 @@ func (s *Store) Add(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return err
 		}
-		return reopen(ctx, tx, row, subject.ID, added)
+		return reopen(ctx, tx, row, highest, subject.ID, added)
 	})
-	if errors.Is(err, ErrAlreadyCovered) {
+	if errors.Is(err, ErrAlreadyCovered) || errors.Is(err, access.ErrDenied) {
 		return nil, err
 	}
 	if err != nil {
@@ -396,6 +400,10 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 		return err
 	}
 	err = database.InTransaction(ctx, s.db, func(ctx context.Context, tx bun.Tx) error {
+		highest, err := s.mayEdit(ctx, tx, subject, row, "take a flaw off an advisory")
+		if err != nil {
+			return err
+		}
 		removed := s.now().UTC().Truncate(time.Microsecond)
 		res, err := tx.NewUpdate().Model((*Cover)(nil)).
 			Set(`"removed_at" = ?`, removed).
@@ -421,9 +429,9 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 		if n == 0 {
 			return ErrNoSuchIssue
 		}
-		return reopen(ctx, tx, row, subject.ID, removed)
+		return reopen(ctx, tx, row, highest, subject.ID, removed)
 	})
-	if errors.Is(err, ErrNoSuchIssue) {
+	if errors.Is(err, ErrNoSuchIssue) || errors.Is(err, access.ErrDenied) {
 		return err
 	}
 	if err != nil {
@@ -438,12 +446,12 @@ func (s *Store) Drop(ctx context.Context, subject access.Subject,
 // document says, so both take back every agreement standing on what it said
 // before — an approver read a document covering three flaws, and a fourth
 // added under their agreement is one nobody read.
-func reopen(ctx context.Context, tx bun.Tx, row *Advisory, who int64, now time.Time) error {
+func reopen(ctx context.Context, tx bun.Tx, row *Advisory, highest int, who int64, now time.Time) error {
 	title, err := carryTitle(ctx, tx, row.ID)
 	if err != nil {
 		return err
 	}
-	_, err = openEdition(ctx, tx, row.ID, who, title, now)
+	_, err = openEdition(ctx, tx, row.ID, highest, who, title, now)
 	return err
 }
 
@@ -667,7 +675,7 @@ func (s *Store) editing(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if err := s.mayWrite(ctx, subject, row, what); err != nil {
+	if err := s.mayWrite(ctx, s.db, subject, row, what); err != nil {
 		return nil, nil, nil, err
 	}
 	named, err := catalog.NewStore(s.db).ProductByName(ctx, product)

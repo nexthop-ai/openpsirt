@@ -44,3 +44,17 @@ func TestEveryTaggedReleaseShipsTheFilesItTagged(t *testing.T) {
 		t.Fatal("no release records a file, so nothing was checked")
 	}
 }
+
+// The version a build expects is the highest migration by the rule the
+// release records read. The embedding includes test files, and one named like
+// a migration would otherwise put the build ahead of every database it made.
+func TestTheExpectedVersionCountsNoTestFile(t *testing.T) {
+	names := []string{"00046_v0120.go", "00047_v0130.go", "00048_v0130_test.go", "fingerprint.go"}
+	got, err := highestOf(names)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 47 {
+		t.Errorf("a build carrying %v expects version %d, want 47", names, got)
+	}
+}

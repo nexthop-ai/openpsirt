@@ -93,3 +93,31 @@ func TestAVersionIsWrittenTheWayItsServerReportsIt(t *testing.T) {
 		}
 	}
 }
+
+func TestAPostgreSQLVersionIsReadFromItsNumber(t *testing.T) {
+	// A pre-release names its version with no dot, and the first dotted
+	// number in what version() says is then the compiler's.
+	for _, tc := range []struct {
+		number string
+		want   Version
+	}{
+		{"180000", Version{18, 0, 0}},
+		{"160015", Version{16, 15, 0}},
+		{"140001", Version{14, 1, 0}},
+		{"130022", Version{13, 22, 0}},
+	} {
+		got, err := postgresVersion(tc.number)
+		if err != nil {
+			t.Errorf("postgresVersion(%q): %v", tc.number, err)
+			continue
+		}
+		if got != tc.want {
+			t.Errorf("postgresVersion(%q) = %s, want %s", tc.number, got, tc.want)
+		}
+	}
+	for _, number := range []string{"", "18beta1", "0", "-1"} {
+		if _, err := postgresVersion(number); err == nil {
+			t.Errorf("postgresVersion(%q) was accepted", number)
+		}
+	}
+}

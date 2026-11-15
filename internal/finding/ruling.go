@@ -456,11 +456,9 @@ func (s *Store) ApproveRuling(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return fmt.Errorf("approve a ruling: %w", err)
 		}
-		changed, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("approve a ruling: %w", err)
-		}
-		if changed == 0 {
+		if changed, err := database.Changed(res, "approve a ruling"); err != nil {
+			return err
+		} else if !changed {
 			return ErrNotWaiting
 		}
 		// Who judged each report is who proposed the ruling, and when they
@@ -517,11 +515,9 @@ func (s *Store) WithdrawRuling(ctx context.Context, subject access.Subject,
 		if err != nil {
 			return fmt.Errorf("withdraw a ruling: %w", err)
 		}
-		changed, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("withdraw a ruling: %w", err)
-		}
-		if changed == 0 {
+		if changed, err := database.Changed(res, "withdraw a ruling"); err != nil {
+			return err
+		} else if !changed {
 			return ErrWithdrawn
 		}
 		if _, err := tx.NewUpdate().Model((*FlawReport)(nil)).

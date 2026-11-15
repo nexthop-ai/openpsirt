@@ -104,13 +104,11 @@ func registerTokens(api huma.API, in core.Deps) {
 		if input.Body.Product != "" {
 			// Resolved through what this person may see, so naming a product
 			// they cannot read answers as one that was never declared rather
-			// than telling them it exists.
-			product, err := core.ProductNamedVisibly(ctx, in, subject, input.Body.Product)
-			if err != nil {
+			// than telling them it exists. An early refusal: the lookup that
+			// decides is made again where the token is minted.
+			if _, err := core.ProductNamedVisibly(ctx, in, subject, input.Body.Product); err != nil {
 				return nil, err
 			}
-			productID = &product.ID
-			productName = product.Name
 		}
 
 		lifetime := time.Duration(0)
@@ -149,6 +147,16 @@ func registerTokens(api huma.API, in core.Deps) {
 		var token *access.Token
 		var secret string
 		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+			// The product is resolved again where the token is minted, and
+			// that one decides: a name another act took since the early
+			// refusal answers as it does now, and a retry reads it afresh.
+			if input.Body.Product != "" {
+				product, err := core.ProductNamedVisiblyIn(ctx, in, tx, subject, input.Body.Product)
+				if err != nil {
+					return err
+				}
+				productID, productName = &product.ID, product.Name
+			}
 			// The ceiling is read in the transaction that mints, so a retry
 			// holds the token to the ceiling in force when it lands.
 			ceiling, err := setting.NewStore(tx).

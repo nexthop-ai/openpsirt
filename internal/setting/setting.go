@@ -916,14 +916,7 @@ func (s *Store) Change(ctx context.Context, name, value string) (before string, 
 		// connection settings make the count rows matched on all four engines,
 		// so a match of none is the row having moved rather than the value
 		// already being the one being written.
-		n, err := database.Affected(res)
-		if err != nil {
-			return fmt.Errorf("record the %q setting: %w", name, err)
-		}
-		if n == 0 {
-			return fmt.Errorf("record the %q setting: %w", name, database.ErrGoAgain)
-		}
-		return nil
+		return database.MovedAll(res, 1, fmt.Sprintf("record the %q setting", name))
 	})
 	if err != nil {
 		return "", false, err

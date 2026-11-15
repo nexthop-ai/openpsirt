@@ -57,12 +57,7 @@ func (g roleV0100) holdsTheLongest(t *testing.T, ctx context.Context, db *databa
 		t.Fatalf("migrate to the latest: %v", err)
 	}
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
-	exec := func(query string, args ...any) {
-		t.Helper()
-		if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-			t.Fatalf("%v\n%s", err, query)
-		}
-	}
+	exec, _ := seeding(t, ctx, db)
 	person, product := g.person, g.product
 
 	var kept string

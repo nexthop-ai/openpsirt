@@ -100,7 +100,7 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 	// Recording that it went out publishes it to the directory and fixes what
 	// each release was fixed from, which is a statement about every product it
 	// covers, so it takes the role every other change to the advisory does.
-	if err := s.mayWrite(ctx, subject, row, "record that an advisory went out"); err != nil {
+	if err := s.mayWrite(ctx, s.db, subject, row, "record that an advisory went out"); err != nil {
 		return nil, err
 	}
 	// A second person has agreed to what it says, checked here because this

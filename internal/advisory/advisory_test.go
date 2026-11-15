@@ -119,44 +119,50 @@ var (
 func each(t *testing.T, fn func(t *testing.T, f *fixture)) {
 	t.Helper()
 	fixtures.Each(t, func(t *testing.T, w *fixtures.World) {
-		// The branch is the seeded build; the tag needs one of its own,
-		// because what an advisory says about a release that never moves is
-		// half of what this store answers.
-		tagged := w.BuildFor(w.Tag, w.Customer)
-		earlier := w.DeclareBranchOrTag(w.Product, "v2.3.9", catalog.Tag, &w.Branch.ID)
-		older := w.BuildFor(earlier, w.Customer)
-		// A second product with a branch and a build, so an advisory can span
-		// two.
-		second := w.DeclareProduct("switchd", "Switch Daemon")
-		secondBranch := w.DeclareBranchOrTag(second, "main", catalog.Branch, nil)
-		secondVariant := w.DeclareVariant(second, "mellanox", true)
-		secondBuild := w.BuildFor(secondBranch, secondVariant)
-		another := w.DeclarePerson("reader", "A Reader", false)
-		mellanox := w.BuildFor(w.Branch, w.DeclareVariant(w.Product, "mellanox", true))
-		f := &fixture{
-			db: w.DB, store: advisory.NewStore(w.DB.DB), finds: finding.NewStore(w.DB.DB),
-			scans:   ingest.NewStore(w.DB.DB),
-			product: w.Product.ID, master: w.Build.ID, tagged: tagged.ID,
-			older:        older.ID,
-			otherProduct: second.ID, other: secondBuild.ID, second: another,
-			otherVariant: mellanox.ID,
-			who: access.NewPerson(w.Person.ID, w.Person.Identity, false, map[int64][]access.Role{
+		fn(t, made(t, w))
+	})
+}
+
+// made is the fixture over one seeded world.
+func made(t *testing.T, w *fixtures.World) *fixture {
+	t.Helper()
+	// The branch is the seeded build; the tag needs one of its own,
+	// because what an advisory says about a release that never moves is
+	// half of what this store answers.
+	tagged := w.BuildFor(w.Tag, w.Customer)
+	earlier := w.DeclareBranchOrTag(w.Product, "v2.3.9", catalog.Tag, &w.Branch.ID)
+	older := w.BuildFor(earlier, w.Customer)
+	// A second product with a branch and a build, so an advisory can span
+	// two.
+	second := w.DeclareProduct("switchd", "Switch Daemon")
+	secondBranch := w.DeclareBranchOrTag(second, "main", catalog.Branch, nil)
+	secondVariant := w.DeclareVariant(second, "mellanox", true)
+	secondBuild := w.BuildFor(secondBranch, secondVariant)
+	another := w.DeclarePerson("reader", "A Reader", false)
+	mellanox := w.BuildFor(w.Branch, w.DeclareVariant(w.Product, "mellanox", true))
+	f := &fixture{
+		db: w.DB, store: advisory.NewStore(w.DB.DB), finds: finding.NewStore(w.DB.DB),
+		scans:   ingest.NewStore(w.DB.DB),
+		product: w.Product.ID, master: w.Build.ID, tagged: tagged.ID,
+		older:        older.ID,
+		otherProduct: second.ID, other: secondBuild.ID, second: another,
+		otherVariant: mellanox.ID,
+		who: access.NewPerson(w.Person.ID, w.Person.Identity, false, map[int64][]access.Role{
+			w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
+			second.ID:    {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
+		}, 0),
+		approver: access.NewPerson(another.ID, another.Identity, false,
+			map[int64][]access.Role{
 				w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 				second.ID:    {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
 			}, 0),
-			approver: access.NewPerson(another.ID, another.Identity, false,
-				map[int64][]access.Role{
-					w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
-					second.ID:    {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage},
-				}, 0),
-			built: time.Now().UTC().Add(-72 * time.Hour),
-		}
-		f.shipped(t, f.master)
-		f.shipped(t, f.tagged)
-		f.shipped(t, f.older)
-		f.shipped(t, f.other)
-		fn(t, f)
-	})
+		built: time.Now().UTC().Add(-72 * time.Hour),
+	}
+	f.shipped(t, f.master)
+	f.shipped(t, f.tagged)
+	f.shipped(t, f.older)
+	f.shipped(t, f.other)
+	return f
 }
 
 // shipped stores a graph against one build, as an inventory naming its own

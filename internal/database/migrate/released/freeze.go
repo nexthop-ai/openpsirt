@@ -58,7 +58,7 @@ func Check(root, migrations, tag string) ([]string, error) {
 		codes[code] = true
 	}
 	for _, name := range names {
-		if strings.HasSuffix(name, "_test.go") {
+		if !source(name) {
 			continue
 		}
 		if n := Number(name); n > r.Last {
@@ -130,12 +130,7 @@ func prepare(root, migrations, tag string) (*freezing, error) {
 	if err != nil {
 		return nil, err
 	}
-	var last int64
-	for _, name := range names {
-		if n := Number(name); n > last && !strings.HasSuffix(name, "_test.go") {
-			last = n
-		}
-	}
+	last := Highest(names)
 	before := previous(records, version)
 	if last < before {
 		return nil, fmt.Errorf("the last migration here is %d, behind %d, the last of the release before %s",

@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -34,13 +35,15 @@ func TestTheKeepAliveUseHasNoDeadline(t *testing.T) {
 	t.Cleanup(func() { keepAliveEvery = restore })
 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Hour)
-	stop := keepAlive(ctx, conn)
+	keeping := keepAlive(ctx, conn)
 	deadline := time.Now().Add(5 * time.Second)
 	for recorded.uses() == 0 && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	cancel()
-	stop()
+	if err := keeping.stop(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	if recorded.uses() == 0 {
 		t.Fatal("the keep-alive never used the connection")
@@ -48,6 +51,65 @@ func TestTheKeepAliveUseHasNoDeadline(t *testing.T) {
 	if recorded.deadlined {
 		t.Error("a keep-alive use carried a deadline, which closes the connection holding the lock")
 	}
+}
+
+// Stopping the keep-alive waits for its last use only as long as the release
+// may take. A use a stalled connection holds is said, never waited on: it
+// lasts until the operating system gives up on the connection.
+func TestStoppingTheKeepAliveDoesNotWaitOnAStalledUse(t *testing.T) {
+	stalled := &stallingConnector{started: make(chan struct{}), unstall: make(chan struct{})}
+	db := sql.OpenDB(stalled)
+	defer func() { _ = db.Close() }()
+	conn, err := db.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	restore := keepAliveEvery
+	keepAliveEvery = 10 * time.Millisecond
+	t.Cleanup(func() { keepAliveEvery = restore })
+
+	keeping := keepAlive(t.Context(), conn)
+	<-stalled.started
+	bounded, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	began := time.Now()
+	err = keeping.stop(bounded)
+	if err == nil {
+		t.Error("stopping a keep-alive whose use is stalled answered that it stopped")
+	}
+	if waited := time.Since(began); waited > 5*time.Second {
+		t.Errorf("stopping a stalled keep-alive waited %s", waited)
+	}
+	close(stalled.unstall)
+	<-keeping.finished
+	_ = conn.Close()
+}
+
+// stallingConnector is a driver, and its own connector, whose every
+// statement waits until unstalled.
+type stallingConnector struct {
+	once    sync.Once
+	started chan struct{}
+	unstall chan struct{}
+	closed  atomic.Int32
+}
+
+func (s *stallingConnector) Open(string) (driver.Conn, error) { return stallingConn{s}, nil }
+func (s *stallingConnector) Connect(context.Context) (driver.Conn, error) {
+	return stallingConn{s}, nil
+}
+func (s *stallingConnector) Driver() driver.Driver { return s }
+
+type stallingConn struct{ s *stallingConnector }
+
+func (c stallingConn) Prepare(string) (driver.Stmt, error) { return nil, driver.ErrSkip }
+func (c stallingConn) Close() error                        { c.s.closed.Add(1); return nil }
+func (c stallingConn) Begin() (driver.Tx, error)           { return nil, driver.ErrSkip }
+
+func (c stallingConn) ExecContext(context.Context, string, []driver.NamedValue) (driver.Result, error) {
+	c.s.once.Do(func() { close(c.s.started) })
+	<-c.s.unstall
+	return driver.RowsAffected(0), nil
 }
 
 // contextRecorder is a driver, and its own connector, that records whether a
