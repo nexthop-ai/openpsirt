@@ -548,3 +548,41 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 		}
 	})
 }
+
+func TestWhatIsYoursToReaffirmNarrowedToAProductIsThatProducts(t *testing.T) {
+	// The triager's lapsed decision is in mine, and they triage theirs too,
+	// so theirs narrows to nothing rather than being refused.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		r.ScannedSiblings(t)
+		lapsed := r.AgreedThenLapsed(t)
+		person, err := r.Rights.ByIdentity(ctx, "triager")
+		if err != nil {
+			t.Fatal(err)
+		}
+		theirs, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Rights.GrantRole(ctx, person.ID, theirs.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+
+		for product, want := range map[string]int{"": 1, "mine": 1, "theirs": 0} {
+			var page struct {
+				Items []struct {
+					Decision struct {
+						ID int64 `json:"id"`
+					} `json:"decision"`
+				} `json:"items"`
+				Total int `json:"total"`
+			}
+			httpapitest.Read(t, r, "triager", "/v1/to-reaffirm?product="+product, &page)
+			if len(page.Items) != want || page.Total != want ||
+				(want == 1 && page.Items[0].Decision.ID != lapsed) {
+				t.Errorf("narrowed to %q, %d of %d listed (%+v), want %d: decision %d",
+					product, len(page.Items), page.Total, page.Items, want, lapsed)
+			}
+		}
+	})
+}
