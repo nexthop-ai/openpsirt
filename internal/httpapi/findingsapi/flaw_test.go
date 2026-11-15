@@ -15,9 +15,11 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/findingsapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 )
 
@@ -732,8 +734,15 @@ func TestAWithdrawnDismissalNobodyAgreedToTellsNobody(t *testing.T) {
 }
 
 // confirmedAs remembers the seeded code finding's prefix, src, as confirmed
-// as a component, as an earlier flaw record would have.
+// as a Debian package, as an earlier flaw record would have.
 func confirmedAs(t *testing.T, r *httpapitest.Reach, component string) {
+	t.Helper()
+	confirmedIn(t, r, component, "deb", "debian")
+}
+
+// confirmedIn is confirmedAs naming the ecosystem and namespace, or neither
+// where they are empty.
+func confirmedIn(t *testing.T, r *httpapitest.Reach, component, ecosystem, namespace string) {
 	t.Helper()
 	ctx := t.Context()
 	mine, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "mine")
@@ -746,8 +755,11 @@ func confirmedAs(t *testing.T, r *httpapitest.Reach, component string) {
 	}
 	row := map[string]any{
 		"product_id": mine.ID, "prefix": "src", "prefix_identity": "src", "under": "src/", "under_length": 4,
-		"component": component, "ecosystem": "deb", "namespace": "debian",
+		"component": component, "ecosystem": nil, "namespace": nil,
 		"confirmed_by": by, "confirmed_at": time.Now().UTC(),
+	}
+	if ecosystem != "" {
+		row["ecosystem"], row["namespace"] = ecosystem, namespace
 	}
 	if _, err := r.DB.DB.NewInsert().Model(&row).TableExpr(`"code_finding_component"`).Exec(ctx); err != nil {
 		t.Fatal(err)
@@ -822,6 +834,49 @@ func TestARecordAsFlawProposesTheBuildsNeverAnalyzedAsUnseen(t *testing.T) {
 				t.Errorf("the flaw proposed build %d seen %v; want the seeded build %d seen and mellanox %d unseen",
 					p.BuildID, p.Seen, broadcom, mellanox)
 			}
+		}
+	})
+}
+
+func TestARecordAsFlawOffersTheComponentTheCodeFindingWasPlacedOn(t *testing.T) {
+	// The build ships its own repository as a component, so the code
+	// finding arriving is placed on it. A name confirmed for the path with
+	// no ecosystem names two components of the build, and is offered as
+	// held, never as lacking.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		top := graph.Described{Purl: "pkg:generic/mine-broadcom@1.0", Name: "mine-broadcom", Version: "1.0"}
+		repository := graph.Described{Purl: "pkg:github/acme/mine@" + httpapitest.CodeFindingCommit,
+			Name: "mine-src", Version: httpapitest.CodeFindingCommit}
+		packaged := graph.Described{Purl: "pkg:deb/debian/mine-src@1.0", Name: "mine-src", Version: "1.0"}
+		_, scan := r.Shipped(t, httpapitest.SeededBuild, "inventory-placed", graph.Snapshot{Root: top,
+			Components:   []graph.Described{repository, packaged},
+			Dependencies: []graph.Dependency{{Parent: top, Child: repository}, {Parent: top, Child: packaged}}})
+		if err := ingest.NewStore(r.DB.DB).Made(ctx, scan, 3, 3, "mine"); err != nil {
+			t.Fatal(err)
+		}
+		httpapitest.ApplyRun(t, r, time.Now().UTC().Add(-time.Hour), httpapitest.CodeFindingRun(true))
+		var occurrence string
+		if err := r.DB.DB.NewSelect().TableExpr(`"finding" AS "f"`).ColumnExpr(`"f"."occurrence_identity"`).
+			Where(`"f"."kind" = ?`, kind.Analysis).Scan(ctx, &occurrence); err != nil {
+			t.Fatal(err)
+		}
+		confirmedIn(t, r, "mine-src", "", "")
+
+		var offer findingsapi.FlawOfferBody
+		httpapitest.Read(t, r, "code-finding-handler", codeFindingAt(occurrence)+"/flaw", &offer)
+		var got []string
+		for _, s := range offer.Suggestions {
+			got = append(got, fmt.Sprintf("%s %s/%s/%s lacking %d", s.From, s.Ecosystem, s.Namespace, s.Component, len(s.Lacking)))
+		}
+		want := []string{
+			"confirmed //mine-src lacking 0",
+			"placed github/acme/mine-src lacking 0",
+			"resembles deb/debian/mine-src lacking 0",
+			"build // lacking 0",
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("offered %q; want %q", got, want)
 		}
 	})
 }
