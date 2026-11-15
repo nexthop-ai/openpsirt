@@ -316,9 +316,10 @@ func (l *listening) resume() {
 // diverting is the response to a request the router answers. Where the
 // phase ended and the handler's answer is a refusal or a failure, or the
 // handler wrote nothing, the upgrading answer is written instead: a handler
-// whose context ended may answer its failed lookup as a refusal. A success or
-// a redirect is written as the handler wrote it, since what it did took
-// effect.
+// whose context ended may answer its failed lookup as a refusal. A success is
+// written as the handler wrote it, since what it did took effect, and so is a
+// redirect, which a browser follows and which may carry a session it set; a
+// sign-in the pause ended redirects to its failure screen.
 type diverting struct {
 	http.ResponseWriter
 	r         *http.Request

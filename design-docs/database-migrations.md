@@ -341,7 +341,8 @@ outage for as long as its migrations take.
 | Answers every request as it answers while it migrates at start (`design-docs/packaging.md` § Starting and stopping) | Readiness fails, and every other path is 503 with `Retry-After` |
 | Ends every request the router was answering | Its transaction rolls back |
 | Answers a request it ended as upgrading where the handler's answer is a refusal, a failure or nothing | A handler whose context ended may answer its failed lookup as a refusal |
-| Keeps the answer of a request whose handler wrote a success or a redirect | What it did took effect, and a retry would repeat it |
+| Keeps the answer of a request whose handler wrote a success | What it did took effect, and a retry would repeat it |
+| Keeps a redirect | A browser follows it, and it may carry a session the handler set; a sign-in the pause ended redirects to the sign-in failure screen |
 | Stops every pass and the queue's workers | No pass writes while another instance migrates |
 | Answers through the router again at Serves, whether or not the stopped passes have ended | The router does not depend on the passes |
 | Starts the passes again once the stopped ones have ended | Two copies of one pass never run at once |
