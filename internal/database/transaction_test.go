@@ -5,7 +5,10 @@ package database_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +16,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/uptrace/bun"
+	"modernc.org/sqlite"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -32,6 +36,8 @@ func TestLosingARaceIsWorthRetryingAndAMistakeIsNot(t *testing.T) {
 		&mysql.MySQLError{Number: 1180, Message: "Got error during COMMIT"},
 		&pgconn.PgError{Code: "40001", Message: "could not serialize access"},
 		&pgconn.PgError{Code: "40P01", Message: "deadlock detected"},
+		// SQLite's contention as a sentence whose type did not survive, which
+		// only the text reads.
 		errors.New("database is locked (5) (SQLITE_BUSY)"),
 	}
 	for _, err := range worth {
@@ -54,6 +60,40 @@ func TestLosingARaceIsWorthRetryingAndAMistakeIsNot(t *testing.T) {
 		if database.WorthRetrying(err) {
 			t.Errorf("retried something that will never come out differently: %v", err)
 		}
+	}
+}
+
+// The driver's own busy error, as a second connection meets it while another
+// holds the file for writing, is contention by its result code.
+func TestSQLiteContentionIsWorthRetryingByItsCode(t *testing.T) {
+	ctx := t.Context()
+	db, err := sql.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "busy.db")+"?_pragma=busy_timeout(0)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	holder, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = holder.Close() }()
+	if _, err := holder.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _, _ = holder.ExecContext(context.Background(), "ROLLBACK") }()
+	other, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = other.Close() }()
+
+	_, busy := other.ExecContext(ctx, "BEGIN IMMEDIATE")
+	var lite *sqlite.Error
+	if !errors.As(busy, &lite) {
+		t.Fatalf("a second writer answered %v (%T), want the driver's own error", busy, busy)
+	}
+	if err := fmt.Errorf("write: %w", busy); !database.WorthRetrying(err) {
+		t.Errorf("not retried: %v (code %d)", err, lite.Code())
 	}
 }
 
