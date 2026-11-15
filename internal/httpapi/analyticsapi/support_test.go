@@ -226,7 +226,9 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		if len(ordered.Ending) != 2 {
 			t.Fatalf("two releases are about to go and %d came back", len(ordered.Ending))
 		}
-		if ordered.Ending[0].BranchOrTag != "v1.0" || ordered.Ending[0].EndedDays != -3 {
+		crossed = time.Now().UTC().Format(time.DateOnly) != started.Format(time.DateOnly)
+		if days := ordered.Ending[0].EndedDays; ordered.Ending[0].BranchOrTag != "v1.0" ||
+			(days != -3 && (!crossed || days != -2)) {
 			t.Errorf("the soonest is not first: %+v", ordered.Ending)
 		}
 
@@ -251,6 +253,52 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		}
 		if len(body) < 2 || body[1][at] != "ending" {
 			t.Errorf("the file does not say which population the row is: %v", body)
+		}
+	})
+}
+
+// The report narrowed to a product, or to one of its branches or tags, lists
+// those releases alone and counts what is open on them alone; across the
+// estate, the release with the most open is first.
+func TestOutOfSupportNarrowedToAScopeListsOnlyItsReleases(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedTwoIssues(t)
+		httpapitest.SeedTheirs(t, r)
+		r.EndingIn(t, "v1.0", -400)
+		for product, on := range map[string]string{"mine": "2020-01-01", "theirs": "2021-01-01"} {
+			ended := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
+				"/v1/products/"+product+"/branches-and-tags/master/end-of-life", `{"on":"`+on+`"}`)
+			if ended.Code != http.StatusNoContent {
+				t.Fatalf("ending %s's master answered %d: %s", product, ended.Code, ended.Body.String())
+			}
+		}
+
+		listed := func(query string) ([]string, int) {
+			var out struct {
+				Items []analyticsapi.RetiredBody `json:"items"`
+				Open  int                        `json:"open"`
+			}
+			httpapitest.Read(t, r, "estate-reader", "/v1/releases/out-of-support"+query, &out)
+			var releases []string
+			for _, row := range out.Items {
+				releases = append(releases, row.Product+"/"+row.BranchOrTag)
+			}
+			return releases, out.Open
+		}
+		for _, c := range []struct {
+			query string
+			want  string
+			open  int
+		}{
+			{"", "mine/master theirs/master mine/v1.0", 3},
+			{"?product=mine", "mine/master mine/v1.0", 2},
+			{"?product=mine&branch_or_tag=v1.0", "mine/v1.0", 0},
+			{"?product=theirs", "theirs/master", 1},
+		} {
+			got, open := listed(c.query)
+			if strings.Join(got, " ") != c.want || open != c.open {
+				t.Errorf("%q lists %v with %d open, want %s with %d", c.query, got, open, c.want, c.open)
+			}
 		}
 	})
 }
