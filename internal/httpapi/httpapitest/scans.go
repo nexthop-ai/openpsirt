@@ -116,6 +116,23 @@ func IngestThrough(t *testing.T, on Engines, opts queue.Options,
 	through func(t *testing.T, db *database.DB) *database.DB, fn func(t *testing.T, f *IngestFixture)) {
 
 	t.Helper()
+	// Small enough that a test can write a document past it. Every other
+	// bound is the default, which OrDefault fills in.
+	ingestWith(t, on, opts, sbom.Limits{MaxBytes: 4096}, through, fn)
+}
+
+// IngestLimited is IngestOn with the default queue options and the document
+// limits given, for a test reaching a bound the fixture's own limits leave
+// out of reach. A zero bound is the default.
+func IngestLimited(t *testing.T, on Engines, limits sbom.Limits, fn func(t *testing.T, f *IngestFixture)) {
+	t.Helper()
+	ingestWith(t, on, queue.DefaultOptions(), limits, nil, fn)
+}
+
+func ingestWith(t *testing.T, on Engines, opts queue.Options, limits sbom.Limits,
+	through func(t *testing.T, db *database.DB) *database.DB, fn func(t *testing.T, f *IngestFixture)) {
+
+	t.Helper()
 	on(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -137,9 +154,7 @@ func IngestThrough(t *testing.T, on Engines, opts queue.Options,
 		handler, _ := httpapi.New(quiet, nil, core.Deps{
 			DB: served, Queue: q,
 			Access: access.NewResolver(rights, access.Trust{}),
-			// Small enough that a test can write a document past it. Every
-			// other bound is the default, which OrDefault fills in.
-			Limits: sbom.Limits{MaxBytes: 4096},
+			Limits: limits,
 		})
 		fn(t, &IngestFixture{
 			Handler: handler, DB: db, Queue: q, Key: secret,

@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -44,7 +45,7 @@ func unread(f *httpapitest.IngestFixture, req *http.Request) (*httptest.Response
 }
 
 func TestAnUploadToAProductTheKeyDoesNotCoverIsRefusedUnread(t *testing.T) {
-	limitedIngest(t, sbom.Limits{}, func(t *testing.T, f *httpapitest.IngestFixture) {
+	httpapitest.IngestLimited(t, dbtest.Two, sbom.Limits{}, func(t *testing.T, f *httpapitest.IngestFixture) {
 		ctx := t.Context()
 		names := catalog.NewStore(f.DB.DB)
 		other, err := names.DeclareProduct(ctx, "elsewhere", "Elsewhere")
@@ -89,7 +90,7 @@ func TestAnUploadToAProductTheKeyDoesNotCoverIsRefusedUnread(t *testing.T) {
 }
 
 func TestADeclaredLengthPastTheLimitIsRefusedUnread(t *testing.T) {
-	limitedIngest(t, sbom.Limits{MaxBytes: 4096}, func(t *testing.T, f *httpapitest.IngestFixture) {
+	httpapitest.IngestLimited(t, dbtest.Two, sbom.Limits{MaxBytes: 4096}, func(t *testing.T, f *httpapitest.IngestFixture) {
 		req := httpapitest.Upload(t, f.Path, httpapitest.Inventory(httpapitest.Nowish(), "libc6"))
 		req.ContentLength = 2*4096 + 1
 		rec, read := unread(f, req)
@@ -103,7 +104,7 @@ func TestADeclaredLengthPastTheLimitIsRefusedUnread(t *testing.T) {
 }
 
 func TestUploadsPastTheSimultaneousLimitAreAskedToSendAgain(t *testing.T) {
-	limitedIngest(t, sbom.Limits{}, func(t *testing.T, f *httpapitest.IngestFixture) {
+	httpapitest.IngestLimited(t, dbtest.Two, sbom.Limits{}, func(t *testing.T, f *httpapitest.IngestFixture) {
 		if _, _, err := setting.NewStore(f.DB.DB).Change(t.Context(), setting.UploadsAtOnce, "1"); err != nil {
 			t.Fatal(err)
 		}

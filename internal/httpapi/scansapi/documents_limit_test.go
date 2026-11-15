@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/bound/boundtest"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -22,7 +23,7 @@ func (a answered) Error() string { return http.StatusText(int(a)) }
 
 func TestAScanCarryingMoreSuppressionDocumentsThanTheLimitIsRefused(t *testing.T) {
 	const most = 2
-	limitedIngest(t, sbom.Limits{MaxDocuments: most}, func(t *testing.T, f *httpapitest.IngestFixture) {
+	httpapitest.IngestLimited(t, dbtest.Two, sbom.Limits{MaxDocuments: most}, func(t *testing.T, f *httpapitest.IngestFixture) {
 		statement := `{"@context": "https://openvex.dev/ns/v0.2.0", "statements": []}`
 		var refused *httptest.ResponseRecorder
 		boundtest.Edges(t, most, func(n int) error {
