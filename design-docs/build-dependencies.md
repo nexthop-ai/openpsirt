@@ -91,7 +91,8 @@ introduces, and report one already on its target branch (REQ-75).
 |---|---|
 | The base is the merge base with `AUDIT_BASE`, `origin/main` unless set; CI fetches full history | |
 | An advisory is present when the base was affected, and introduced otherwise | A bump fixing one advisory of two stays green |
-| A Go finding is present when the base's `go.mod` version is in its affected ranges | |
+| A Go finding is present when the base's `go.mod` version is in its affected ranges and a scan of the base reaches it | A change making a vulnerable symbol reachable introduces the advisory, though the base held the version |
+| The base is scanned in a detached checkout of its own, over the packages it holds, only when some finding's version was already held | A package the change adds is not in the base; most changes carry no held finding and pay for one scan |
 | A standard-library finding is present when the base Dockerfile's Go release is in its ranges; where the base has no Dockerfile, `go.mod`'s `toolchain` line, else its `go` line | That tag is every workflow's toolchain, and the toolchain line is the narrower pin |
 | A base Dockerfile whose `FROM golang:` release this cannot read refuses when the scan holds a standard-library finding | Falling back to the `go` floor reads a toolchain moved back past a fix as already affected. A test holds the repository's own Dockerfile to the pattern |
 | An npm advisory is present when npm's audit of the base lockfile names it for the same package | A moved or still-affected package was affected before |

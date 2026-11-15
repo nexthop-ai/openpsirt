@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -72,12 +73,48 @@ const goStream = `{"config":{"scanner_name":"govulncheck"}}
 {"finding":{"osv":"GO-NEW","trace":[{"module":"example.com/m","version":"v1.1.0","function":"F"}]}}
 `
 
-func TestTheGoHalfFailsOnlyWhatTheBaseDidNotCarry(t *testing.T) {
+// goBaseStream is govulncheck's output for the base: v1.0.0, reaching GO-OLD.
+const goBaseStream = `{"config":{"scanner_name":"govulncheck"}}
+{"SBOM":{"modules":[{"path":"example.com/m","version":"v1.0.0"}]}}
+{"osv":{"id":"GO-OLD","affected":[{"package":{"name":"example.com/m"},"ranges":[{"type":"SEMVER","events":[{"introduced":"0"}]}]}]}}
+{"finding":{"osv":"GO-OLD","trace":[{"module":"example.com/m","version":"v1.0.0","function":"F"}]}}
+`
+
+// goBaseUnreached is the base's scan holding the module and calling nothing
+// GO-OLD affects.
+const goBaseUnreached = `{"config":{"scanner_name":"govulncheck"}}
+{"SBOM":{"modules":[{"path":"example.com/m","version":"v1.0.0"}]}}
+{"osv":{"id":"GO-OLD","affected":[{"package":{"name":"example.com/m"},"ranges":[{"type":"SEMVER","events":[{"introduced":"0"}]}]}]}}
+`
+
+// goScanner answers the working tree's scan with goStream and the base's,
+// run anywhere else, with the stream given.
+func goScanner(t *testing.T, base string) (string, []string) {
+	t.Helper()
 	dir := repository(t, map[string]string{"go.mod": "module x\n\ngo 1.27.1\n\nrequire example.com/m v1.0.0\n"})
-	write(t, dir, map[string]string{"stream.json": goStream})
+	streams := t.TempDir()
+	write(t, streams, map[string]string{"head.json": goStream, "base.json": base})
+	t.Setenv("ROOT", dir)
+	t.Setenv("STREAMS", streams)
+	script := `case "$PWD" in "$ROOT") cat "$STREAMS/head.json" ;; *) cat "$STREAMS/base.json" ;; esac`
+	return dir, []string{"go", "--", "sh", "-c", script}
+}
+
+func TestTheGoHalfFailsOnlyWhatTheBaseDidNotCarry(t *testing.T) {
+	dir, command := goScanner(t, goBaseStream)
 	var out strings.Builder
-	err := run(dir, "main", []string{"go", "--", "cat", "stream.json"}, &out)
+	err := run(dir, "main", command, &out)
 	splitReport(t, err, out.String(), "main", "GO-NEW", "GO-OLD")
+}
+
+func TestAGoAdvisoryTheBaseHeldAndDidNotReachIsIntroduced(t *testing.T) {
+	dir, command := goScanner(t, goBaseUnreached)
+	var out strings.Builder
+	err := run(dir, "main", command, &out)
+	splitReport(t, err, out.String(), "main", "GO-OLD", "")
+	if strings.Contains(out.String(), "already on main") {
+		t.Errorf("an advisory the base did not reach was reported as present:\n%s", out.String())
+	}
 }
 
 // splitReport holds a failed run's report to naming introducedID alone among
@@ -200,8 +237,9 @@ func TestTheStandardLibraryIsTheReleaseTheBaseImageBuildsWith(t *testing.T) {
 		}
 		dir := repository(t, files)
 		write(t, dir, map[string]string{"stream.json": stdlibStream})
+		stream := dir + string(filepath.Separator) + "stream.json"
 		var out strings.Builder
-		err := run(dir, "main", []string{"go", "--", "cat", "stream.json"}, &out)
+		err := run(dir, "main", []string{"go", "--", "cat", stream}, &out)
 		if got := errors.Is(err, errFailed); got != c.introduced {
 			t.Errorf("%s: failed %v, want %v: %v\n%s", c.what, got, c.introduced, err, out.String())
 		}
@@ -214,8 +252,9 @@ func TestADockerfileNamingNoReleaseThisReadsIsRefused(t *testing.T) {
 		"Dockerfile": "FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS build\n",
 	})
 	write(t, dir, map[string]string{"stream.json": stdlibStream})
+	stream := dir + string(filepath.Separator) + "stream.json"
 	var out strings.Builder
-	err := run(dir, "main", []string{"go", "--", "cat", "stream.json"}, &out)
+	err := run(dir, "main", []string{"go", "--", "cat", stream}, &out)
 	if err == nil || errors.Is(err, errFailed) || !strings.Contains(err.Error(), "Dockerfile") {
 		t.Errorf("a Dockerfile whose release is unread answered %v", err)
 	}
@@ -227,7 +266,29 @@ func TestADockerfileNamingNoReleaseIsNotAskedWithoutAStandardLibraryFinding(t *t
 		"Dockerfile": "FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS build\n",
 	})
 	write(t, dir, map[string]string{"stream.json": goStream})
+	stream := dir + string(filepath.Separator) + "stream.json"
 	var out strings.Builder
-	err := run(dir, "main", []string{"go", "--", "cat", "stream.json"}, &out)
+	err := run(dir, "main", []string{"go", "--", "cat", stream}, &out)
 	splitReport(t, err, out.String(), "main", "GO-NEW", "GO-OLD")
+}
+
+func TestThePackagesScannedAreTheModulesOwnAndNotInstalledOnes(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, map[string]string{
+		"go.mod":                       "module x\n\ngo 1.27\n",
+		"a.go":                         "package x\n",
+		"inner/b.go":                   "package inner\n",
+		"web/node_modules/dep/go/c.go": "package dep\n",
+	})
+	got, err := withPackages(dir, []string{"scan", "-json", packagesArg, "after"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"scan", "-json", "x", "x/inner", "after"}
+	if !slices.Equal(got, want) {
+		t.Errorf("the command read %q, want %q", got, want)
+	}
+	if got, _ := withPackages(dir, []string{"cat", "f"}); !slices.Equal(got, []string{"cat", "f"}) {
+		t.Errorf("a command without the placeholder became %q", got)
+	}
 }

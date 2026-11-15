@@ -44,7 +44,7 @@ WEB_LICENSE_EXCEPTIONS := @fontsource/=OFL-1.1,argparse=PSF-2.0
 # set. design-docs/build-dependencies.md § Known vulnerabilities has the rules.
 govulncheck:
 	$(GO) run ./internal/tools/advisories go -- \
-	  $(call tool,govulncheck) -format json $(PACKAGES)
+	  $(call tool,govulncheck) -format json '{packages}'
 
 # Both halves of what ships, against one allowlist.
 #
