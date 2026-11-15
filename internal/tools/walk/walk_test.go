@@ -11,11 +11,11 @@ import (
 	"testing"
 )
 
-// The reader all six gate programs route through, and it had no test.
+// The reader every gate program routes through.
 //
 // The cost is specific: a gate whose walk reaches nothing prints the
 // same all-clear as one that read the whole tree and found nothing wrong, and
-// the refusal that tells those apart had never been seen to fire. AGENTS.md:
+// these tests watch the refusal that tells those apart fire. AGENTS.md:
 // "A control whose test has never been seen to fail is a control nobody has
 // tested."
 
@@ -134,7 +134,7 @@ func TestACopyOfTheCheckoutInsideItIsNotRead(t *testing.T) {
 }
 
 func TestWhatACallerAddsIsSkippedToo(t *testing.T) {
-	// The five Go gates pass "web" and readable passes "vendor", each with
+	// The Go gates pass "web" and readable passes "vendor", each with
 	// the reason at the call site. If extra did not reach the walk they would
 	// all silently read more than they say they do.
 	tree(t, map[string]string{

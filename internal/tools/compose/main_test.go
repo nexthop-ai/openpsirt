@@ -206,9 +206,8 @@ func TestWhatTheProducerSaidIsCarriedThrough(t *testing.T) {
 func TestWhatASecondProducerSaidAboutOneComponentIsKeptToo(t *testing.T) {
 	// The live composition is three inputs: a filesystem catalog, and one
 	// catalog per binary. A component all three see — the Go runtime's own
-	// module, a distribution package a binary also links — was described by
-	// each of them and only the first description survived, taking the
-	// licenses and hashes the others recorded with it.
+	// module, a distribution package a binary also links — is described by
+	// each of them, and every description's licenses and hashes are kept.
 	filesystem := `{
 	  "bomFormat": "CycloneDX", "specVersion": "1.6",
 	  "components": [

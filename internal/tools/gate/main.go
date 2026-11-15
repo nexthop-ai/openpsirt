@@ -86,11 +86,10 @@ var runs = map[tier][]string{
 	api:     {"openapi-current", "web-api"},
 	engines: {"reserved", "test-all", "check-engines"},
 	modules: {"govulncheck", "licenses", "sbom"},
-	// Everything, the container and the chart included. Those are the one
-	// tier CI runs and the local gate did not, which is how a web build
-	// reaching outside `web/` passed every check here and failed the image:
-	// `check` type-checks from a checkout where the path resolves, and
-	// nothing before the push built the thing that could not.
+	// Everything, the container and the chart included. They build from the
+	// image context rather than the checkout, so a web build reaching outside
+	// `web/` passes `check`, which type-checks from a checkout where the path
+	// resolves, and fails only here.
 	//
 	// It skips itself, loudly, where docker or helm is absent, so a checkout
 	// without them still passes rather than being unable to run the gate.

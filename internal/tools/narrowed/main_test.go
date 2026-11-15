@@ -120,8 +120,8 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 		{
 			// The hop nearly every site takes. The resolved names are used
 			// once, by the resolver, and the read is keyed on what that
-			// returned — so a check that stopped at the first use was
-			// checking the exempt call and nothing else.
+			// returned, so a check stopping at the first use checks the
+			// exempt call and nothing else.
 			"read through the build a resolver handed back",
 			`func f() {
 				named, err := core.LocatedVisibly(ctx, in, subject, product, branchOrTag, variant)
@@ -291,8 +291,8 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 
 func TestAClosureRebindingANameLeavesTheOuterResolution(t *testing.T) {
 	// The outer resolution is read without a subject; a closure below binds
-	// the same name again. Keyed by name with the last binding winning, the
-	// closure's binding took the outer one away and the read went unreported.
+	// the same name again. A closure rebinding the name does not take the
+	// outer resolution away, so the read is reported.
 	body, closures := bodyOf(t, `func f() {
 		named, err := core.LocatedVisibly(ctx, in, subject, p, s, v)
 		_ = err
