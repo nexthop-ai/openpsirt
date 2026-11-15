@@ -5,6 +5,7 @@ package weblink_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -149,31 +150,43 @@ const odd = "a/b c?d&f=g%#e"
 // somebody told about a thing is shown something else, silently.
 func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 	known := routes(t)
-	built := map[string]func(n string) string{
-		"Home":                        func(string) string { return weblink.Home() },
-		"ReviewQueue":                 func(string) string { return weblink.ReviewQueue() },
-		"ReviewQueueMine":             func(string) string { return weblink.ReviewQueueMine() },
-		"ReviewQueueReaffirm":         func(string) string { return weblink.ReviewQueueReaffirm() },
-		"Assignments":                 func(string) string { return weblink.Assignments() },
-		"AssignmentsTeam":             weblink.AssignmentsTeam,
-		"AssignmentsPerson":           weblink.AssignmentsPerson,
-		"Settings":                    func(string) string { return weblink.Settings() },
-		"Products":                    func(string) string { return weblink.Products() },
-		"System":                      func(string) string { return weblink.System() },
-		"Incidents":                   func(string) string { return weblink.Incidents() },
-		"Decision":                    func(string) string { return weblink.Decision(7) },
-		"DecisionOccurrence":          func(string) string { return weblink.DecisionOccurrence(7) },
-		"Issue":                       weblink.Issue,
-		"ProductFindings":             func(n string) string { return weblink.ProductFindings(n, n) },
-		"VulnerabilityReportsWaiting": weblink.VulnerabilityReportsWaiting,
-		"VulnerabilityReport":         func(n string) string { return weblink.VulnerabilityReport(n, n) },
-		"Finding":                     func(n string) string { return weblink.Finding(n, n, n, n, n, n) },
-		"Uploads":                     func(n string) string { return weblink.Uploads(n, n, n) },
-		"CodeFinding":                 func(n string) string { return weblink.CodeFinding(n, n, n, n) },
-		"CodeFindings":                func(n string) string { return weblink.CodeFindings(n, n, n, n, n) },
-		"SuppressionRules":            func(n string) string { return weblink.SuppressionRules(n) },
-		"InventoryChanges":            func(n string) string { return weblink.InventoryChanges(n, n, n, 7) },
-		"AnalyticsReport":             func(n string) string { return weblink.AnalyticsReport(n, n) },
+	// Each builder with how many names it takes, called with them in order.
+	type builder struct {
+		names int
+		build func(n []string) string
+	}
+	none := func(build func() string) builder {
+		return builder{0, func([]string) string { return build() }}
+	}
+	built := map[string]builder{
+		"Home":                        none(weblink.Home),
+		"ReviewQueue":                 none(weblink.ReviewQueue),
+		"ReviewQueueMine":             none(weblink.ReviewQueueMine),
+		"ReviewQueueReaffirm":         none(weblink.ReviewQueueReaffirm),
+		"Assignments":                 none(weblink.Assignments),
+		"AssignmentsTeam":             {1, func(n []string) string { return weblink.AssignmentsTeam(n[0]) }},
+		"AssignmentsPerson":           {1, func(n []string) string { return weblink.AssignmentsPerson(n[0]) }},
+		"Settings":                    none(weblink.Settings),
+		"Products":                    none(weblink.Products),
+		"System":                      none(weblink.System),
+		"Incidents":                   none(weblink.Incidents),
+		"Decision":                    none(func() string { return weblink.Decision(7) }),
+		"DecisionOccurrence":          none(func() string { return weblink.DecisionOccurrence(7) }),
+		"Issue":                       {1, func(n []string) string { return weblink.Issue(n[0]) }},
+		"ProductFindings":             {2, func(n []string) string { return weblink.ProductFindings(n[0], n[1]) }},
+		"VulnerabilityReportsWaiting": {1, func(n []string) string { return weblink.VulnerabilityReportsWaiting(n[0]) }},
+		"VulnerabilityReport":         {2, func(n []string) string { return weblink.VulnerabilityReport(n[0], n[1]) }},
+		"Finding": {6, func(n []string) string {
+			return weblink.Finding(n[0], n[1], n[2], n[3], n[4], n[5])
+		}},
+		"Uploads":     {3, func(n []string) string { return weblink.Uploads(n[0], n[1], n[2]) }},
+		"CodeFinding": {4, func(n []string) string { return weblink.CodeFinding(n[0], n[1], n[2], n[3]) }},
+		"CodeFindings": {5, func(n []string) string {
+			return weblink.CodeFindings(n[0], n[1], n[2], n[3], n[4])
+		}},
+		"SuppressionRules": {1, func(n []string) string { return weblink.SuppressionRules(n[0]) }},
+		"InventoryChanges": {3, func(n []string) string { return weblink.InventoryChanges(n[0], n[1], n[2], 7) }},
+		"AnalyticsReport":  {2, func(n []string) string { return weblink.AnalyticsReport(n[0], n[1]) }},
 	}
 
 	// Every builder the package exports has a sample above, and every sample
@@ -191,21 +204,46 @@ func TestEveryBuiltAddressIsARouteTheApplicationServes(t *testing.T) {
 		}
 	}
 
+	// names is every name set to the sample at position at, and the others
+	// ordinary; at -1 sets every one.
+	names := func(count, at int, sample string) []string {
+		out := make([]string, count)
+		for i := range out {
+			out[i] = "p"
+			if at < 0 || i == at {
+				out[i] = sample
+			}
+		}
+		return out
+	}
 	for _, name := range exported {
-		build, sampled := built[name]
+		b, sampled := built[name]
 		if !sampled {
 			continue
 		}
 		// A name of "." or "..", which a browser resolves rather than sends,
-		// and one of three dots, which it sends as written.
+		// and one of three dots, which it sends as written. Each name is
+		// given the sample alone, because a builder stops at the first name
+		// that would climb, so the same sample in every name shows only the
+		// first is checked.
 		for _, sample := range []string{odd, "..", ".", "..."} {
-			address := build(sample)
-			if why := unrouted(known, address); why != "" {
-				t.Errorf("weblink.%s(%q) built %s: %s", name, sample, address, why)
+			for at := -1; at < b.names; at++ {
+				address := b.build(names(b.names, at, sample))
+				if why := unrouted(known, address); why != "" {
+					which := fmt.Sprintf("name %d", at+1)
+					if at < 0 {
+						which = "every name"
+					}
+					t.Errorf("weblink.%s with %s as %q built %s: %s", name, which, sample, address, why)
+				}
 			}
 		}
-		if build("a") != build("b") && !strings.Contains(build("..."), "...") {
-			t.Errorf("weblink.%s(%q) built %s, which drops a name a browser sends as written", name, "...", build("..."))
+		for at := range b.names {
+			if b.build(names(b.names, at, "a")) != b.build(names(b.names, at, "b")) &&
+				!strings.Contains(b.build(names(b.names, at, "...")), "...") {
+				t.Errorf("weblink.%s with name %d as %q built %s, which drops a name a browser sends as written",
+					name, at+1, "...", b.build(names(b.names, at, "...")))
+			}
 		}
 	}
 }
