@@ -352,3 +352,28 @@ func TestAMomentOfUpdateWithNoOffsetIsReadAsUTC(t *testing.T) {
 		t.Errorf("taken %q, want the moment read as UTC", snapshot.Version())
 	}
 }
+
+func TestAnArchiveHoldingTheRecordsDirectlyIsBuilt(t *testing.T) {
+	// An operator's import may be an archive of record files with no
+	// archive inside it.
+	var raw bytes.Buffer
+	w := zip.NewWriter(&raw)
+	f, err := w.Create("cves/2026/31xxx/CVE-2026-31589.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(t.TempDir(), "records.zip")
+	if err := os.WriteFile(archive, raw.Bytes(), 0o600); err != nil { //nolint:gosec // G703: a path under the test's own directory
+		t.Fatal(err)
+	}
+	snapshot := built(t, archive)
+	if snapshot.Len() != 1 || !snapshot.Decide([]string{"CVE-2026-31589"}, kernel("6.18.55")).Narrows() {
+		t.Errorf("built %d records, want the one the archive holds, narrowing what it states", snapshot.Len())
+	}
+}
