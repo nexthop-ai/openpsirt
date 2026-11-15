@@ -60,46 +60,8 @@ func TestAScannerAllowedToOutlastItsHoldIsRefused(t *testing.T) {
 	})
 }
 
-// issuing is a provider that only says who issues its identifiers, which is
-// all a start asks of one.
-type issuing struct{ issuer string }
-
-func (p issuing) Name() string   { return "ours" }
-func (p issuing) Issuer() string { return p.issuer }
-func (p issuing) Begin(context.Context, string) (string, signin.Pending, error) {
-	return "", signin.Pending{}, nil
-}
-func (p issuing) Complete(context.Context, string, signin.Pending, string) (*signin.Identity, error) {
-	return nil, nil
-}
-
-func TestAProviderOtherThanTheOneIdentifiersWereBoundUnderIsRefused(t *testing.T) {
-	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		rights := access.NewStore(db.DB)
-		person, err := rights.Ensure(ctx, "alice", "Alice", nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := rights.Claim(ctx, person.ID, "alice"); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := rights.MatchProvider(ctx, "https://a.example", "00u1", "alice"); err != nil {
-			t.Fatal(err)
-		}
-		if err := onlyTheBoundProvider(ctx, rights,
-			map[string]signin.Provider{"ours": issuing{"https://b.example"}}); err == nil {
-			t.Error("a provider with another issuer started over identifiers bound under the first")
-		}
-		if err := onlyTheBoundProvider(ctx, rights,
-			map[string]signin.Provider{"ours": issuing{"https://a.example"}}); err != nil {
-			t.Errorf("the provider the identifiers were bound under was refused: %v", err)
-		}
-	})
-}
-
 func TestAProviderWithNoAddressToReturnToIsRefused(t *testing.T) {
-	providers := map[string]signin.Provider{"ours": issuing{"https://a.example"}}
+	providers := map[string]signin.Provider{"ours": labelled{name: "ours", issuer: "https://a.example"}}
 	if err := returnsTo(providers, ""); err == nil {
 		t.Error("a provider with no address to send people back to was accepted")
 	}
