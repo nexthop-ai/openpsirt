@@ -119,9 +119,9 @@ func TestAReleaseNobodyScannedIsNotComparedAgainstAsZero(t *testing.T) {
 	// answers a person acts on differently. Reporting the second as the first
 	// says a release was clean when nothing ever looked at it.
 	each(t, func(t *testing.T, f *fixture) {
-		// Declared and never built, which is the ordinary state of a tag
-		// between being cut and its pipeline running.
-		f.cutFrom(t, "v2.5.0")
+		// Declared, and its scan begun and never finished, which is the
+		// ordinary state of a tag while its pipeline runs.
+		f.runOn(t, f.cutFrom(t, "v2.5.0"))
 		f.shipped(t, twoConsumers())
 		here := f.run(t)
 		if _, err := f.store.Apply(t.Context(), f.build, here,

@@ -162,6 +162,30 @@ func TestScrutinyNarrowedToAProductCountsThatProductAlone(t *testing.T) {
 	})
 }
 
+func TestScrutinyCountsOnlyTheProductsTheAskerReads(t *testing.T) {
+	// Somebody triaging across the estate stands a short deferral in each of
+	// two products; a reader of one is told about that one alone.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		disclosed, _ := httpapitest.SeedTheirs(t, r)
+		r.Claimed(t, "wide-triager", "CVE-2026-9999", "libnl-3-200", shortDeferral())
+		theirs := httpapitest.AsPerson(t, r, "wide-triager", http.MethodPost,
+			"/v1/products/theirs/branches-and-tags/master/variants/mellanox/findings/"+disclosed+
+				"/components/libestate/decision", shortDeferral())
+		if theirs.Code != http.StatusCreated {
+			t.Fatalf("deciding in the other product answered %d: %s", theirs.Code, theirs.Body.String())
+		}
+
+		n := 0
+		for _, row := range scrutiny(t, r, "triager", "").Alone {
+			n += row.Decisions
+		}
+		if n != 1 {
+			t.Errorf("a reader of mine alone sees %d decisions standing alone, want mine's one", n)
+		}
+	})
+}
+
 func TestADecisionCoveringMoreThanWasAgreedToIsReported(t *testing.T) {
 	// A decision reaches by matching, so a build appearing afterwards is covered
 	// with nobody acting and nobody having agreed to the larger number. What

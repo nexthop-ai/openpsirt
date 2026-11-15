@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -380,6 +381,53 @@ func TestTheBoundOnOneCycleIsTheSameWhicheverWayTheFeedIsOrdered(t *testing.T) {
 // byteName is a short distinct path per document.
 func byteName(i int) string {
 	return "/" + strings.Repeat("a", 1+i/26) + string(rune('a'+i%26)) + ".json"
+}
+
+func TestAPassThatCannotRenewItsLeaseBetweenSuppliersStopsWithTheError(t *testing.T) {
+	// A lease that cannot be asked for is not known to be held, so the pass
+	// stops between suppliers and says why, rather than reading on as if it
+	// held one.
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.publishes("/2026/EL-10.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0010", "libnl-3-200", "3.7.1", "CVE-2026-9334"))
+		store, _, pass := passOver(t, f, p, "one")
+		const mirror = "/mirror/provider-metadata.json"
+		p.documents[mirror] = `{"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":"` +
+			p.server.URL + `/feed.json"}]}}]}`
+		second, err := store.Add(ctx, f.by, f.product, "Example Linux mirror", p.server.URL+mirror)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*supplier.Feed)(nil)).
+			Set(`"caught_up_to" = ?`, long).Where(`"id" = ?`, second.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		// The lease table goes away as the first supplier's document is
+		// fetched, so the next time the lease is asked for, the asking fails.
+		var restore func()
+		p.asking = func(path string) {
+			if path == "/2026/EL-10.json" && restore == nil {
+				restore = dbtest.Hide(t, f.db.DB, "lease")
+			}
+		}
+
+		_, err = pass.Once(ctx)
+		if restore == nil {
+			t.Fatal("the first supplier's document was never fetched")
+		}
+		restore()
+		if err == nil || !strings.Contains(err.Error(), "keep the lease on reading what suppliers publish") {
+			t.Fatalf("the pass ended with %v, want the lease it could not keep", err)
+		}
+		for _, path := range p.asked {
+			if path == mirror {
+				t.Errorf("the second supplier was reached after the lease could not be asked for: %v", p.asked)
+			}
+		}
+	})
 }
 
 func TestAPassThatLosesTheLeaseBetweenSuppliersReadsNoMore(t *testing.T) {

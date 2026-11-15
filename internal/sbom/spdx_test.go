@@ -386,10 +386,19 @@ func twoEdgesSPDX() string {
 		`{"spdxElementId": "SPDXRef-root", "relatedSpdxElement": "SPDXRef-b", "relationshipType": "DEPENDS_ON"},`, 1)
 }
 
-// A deployment sets one bound and leaves the rest unset, which reads as zero;
-// the reader holds every unset bound at its default rather than at zero, so
-// the document is read.
-func TestABoundLeftUnsetIsReadAtItsDefault(t *testing.T) {
+// A deployment sets one bound and leaves the rest unset, which reads as zero.
+// Every bound left unset takes its default, never zero, which would refuse
+// every document carrying what it bounds.
+func TestEveryBoundLeftUnsetTakesItsDefault(t *testing.T) {
+	want := sbom.DefaultLimits()
+	want.MaxDepth = 8
+	if got := (sbom.Limits{MaxDepth: 8}).OrDefault(); got != want {
+		t.Errorf("unset bounds read as %+v, want the defaults %+v", got, want)
+	}
+}
+
+// The reader applies those defaults, so a document within them is read.
+func TestTheReaderHoldsAnUnsetBoundAtItsDefault(t *testing.T) {
 	read, err := sbom.Read(strings.NewReader(twoEdgesSPDX()), sbom.Limits{MaxDepth: 8})
 	if err != nil {
 		t.Fatalf("a document within every default was refused: %v", err)

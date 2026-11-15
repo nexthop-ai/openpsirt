@@ -91,3 +91,76 @@ type httptestAnswer struct {
 	code int
 	body string
 }
+
+// A read naming a product in its path answers a product the asker holds
+// nothing on exactly as it answers a product nobody declared, whatever the
+// branch or tag and variant beside it, declared or not, in the path or the
+// query. The names the asker typed are taken out of both answers before they
+// are compared, since an answer may repeat what was asked. The reads are
+// taken from the registered operations, as above.
+func TestAProductNamedInAPathAnswersAlikeHiddenOrUndeclared(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		swept, located := 0, 0
+		for path, item := range r.API.OpenAPI().Paths {
+			if item.Get == nil || !strings.Contains(path, "{product}") {
+				continue
+			}
+			takes := map[string]bool{}
+			var required []string
+			for _, p := range item.Get.Parameters {
+				if p.In != "query" {
+					continue
+				}
+				takes[p.Name] = true
+				if p.Required {
+					required = append(required, p.Name+"=libnl")
+				}
+			}
+			ask := func(product, branchOrTag, variant, query string) *httptestAnswer {
+				at := strings.NewReplacer("{product}", product, "{branch_or_tag}", branchOrTag,
+					"{variant}", variant).Replace(path)
+				at = fill(at)
+				if strings.Contains(at, "{") {
+					t.Fatalf("%s has a path parameter this sweep has no value for, so it is not being checked", path)
+				}
+				if len(required) > 0 {
+					query = strings.Join(required, "&") + "&" + query
+				}
+				got := httpapitest.AsPerson(t, r, "reader", http.MethodGet, at+"?"+query, "")
+				typed := strings.NewReplacer(product, "PRODUCT", branchOrTag, "BRANCH", variant, "VARIANT")
+				return &httptestAnswer{code: got.Code, body: typed.Replace(got.Body.String())}
+			}
+			undeclared := ask("nosuch", "master", "mellanox", "")
+			hidden := []*httptestAnswer{ask("theirs", "master", "mellanox", "")}
+			if strings.Contains(path, "{branch_or_tag}") {
+				located++
+				hidden = append(hidden, ask("theirs", "nosuch", "mellanox", ""))
+			}
+			if strings.Contains(path, "{variant}") {
+				hidden = append(hidden, ask("theirs", "master", "nosuchvariant", ""))
+			}
+			if takes["branch_or_tag"] {
+				hidden = append(hidden, ask("theirs", "master", "mellanox", "branch_or_tag=master"),
+					ask("theirs", "master", "mellanox", "branch_or_tag=nosuch"))
+			}
+			if takes["variant"] {
+				hidden = append(hidden, ask("theirs", "master", "mellanox", "variant=mellanox"),
+					ask("theirs", "master", "mellanox", "variant=nosuch"))
+			}
+			swept++
+			for _, got := range hidden {
+				if *got != *undeclared {
+					t.Errorf("GET %s answered %d %s for a hidden product, and %d %s for one nobody declared",
+						path, got.code, got.body, undeclared.code, undeclared.body)
+				}
+			}
+		}
+		// A sweep that walks nothing passes, so each class is counted.
+		if swept < 40 || located < 20 {
+			t.Errorf("only %d reads name a product in their path and %d of them a branch or tag: "+
+				"this sweep is not walking them", swept, located)
+		}
+		t.Logf("swept %d reads naming a product in their path, %d of them a branch or tag", swept, located)
+	})
+}

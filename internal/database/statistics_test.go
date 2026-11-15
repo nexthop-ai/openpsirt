@@ -189,6 +189,16 @@ func TestRefreshingStatisticsKeepsAnInMemoryDatabase(t *testing.T) {
 	}
 }
 
+// The servers keep their own statistics, so a refresh asks nothing of them:
+// MySQL and MariaDB refuse a bare ANALYZE.
+func TestRefreshingStatisticsAsksNothingOfAServer(t *testing.T) {
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
+		if err := database.RefreshStatistics(t.Context(), db); err != nil {
+			t.Error(err)
+		}
+	})
+}
+
 // A table something else holds is stepped over rather than waited for, so a
 // schema change or a vacuum on another replica never holds a start. MySQL and
 // MariaDB otherwise wait for the server's default of a year, and PostgreSQL
