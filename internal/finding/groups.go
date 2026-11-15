@@ -143,10 +143,9 @@ type Group struct {
 	// on the row, a medium sitting above a high looks like the list is
 	// unsorted, when it is sorted by something the list never showed.
 	LikelihoodPPM int
-	// ScoreCenti is what the ordering actually compares. The severity word
-	// beside it comes from whichever scoring generation the source used — a
-	// 2003 issue scored 10.0 reads "high" under CVSS v2 and "critical" under
-	// v3 — so a row showing only the word looks mis-sorted when two tie.
+	// ScoreCenti is the number a severity order compares inside one band,
+	// the recording product's own for a recorded flaw the issue holds no score
+	// for. The order reads only the published score, so that one orders nothing.
 	//
 	// Scored says whether there is one at all, because the column is nullable
 	// and zero is a real score. Published as a zero, an unscored finding sorted

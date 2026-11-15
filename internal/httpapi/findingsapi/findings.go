@@ -127,10 +127,9 @@ type FindingBody struct {
 	// between reachability and severity, so a list ordering by it and not
 	// showing it reads as unsorted.
 	Likelihood float64 `json:"likelihood,omitempty" doc:"Published estimate that this will be exploited, 0 to 1"`
-	// Score is the number the ordering compares. The word beside it comes from
-	// whichever scoring generation rated it — 10.0 reads "high" under CVSS v2
-	// and "critical" under v3 — so two rows can tie on the number while their
-	// words disagree, and without the number that looks mis-sorted.
+	// Score is the number a severity order compares inside one band. It is the
+	// recording product's own for a recorded flaw the issue holds no score for,
+	// and that score orders nothing: the order reads the published one.
 	Score float64 `json:"score,omitempty" doc:"The severity as a number. The published score orders the findings inside one band when the list is sorted by severity"`
 	// ScoreVersion is the scheme that number is on. Two schemes are scorable
 	// here and their numbers are not comparable, so a row carrying the number
