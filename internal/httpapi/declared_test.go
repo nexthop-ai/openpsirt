@@ -51,14 +51,11 @@ var standIn = map[string]string{
 }
 
 func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T) {
-	// telling at the finding's visibility and the honest sentence on the
-	// privileges page: the declaration is not the check, the check is a
-	// line in each handler, and the two drifted apart three times before
-	// this review and three times during it — the assignment rule preview, the tag
-	// list and the reporter's contact details all answered somebody the
-	// declaration said could not ask.
+	// The declaration is not the check: the check is a line in each
+	// handler, and the two drift apart unless something holds them together.
+	// A handler answering somebody its declaration says cannot ask is found
+	// by reading the two against each other.
 	//
-	// Every one of those was found by reading the two against each other.
 	// This is the floor underneath that reading: whatever else an
 	// operation declaring a role on a product does, it does not answer 2xx
 	// to somebody who holds none of them. It cannot prove the check is the
@@ -93,13 +90,13 @@ func TestAnOperationRefusesSomebodyHoldingNoneOfTheRolesItDeclares(t *testing.T)
 					narrowed++
 					continue
 				}
-				// who is who is a stranger to this operation
-				// depends on what it asks for. The scope was
-				// read as "a scope alone is satisfied by
-				// anybody holding anything", which is true of
-				// the credential scopes and false of the ones
-				// that name a standing nobody holds by default
-				// — so every administrator-only operation went
+				// Who is a stranger to this operation depends
+				// on what it asks for. "A scope alone is
+				// satisfied by anybody holding anything" is
+				// true of the credential scopes and false of
+				// the ones that name a standing nobody holds
+				// by default; read that way, every
+				// administrator-only operation would go
 				// unswept, which is most of the ones a mistake
 				// would be worst on.
 				var who string
