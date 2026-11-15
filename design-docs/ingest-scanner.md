@@ -115,7 +115,7 @@ scanner's data and read whole (REQ-12, REQ-31); what a scan does with it is
 | Rule | Reason |
 |---|---|
 | A connected deployment checks hourly, reading the newest release by its page's redirect | The host's API allows sixty anonymous requests an hour |
-| Only the repository host and its two download hosts are reached, the one redirect followed only to those (REQ-69) | |
+| Only the repository host and its two download hosts are reached; a download follows at most three redirects, each only to those hosts (REQ-69) | The repository host hands a download to its storage host; a bound stops an endless chain holding the fetch |
 | An air-gapped deployment is carried a snapshot from `make cve-records`, read back before declaring it, and copied in with fetching off | |
 | `openpsirt records import` reads an archive fetched another way | |
 | The snapshot is replaced by rename | A scan reads old or new, never half |
