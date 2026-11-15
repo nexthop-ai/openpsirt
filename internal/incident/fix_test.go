@@ -6,6 +6,7 @@ package incident_test
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -202,15 +203,18 @@ func TestAFixIsNamedInATagOfTheRecordsProductOnceAtATime(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for _, tc := range []struct{ name, release string }{
-			{"a branch", world.BranchName},
-			{"a retired tag", retired.Name},
-			{"another product's tag", "v9.9.9"},
-			{"a tag nobody declared", "v0.0.1"},
-			{"nothing", "  "},
+		for _, tc := range []struct{ name, release, want string }{
+			{"a branch", world.BranchName, "is a branch"},
+			{"a retired tag", retired.Name, "is retired"},
+			{"another product's tag", "v9.9.9", incident.ErrNoSuchRelease.Error()},
+			{"a tag nobody declared", "v0.0.1", incident.ErrNoSuchRelease.Error()},
+			// Refused for being blank, before a lookup could refuse it as
+			// naming no release.
+			{"nothing", "  ", "say which release carries the fix"},
 		} {
-			if _, err := f.store.NameFix(ctx, f.triager, record.ID, tc.release); err == nil {
-				t.Errorf("%s was named as carrying the fix", tc.name)
+			_, err := f.store.NameFix(ctx, f.triager, record.ID, tc.release)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("%s answered %v, want the refusal saying %q", tc.name, err, tc.want)
 			}
 		}
 		if _, err := f.store.NameFix(ctx, f.triager, record.ID, "v0.0.1"); !errors.Is(err, incident.ErrNoSuchRelease) {

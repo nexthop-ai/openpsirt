@@ -565,21 +565,26 @@ func TestANoticeSaysWhoWhenAndWhat(t *testing.T) {
 		for _, tc := range []struct {
 			name, recipient, said string
 			at                    time.Time
+			want                  string
 		}{
-			{"nobody named", "  ", "An attack.", when},
+			{"nobody named", "  ", "An attack.", when, "say who was told"},
 			{"a recipient longer than a name", strings.Repeat("x", incident.RecipientLimit+1),
-				"An attack.", when},
-			{"nothing said", "ENISA", "  ", when},
-			{"no moment", "ENISA", "An attack.", time.Time{}},
+				"An attack.", when, "who was told is at most"},
+			{"nothing said", "ENISA", "  ", when, "say what they were told"},
+			// Refused for having no moment, before the comparison with when
+			// the attack became known could refuse it as too early.
+			{"no moment", "ENISA", "An attack.", time.Time{}, "say when they were told"},
 			// What was said is kept in a table nobody edits and rendered to
 			// whoever answers for it, so the markdown policy and the bound
 			// hold before it is stored.
-			{"raw HTML in what was said", "ENISA", "<b>An attack.</b>", when},
-			{"more said than the bound", "ENISA", strings.Repeat("x", markdown.MaxBytes+1), when},
+			{"raw HTML in what was said", "ENISA", "<b>An attack.</b>", when, "markup is not interpreted here"},
+			{"more said than the bound", "ENISA", strings.Repeat("x", markdown.MaxBytes+1), when,
+				"longer than"},
 		} {
-			if _, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil,
-				tc.recipient, tc.at, tc.said, incident.Details{}); err == nil {
-				t.Errorf("a notice with %s was recorded", tc.name)
+			_, err := f.store.RecordTold(t.Context(), f.triager, record.ID, nil,
+				tc.recipient, tc.at, tc.said, incident.Details{})
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("a notice with %s answered %v, want the refusal saying %q", tc.name, err, tc.want)
 			}
 		}
 	})
