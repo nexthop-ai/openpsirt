@@ -24227,11 +24227,9 @@ export interface operations {
     "get-component": {
         parameters: {
             query?: {
-                /** @description Limit to one product, by name. Empty means every product you can see */
-                product?: string;
-                /** @description Limit to one branch or tag. Only meaningful with a product */
+                /** @description Limit to one branch or tag of the product */
                 branch_or_tag?: string;
-                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                /** @description Limit to one variant of the product, independent of the branch */
                 variant?: string;
             };
             header?: never;

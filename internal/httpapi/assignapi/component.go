@@ -137,18 +137,18 @@ func registerComponent(api huma.API, in core.Deps) {
 			"where nothing is open.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
-		Product   string `path:"product"`
-		Component string `path:"component"`
-		core.ScopeQuery
+		Product     string `path:"product"`
+		Component   string `path:"component"`
+		BranchOrTag string `query:"branch_or_tag" doc:"Limit to one branch or tag of the product"`
+		Variant     string `query:"variant" doc:"Limit to one variant of the product, independent of the branch"`
 	}) (*core.ListOutput[PerBuildBody], error) {
 		in := core.Of(ctx, in)
 		subject, err := core.Reading(ctx)
 		if err != nil {
 			return nil, err
 		}
-		asked := input.ScopeQuery
-		asked.Product = input.Product
-		scope, err := core.Scoped(ctx, in, subject, asked)
+		scope, err := core.Scoped(ctx, in, subject, core.ScopeQuery{
+			Product: input.Product, BranchOrTag: input.BranchOrTag, Variant: input.Variant})
 		if err != nil {
 			return nil, err
 		}
