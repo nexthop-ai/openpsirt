@@ -789,3 +789,70 @@ func TestAnIssueIsStatedUnderEveryNameItHas(t *testing.T) {
 		})
 	}
 }
+
+// An issue filed under a name that is not a well-formed CVE, such as a pending
+// placeholder, and known also by a CVE, is stated under the CVE in the field a
+// reader looks in: by the VEX document and by an advisory covering it alike.
+// The placeholder stays among the names, and the VEX document says the CVE
+// once.
+func TestAnIssueFiledUnderAPlaceholderIsStatedUnderItsCVE(t *testing.T) {
+	const placeholder, cve = "CVE-2024-XXXX", "CVE-2024-12345"
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		ctx := t.Context()
+		// A flaw recorded here, then reported by a scan under the placeholder
+		// with the minted name and the CVE beside it, which files the issue
+		// under the placeholder.
+		_, minted, err := w.findings.Enter(ctx, w.proposer, finding.Entering{
+			BuildIDs: []int64{w.Build.ID}, Component: swss.Name, Severity: "high",
+			Summary:   "The management socket answers before anyone authenticated.",
+			Disclosed: true, Told: finding.Told{FoundHere: true},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Report(w.Build, finding.Reported{
+			Issue: finding.Named{Identifier: placeholder, Severity: "high", Description: "What it is.",
+				Aliases: []string{minted, cve}},
+			Component: swss,
+		})
+		w.decide(w.Build, placeholder, swss,
+			decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+		w.publishes(w.Product, true)
+		w.write()
+
+		doc := w.csafAbout(w.Product, placeholder)
+		if doc == nil {
+			t.Fatalf("no CSAF document about %s", placeholder)
+		}
+		stated := doc.Vulnerabilities[0]
+		if stated.CVE != cve {
+			t.Errorf("the VEX document's CVE is %q, want %q", stated.CVE, cve)
+		}
+		var named []string
+		for _, id := range stated.IDs {
+			named = append(named, id.Text)
+		}
+		if !slices.Contains(named, placeholder) || slices.Contains(named, cve) {
+			t.Errorf("the VEX document names the issue %q, want %s among them and %s alone in its field",
+				named, placeholder, cve)
+		}
+
+		advisories := advisory.NewStore(w.DB.DB)
+		made, err := advisories.Mint(ctx, w.proposer, who, "The management socket")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := advisories.Add(ctx, w.proposer, made.Identifier, w.Product.Name, placeholder); err != nil {
+			t.Fatal(err)
+		}
+		covering, _, err := advisories.ForAdvisoryAt(ctx, w.proposer, who, made.Identifier)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := covering.Vulnerabilities[0].CVE; got != stated.CVE {
+			t.Errorf("the advisory's CVE is %q and the VEX document's %q, want both %q", got, stated.CVE, cve)
+		}
+	})
+}
