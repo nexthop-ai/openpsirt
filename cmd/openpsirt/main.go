@@ -542,7 +542,7 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 		// The bounds the upload operations refuse a request by, before the
 		// background readers apply the same ones to what was taken.
 		Limits:   cfg.Limits(),
-		Analysis: cfg.AnalysisLimits(), AnalysisDocuments: cfg.AnalysisDocuments(),
+		Analysis: cfg.AnalysisLimits(), AnalysisDocuments: cfg.AnalysisMaxDocuments,
 		// The resolver reads through a store that bounds a derived grant to
 		// the session lifetime. A browser re-derives its roles at every
 		// sign-in; a personal token never signs in, so without a bound a

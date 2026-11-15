@@ -47,11 +47,3 @@ func (c Config) AnalysisLimits() sarif.Limits {
 		MaxHeld:           c.AnalysisMaxHeld,
 	}
 }
-
-// AnalysisDocuments is how many documents one analyzer upload may carry.
-func (c Config) AnalysisDocuments() int {
-	if c.AnalysisMaxDocuments > 0 {
-		return c.AnalysisMaxDocuments
-	}
-	return sarif.DefaultDocuments
-}
