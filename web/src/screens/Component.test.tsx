@@ -104,7 +104,16 @@ describe("scheduling an upgrade of a component", () => {
     });
     expect(mount.host().textContent).toContain("Recorded against 2 occurrences across 2 issues.");
     // A decision, so the queue and the proposer's own list move with it.
-    expect(invalidated()).toEqual(expect.arrayContaining(["queue", "my-decisions", "holdings"]));
+    expect(invalidated()).toEqual(
+      expect.arrayContaining([
+        "queue",
+        "my-decisions",
+        "holdings",
+        "findings-by-component",
+        "planned-upgrades",
+        "build-planned-upgrades",
+      ]),
+    );
   });
 
   it("opens on the other version's own build when that version is picked", async () => {

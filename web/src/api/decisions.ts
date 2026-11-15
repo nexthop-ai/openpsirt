@@ -139,6 +139,11 @@ const afterDecision = [
   // The list the work came from. A decision answers findings, so agreeing to
   // one moves what the list says about every occurrence it covers.
   "findings",
+  // The same list by component and by upgrade, and a build's planned
+  // upgrades: a promise to upgrade is a decision, and its rows join them.
+  "findings-by-component",
+  "planned-upgrades",
+  "build-planned-upgrades",
   // What an advisory states about a release, which follows the decisions
   // covering it.
   "advisory",

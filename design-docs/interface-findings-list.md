@@ -113,6 +113,7 @@ bump both start from a filtered set.
 | Select all, offered on the batch bar in one product once something is ticked, takes every row the filter matches, counted by the list's total and naming no rows; a changed filter ends it | The server assigns what matches when the act lands |
 | Across products each row is its own request, and a loop over a selection survives a refusal: the rest are tried, failures stay selected with a count, and the undo control still appears | |
 | A hand-over reads again every list of who holds what, as a hand-back does: the home tiles, the assigned queues, the held reports and code findings | Each names what the person holds |
+| A decision, an upgrade scheduled from a component among them, reads again the list in every view and a build's planned upgrades | A promise to upgrade is a decision, and its rows join those lists |
 
 ## The by-component view
 
