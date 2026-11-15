@@ -13,6 +13,7 @@ import { Revisions, Standing } from "./FindingDecision";
 import { Products } from "./Products";
 import { Decide } from "../ui/Decide";
 import { PUBLISHED } from "../test/outcomes";
+import { DECIDING_AT } from "../test/deciding";
 import { Notices } from "../ui/Notices";
 import { screen, serve, settle, mounted } from "../test/mount";
 import { readingDependencies } from "../test/reach";
@@ -134,14 +135,7 @@ describe("a secondary read that fails", () => {
     mount.render(
       screen(
         <Decide
-          at={{
-            product: "sonic",
-            branch_or_tag: "master",
-            variant: "broadcom",
-            vulnerability: "CVE-2026-1",
-            component: "openssl",
-            version: "3.0.2",
-          }}
+          at={DECIDING_AT}
           occurrences={[{ occurrence: "p1", component: "openssl" }]}
           onDone={() => undefined}
         />,

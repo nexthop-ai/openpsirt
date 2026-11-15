@@ -15,6 +15,7 @@ import { revisionStart } from "./ReasonEditor";
 import { Scoring } from "./Scoring";
 import { pasted } from "./Words";
 import { screen, serve, settle, mounted } from "../test/mount";
+import { change, press } from "../test/controls";
 
 const mount = mounted();
 
@@ -127,22 +128,18 @@ function Scored({ start }: { start: string }) {
 
 describe("working out a score", () => {
   const select = (id: string) => mount.host().querySelector<HTMLSelectElement>(`#${id}`);
-  const choose = (id: string, value: string) =>
-    act(() => {
-      const box = select(id);
-      if (!box) throw new Error(`no ${id}`);
-      box.value = value;
-      box.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+  const choose = (id: string, value: string) => change(select(id), value);
+
+  // The scoring form opened on a vector.
+  async function openScoring(vector: string) {
+    serve(() => ({ data: { version: "3.1", score: 9.8, severity: "critical" } }));
+    mount.render(screen(<Scored start={vector} />));
+    await settle();
+    await press(mount.host(), "Change the score");
+  }
 
   it("keeps the answers the other scheme shares when the scheme changes", async () => {
-    serve(() => ({ data: { version: "3.1", score: 9.8, severity: "critical" } }));
-    mount.render(screen(<Scored start="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H" />));
-    await settle();
-    const open = Array.from(mount.host().querySelectorAll("button")).find(
-      (each) => each.textContent === "Change the score",
-    );
-    act(() => open?.click());
+    await openScoring("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
     choose("cvss-version", "CVSS:4.0");
     await settle();
     expect(select("cvss-AV")?.value).toBe("N");
@@ -151,13 +148,7 @@ describe("working out a score", () => {
   });
 
   it("keeps the other answers when one is blanked", async () => {
-    serve(() => ({ data: { version: "3.1", score: 9.8, severity: "critical" } }));
-    mount.render(screen(<Scored start="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H" />));
-    await settle();
-    const open = Array.from(mount.host().querySelectorAll("button")).find(
-      (each) => each.textContent === "Change the score",
-    );
-    act(() => open?.click());
+    await openScoring("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H");
     choose("cvss-AV", "");
     await settle();
     expect(select("cvss-AC")?.value).toBe("L");

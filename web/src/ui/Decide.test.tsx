@@ -3,28 +3,14 @@
 
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Decide, type At } from "./Decide";
-import { accept, client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
-import { PUBLISHED } from "../test/outcomes";
+import { Decide } from "./Decide";
+import { change } from "../test/controls";
+import { DECIDING_AT as at, serveDecider } from "../test/deciding";
+import { accept, client, mounted, screen, settle, watchInvalidations } from "../test/mount";
 
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-const at: At = {
-  product: "sonic",
-  branch_or_tag: "master",
-  variant: "broadcom",
-  vulnerability: "CVE-2026-1",
-  component: "openssl",
-  version: "3.0.2",
-};
-
-// A controlled field changed the way a person changes it.
-function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
-  Object.getOwnPropertyDescriptor(proto.prototype, "value")?.set?.call(field, value);
-  field.dispatchEvent(new Event("input", { bubbles: true }));
-}
 
 // A day this many whole days from today, as the date field writes one.
 function daysOut(days: number): string {
@@ -44,22 +30,7 @@ describe("proposing a deferral past the threshold", () => {
   // threshold" and the test fails on it. And by sending the landing date in
   // place of the deferral date: the body check fails.
   it("says a second person must agree, and sends the date and the reasoning", async () => {
-    serve((path) => {
-      if (path === "/v1/session/me") {
-        return {
-          data: {
-            identity: "ana",
-            name: "Ana",
-            admin: false,
-            kind: "person",
-            deferral_days: 30,
-            outcomes: PUBLISHED,
-          },
-        };
-      }
-      if (path.endsWith("/reach")) return { data: { automatic: [], differing: [] } };
-      return { data: { items: [], total: 0 } };
-    });
+    serveDecider();
     const sent = accept(() => ({
       data: { decision_id: 9, recorded: 1, covered: 1, left: 0, needs_approval: true },
     }));
@@ -83,13 +54,9 @@ describe("proposing a deferral past the threshold", () => {
     const until = daysOut(25);
     const date = host.querySelector<HTMLInputElement>('input[type="date"]');
     expect(date, "no date field").not.toBeNull();
-    act(() => {
-      if (date) type(date, until);
-    });
+    change(date, until);
     const reasoning = host.querySelector<HTMLTextAreaElement>("textarea");
-    act(() => {
-      if (reasoning) type(reasoning, "Waiting on the vendor's next image.");
-    });
+    change(reasoning, "Waiting on the vendor's next image.");
 
     // Said beside the date and in the aside, before anything is sent.
     const said = "with what was put off before reaches the 30-day threshold, so a second person";
@@ -123,22 +90,7 @@ describe("proposing a deferral past the threshold", () => {
 
 describe("the decision form's Ctrl+Enter", () => {
   async function ready(queries = client()) {
-    serve((path) => {
-      if (path === "/v1/session/me") {
-        return {
-          data: {
-            identity: "ana",
-            name: "Ana",
-            admin: false,
-            kind: "person",
-            deferral_days: 30,
-            outcomes: PUBLISHED,
-          },
-        };
-      }
-      if (path.endsWith("/reach")) return { data: { automatic: [], differing: [] } };
-      return { data: { items: [], total: 0 } };
-    });
+    serveDecider();
     const sent = accept(() => ({
       data: { decision_id: 9, recorded: 1, covered: 1, left: 0, needs_approval: false },
     }));
@@ -164,13 +116,9 @@ describe("the decision form's Ctrl+Enter", () => {
     );
     act(() => deferred?.click());
     const date = host.querySelector<HTMLInputElement>('input[type="date"]');
-    act(() => {
-      if (date) type(date, daysOut(10));
-    });
+    change(date, daysOut(10));
     const reasoning = host.querySelector<HTMLTextAreaElement>(".writing textarea");
-    act(() => {
-      if (reasoning) type(reasoning, "Waiting on the vendor's next image.");
-    });
+    change(reasoning, "Waiting on the vendor's next image.");
     return { sent, host, reasoning };
   }
 
