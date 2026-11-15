@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
@@ -89,4 +91,46 @@ func TestNobodyIsToldOfHandingBackATeamQueueOrTheirOwnTaking(t *testing.T) {
 	if logged.errors != 0 {
 		t.Errorf("deciding to tell nobody read the database and logged %d errors", logged.errors)
 	}
+}
+
+// Somebody is told of withheld work only when they read it at every
+// visibility it holds: reading the product, or one of two withheld
+// visibilities, is not enough.
+func TestANoticeNeedsEveryWithheldVisibility(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		in := core.Deps{DB: db, Logger: slog.New(&counted{})}
+		people := access.NewStore(db.DB)
+		person, err := people.Ensure(ctx, "triager", "Triager", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		product, err := catalog.NewStore(db.DB).DeclareProduct(ctx, "mine", "Mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		private := []access.Visibility{access.Private}
+		tested := []access.Visibility{access.SecurityTesting}
+		both := []access.Visibility{access.Private, access.SecurityTesting}
+		cases := []struct {
+			grant access.Role
+			want  map[string]bool
+		}{
+			{access.PublicRead, map[string]bool{"private": false, "security testing": false, "both": false}},
+			{access.PrivateRead, map[string]bool{"private": true, "security testing": false, "both": false}},
+			{access.SecurityTestingRead, map[string]bool{"private": true, "security testing": true, "both": true}},
+		}
+		for _, c := range cases {
+			if err := people.GrantRole(ctx, person.ID, product.ID, c.grant); err != nil {
+				t.Fatal(err)
+			}
+			for name, withheld := range map[string][]access.Visibility{
+				"private": private, "security testing": tested, "both": both,
+			} {
+				if got := seenBy(ctx, in, "triager", product.ID, withheld); got != c.want[name] {
+					t.Errorf("holding up to %s, told of %s work: %v, want %v", c.grant, name, got, c.want[name])
+				}
+			}
+		}
+	})
 }
