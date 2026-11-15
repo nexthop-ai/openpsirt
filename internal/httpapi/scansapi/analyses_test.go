@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -165,9 +166,6 @@ func TestAnAnalyzerUploadIsRefusedInWordsTheSenderCanAct(t *testing.T) {
 			"not SARIF":      {[]string{`{"runs":`}, map[string]string{"series": "s"}, "document 1"},
 			"broken gzip":    {[]string{gzipped(t, clangRun)[:20]}, map[string]string{"series": "s"}, "gzip"},
 			"in the future":  {[]string{clangRun}, map[string]string{"series": "s", "built": "2999-01-01T00:00:00Z"}, "future"},
-			"too many at once": {[]string{clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun,
-				clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun, clangRun},
-				map[string]string{"series": "s"}, "per-unit documents"},
 			"a scanner alone": {[]string{`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Trivy"}},"results":[]}]}`},
 				map[string]string{"series": "s"}, "scanner's (Trivy)"},
 			"a web scanner alone": {[]string{`{"version":"2.1.0","runs":[{"tool":{"driver":{"name":"ZAP"}},"results":[` +
@@ -280,34 +278,71 @@ func TestAPersonSendsAnAnalyzerRunWhereTheyTriageSecurityTesting(t *testing.T) {
 	})
 }
 
-// An analyzer run turned away by a full backlog is told when to send again,
-// and the refusal is recorded against its series as any other is.
-func TestAnAnalyzerUploadAgainstAFullBacklogIsRecordedAndToldWhenToRetry(t *testing.T) {
-	opts := queue.DefaultOptions()
-	opts.MaxBacklog = 1
-	httpapitest.IngestOn(t, dbtest.Two, opts, func(t *testing.T, f *httpapitest.IngestFixture) {
-		if _, err := f.Queue.Add(t.Context(), queue.Analyze, "somebody else's run"); err != nil {
-			t.Fatal(err)
-		}
-		body, kind := httpapitest.Form(t,
-			httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: clangRun},
-			httpapitest.Part{Field: "series", Content: "nightly"})
-		req := httptest.NewRequest(http.MethodPost, analyses(f), body)
-		req.Header.Set("Content-Type", kind)
-		rec := httptest.NewRecorder()
-		f.Handler.ServeHTTP(rec, f.Sending(req))
-		if rec.Code != http.StatusServiceUnavailable {
-			t.Fatalf("an analyzer run against a full backlog answered %d: %s", rec.Code, rec.Body.String())
-		}
-		if rec.Header().Get("Retry-After") == "" {
-			t.Error("an analyzer run turned away by a full backlog is not told when to send again")
-		}
-		held, err := f.DB.DB.NewSelect().TableExpr(`"series_refusal"`).Count(t.Context())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if held != 1 {
-			t.Errorf("%d refusals recorded for an analyzer run a full backlog turned away, want 1", held)
-		}
-	})
+// Every door that turns an analyzer run away records why against its series,
+// and a full backlog says when to send again.
+func TestEveryDoorThatTurnsAnAnalyzerUploadAwayRecordsIt(t *testing.T) {
+	tooMany := make([]string, 17)
+	for i := range tooMany {
+		tooMany[i] = clangRun
+	}
+	for _, c := range []struct {
+		what   string
+		before func(t *testing.T, f *httpapitest.IngestFixture)
+		docs   []string
+		want   int
+		// said is what the recorded reason has to carry.
+		said string
+	}{
+		{what: "more documents than are read", docs: tooMany,
+			want: http.StatusUnprocessableEntity, said: "per-unit documents"},
+		{what: "a variant that is retired",
+			before: func(t *testing.T, f *httpapitest.IngestFixture) {
+				if _, err := f.DB.DB.NewUpdate().Table("variant").Set(`"retired_at" = ?`,
+					time.Now().UTC()).Where("1 = 1").Exec(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+			},
+			docs: []string{clangRun}, want: http.StatusConflict, said: "is retired and takes no analysis"},
+		{what: "a full backlog",
+			before: func(t *testing.T, f *httpapitest.IngestFixture) {
+				if _, err := f.Queue.Add(t.Context(), queue.Analyze, "somebody else's run"); err != nil {
+					t.Fatal(err)
+				}
+			},
+			docs: []string{clangRun}, want: http.StatusServiceUnavailable, said: "already waiting"},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			opts := queue.DefaultOptions()
+			opts.MaxBacklog = 1
+			httpapitest.IngestOn(t, dbtest.Two, opts, func(t *testing.T, f *httpapitest.IngestFixture) {
+				if c.before != nil {
+					c.before(t, f)
+				}
+				var parts []httpapitest.Part
+				for _, d := range c.docs {
+					parts = append(parts, httpapitest.Part{Field: "sarif", Filename: "run.sarif", Content: d})
+				}
+				parts = append(parts, httpapitest.Part{Field: "series", Content: "nightly"})
+				body, kind := httpapitest.Form(t, parts...)
+				req := httptest.NewRequest(http.MethodPost, analyses(f), body)
+				req.Header.Set("Content-Type", kind)
+				rec := httptest.NewRecorder()
+				f.Handler.ServeHTTP(rec, f.Sending(req))
+				if rec.Code != c.want {
+					t.Fatalf("%s answered %d, want %d: %s", c.what, rec.Code, c.want, rec.Body.String())
+				}
+				if c.want == http.StatusServiceUnavailable && rec.Header().Get("Retry-After") == "" {
+					t.Errorf("%s is not told when to send again", c.what)
+				}
+				var recorded []series.Refusal
+				if err := f.DB.DB.NewSelect().Model(&recorded).Scan(t.Context()); err != nil {
+					t.Fatal(err)
+				}
+				if len(recorded) != 1 || recorded[0].Series != "nightly" ||
+					!strings.Contains(recorded[0].Reason, c.said) {
+					t.Errorf("%s recorded %+v, want one refusal of nightly saying %q", c.what, recorded, c.said)
+				}
+			})
+		})
+	}
 }
