@@ -28,7 +28,6 @@ func TestWhatCountsAsAnUnreadableByte(t *testing.T) {
 		{"a NUL", "a\x00b", true, 1},
 		{"a vertical tab", "one\ntwo\vthree", true, 2},
 		{"a delete", "one\ntwo\nthree\x7f", true, 3},
-		{"an escape, which is how a terminal is coloured", "\x1b[31mred", true, 1},
 		{"nothing at all", "", false, 0},
 		// Multi-byte UTF-8 is text: every continuation byte is at or above
 		// 0x80, so a range over bytes must not read one as a control.

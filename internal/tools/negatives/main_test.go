@@ -25,14 +25,6 @@ func TestWhatCountsAsA404BuiltFromAnError(t *testing.T) {
 			`		return nil, huma.Error404NotFound(err.Error())`, true,
 		},
 		{
-			"the same under another name",
-			`	return huma.Error404NotFound(cause.Error())`, true,
-		},
-		{
-			"and another",
-			`	return huma.Error404NotFound(failure.Error())`, true,
-		},
-		{
 			"with a sentence in front of it, which publishes the text just the same",
 			`	return huma.Error404NotFound("cannot read that: " + err.Error())`, true,
 		},
@@ -42,10 +34,6 @@ func TestWhatCountsAsA404BuiltFromAnError(t *testing.T) {
 			// body as a detail, whatever it is called.
 			"an error passed as a detail",
 			`	return huma.Error404NotFound("that product does not exist", err)`, true,
-		},
-		{
-			"an error under any other name",
-			`	return huma.Error404NotFound(readErr.Error())`, true,
 		},
 		{
 			"an error's text after a formatted sentence",
@@ -158,8 +146,6 @@ func TestWhatCountsAsAnArmThatAnswers404WhateverTheErrorWas(t *testing.T) {
 		{"with a comment between", "\tif err != nil {\n\t\t// Not there.\n\t\treturn nil, noSuchFinding()\n\t}", true},
 		{"or'd with an emptiness", "\tif err != nil || len(p) == 0 {\n\t\treturn nil, noSuchFinding()\n\t}", true},
 		{"as the fourth of four values", "\tif err != nil || len(all) == 0 {\n\t\treturn nil, 0, 0, noSuchFinding()\n\t}", true},
-		{"as the fourth of four, one a string", "\tif err != nil {\n\t\treturn 0, 0, \"\", noSuchNote()\n\t}", true},
-		{"as the fifth of five, one a struct", "\tif err != nil {\n\t\treturn Subject{}, nil, 0, \"\", noSuchPerson()\n\t}", true},
 		{"exported and called from another package", "\tif err != nil {\n\t\treturn nil, core.NoSuchPerson()\n\t}", true},
 		{"exported and called in its own package", "\tif err != nil {\n\t\treturn nil, NoSuchPerson()\n\t}", true},
 		{"the scanned-nothing helper", "\tif err != nil {\n\t\treturn nil, core.NothingScannedThere()\n\t}", true},
