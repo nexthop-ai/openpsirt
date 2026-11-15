@@ -16,14 +16,18 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/analysis"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/patchbranch"
+	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
+	"github.com/nexthop-ai/openpsirt/internal/sourcelink"
 	"github.com/nexthop-ai/openpsirt/internal/trail"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 	"github.com/nexthop-ai/openpsirt/internal/vex"
@@ -68,6 +72,15 @@ func TestEveryVocabularyListsEveryConstantOfItsType(t *testing.T) {
 		listed(triage.States()),
 		listed(triage.QueueReasons()),
 		listed(triage.DecisionKinds()),
+		listed(triage.CodeFindingReasons()),
+		listed(analysis.States(), "notFixed"),
+		listed(analysis.Sources()),
+		listed(analysis.RuleStates()),
+		listed(analysis.Changes()),
+		listed(series.Statuses()),
+		listed(series.Reasons()),
+		listed(sourcelink.Styles()),
+		listed(kind.Families()),
 		listed(access.Roles()),
 		listed(access.OverTheDeployment()),
 		listed(access.Modes()),
@@ -90,6 +103,10 @@ func TestEveryVocabularyListsEveryConstantOfItsType(t *testing.T) {
 		listed(finding.PlannedUpgradeSortKeys()),
 		listed(finding.Closures()),
 		listed(finding.VariantSpreads(), "AnyVariants"),
+		listed(finding.GroupedBy()),
+		listed(finding.DateStandings()),
+		listed(finding.Directions()),
+		listed(finding.ReportActs()),
 		listed(graph.Reasons),
 		listed(graph.ChangeKinds()),
 		listed(notify.Kinds()),
