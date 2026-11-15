@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -28,20 +29,34 @@ import (
 // database: the lock is about one schema, and two databases on one server
 // migrating at once are not in each other's way. Named locks are capped at
 // 64 characters, so a long database name is hashed rather than cut.
+//
+// The schema change lock is held beside the migration lock, on the same
+// session, only while migrations are applied: the migration lock is also taken
+// by a start with nothing to apply, and an instance serving pauses for the
+// change lock alone.
 const (
-	lockName = "openpsirt_migrate"
-	lockID   = 8_147_263_001
+	lockName   = "openpsirt_migrate"
+	lockID     = 8_147_263_001
+	changeName = "openpsirt_changing"
+	changeID   = 8_147_263_002
 )
 
-func namedLock(ctx context.Context, conn *sql.Conn) (string, error) {
+// rowQuerier is a pinned connection or a pool.
+type rowQuerier interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+// namedLock is the name a MySQL or MariaDB lock takes for the current
+// database, from one of the prefixes above.
+func namedLock(ctx context.Context, q rowQuerier, prefix string) (string, error) {
 	var current sql.NullString
-	if err := conn.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&current); err != nil {
+	if err := q.QueryRowContext(ctx, "SELECT DATABASE()").Scan(&current); err != nil {
 		return "", fmt.Errorf("read the current database: %w", err)
 	}
-	name := lockName + ":" + current.String
+	name := prefix + ":" + current.String
 	if len(name) > 64 {
 		sum := sha1.Sum([]byte(current.String)) //nolint:gosec // G401: see the import
-		name = lockName + ":" + hex.EncodeToString(sum[:])
+		name = prefix + ":" + hex.EncodeToString(sum[:])
 	}
 	return name, nil
 }
@@ -83,7 +98,7 @@ var keepAliveEvery = 30 * time.Second
 
 // keepAlive uses a pinned connection on a timer until stopped.
 func keepAlive(ctx context.Context, conn *sql.Conn) keeper {
-	k := keeper{done: make(chan struct{}), finished: make(chan struct{})}
+	k := keeper{done: make(chan struct{}), finished: make(chan struct{}), turn: make(chan struct{}, 1)}
 	go func() {
 		defer close(k.finished)
 		tick := time.NewTicker(keepAliveEvery)
@@ -98,7 +113,9 @@ func keepAlive(ctx context.Context, conn *sql.Conn) keeper {
 				// the session. A use that fails says the session may be gone,
 				// which the release reports when it finds the lock no longer
 				// held.
+				k.turn <- struct{}{}
 				_, _ = conn.ExecContext(context.WithoutCancel(ctx), "SELECT 1")
+				<-k.turn
 			}
 		}
 	}()
@@ -125,6 +142,23 @@ func abandon(k keeper, conn *sql.Conn) {
 type keeper struct {
 	done     chan struct{}
 	finished chan struct{}
+	// turn is held by whatever uses the connection beside the keep-alive,
+	// the schema change lock's statements, so no two statements overlap on
+	// it: a driver may close a connection asked a second question before it
+	// has read the first answer, and the session's locks go with it.
+	turn chan struct{}
+}
+
+// using runs use on the connection once no keep-alive use is on it, unless
+// ctx ends first.
+func (k keeper) using(ctx context.Context, use func() error) error {
+	select {
+	case k.turn <- struct{}{}:
+	case <-ctx.Done():
+		return fmt.Errorf("the connection holding the migration lock did not answer: %w", ctx.Err())
+	}
+	defer func() { <-k.turn }()
+	return use()
 }
 
 // stop ends the keep-alive and waits for its last use to finish, because the
@@ -144,6 +178,18 @@ func (k keeper) stop(ctx context.Context) error {
 // unlock releases a migration lock and returns the pinned connection.
 type unlock func(context.Context) error
 
+// held is the migration lock, once taken.
+type held struct {
+	// release lets the migration lock go.
+	release unlock
+	// change takes the schema change lock for as long as this instance
+	// applies migrations, and answers its release. It is taken only while the
+	// migration lock is held, so on the server engines nothing but a session
+	// outside this application contends for it; on SQLite a serving instance
+	// looking at it holds it shared for a moment.
+	change func(context.Context) (unlock, error)
+}
+
 // acquire takes the migration lock, so that instances starting at once do not
 // migrate at the same time.
 //
@@ -157,7 +203,7 @@ type unlock func(context.Context) error
 // different connection — and neither engine reports that as an error, it just
 // silently fails to release. The lock would then be held for the life of the
 // process and every other instance would block on it.
-func acquire(ctx context.Context, db *database.DB) (unlock, error) {
+func acquire(ctx context.Context, db *database.DB) (*held, error) {
 	if db.Server.Engine == database.SQLite {
 		// SQLite has no advisory lock and cannot take one on this handle: it
 		// migrates on a single connection, which the migration itself needs.
@@ -211,36 +257,60 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 				break
 			}
 			if !lockNotAvailable(err) || ctx.Err() != nil {
-				holder := holderOf(ctx, conn, db.Server.Engine, "")
+				holder := holderOf(ctx, conn, db.Server.Engine, "", lockID)
 				closeConn()
 				return nil, fmt.Errorf("take migration lock%s: %w", holder, err)
 			}
-			waits.still(func() string { return holderOf(ctx, conn, db.Server.Engine, "") })
+			waits.still(func() string { return holderOf(ctx, conn, db.Server.Engine, "", lockID) })
 		}
 		keeping := keepAlive(ctx, conn)
-		return func(ctx context.Context) error {
-			if err := keeping.stop(ctx); err != nil {
-				abandon(keeping, conn)
-				return err
-			}
-			// pg_advisory_unlock answers false when this session did not hold
-			// the lock. Executing it without reading the result would report
-			// success while leaking the lock.
-			var released *int
-			if err := conn.QueryRowContext(ctx,
-				"SELECT CAST(pg_advisory_unlock($1) AS INTEGER)", lockID).Scan(&released); err != nil {
-				abandon(keeping, conn)
-				return fmt.Errorf("release migration lock: %w", err)
-			}
-			closeConn()
-			return heldWhenReleased(released)
+		changes := &changing{}
+		return &held{
+			release: func(ctx context.Context) error {
+				if err := keeping.stop(ctx); err != nil {
+					abandon(keeping, conn)
+					return err
+				}
+				// pg_advisory_unlock answers false when this session did not hold
+				// the lock. Executing it without reading the result would report
+				// success while leaking the lock.
+				var released *int
+				if err := conn.QueryRowContext(ctx,
+					"SELECT CAST(pg_advisory_unlock($1) AS INTEGER)", lockID).Scan(&released); err != nil {
+					abandon(keeping, conn)
+					return fmt.Errorf("release migration lock: %w", err)
+				}
+				changes.giveBack(keeping, conn, closeConn)
+				return heldWhenReleased(released)
+			},
+			change: func(ctx context.Context) (unlock, error) {
+				var granted bool
+				if err := keeping.using(ctx, func() error {
+					return conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", changeID).Scan(&granted)
+				}); err != nil {
+					return nil, fmt.Errorf("take the schema change lock: %w", err)
+				}
+				if !granted {
+					var holder string
+					_ = keeping.using(ctx, func() error { holder = holderOf(ctx, conn, db.Server.Engine, "", changeID); return nil })
+					return nil, fmt.Errorf("take the schema change lock: it is held%s", holder)
+				}
+				return changes.released(func(ctx context.Context) (*int, error) {
+					var released *int
+					err := keeping.using(ctx, func() error {
+						return conn.QueryRowContext(ctx,
+							"SELECT CAST(pg_advisory_unlock($1) AS INTEGER)", changeID).Scan(&released)
+					})
+					return released, err
+				}), nil
+			},
 		}, nil
 
 	case database.MySQL, database.MariaDB:
 		// GET_LOCK returns 1 when granted, 0 when the attempt timed out, and
 		// NULL on error. A timeout means another session holds the lock, and
 		// the next attempt follows.
-		name, err := namedLock(ctx, conn)
+		name, err := namedLock(ctx, conn, lockName)
 		if err != nil {
 			closeConn()
 			return nil, err
@@ -249,7 +319,7 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 			var granted *int
 			row := conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, ?)", name, lockAttemptSeconds)
 			if err := row.Scan(&granted); err != nil {
-				holder := holderOf(ctx, conn, db.Server.Engine, name)
+				holder := holderOf(ctx, conn, db.Server.Engine, name, 0)
 				closeConn()
 				return nil, fmt.Errorf("take migration lock%s: %w", holder, err)
 			}
@@ -264,29 +334,94 @@ func acquire(ctx context.Context, db *database.DB) (unlock, error) {
 				closeConn()
 				return nil, err
 			}
-			waits.still(func() string { return holderOf(ctx, conn, db.Server.Engine, name) })
+			waits.still(func() string { return holderOf(ctx, conn, db.Server.Engine, name, 0) })
 		}
 		keeping := keepAlive(ctx, conn)
-		return func(ctx context.Context) error {
-			if err := keeping.stop(ctx); err != nil {
-				abandon(keeping, conn)
-				return err
-			}
-			// RELEASE_LOCK answers 0 when held by another session and NULL
-			// when no such lock exists. Neither is an error to the driver.
-			var released *int
-			if err := conn.QueryRowContext(ctx,
-				"SELECT RELEASE_LOCK(?)", name).Scan(&released); err != nil {
-				abandon(keeping, conn)
-				return fmt.Errorf("release migration lock: %w", err)
-			}
-			closeConn()
-			return heldWhenReleased(released)
+		changes := &changing{}
+		return &held{
+			release: func(ctx context.Context) error {
+				if err := keeping.stop(ctx); err != nil {
+					abandon(keeping, conn)
+					return err
+				}
+				// RELEASE_LOCK answers 0 when held by another session and NULL
+				// when no such lock exists. Neither is an error to the driver.
+				var released *int
+				if err := conn.QueryRowContext(ctx,
+					"SELECT RELEASE_LOCK(?)", name).Scan(&released); err != nil {
+					abandon(keeping, conn)
+					return fmt.Errorf("release migration lock: %w", err)
+				}
+				changes.giveBack(keeping, conn, closeConn)
+				return heldWhenReleased(released)
+			},
+			change: func(ctx context.Context) (unlock, error) {
+				var change string
+				var granted *int
+				// A wait of zero: only a session outside this application can
+				// hold it.
+				if err := keeping.using(ctx, func() error {
+					var err error
+					if change, err = namedLock(ctx, conn, changeName); err != nil {
+						return err
+					}
+					return conn.QueryRowContext(ctx, "SELECT GET_LOCK(?, 0)", change).Scan(&granted)
+				}); err != nil {
+					return nil, fmt.Errorf("take the schema change lock: %w", err)
+				}
+				if granted == nil || *granted != 1 {
+					var holder string
+					_ = keeping.using(ctx, func() error { holder = holderOf(ctx, conn, db.Server.Engine, change, 0); return nil })
+					return nil, fmt.Errorf("take the schema change lock: it is held%s", holder)
+				}
+				return changes.released(func(ctx context.Context) (*int, error) {
+					var released *int
+					err := keeping.using(ctx, func() error {
+						return conn.QueryRowContext(ctx, "SELECT RELEASE_LOCK(?)", change).Scan(&released)
+					})
+					return released, err
+				}), nil
+			},
 		}, nil
 	}
 
 	closeConn()
 	return nil, fmt.Errorf("no migration lock for %s", db.Server.Engine)
+}
+
+// changing records whether the schema change lock was let go as held. A
+// connection that may still hold it is closed when the migration lock is let
+// go, never returned to the pool: pooled, it would hold the change lock, and
+// every serving instance would stay paused, until the pool retired it.
+type changing struct {
+	stale atomic.Bool
+}
+
+// released is the release of a change lock taken, given the statement that
+// lets it go on the pinned connection.
+func (c *changing) released(let func(context.Context) (*int, error)) unlock {
+	return func(ctx context.Context) error {
+		released, err := let(ctx)
+		if err != nil {
+			c.stale.Store(true)
+			return fmt.Errorf("release the schema change lock: %w", err)
+		}
+		if err := heldWhenReleased(released); err != nil {
+			c.stale.Store(true)
+			return fmt.Errorf("release the schema change lock: %w", err)
+		}
+		return nil
+	}
+}
+
+// giveBack hands the lock's connection back once the migration lock is let
+// go: to the pool, or closed where the change lock may still be on it.
+func (c *changing) giveBack(k keeper, conn *sql.Conn, closeConn func()) {
+	if c.stale.Load() {
+		abandon(k, conn)
+		return
+	}
+	closeConn()
 }
 
 // heldWhenReleased reads what a release answered: one where this session held
@@ -308,6 +443,8 @@ type waiting struct {
 	logger *slog.Logger
 	since  time.Time
 	said   time.Time
+	// change is a wait for the schema change lock, not the migration lock.
+	change bool
 }
 
 // still says the lock is still held, where a line is due. The holder is asked
@@ -322,8 +459,12 @@ func (w *waiting) still(holder func() string) {
 	if held == "" {
 		held = "a session the server does not name"
 	}
-	w.logger.Info("waiting for the migration lock", "holder", held,
-		"waited", now.Sub(w.since).Round(time.Second))
+	waited := now.Sub(w.since).Round(time.Second)
+	if w.change {
+		w.logger.Info("waiting for the schema change lock", "holder", held, "waited", waited)
+		return
+	}
+	w.logger.Info("waiting for the migration lock", "holder", held, "waited", waited)
 }
 
 // lockNotAvailable reports whether PostgreSQL ended an attempt at a lock
@@ -333,9 +474,9 @@ func lockNotAvailable(err error) bool {
 	return errors.As(err, &pg) && pg.Code == "55P03"
 }
 
-// holderOf names the session holding the migration lock, for a wait that is
-// still going on or a failure to take the lock, or says nothing where the
-// server will not tell.
+// holderOf names the session holding the lock id names on PostgreSQL, or name
+// on MySQL and MariaDB, for a wait that is still going on or a failure to take
+// the lock, or says nothing where the server will not tell.
 //
 // Any account that can connect may take the lock: a named lock on MySQL and
 // MariaDB needs no privilege and is shared by every database on the server,
@@ -346,7 +487,7 @@ func lockNotAvailable(err error) bool {
 // On PostgreSQL every role sees each session's user and application; a role
 // without the right to see other sessions sees neither their state nor their
 // query. Where the server leaves a name empty the answer omits it.
-func holderOf(ctx context.Context, conn *sql.Conn, engine database.Engine, name string) string {
+func holderOf(ctx context.Context, conn *sql.Conn, engine database.Engine, name string, id int64) string {
 	asking, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
 	defer cancel()
 	switch engine {
@@ -359,7 +500,7 @@ func holderOf(ctx context.Context, conn *sql.Conn, engine database.Engine, name 
 			WHERE "l"."locktype" = 'advisory' AND "l"."granted"
 			AND "l"."database" = (SELECT "oid" FROM "pg_catalog"."pg_database" WHERE "datname" = current_database())
 			AND "l"."classid"::bigint = $1 AND "l"."objid"::bigint = $2 AND "l"."objsubid" = 1`,
-			int64(lockID>>32), int64(lockID&0xffffffff)).Scan(&pid, &user, &application)
+			id>>32, id&0xffffffff).Scan(&pid, &user, &application)
 		if err != nil {
 			return ""
 		}

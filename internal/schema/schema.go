@@ -13,6 +13,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
@@ -35,13 +36,91 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 	if err := NotAhead(ctx, db); err != nil {
 		return err
 	}
-	if err := migrate.Up(ctx, db, logger); err != nil {
+	if err := migrate.Up(ctx, db, logger, Notice); err != nil {
 		return err
 	}
 	// Asked again once the lock is released: a later release may have
 	// migrated while this one waited on it, which leaves this one nothing to
 	// apply and a schema it cannot read.
 	return NotAhead(ctx, db)
+}
+
+// WatchEvery is how often an instance serving a database asks whether
+// another instance is changing its schema.
+const WatchEvery = time.Second
+
+// Notice is how long an upgrade waits, holding the schema change lock, before
+// its first statement: an interval for every serving instance to ask, the
+// thirty seconds the longest write a stopped request or pass goes on with is
+// bounded by (recording a patch branch visit, cleaning up an attachment), and
+// a second more.
+const Notice = WatchEvery + 30*time.Second + time.Second
+
+// Standing is what an instance serving a database makes of its schema.
+type Standing int
+
+const (
+	// Serves is a schema at this build's version that nothing is changing.
+	Serves Standing = iota
+	// Changes is a schema another instance is changing. An instance of this
+	// build serves again once it is Serves.
+	Changes
+	// Superseded is a schema a later release applied, which this build never
+	// serves again.
+	Superseded
+	// Behind is a schema older than this build's that nothing is changing,
+	// such as a restored backup. A start of this build migrates or refuses
+	// it, so a serving instance stops and the platform starts it again.
+	Behind
+)
+
+// Watcher asks what an instance serving a database makes of its schema.
+type Watcher struct {
+	observer *migrate.Observer
+	expected int64
+}
+
+// NewWatcher is a Watcher of db for this build.
+func NewWatcher(ctx context.Context, db *database.DB) (*Watcher, error) {
+	expected, err := Expected()
+	if err != nil {
+		return nil, err
+	}
+	observer, err := migrate.NewObserver(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	return &Watcher{observer: observer, expected: expected}, nil
+}
+
+// Look reports the schema's standing, with the version applied and the one
+// this build carries.
+func (w *Watcher) Look(ctx context.Context) (Standing, int64, int64, error) {
+	changing, err := w.observer.Changing(ctx)
+	if err != nil {
+		return Serves, 0, w.expected, err
+	}
+	applied, err := w.observer.Applied(ctx)
+	if err != nil {
+		return Serves, 0, w.expected, err
+	}
+	return stands(changing, applied, w.expected), applied, w.expected, nil
+}
+
+// stands is the standing of a schema at applied, for a build carrying
+// expected, changing or not. A version ahead outranks a change: a later
+// release mid-upgrade has already left this build behind. A change outranks
+// a version behind, which an upgrade passes through.
+func stands(changing bool, applied, expected int64) Standing {
+	switch {
+	case applied > expected:
+		return Superseded
+	case changing:
+		return Changes
+	case applied < expected:
+		return Behind
+	}
+	return Serves
 }
 
 // NotAhead refuses a database whose schema is newer than this build's.

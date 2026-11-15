@@ -24,6 +24,8 @@ import (
 // the migration held where a test can see it and a stop it can send.
 type starting struct {
 	addr string
+	// url is the database the start serves.
+	url string
 	// entered closes when the migration begins, and release lets it go on.
 	entered chan struct{}
 	release chan struct{}
@@ -51,7 +53,8 @@ func freeAddress(t *testing.T) string {
 // nothing else: one administrator, and no CVE records fetched.
 func startHeld(t *testing.T, addr string, migrate func(context.Context, *database.DB, *slog.Logger) error) *starting {
 	t.Helper()
-	t.Setenv("OPENPSIRT_DATABASE_URL", "sqlite://"+filepath.Join(t.TempDir(), "held.db"))
+	url := "sqlite://" + filepath.Join(t.TempDir(), "held.db")
+	t.Setenv("OPENPSIRT_DATABASE_URL", url)
 	t.Setenv("OPENPSIRT_ADDR", addr)
 	t.Setenv("OPENPSIRT_AUTO_MIGRATE", "true")
 	t.Setenv("OPENPSIRT_RECORDS_UPDATE", "false")
@@ -63,7 +66,7 @@ func startHeld(t *testing.T, addr string, migrate func(context.Context, *databas
 		t.Setenv("OPENPSIRT_BOOTSTRAP_ADMINS", "root")
 	}
 
-	s := &starting{addr: addr, entered: make(chan struct{}), release: make(chan struct{}),
+	s := &starting{addr: addr, url: url, entered: make(chan struct{}), release: make(chan struct{}),
 		done: make(chan error, 1)}
 	parent, stop := context.WithCancel(context.Background())
 	s.stop = stop

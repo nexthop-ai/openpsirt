@@ -236,6 +236,7 @@ var tables = []string{
 	"branch_or_tag",
 	"product",
 	"application_setting",
+	"schema_change",
 }
 
 // TablesIn is every table the migrations made, sorted, read from the database

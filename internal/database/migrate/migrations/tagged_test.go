@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -66,8 +67,8 @@ func TestEachReleaseBuildsTheSchemaItTagged(t *testing.T) {
 func leaveAtLatest(t *testing.T, ctx context.Context, db *database.DB) {
 	t.Helper()
 	// Up before emptying, because emptying asks every table the latest
-	// migration makes.
-	if err := schema.Up(ctx, db, quiet()); err != nil {
+	// migration makes. No notice, since nothing serves a test's database.
+	if err := migrate.Up(ctx, db, quiet(), 0); err != nil {
 		t.Fatalf("migrate to the latest: %v", err)
 	}
 	dbtest.Reset(t, db)

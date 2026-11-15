@@ -233,12 +233,18 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 		if err != nil {
 			return err
 		}
+		watcher, err := schema.NewWatcher(ctx, db)
+		if err != nil {
+			return startupFailed(err, "preparing to watch the schema", cfg)
+		}
 		server, err := listen(cfg, logger, handler)
 		if err != nil {
 			return err
 		}
+		server.answer(handler)
 		serving = true
-		return serveBeside(stopping, cfg, logger, server, beside.background)
+		return serveBeside(stopping, cfg, logger, server, beside.background,
+			watchSchema(logger, watcher.Look, schema.WatchEvery))
 	}
 
 	// Migrating before serving means a request never arrives against a schema
@@ -278,10 +284,15 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	if err != nil {
 		return server.abandon(cfg, logger, err)
 	}
+	watcher, err := schema.NewWatcher(startup, db)
+	if err != nil {
+		return server.abandon(cfg, logger, startupFailed(err, "preparing to watch the schema", cfg))
+	}
 	server.answer(handler)
 	logger.Info("serving")
 	serving = true
-	return serveBeside(stopping, cfg, logger, server, beside.background)
+	return serveBeside(stopping, cfg, logger, server, beside.background,
+		watchSchema(logger, watcher.Look, schema.WatchEvery))
 }
 
 // applySchema brings the database up to the schema this build expects as a

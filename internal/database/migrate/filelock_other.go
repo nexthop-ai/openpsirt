@@ -27,3 +27,14 @@ func lockFile(context.Context, string, *slog.Logger) (unlock, error) {
 		"this platform has no advisory file locking, so a SQLite database cannot be " +
 			"migrated safely here: use one of the server engines")
 }
+
+// changeFile has no implementation on this platform; lockFile refuses first.
+func changeFile(context.Context, string, *slog.Logger) (unlock, error) {
+	return nil, fmt.Errorf("this platform has no advisory file locking")
+}
+
+// fileLocked has no implementation on this platform, where no SQLite database
+// is migrated, so no schema change lock is ever held.
+func fileLocked(string) (bool, error) {
+	return false, nil
+}

@@ -12,16 +12,15 @@ replicaCount: 2
 terminationGracePeriodSeconds: 60
 
 # Every pod of the earlier release stops before any pod of this one starts.
-# Below 1.0 an upgrade can drop and reshape tables the earlier release reads
-# and writes, so a replica of it left serving fails on them. It also lets a
-# ReadWriteOnce claim move to a pod on another node, which a rolling update
-# cannot: the new pod waits for a volume the old one still holds.
+# That lets a ReadWriteOnce claim move to a pod on another node, which a
+# rolling update cannot: the new pod waits for a volume the old one still
+# holds.
 #
-# The cost is that nothing answers between the old pods stopping and a new one
-# passing its readiness probe, and an upgrade that fails to start leaves
-# nothing serving. Set {type: RollingUpdate} for a deployment that has to stay
-# up through one, and scale to zero by hand before any upgrade that changes the
-# schema.
+# Under {type: RollingUpdate}, a new pod changing the schema stops every old
+# pod serving: each fails readiness and answers as upgrading while the
+# migration runs, then exits once the schema is past its own, and the new pod
+# serves once the migration ends. An upgrade that changes the schema is an
+# outage either way; one that changes nothing rolls with no pause.
 strategy:
   type: Recreate
 

@@ -2,7 +2,8 @@
 
 How the schema is created and moved forward: application at start, the chain
 from the baseline, the record each release keeps, the rehearsal before a tag,
-and the lock that lets one instance migrate at a time.
+the lock that lets one instance migrate at a time, and the lock that stops
+every other instance serving while it does.
 
 Satisfies REQ-72, REQ-76.
 
@@ -16,6 +17,7 @@ Satisfies REQ-72, REQ-76.
 - [Upgrade rehearsal](#upgrade-rehearsal)
 - [Statement lock waits](#statement-lock-waits)
 - [Migration locks](#migration-locks)
+- [Instances during an upgrade](#instances-during-an-upgrade)
 - [Limits](#limits)
 
 ## Migrations
@@ -264,6 +266,7 @@ One instance migrates at a time (REQ-72).
 |---|---|---|
 | Migration mutex | Other goroutines in the process | A mutex. The migration library keeps its dialect in package state, so two goroutines race whatever the database lock |
 | Advisory lock | Other instances on the database | `pg_advisory_lock`, held by the database; `GET_LOCK` on a name carrying the database, since a MySQL named lock belongs to the server; an operating-system lock on a file beside a SQLite database |
+| Schema change lock | Serving, on every other instance, while migrations are applied (§ Instances during an upgrade) | The same mechanisms under another key, name or file, taken on the advisory lock's session |
 
 | Rule | Reason |
 |---|---|
@@ -294,10 +297,63 @@ Four processes on one file with no lock leave the schema correct, with three
 failing on the library's bookkeeping; the lock makes them wait and find the work
 done.
 
+## Instances during an upgrade
+
+No instance serves while another applies migrations (REQ-72): an answer read
+from a schema part way through a change cannot be trusted, so an upgrade is an
+outage for as long as its migrations take.
+
+| Rule | Reason |
+|---|---|
+| An upgrade takes the schema change lock after reading the version, where a migration is outstanding, and lets it go after the last migration and the statistics refresh, on every path | A start with nothing to apply takes the migration lock alone, so a replica starting beside others pauses none of them |
+| Beside the lock, the upgrade writes a row to the schema change record, where the database has that table, and removes it once the upgrade succeeds | The lock goes with its session; the row outlives an upgrade that fails part way |
+| On MySQL and MariaDB an upgrade ending any other way than success leaves its row | Each data-definition statement commits alone, so the schema is part changed, and nothing serves it until an upgrade succeeds or the backup is restored |
+| On PostgreSQL and SQLite a failed upgrade removes its row | Its transaction rolled back, leaving the schema of the version recorded |
+| On a database holding a schema, the upgrade waits 32 seconds holding the change lock before its first statement | One interval for every serving instance to look, 30 seconds for the longest write a stopped request or pass goes on with (recording a patch branch visit, cleaning up an attachment), and a second more. A test helper migrating a database it alone holds waits none |
+| A statement already running when an instance pauses holds its tables, and the upgrade waits for it | § Statement lock waits |
+| `openpsirt migrate up` takes the change lock and waits the same way | It is the same upgrade under other credentials |
+| A serving instance looks every second: is the change lock held or a record standing, and which version is applied | One look costs under a millisecond on every engine: 0.79 ms on PostgreSQL, the slowest (`design-docs/database-measurements.md` § Schema watch looks) |
+| A look takes nothing an upgrade waits for | PostgreSQL reads the lock table; MySQL and MariaDB ask who holds the named lock; SQLite takes a shared lock on the file for the moment of looking, never through a link and never waiting on a file that is not a regular one, and the upgrade tries again past it |
+| A look that fails or passes two seconds reads as Changes, logged once until a look succeeds | An instance that cannot tell whether the schema is changing does not serve it; the bound is under the notice |
+| SQLite's change lock file is created readable by every user | Migrations may run as another user than the server, whose looks would otherwise fail |
+| On SQLite a change lock held past one attempt at the migration lock is logged about once a minute | A serving instance's look holds it for a moment; anything longer is a holder outside the application |
+| On the server engines the change lock held by a session outside the application refuses the upgrade, naming the holder | Only the migration lock's holder takes it |
+| The change lock's statements and the keep-alive never overlap on the lock's connection | A driver may close a connection asked a second question before it has read the first answer, and both locks go with the session |
+| A change lock whose release failed has its connection closed when the migration lock is let go, never pooled | A pooled connection holding it would pause every instance until the pool retired it |
+
+| Standing | When | The instance |
+|---|---|---|
+| Serves | The applied version is this build's and nothing is changing it | Serves through the router, and runs its passes |
+| Changes | The change lock is held or a record stands, at a version not ahead of this build's | Pauses, and resumes at Serves |
+| Behind | The applied version is behind this build's and nothing is changing it, such as a restored backup | Stops |
+| Superseded | The applied version is ahead of this build's, whether or not anything is changing it | Stops |
+
+| A paused instance | Reason |
+|---|---|
+| Answers every request as it answers while it migrates at start (`design-docs/packaging.md` § Starting and stopping) | Readiness fails, and every other path is 503 with `Retry-After` |
+| Ends every request the router was answering | Its transaction rolls back rather than committing against a changing schema |
+| Answers a request it ended as upgrading where the handler's answer is a failure or nothing | The failure is the ending of its context |
+| Keeps the answer of a request whose handler answered a success | What it did took effect, and a retry would repeat it |
+| Stops every pass and the queue's workers | No pass writes while another instance migrates |
+| Starts the passes again on resuming, once the stopped ones have ended, and goes on reading standings while they end | Two copies of one pass never run at once |
+
+| A stopping instance | Reason |
+|---|---|
+| Pauses, then stops through the ordinary shutdown and exits 1, naming both versions | A supervisor reads the exit code |
+| Stops when Superseded rather than waiting | It never serves this database again, since a database is only ever upgraded; it ends where a start of the same binary ends, refused, and the platform replaces it. Waiting would leave it alive and unready with nothing to end it |
+| Stops when Behind | Its next start migrates the database or refuses it |
+
+| Rule | Reason |
+|---|---|
+| The watch runs whether automatic migration is on or off | A separate `openpsirt migrate up` changes the schema the same way |
+| The watch ends with serving | It reads a database the process closes once serving ends |
+| No interval setting | A look every second costs under a millisecond, so a slower one earns nothing |
+
 ## Limits
 
 | Limit | Detail |
 |---|---|
 | The concurrency test does not cover the advisory lock | Every caller takes the in-process mutex first, so goroutines driven through the normal path pass with the advisory lock deleted. The suite drives the advisory lock from two pools directly (`design-docs/database.md` § Test harness) |
 | Any account can hold the migration lock | Any account on a MySQL or MariaDB server, or any role with CONNECT on the PostgreSQL database, can take the migration lock and hold every start behind it; the waiter's log line names the connection to end |
+| An instance of a release without the change lock does not look | It serves through an upgrade; the upgrade note says to stop every instance of the earlier release first |
 | On MySQL and MariaDB a data step waits for a row as the server's own bound says, and a writer holding the row past it fails the migration. | Retrying the step where it stands loses the work before it under `innodb_rollback_on_timeout`, and retrying from the start runs again each data-definition statement already committed |

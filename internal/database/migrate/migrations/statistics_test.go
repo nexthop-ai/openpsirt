@@ -38,7 +38,7 @@ func TestAnUpgradeLeavesEveryIndexWithStatistics(t *testing.T) {
 		if err := database.RefreshStatistics(ctx, db); err != nil {
 			t.Fatal(err)
 		}
-		if err := migrate.Up(ctx, db, quiet()); err != nil {
+		if err := migrate.Up(ctx, db, quiet(), 0); err != nil {
 			t.Fatalf("upgrade: %v", err)
 		}
 		missing, examined := unanalyzedIndexes(t, ctx, db)

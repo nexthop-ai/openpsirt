@@ -10,6 +10,7 @@ it and points here for the run.
 - [The v0.11.0 upgrade](#the-v0110-upgrade)
 - [Index reads](#index-reads)
 - [Statistics after an upgrade](#statistics-after-an-upgrade)
+- [Schema watch looks](#schema-watch-looks)
 
 ## Statement preparation modes
 
@@ -102,3 +103,20 @@ indexes, none for the indexes on its kind and its occurrence, and none for 93
 tables, the renamed ones among them. Each slow read began at the index on a
 finding's kind, which 414,681 of 414,683 findings share. Analyzing every table
 of the upgraded database took 1.2 s.
+
+## Schema watch looks
+
+The mean of 2,000 looks of each kind against the CI engines on one development
+host, after 50 to warm the pool. The change lock look on SQLite is a file with
+nobody holding it. `design-docs/database-migrations.md` § Instances during an
+upgrade holds the rule.
+
+| Engine | Change lock | Version |
+|---|---|---|
+| PostgreSQL | 0.46 ms | 0.33 ms |
+| MySQL | 0.12 ms | 0.19 ms |
+| MariaDB | 0.11 ms | 0.16 ms |
+| SQLite | 0.002 ms | 0.013 ms |
+
+The record of schema changes adds one count of a table holding no row, on the
+server engines only where the change lock is free.

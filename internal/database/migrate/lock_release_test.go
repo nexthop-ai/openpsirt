@@ -57,7 +57,7 @@ func TestALockConnectionWhoseReleaseFailsIsClosedNotPooled(t *testing.T) {
 
 				returned := make(chan error, 1)
 				go func() {
-					returned <- withLock(t.Context(), db, logger, func(context.Context) error {
+					returned <- withLock(t.Context(), db, logger, func(context.Context, *held) error {
 						if script.stallKeepAlive {
 							<-script.started
 						}

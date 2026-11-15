@@ -67,7 +67,7 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 		first := open(t, address)
 		second := open(t, address)
 
-		release, err := acquire(ctx, first)
+		release, err := take(ctx, first)
 		if err != nil {
 			t.Fatalf("first instance could not take the lock: %v", err)
 		}
@@ -79,7 +79,7 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 		said := &lines{}
 		waiting, cancel := context.WithTimeout(WithEngine(ctx, name, said.logger()), 1500*time.Millisecond)
 		defer cancel()
-		if release2, err := acquire(waiting, second); err == nil {
+		if release2, err := take(waiting, second); err == nil {
 			_ = release2(ctx)
 			_ = release(ctx)
 			t.Fatal("a second instance took the migration lock while it was held")
@@ -99,7 +99,7 @@ func TestLockExcludesAnotherConnection(t *testing.T) {
 
 		// And once released, the next instance must get it — a lock that
 		// is never released is as broken as one that never excludes.
-		release2, err := acquire(ctx, second)
+		release2, err := take(ctx, second)
 		if err != nil {
 			t.Fatalf("lock was not released: %v", err)
 		}
@@ -152,7 +152,7 @@ func TestAWaiterTakesTheLockWhenItsHolderDies(t *testing.T) {
 		killer := open(t, address)
 		ctx := t.Context()
 
-		release, err := acquire(ctx, holder)
+		release, err := take(ctx, holder)
 		if err != nil {
 			t.Fatalf("the first instance could not take the lock: %v", err)
 		}
@@ -164,7 +164,7 @@ func TestAWaiterTakesTheLockWhenItsHolderDies(t *testing.T) {
 		migrated := make(chan struct{})
 		done := make(chan error, 1)
 		go func() {
-			done <- withLock(ctx, waiter, said.logger(), func(context.Context) error {
+			done <- withLock(ctx, waiter, said.logger(), func(context.Context, *held) error {
 				close(migrated)
 				return nil
 			})
@@ -222,7 +222,7 @@ func TestAWaitForTheLockEndsWhenItsContextDoes(t *testing.T) {
 		waiter := open(t, address)
 		ctx := t.Context()
 
-		release, err := acquire(ctx, holder)
+		release, err := take(ctx, holder)
 		if err != nil {
 			t.Fatalf("the first instance could not take the lock: %v", err)
 		}
@@ -231,7 +231,7 @@ func TestAWaitForTheLockEndsWhenItsContextDoes(t *testing.T) {
 		stopping, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
 		defer cancel()
 		started := time.Now()
-		if again, err := acquire(stopping, waiter); err == nil {
+		if again, err := take(stopping, waiter); err == nil {
 			_ = again(ctx)
 			t.Fatal("a waiter took the lock while it was held")
 		}
@@ -261,7 +261,7 @@ func TestTheLockLeavesNoSettingOnAConnectionItHandsBack(t *testing.T) {
 		t.Fatalf("read the bound before: %v", err)
 	}
 
-	release, err := acquire(ctx, db)
+	release, err := take(ctx, db)
 	if err != nil {
 		t.Fatalf("acquire: %v", err)
 	}
@@ -449,7 +449,7 @@ func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
 
 	shortAttempts(t)
 
-	release, err := acquire(ctx, first)
+	release, err := take(ctx, first)
 	if err != nil {
 		t.Fatalf("the first migration could not take the lock: %v", err)
 	}
@@ -459,7 +459,7 @@ func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
 	said := &lines{}
 	waiting, cancel := context.WithTimeout(WithEngine(ctx, database.SQLite, said.logger()), 300*time.Millisecond)
 	defer cancel()
-	if _, err := acquire(waiting, second); err == nil {
+	if _, err := take(waiting, second); err == nil {
 		t.Error("two processes were allowed to migrate one file at the same time")
 	} else if !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("a wait ended by its context answered %v", err)
@@ -473,7 +473,7 @@ func TestASecondProcessCannotMigrateOneSQLiteFile(t *testing.T) {
 	if err := release(ctx); err != nil {
 		t.Fatalf("release: %v", err)
 	}
-	again, err := acquire(ctx, second)
+	again, err := take(ctx, second)
 	if err != nil {
 		t.Fatalf("the lock was not handed on after release: %v", err)
 	}
@@ -490,7 +490,7 @@ func TestAnInMemoryDatabaseHasNoSecondProcessToExclude(t *testing.T) {
 	// read-only root cannot be written at all.
 	t.Chdir(t.TempDir())
 	db := open(t, "sqlite://:memory:")
-	release, err := acquire(context.Background(), db)
+	release, err := take(context.Background(), db)
 	if err != nil {
 		t.Fatalf("acquire against an in-memory database: %v", err)
 	}
@@ -547,7 +547,7 @@ func TestAPoolOfOneIsRefusedRatherThanWaitedOn(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
 		defer cancel()
-		err = withLock(ctx, db, slog.Default(), func(context.Context) error { return nil })
+		err = withLock(ctx, db, slog.Default(), func(context.Context, *held) error { return nil })
 		if err == nil {
 			t.Fatal("a pool of one connection was accepted for a migration")
 		}
@@ -586,7 +586,7 @@ func TestTheLockOutlastsAServersIdleTimeout(t *testing.T) {
 		waiting := open(t, address)
 		ctx := t.Context()
 
-		release, err := acquire(ctx, holder)
+		release, err := take(ctx, holder)
 		if err != nil {
 			t.Fatalf("the first instance could not take the lock: %v", err)
 		}
@@ -595,7 +595,7 @@ func TestTheLockOutlastsAServersIdleTimeout(t *testing.T) {
 		// server released with the holder's session.
 		asking, cancel := context.WithTimeout(ctx, time.Second)
 		defer cancel()
-		if again, err := acquire(asking, waiting); err == nil {
+		if again, err := take(asking, waiting); err == nil {
 			_ = again(ctx)
 			t.Fatal("the holder's session was ended while idle and a waiting instance took the lock")
 		}
@@ -674,7 +674,7 @@ func TestSQLiteMigratesOnOneConnectionAndGetsItsPoolBack(t *testing.T) {
 
 	quiet := slog.New(slog.DiscardHandler)
 	var during int
-	if err := withLock(t.Context(), db, quiet, func(context.Context) error {
+	if err := withLock(t.Context(), db, quiet, func(context.Context, *held) error {
 		during = db.Stats().MaxOpenConnections
 		return nil
 	}); err != nil {
@@ -736,7 +736,7 @@ func TestALockLostPartWayFailsTheMigration(t *testing.T) {
 		ctx := t.Context()
 		quiet := slog.New(slog.DiscardHandler)
 
-		err := withLock(ctx, db, quiet, func(ctx context.Context) error {
+		err := withLock(ctx, db, quiet, func(ctx context.Context, _ *held) error {
 			return endHolder(ctx, killer)
 		})
 		if err == nil || !strings.Contains(err.Error(), "may have migrated at the same time") {
@@ -768,7 +768,7 @@ func endHolder(ctx context.Context, killer *database.DB) error {
 			return err
 		}
 		defer func() { _ = conn.Close() }()
-		name, err := namedLock(ctx, conn)
+		name, err := namedLock(ctx, conn, lockName)
 		if err != nil {
 			return err
 		}
@@ -781,4 +781,14 @@ func endHolder(ctx context.Context, killer *database.DB) error {
 		}
 	}
 	return nil
+}
+
+// take is acquire for a test that holds the migration lock and nothing beside
+// it.
+func take(ctx context.Context, db *database.DB) (unlock, error) {
+	lock, err := acquire(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	return lock.release, nil
 }

@@ -12,9 +12,12 @@ package migrate
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
+	"time"
 
 	"github.com/pressly/goose/v3"
 
@@ -87,12 +90,24 @@ func gooseDialect(e database.Engine) (goose.Dialect, error) {
 }
 
 // Up applies every outstanding migration, holding the lock while it does.
-func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
-	return withLock(ctx, db, logger, func(ctx context.Context) error {
+//
+// Where a migration is outstanding it also holds the schema change lock, from
+// before the first statement until after the last, which tells an instance
+// serving the database to stop. On a database holding a schema it then waits
+// notice before the first statement, for those instances to see the lock and
+// stop. A start with nothing to apply never takes the change lock, so a
+// replica starting beside others pauses none of them.
+func Up(ctx context.Context, db *database.DB, logger *slog.Logger, notice time.Duration) error {
+	return withLock(ctx, db, logger, func(ctx context.Context, lock *held) (failed error) {
 		before, err := goose.GetDBVersionContext(ctx, db.DB.DB)
 		if err != nil {
 			return fmt.Errorf("read schema version: %w", err)
 		}
+		stopChanging, err := changeSchema(ctx, db, lock, logger, before, goose.MaxVersion, notice)
+		if err != nil {
+			return err
+		}
+		defer func() { stopChanging(failed) }()
 		if err := goose.UpContext(ctx, db.DB.DB, "."); err != nil {
 			return upEnded(ctx, db.Server.Engine, before, err)
 		}
@@ -111,6 +126,120 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 		}
 		return nil
 	})
+}
+
+// changeSchema takes the schema change lock where a migration after before
+// and up to target is outstanding, records the change where the database
+// keeps that record, waits notice on a database holding a schema, and answers
+// what ends the change given how the upgrade ended. Where nothing is
+// outstanding it takes nothing.
+//
+// The record is removed when the upgrade succeeds, and on an engine whose
+// schema changes roll back with their transaction. On MySQL and MariaDB an
+// upgrade ending any other way leaves the schema part changed, so the record
+// stays, and every serving instance stays paused, until an upgrade succeeds
+// or the backup is restored.
+//
+// A release of the lock that fails is logged: the migration lock's release
+// follows on the same session, and reports a session lost part way.
+func changeSchema(ctx context.Context, db *database.DB, lock *held, logger *slog.Logger, before, target int64,
+	notice time.Duration) (func(error), error) {
+	nothing := func(error) {}
+	if target <= before {
+		return nothing, nil
+	}
+	// The library answers an error, not an empty list, where none is
+	// outstanding.
+	outstanding, err := goose.CollectMigrations(".", before, target)
+	if err != nil && !errors.Is(err, goose.ErrNoMigrationFiles) {
+		return nil, fmt.Errorf("list the outstanding migrations: %w", err)
+	}
+	if len(outstanding) == 0 {
+		return nothing, nil
+	}
+	return beginChange(ctx, db, lock, logger, before, notice)
+}
+
+// beginChange takes the schema change lock, records the change, and waits
+// notice on a database holding a schema, as changeSchema says.
+func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.Logger, before int64,
+	notice time.Duration) (func(error), error) {
+	release, err := lock.change(ctx)
+	if err != nil {
+		return nil, err
+	}
+	let := func() {
+		if err := releaseWithin(ctx, release); err != nil {
+			logger.Warn("could not release the schema change lock", "error", err)
+		}
+	}
+	if err := recordChange(ctx, db); err != nil {
+		let()
+		return nil, err
+	}
+	stop := func(failed error) {
+		partChanged := failed != nil && (db.Server.Engine == database.MySQL || db.Server.Engine == database.MariaDB)
+		if partChanged {
+			logger.Warn("the schema is left part changed, so every serving instance stays paused " +
+				"until an upgrade succeeds or the backup taken before it is restored")
+		} else if err := clearChange(ctx, db); err != nil {
+			logger.Warn("could not clear the record of the schema change", "error", err)
+		}
+		let()
+	}
+	if before != 0 && notice > 0 {
+		logger.Info("waiting for serving instances to stop before changing the schema", "wait", notice)
+		select {
+		case <-ctx.Done():
+			// Nothing has changed yet, on any engine.
+			stop(nil)
+			return nil, fmt.Errorf("stopped before changing the schema: %w", ctx.Err())
+		case <-time.After(notice):
+		}
+	}
+	return stop, nil
+}
+
+// ChangeTable is the record an upgrade keeps while it changes the schema,
+// which a release's migration makes and this reads and writes.
+const ChangeTable = "schema_change"
+
+// recordChange writes the record of an upgrade changing the schema, where the
+// database has the table for it: a database the release that made the table
+// has not yet upgraded has none.
+func recordChange(ctx context.Context, db *database.DB) error {
+	there, err := tableExists(ctx, db, ChangeTable)
+	if err != nil || !there {
+		return err
+	}
+	host, err := os.Hostname()
+	if err != nil || host == "" {
+		host = "an unnamed host"
+	}
+	by := fmt.Sprintf("process %d on %s", os.Getpid(), host)
+	if len(by) > database.NameWidth {
+		by = by[:database.NameWidth]
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO "`+ChangeTable+`" ("started_at", "started_by") VALUES (?, ?)`,
+		time.Now().UTC(), by); err != nil {
+		return fmt.Errorf("record the schema change: %w", err)
+	}
+	return nil
+}
+
+// clearChange removes every record of an upgrade changing the schema, once
+// the schema is whole. Bounded as a release is, whatever happened to ctx.
+func clearChange(ctx context.Context, db *database.DB) error {
+	clearing, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+	defer cancel()
+	there, err := tableExists(clearing, db, ChangeTable)
+	if err != nil || !there {
+		return err
+	}
+	if _, err := db.ExecContext(clearing, `DELETE FROM "`+ChangeTable+`"`); err != nil {
+		return fmt.Errorf("clear the record of the schema change: %w", err)
+	}
+	return nil
 }
 
 // refreshStatistics analyzes every table once migrations have changed the
@@ -175,7 +304,16 @@ func upFailed(engine database.Engine, before int64, err error) error {
 // holding the lock while it does. A test builds the schema a release shipped
 // with it.
 func UpTo(ctx context.Context, db *database.DB, logger *slog.Logger, version int64) error {
-	return withLock(ctx, db, logger, func(ctx context.Context) error {
+	return withLock(ctx, db, logger, func(ctx context.Context, lock *held) (failed error) {
+		before, err := goose.GetDBVersionContext(ctx, db.DB.DB)
+		if err != nil {
+			return fmt.Errorf("read schema version: %w", err)
+		}
+		stopChanging, err := changeSchema(ctx, db, lock, logger, before, version, 0)
+		if err != nil {
+			return err
+		}
+		defer func() { stopChanging(failed) }()
 		if err := goose.UpToContext(ctx, db.DB.DB, ".", version); err != nil {
 			return fmt.Errorf("apply migrations up to %d: %w", version, err)
 		}
@@ -216,7 +354,8 @@ func Version(ctx context.Context, db *database.DB) (int64, error) {
 // in terms of.
 const dbMaxOpen = "OPENPSIRT_DB_MAX_OPEN"
 
-func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func(context.Context) error) (failed error) {
+func withLock(ctx context.Context, db *database.DB, logger *slog.Logger,
+	fn func(context.Context, *held) error) (failed error) {
 	running.Lock()
 	defer running.Unlock()
 
@@ -251,12 +390,12 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 		}()
 	}
 
-	release, err := acquire(ctx, db)
+	lock, err := acquire(ctx, db)
 	if err != nil {
 		return err
 	}
 	defer func() {
-		err := releaseWithin(ctx, release)
+		err := releaseWithin(ctx, lock.release)
 		switch {
 		case err == nil:
 		case failed == nil:
@@ -271,7 +410,7 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger, fn func
 		}
 	}()
 
-	return fn(ctx)
+	return fn(ctx, lock)
 }
 
 // releaseWithin releases the migration lock within resetWait, whatever

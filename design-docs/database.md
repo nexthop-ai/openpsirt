@@ -24,7 +24,7 @@ The rest of the area:
 
 | Document | Covers |
 |---|---|
-| `design-docs/database-migrations.md` | Applying migrations, the baseline, release records, rehearsal, the migration lock |
+| `design-docs/database-migrations.md` | Applying migrations, the baseline, release records, rehearsal, the migration lock, serving during an upgrade |
 | `design-docs/database-upgrades.md` | What each release's upgrade migration does |
 | `design-docs/database-queries.md` | Query rules the engines impose: quoting, patterns, counts, recursion, collation, text, bulk inserts |
 | `design-docs/database-transactions.md` | Replicas, retryable transactions, reads a write depends on, absence and failure |
@@ -64,7 +64,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Location | Reason |
 |---|---|
 | Schema migrations | Data-definition language differs |
-| The migration lock | Each engine spells advisory locking differently |
+| The migration lock and the schema change lock | Each engine spells advisory locking differently, and asking who holds a lock (`design-docs/database-migrations.md` § Instances during an upgrade) |
 | Connection setup | Driver-specific settings, including how PostgreSQL's statements are sent (§ Statement preparation) and the settings its sessions start with (§ PostgreSQL session settings) |
 | Recognizing what an engine reports | Each driver has its own error type. Three questions, each silent when wrong: a lost race worth retrying (REQ-71), a unique constraint refusing a duplicate, a failure from the engine rather than an impossible request |
 | Subtracting two moments | No portable expression yields seconds: one engine returns an interval, one a number of days |

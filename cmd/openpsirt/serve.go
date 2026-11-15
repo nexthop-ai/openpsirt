@@ -21,6 +21,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/directory"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/issuedate"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
@@ -28,6 +29,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/scanner"
+	"github.com/nexthop-ai/openpsirt/internal/schema"
 	"github.com/nexthop-ai/openpsirt/internal/signing"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 	"github.com/nexthop-ai/openpsirt/internal/upstream"
@@ -195,19 +197,42 @@ func (p passes) loops() []loop {
 }
 
 // listening is the HTTP server once its port is open, answering through
-// whichever handler it holds now.
+// whichever handler the phase it is in holds.
 //
 // Where the process applies the schema itself, the port opens before it does,
 // answering through the handler for that phase, and the router replaces it
 // once the start is complete. A platform that asks whether the process is
 // alive then hears that it is while a long migration runs, rather than ending
 // it part way.
+//
+// Once the router answers, another instance changing the schema pauses it:
+// every request is answered as the start answers while it migrates, and every
+// request the router was answering has its context ended, so its transaction
+// rolls back rather than committing against a schema being changed.
 type listening struct {
-	srv     *http.Server
-	handler atomic.Pointer[http.Handler]
+	srv   *http.Server
+	phase atomic.Pointer[phase]
+	// router answers once the start is complete, and again after a pause.
+	router http.Handler
+	// upgrading answers while a schema is applied, here or elsewhere.
+	upgrading http.Handler
+	// end ends the requests of the phase the router answers in.
+	end context.CancelCauseFunc
 	// failed carries a failure to serve after the port opened.
 	failed chan error
 }
+
+// phase is a handler and how long the requests it answers last.
+type phase struct {
+	handler http.Handler
+	// ended ends every request this phase answers, once the phase is over.
+	// Nil where requests outlast it: one already answered while the port
+	// opens is finished with the handler it began with.
+	ended context.Context
+}
+
+// errSchemaChanging is why a request the router was answering ended.
+var errSchemaChanging = errors.New("another instance is changing the schema")
 
 // listen opens the port and serves through first until answer replaces it.
 //
@@ -218,12 +243,10 @@ func listen(cfg config.Config, logger *slog.Logger, first http.Handler) (*listen
 	if err != nil {
 		return nil, err
 	}
-	l := &listening{failed: make(chan error, 1)}
-	l.handler.Store(&first)
+	l := &listening{failed: make(chan error, 1), upgrading: httpapi.Upgrading()}
+	l.phase.Store(&phase{handler: first})
 	l.srv = &http.Server{
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			(*l.handler.Load()).ServeHTTP(w, r)
-		}),
+		Handler: http.HandlerFunc(l.serve),
 		// Without these a client can hold a connection, a goroutine and a file
 		// descriptor open indefinitely by sending headers slowly. Enough such
 		// connections exhaust every replica while the liveness probe keeps
@@ -243,10 +266,120 @@ func listen(cfg config.Config, logger *slog.Logger, first http.Handler) (*listen
 	return l, nil
 }
 
-// answer replaces the handler every request after this one reaches. A request
-// already being answered finishes with the handler it began with.
+// serve answers a request through the current phase. A request the router
+// answers ends when its phase does, and a failure it answers after that, or
+// no answer, is replaced by the upgrading one.
+func (l *listening) serve(w http.ResponseWriter, r *http.Request) {
+	p := l.phase.Load()
+	if p.ended == nil {
+		p.handler.ServeHTTP(w, r)
+		return
+	}
+	ctx, cancel := context.WithCancelCause(r.Context())
+	defer cancel(nil)
+	stop := context.AfterFunc(p.ended, func() { cancel(context.Cause(p.ended)) })
+	defer stop()
+	answer := &diverting{ResponseWriter: w, r: r, ended: p.ended, upgrading: l.upgrading}
+	p.handler.ServeHTTP(answer, r.WithContext(ctx))
+	answer.finish()
+}
+
+// answer makes handler the router, which every request after this one
+// reaches. A request already being answered finishes with the handler it
+// began with.
 func (l *listening) answer(handler http.Handler) {
-	l.handler.Store(&handler)
+	l.router = handler
+	l.open()
+}
+
+// open starts a phase the router answers in.
+func (l *listening) open() {
+	ended, end := context.WithCancelCause(context.Background())
+	l.end = end
+	l.phase.Store(&phase{handler: l.router, ended: ended})
+}
+
+// pause answers every request as upgrading and ends the ones the router was
+// answering.
+func (l *listening) pause() {
+	l.phase.Store(&phase{handler: l.upgrading})
+	if l.end != nil {
+		l.end(errSchemaChanging)
+	}
+}
+
+// resume answers through the router again.
+func (l *listening) resume() {
+	l.open()
+}
+
+// diverting is the response to a request the router answers. Where the
+// phase ended and the handler's answer is a failure, or the handler wrote
+// nothing, the upgrading answer is written instead: its failure is the ending
+// of its context. A success is written as the handler wrote it, since what it
+// did took effect.
+type diverting struct {
+	http.ResponseWriter
+	r         *http.Request
+	ended     context.Context
+	upgrading http.Handler
+	begun     bool
+	diverted  bool
+}
+
+// through reports whether the handler's answer, beginning with status code,
+// is the one written, deciding as the answer begins.
+func (d *diverting) through(code int) bool {
+	if !d.begun {
+		d.begun = true
+		if code >= http.StatusInternalServerError && d.ended.Err() != nil {
+			d.divert()
+		}
+	}
+	return !d.diverted
+}
+
+// divert writes the upgrading answer in place of the handler's.
+func (d *diverting) divert() {
+	d.begun, d.diverted = true, true
+	// The handler's headers belong to the answer dropped.
+	header := d.Header()
+	for name := range header {
+		delete(header, name)
+	}
+	d.upgrading.ServeHTTP(d.ResponseWriter, d.r)
+}
+
+// finish answers a request whose handler wrote nothing and whose phase ended.
+func (d *diverting) finish() {
+	if !d.begun && d.ended.Err() != nil {
+		d.divert()
+	}
+}
+
+func (d *diverting) WriteHeader(code int) {
+	if code < http.StatusOK {
+		// An informational answer precedes the answer, and decides nothing.
+		if !d.begun {
+			d.ResponseWriter.WriteHeader(code)
+		}
+		return
+	}
+	if d.through(code) {
+		d.ResponseWriter.WriteHeader(code)
+	}
+}
+
+func (d *diverting) Write(b []byte) (int, error) {
+	if d.through(http.StatusOK) {
+		return d.ResponseWriter.Write(b)
+	}
+	return len(b), nil
+}
+
+// Unwrap lets a response controller reach the connection's writer.
+func (d *diverting) Unwrap() http.ResponseWriter {
+	return d.ResponseWriter
 }
 
 // abandon closes the port of a start that did not complete, and answers the
@@ -261,33 +394,174 @@ func (l *listening) abandon(cfg config.Config, logger *slog.Logger, err error) e
 	return err
 }
 
+// sighting is the standing of the schema, as it moved.
+type sighting struct {
+	standing schema.Standing
+	// applied is the version applied, and carried the one this build carries.
+	applied, carried int64
+}
+
+// lookWithin bounds one look at the schema. A look that fails or overruns is
+// read as a change, so it is shorter than the notice an upgrade gives.
+const lookWithin = 2 * time.Second
+
+// watchSchema answers what looks at the schema every interval until its
+// context ends, sending each standing that differs from the one before. The
+// first compared against is Serves, which the start established.
+//
+// A look that fails is read as Changes: an instance that cannot tell whether
+// the schema is changing does not serve it. The failure is logged once until
+// a look succeeds.
+func watchSchema(logger *slog.Logger, look func(context.Context) (schema.Standing, int64, int64, error),
+	every time.Duration) func(context.Context) <-chan sighting {
+	return func(ctx context.Context) <-chan sighting {
+		seen := make(chan sighting)
+		go func() {
+			last, failing := schema.Serves, false
+			tick := time.NewTicker(every)
+			defer tick.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-tick.C:
+				}
+				asking, cancel := context.WithTimeout(ctx, lookWithin)
+				standing, applied, carried, err := look(asking)
+				cancel()
+				if ctx.Err() != nil {
+					return
+				}
+				switch {
+				case err != nil:
+					if !failing {
+						logger.Warn("could not ask whether the schema is changing: not serving until it can",
+							"error", err)
+					}
+					failing, standing = true, schema.Changes
+				default:
+					failing = false
+				}
+				if standing == last {
+					continue
+				}
+				last = standing
+				select {
+				case seen <- sighting{standing: standing, applied: applied, carried: carried}:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+		return seen
+	}
+}
+
 // serveBeside serves, with whatever start begins running beside the server
 // stopped and waited for on every way out.
 //
 // It shuts down when parent ends, which is a stop signal in a running process.
+//
+// While it serves, watch reports the schema's standing. Where another
+// instance changes the schema, it pauses: requests are answered as upgrading,
+// the ones being answered end, and the passes stop. It serves again when the
+// schema is this build's, starting the passes again once the ones stopped have
+// ended. Where a later release has upgraded the schema, or it has fallen
+// behind this build with nothing changing it, it stops, and says so in its
+// error. A nil watch reports nothing.
 func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger, server *listening,
-	start func(context.Context) *sync.WaitGroup) error {
+	start func(context.Context) *sync.WaitGroup, watch func(context.Context) <-chan sighting) error {
 	ctx, stop := context.WithCancel(parent)
 	defer stop()
 
+	var standings <-chan sighting
+	if watch != nil {
+		standings = watch(ctx)
+	}
 	// Reading stops when the signal arrives, before the server drains, so a
 	// scan is not picked up during the seconds we are on our way out.
-	workers := start(ctx)
+	running, stopRunning := context.WithCancel(ctx)
+	defer func() { stopRunning() }()
+	workers := start(running)
 	srv := server.srv
 	errs := server.failed
-
-	select {
-	case err := <-errs:
-		// The workers are already running, each of them beginning with a
-		// timer that fires at once. Returning without waiting would leave
-		// them mid-query while the caller's deferred close takes the database
-		// away, turning an orderly failure to serve into failed scans and
-		// jobs retried for no reason. Stopping them is what ctx's cancel
-		// does; waiting is what this adds.
-		stop()
-		return errors.Join(err, workersStopped(workers, cfg, logger))
-	case <-ctx.Done():
+	// paused is whether the router is set aside; drained closes once the
+	// passes a pause stopped have ended, and is nil while none are ending.
+	// Two copies of one pass never run at once.
+	paused, wanted := false, false
+	var drained <-chan struct{}
+	var stopping error
+	resume := func(version int64) {
+		running, stopRunning = context.WithCancel(ctx) //nolint:gosec // G118: the deferred call above cancels whichever context is current
+		workers = start(running)
+		server.resume()
+		paused, wanted = false, false
+		logger.Info("the schema is this build's again: serving", "version", version)
 	}
+	var version int64
+
+serving:
+	for {
+		select {
+		case err := <-errs:
+			// The workers are already running, each of them beginning with a
+			// timer that fires at once. Returning without waiting would leave
+			// them mid-query while the caller's deferred close takes the database
+			// away, turning an orderly failure to serve into failed scans and
+			// jobs retried for no reason. Stopping them is what ctx's cancel
+			// does; waiting is what this adds.
+			stopRunning()
+			stop()
+			return errors.Join(err, workersStopped(workers, cfg, logger))
+		case <-ctx.Done():
+			break serving
+		case <-drained:
+			drained = nil
+			if wanted {
+				resume(version)
+			}
+		case seen := <-standings:
+			switch seen.standing {
+			case schema.Changes:
+				wanted = false
+				if paused {
+					continue
+				}
+				server.pause()
+				stopRunning()
+				drained = ended(workers)
+				paused = true
+				logger.Warn("another instance is changing the schema: not serving until it is this build's",
+					"applied", seen.applied, "carried", seen.carried)
+			case schema.Serves:
+				if !paused {
+					continue
+				}
+				version = seen.applied
+				if drained != nil {
+					wanted = true
+					continue
+				}
+				resume(version)
+			case schema.Superseded, schema.Behind:
+				server.pause()
+				stopRunning()
+				stopping = fmt.Errorf("the database is at schema version %d, which a later release "+
+					"applied while this build served it, and this build carries %d: a database is only "+
+					"ever upgraded, so this build stops and the release that upgraded it serves it",
+					seen.applied, seen.carried)
+				if seen.standing == schema.Behind {
+					stopping = fmt.Errorf("the database is at schema version %d, behind the %d this "+
+						"build carries, and nothing is changing it: this build stops, and its next "+
+						"start migrates it or refuses it", seen.applied, seen.carried)
+				}
+				logger.Error("the schema is no longer this build's: stopping", "applied", seen.applied,
+					"carried", seen.carried)
+				break serving
+			}
+		}
+	}
+	stopRunning()
 
 	// Let in-flight requests finish rather than cutting them off.
 	logger.Info("shutting down", "grace", cfg.ShutdownGrace)
@@ -319,7 +593,7 @@ func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger,
 	if shutdownErr != nil {
 		shutdownErr = fmt.Errorf("shutdown: %w", shutdownErr)
 	}
-	if err := errors.Join(shutdownErr, workerErr); err != nil {
+	if err := errors.Join(stopping, shutdownErr, workerErr); err != nil {
 		return err
 	}
 	logger.Info("stopped")
@@ -340,19 +614,24 @@ func workersStopped(workers *sync.WaitGroup, cfg config.Config, logger *slog.Log
 	return fmt.Errorf("background work did not stop within %s", cfg.ShutdownGrace)
 }
 
+// ended closes once a group has finished.
+func ended(group *sync.WaitGroup) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		group.Wait()
+		close(done)
+	}()
+	return done
+}
+
 // waitFor waits for a group, and reports whether it finished in time.
 //
 // The goroutine it leaks where the wait times out is deliberate and bounded by
 // the process: it ends when the process does, which is a moment later, and the
 // alternative is a shutdown with no end at all.
 func waitFor(group *sync.WaitGroup, grace time.Duration) bool {
-	done := make(chan struct{})
-	go func() {
-		group.Wait()
-		close(done)
-	}()
 	select {
-	case <-done:
+	case <-ended(group):
 		return true
 	case <-time.After(grace):
 		return false

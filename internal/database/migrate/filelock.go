@@ -36,7 +36,10 @@ import (
 // engines, naming the holder about once a minute. The holder writes its
 // process and host into the file as it takes the lock, because the operating
 // system's lock names nobody.
-func sqliteLock(ctx context.Context, db *database.DB) (unlock, error) {
+//
+// The schema change lock is a second file beside the database, locked the
+// same way while migrations are applied.
+func sqliteLock(ctx context.Context, db *database.DB) (*held, error) {
 	path, err := sqliteFile(ctx, db)
 	if err != nil {
 		return nil, err
@@ -44,15 +47,28 @@ func sqliteLock(ctx context.Context, db *database.DB) (unlock, error) {
 	if path == "" {
 		// An in-memory database, which belongs to this process alone. There
 		// is no file to lock and no second process that could reach it.
-		return func(context.Context) error { return nil }, nil
+		nothing := func(context.Context) error { return nil }
+		return &held{release: nothing, change: func(context.Context) (unlock, error) { return nothing, nil }}, nil
 	}
-	return lockFile(ctx, path+lockSuffix, LoggerFrom(ctx))
+	release, err := lockFile(ctx, path+lockSuffix, LoggerFrom(ctx))
+	if err != nil {
+		return nil, err
+	}
+	return &held{
+		release: release,
+		change: func(ctx context.Context) (unlock, error) {
+			return changeFile(ctx, path+changeSuffix, LoggerFrom(ctx))
+		},
+	}, nil
 }
 
 // lockSuffix names the lock beside the database rather than locking the
 // database file itself, so nothing here competes with SQLite's own locking of
-// that file.
-const lockSuffix = ".migrate-lock"
+// that file. changeSuffix names the schema change lock beside it.
+const (
+	lockSuffix   = ".migrate-lock"
+	changeSuffix = ".schema-change"
+)
 
 // sqliteFile asks the connection which file it is working on.
 //

@@ -174,7 +174,7 @@ func TestMigratingReadsNothingFromTheWorkingDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = db.Close() })
-	if err := migrate.Up(t.Context(), db, quiet()); err != nil {
+	if err := migrate.Up(t.Context(), db, quiet(), 0); err != nil {
 		t.Fatalf("a file in the working directory stopped the migration: %v", err)
 	}
 	version, err := migrate.Version(t.Context(), db)

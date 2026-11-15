@@ -14,7 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/schema"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 // roleV0100 is the person and the product of a grant a v0.10.0 database
@@ -53,7 +53,7 @@ func (g roleV0100) holdsTheLongest(t *testing.T, ctx context.Context, db *databa
 	if longest == "" {
 		t.Fatal("no role was found, so this checked nothing")
 	}
-	if err := schema.Up(ctx, db, quiet()); err != nil {
+	if err := migrate.Up(ctx, db, quiet(), 0); err != nil {
 		t.Fatalf("migrate to the latest: %v", err)
 	}
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
