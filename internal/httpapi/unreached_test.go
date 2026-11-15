@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -216,16 +218,30 @@ func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 // TestReleaseNotesNameNothingNobodyHasAnnounced drives the one route whose
 // output is meant to be pasted into a customer release note.
 //
-// It writes text/markdown and nothing reached it. An undisclosed finding is
-// counted there and never named: the document is the thing that leaves this
-// deployment, so the rule that governs it is the one that governs an advisory.
+// It writes text/markdown. An undisclosed fix is counted there and never
+// named: the document is the thing that leaves this deployment, so the rule
+// that governs it is the one that governs an advisory. The later build lacks
+// the undisclosed flaw the earlier one carries, so there is a fix to leave
+// out, and asking for undisclosed findings names it.
 func TestReleaseNotesNameNothingNobodyHasAnnounced(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		embargoed := r.Embargoed(t)
+		r.ScannedAlso(t, "mellanox", "3.7.0")
+		embargoed := recordedIn(t, r, "broadcom", "mellanox")
+		// Fixed in the later build, which is what a closure with that
+		// reason records; how a scan derives one has tests of its own.
+		later := r.BuildOf(t, httpapitest.Build{Product: "mine", BranchOrTag: "master", Variant: "mellanox"})
+		if _, err := r.DB.DB.NewUpdate().Table("finding").
+			Set(`"closed_at" = ?`, time.Now().UTC()).
+			Set(`"closed_because" = ?`, finding.Fixed).
+			Where(`"build_id" = ?`, later).
+			Where(`"vulnerability_id" IN (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`, embargoed).
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
 
 		const notes = "/v1/products/mine/comparison/notes" +
-			"?from=master&from_variant=broadcom&to=master&to_variant=broadcom"
+			"?from=master&from_variant=broadcom&to=master&to_variant=mellanox"
 
 		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, notes, "")
 		if got.Code != http.StatusOK {
@@ -234,11 +250,22 @@ func TestReleaseNotesNameNothingNobodyHasAnnounced(t *testing.T) {
 		if kind := got.Header().Get("Content-Type"); !strings.HasPrefix(kind, "text/markdown") {
 			t.Errorf("release notes came back as %q, want text/markdown", kind)
 		}
-		// An undisclosed fix is counted and never named. That is the whole
-		// rule this document is under: it is the thing that leaves the
-		// deployment, so what governs it is what governs an advisory.
-		if strings.Contains(got.Body.String(), embargoed) {
-			t.Errorf("release notes name an undisclosed issue: %s", got.Body.String())
+		body := got.Body.String()
+		if strings.Contains(body, embargoed) {
+			t.Errorf("release notes name an undisclosed issue: %s", body)
+		}
+		const leftOut = "One further fix is not listed here, for a finding that has not been disclosed."
+		if !strings.Contains(body, leftOut) {
+			t.Errorf("release notes do not count the undisclosed fix they leave out: %s", body)
+		}
+
+		// Asked for, the same fix is named, so its absence above is the rule
+		// at work rather than a comparison that fixed nothing.
+		named := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
+			notes+"&include_undisclosed=true", "")
+		if named.Code != http.StatusOK || !strings.Contains(named.Body.String(), embargoed) {
+			t.Errorf("release notes asked to include undisclosed fixes answered %d without %s: %s",
+				named.Code, embargoed, named.Body.String())
 		}
 
 		// And somebody holding nothing on the product does not get them.
@@ -248,6 +275,30 @@ func TestReleaseNotesNameNothingNobodyHasAnnounced(t *testing.T) {
 				refusedFor.Code)
 		}
 	})
+}
+
+// recordedIn records an undisclosed flaw against the seeded library in each
+// variant of master, and answers its identifier.
+func recordedIn(t *testing.T, r *httpapitest.Reach, variants ...string) string {
+	t.Helper()
+	builds := make([]string, 0, len(variants))
+	for _, v := range variants {
+		builds = append(builds, `{"branch_or_tag":"master","variant":"`+v+`"}`)
+	}
+	got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+		`{"builds":[`+strings.Join(builds, ",")+`],`+
+			`"summary":"The management socket answers before anyone has authenticated.",`+
+			`"severity":"high","component":"libnl-3-200"}`)
+	if got.Code != http.StatusCreated {
+		t.Fatalf("recording a flaw answered %d: %s", got.Code, got.Body.String())
+	}
+	var recorded struct {
+		Identifier string `json:"identifier"`
+	}
+	if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
+		t.Fatal(err)
+	}
+	return recorded.Identifier
 }
 
 // TestClosingAFindingByHandGoesThroughTheRouteAndIsRefusedWithoutTheRight
