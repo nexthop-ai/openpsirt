@@ -269,9 +269,10 @@ func TestAV0100DatabaseHoldingEverySeedUpgradesToV0110(t *testing.T) {
 		}
 		dbtest.MigrateTo(t, db, v0110)
 
-		// Every issue says what sort of issue it is: a flaw where somebody
-		// recorded a finding of it here, and a published vulnerability
-		// otherwise.
+		// The upgraded schema is the shape the release declares, which every
+		// subtest below reads it in, since none of them changes it. Every
+		// issue says what sort of issue it is: a flaw where somebody recorded
+		// a finding of it here, and a published vulnerability otherwise.
 		t.Run("AV0100DatabaseUpgradesToV0110", func(t *testing.T) {
 			declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
 			issues.kindsAre(t, ctx, db)
@@ -294,13 +295,11 @@ func TestAV0100DatabaseHoldingEverySeedUpgradesToV0110(t *testing.T) {
 		// A claim and everything beside it reads back under v0.11.0's names
 		// in the shape the release declares.
 		t.Run("AV0100DatabaseTakesTheV0110TriageNames", func(t *testing.T) {
-			declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
 			triage.renamedAs(t, ctx, db)
 		})
 		// A standing rule, a supplier, a label and VEX each way read back
 		// under v0.11.0's names in the shape the release declares.
 		t.Run("AV0100DatabaseTakesTheV0110RuleNames", func(t *testing.T) {
-			declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
 			rules.renamedAs(t, ctx, db)
 		})
 		// Every stored word v0.11.0 renames reads in v0.11.0's spelling.
@@ -311,7 +310,6 @@ func TestAV0100DatabaseHoldingEverySeedUpgradesToV0110(t *testing.T) {
 		// under v0.11.0's names in the shape the release declares, with new
 		// rows numbered after the old.
 		t.Run("AV0100DatabaseTakesTheV0110IncidentNames", func(t *testing.T) {
-			declarationsAreBuilt(t, ctx, db, migrations.StatementsV0110(db.Server.Engine))
 			incidents.renamedAs(t, ctx, db)
 			incidents.numberedAfter(t, ctx, db)
 		})
