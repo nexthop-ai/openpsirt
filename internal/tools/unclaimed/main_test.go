@@ -135,3 +135,14 @@ func keys(named map[string]bool) []string {
 	}
 	return out
 }
+
+func TestAnIdentifierNamingNoRequirementIsAStray(t *testing.T) {
+	rows := map[string]bool{canonical("REQ-41"): true}
+	got := straysIn("sign-in (REQ-41), the proxy (ACC-19), a dropped row (REQ-98), REQ-041 again", rows)
+	if want := []string{"ACC-19", "REQ-98"}; !slices.Equal(got, want) {
+		t.Errorf("the strays read as %q, want %q", got, want)
+	}
+	if got := straysIn("CVE-2024-1234, SHA-256 and CWE-79 are not decisions", rows); len(got) != 0 {
+		t.Errorf("identifiers of other schemes read as strays: %q", got)
+	}
+}

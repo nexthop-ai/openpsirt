@@ -119,7 +119,7 @@ endif
 
 # The four servers the test URLs point at, started, waited for, and written
 # into local.mk. Running against every engine is ordinary development here
-# rather than something CI does afterwards (DAT-12), so a machine that can run
+# rather than something CI does afterwards (REQ-71), so a machine that can run
 # the suite properly is one command rather than a setup document followed by
 # hand — and a document followed by hand is how three of four engines end up
 # unconfigured while the suite reports green.
