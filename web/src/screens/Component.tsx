@@ -89,9 +89,8 @@ function pickPackage(row: Build, asked: string): Package | undefined {
 }
 
 // One decision about many issues at this component, which is the answer where
-// no version fixes them. The screen was built, works, and had no link to it
-// anywhere in the application: this page is where the question is asked, so
-// this is where the way to it belongs.
+// no version fixes them. This page is where the question is asked, so this is
+// where the way to it belongs.
 //
 // The package's version, ecosystem and namespace travel with the name, because
 // a build can hold one name as more than one component.
@@ -199,12 +198,10 @@ export function Component() {
 
   const sameVersion = rows.filter((row) => row.version === here.version);
   // The index the package is published on, as the server worked it out. This
-  // screen had a table of its own in a second language, with a different
-  // membership and different answers for the same identifier — it sent every
-  // Debian-family package to Debian's tracker, so an Ubuntu package's link
-  // landed on a record for different code with a different version history and
-  // a different advisory status, while the server's own link for the same
-  // finding went to Launchpad. A link that lands on a record for the wrong
+  // screen holds no table of its own: a second table answers differently for
+  // the same identifier — an Ubuntu package sent to Debian's tracker lands on
+  // a record for different code with a different version history and a
+  // different advisory status. A link that lands on a record for the wrong
   // thing costs more than no link, because it is followed before it is
   // disbelieved.
   const link = pkg.package_page_url ?? null;

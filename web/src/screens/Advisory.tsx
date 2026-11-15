@@ -170,8 +170,8 @@ function Title({ advisory, title }: { advisory: string; title: string }) {
 
 // What the advisory says: the title, the flaws it names, and naming another.
 //
-// One panel, because the three are one act. Split, the title's own label sat
-// under a heading of the same word.
+// One panel, because the three are one act, and split, the title's own label
+// would sit under a heading of the same word.
 function Says({ advisory, title, covers }: { title: string; advisory: string; covers: Covered[] }) {
   const [product, setProduct] = useState("");
   const [flaw, setFlaw] = useState("");

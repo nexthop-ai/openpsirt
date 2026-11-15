@@ -21,9 +21,10 @@ const WINDOWS = [90, 365, 3650] as const;
 
 // The advisories published, and the ones published twice.
 //
-// Answered per flaw until now. That is the right shape for somebody about
-// to publish a revision — has one gone out, and is what is out still what we
-// would generate — and the wrong shape for the question a period asks.
+// Answered per period. Per-flaw history is on the flaw, which is the right
+// shape for somebody about to publish a revision — has one gone out, and is
+// what is out still what we would generate — and the wrong shape for the
+// question a period asks.
 //
 // Advisories are about flaws in our own product, recorded here by hand.
 // Known issues in third-party components are tracked and fixed rather than

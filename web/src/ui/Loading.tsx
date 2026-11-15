@@ -3,14 +3,13 @@
 
 // The placeholder a screen shows while it is waiting.
 //
-// One component rather than the sentence typed out thirty-nine times in four
-// spellings. Nothing about it is clever: the point is that a screen which
-// changes how waiting looks changes it everywhere, and that the one thing this
-// has to get right is announced rather than left to a reader who cannot see
-// the page.
+// One component rather than a sentence typed out on every screen. Nothing
+// about it is clever: the point is that a change to how waiting looks reaches
+// every screen, and that the one thing this has to get right is announced
+// rather than left to a reader who cannot see the page.
 //
 // `inline` is for waiting inside a line of text rather than in place of a
-// block, which is the one real variation the thirty-nine had between them.
+// block, which is the one real variation between screens.
 //
 // A mark that moves sits beside the word. The word alone is one line of faint
 // text on a page that is otherwise still, and a page that is still reads as a

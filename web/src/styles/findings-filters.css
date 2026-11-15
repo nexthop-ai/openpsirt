@@ -6,10 +6,9 @@
 
 /* ---------- the findings list's filters ---------- */
 
-/* The panel: groups side by side, each a titled set of labeled controls. It
-   replaced a flat run of boxes where half the filters were identified only by
-   their values — which is how two of the most-asked-for ones sat on screen
-   and were reported missing. */
+/* The panel: groups side by side, each a titled set of labeled controls, so
+   every filter is identified by its title as well as its values; a filter
+   identified only by its values reads as missing. */
 .filterpanel {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
@@ -291,9 +290,8 @@
   width: auto;
 }
 
-/* A checkbox and its word. The class was in the markup and in no stylesheet —
-   it drew correctly only because the panel it used to sit in was a flex row
-   with a gap, so the moment it moved the box and its label ran together. */
+/* A checkbox and its word, laid out by its own rule so the box and its label
+   stay apart in whatever container holds them. */
 .check {
   display: flex;
   align-items: center;

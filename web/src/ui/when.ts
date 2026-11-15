@@ -120,10 +120,10 @@ export function since(moment: string | null | undefined, now: Date = new Date())
 
 // lasted is how long something took, between two stored moments.
 //
-// A run says when it started and when it finished and the screen drew only the
-// second, so "did the nightly scan take four minutes or four hours" — the
-// question somebody asks when a build is late — had no answer on the page
-// about that run. Seconds are said outright below a minute, because a scan
+// A run says when it started and when it finished, and the time between
+// answers "did the nightly scan take four minutes or four hours" — the
+// question somebody asks when a build is late — on the page about that run.
+// Seconds are said outright below a minute, because a scan
 // that took nine seconds and one that took fifty are different things and
 // "0 minutes" says neither.
 export function lasted(from: string | null | undefined, to: string | null | undefined): string {

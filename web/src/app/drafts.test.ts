@@ -53,8 +53,8 @@ describe("drafts", () => {
     // The control that covers a session which quietly expired rather than
     // being signed out of. Same browser, same screen, different person.
     //
-    // The identity in the key stopped Ana's text being read back into Ben's
-    // form; it did not stop the text being in the storage, which outlives
+    // The identity in the key stops Ana's text being read back into Ben's
+    // form; it does not stop the text being in the storage, which outlives
     // every session and needs no credential to read. So somebody signing in
     // takes away what is not theirs, and Ana's draft does not come back when
     // she does.
@@ -68,8 +68,8 @@ describe("drafts", () => {
 
   it("forgets a draft nobody came back to", () => {
     // Browser storage outlives every session, so text about an undisclosed
-    // finding written on a shared machine sat there for whoever opened the
-    // tools next. A draft has an age now.
+    // finding written on a shared machine would be there for whoever opens
+    // the tools next. A draft has an age.
     belongTo("oidc:ana");
     keep("revise:7", "started before the meeting");
     const key = theOnlyKey();

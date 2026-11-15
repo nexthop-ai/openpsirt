@@ -39,7 +39,7 @@ export type SortWord = NonNullable<
 
 // The orders this list offers as column headers, by the column they sit under.
 //
-// Four of the six. The other two are in the order control above the list:
+// The orders with no column are in the order control above the list:
 // `urgency` has no column because it is composed from four signals, and `age`
 // has none because the table is already wider than a laptop.
 export const SORTS = {
@@ -52,12 +52,11 @@ export const SORTS = {
 
 // Every order, by the word a reader picks it by.
 //
-// All six, checked against the server's own enum: an order the server gains
+// Every one, checked against the server's own enum: an order the server gains
 // and this list does not offer is a compile error here rather than a word
 // nobody can reach. The list is ordered by urgency when nothing is asked —
-// the tool's own ranking, and what REQ-32 exists for — and that was the one
-// order with no name on screen and no way back to it once a column header had
-// been clicked.
+// the tool's own ranking, and what REQ-32 exists for — and it is named here
+// so there is a way back to it once a column header has been clicked.
 export const ORDERS = {
   urgency: "Urgency",
   severity: "Severity",
@@ -84,10 +83,9 @@ export const BY_DEFAULT: SortWord = "urgency";
 // The orders that mean "least first" on the first ask.
 //
 // Most of them are "most first": the worst severity, the highest likelihood,
-// the widest reach. Two are not, and both were opening at the end nobody
-// wanted — Due sorted the furthest-away deadline first, which is the answer to
-// a question nobody asks, and Age is a question about what has sat here
-// longest.
+// the widest reach. Due and Age open least first: the soonest deadline, since
+// the furthest-away one first answers a question nobody asks, and the oldest
+// finding, since Age is a question about what has sat here longest.
 export const LEAST_FIRST: readonly SortWord[] = ["deadline", "age"];
 
 // Work nobody holds and nobody has decided, as filters on this list.
@@ -180,8 +178,8 @@ export function withParam(params: URLSearchParams, key: string, value: string): 
 // withEach is several filters changed in one act.
 //
 // Two `withParam` calls in a row each build their change from the same
-// parameters, so the second writes over the first — which is why unticking a
-// box that also had to clear a shortcut could not turn the box off.
+// parameters, so the second writes over the first: a box that also clears a
+// shortcut is unticked in one act.
 export function withEach(
   params: URLSearchParams,
   changes: Record<string, string>,
@@ -623,10 +621,9 @@ export function findingsPageKey(
 // At the largest page there is no room to widen, because the server returns at
 // most that many in one request. The walk then ends at the page edge rather
 // than asking twice, which is the honest outcome: one request answers, or it
-// does not — and the window is the page itself, unmoved. Widening backward
-// alone shifted it back a row, so the last row of every page fell outside its
-// own window; the finding screen locates itself in the window by identity, so
-// it found nothing and the walk vanished at the largest page size.
+// does not — and the window is the page itself, unmoved. The finding screen
+// locates itself in the window by identity, so the last row of the page has
+// to stay inside it, which widening backward alone would shift it out of.
 export function windowFor(offset: number, limit: number): { offset: number; limit: number } {
   if (limit >= LIST_MOST) return { offset, limit: LIST_MOST };
   const start = Math.max(0, offset - 1);

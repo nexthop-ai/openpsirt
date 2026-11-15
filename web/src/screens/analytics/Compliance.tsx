@@ -25,8 +25,8 @@ export function plainlyLate(at: Parameters<typeof findingsPath>[0]): string {
 
 // The work that met the dates policy set for it, and the work that did not.
 //
-// The question a manager asks first, and it was answered by one figure with
-// nothing behind it. A single percentage cannot be acted on: it does not say
+// The question a manager asks first, answered with what is behind the figure,
+// because a single percentage cannot be acted on: it does not say
 // which severity is slipping, how much of the shortfall was deliberate, or what
 // is late right now as against what was late once.
 //
@@ -40,8 +40,8 @@ export function Compliance() {
   const scope = scopeQuery(at);
   const product = at.product ?? "";
   const [params] = useSearchParams();
-  // No window by default, which is the lifetime figure this has always
-  // answered. A period is what a quarterly review or a financial year asks
+  // No window by default, which is the lifetime figure. A period is what a
+  // quarterly review or a financial year asks
   // for, and it bounds what closed in it — what is open is always now.
   const period = periodAsked(params);
   const when = asked(period, 0);

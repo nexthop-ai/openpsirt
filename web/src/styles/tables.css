@@ -108,7 +108,7 @@ th.num {
 
    The component's name does not wrap. It breaks at every hyphen, and a Debian
    kernel package is nothing but hyphens, so a name that would sit on one line
-   was arriving as three ragged ones and deciding the height of the row. The
+   arrives as three ragged ones and decides the height of the row. The
    column is as wide as the longest name either way — a name is one token to a
    reader whatever the browser thinks — so holding it on one line costs
    nothing and saves two.
@@ -161,9 +161,9 @@ th.num {
 
 /* Where a row sits. It wraps, but only between the parts — the two ends of
    the way down, and the note saying the row covers more builds than the one
-   named. Left to break anywhere, four short words became three lines and set
+   named. Left to break anywhere, four short words become three lines and set
    the height of every row on the page: the tallest cell decides, and in a
-   column 80px wide this was it. */
+   column 80px wide this is it. */
 .chain {
   color: var(--muted);
   display: flex;

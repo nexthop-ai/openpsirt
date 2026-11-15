@@ -12,10 +12,9 @@ import { Required } from "../ui/Required";
 
 // Correcting which builds a recorded flaw affects.
 //
-// The endpoint answered and nothing called it. The first belief about a
-// flaw is written down before the analysis is finished — that is the point of
-// being able to record one early — so it has to be correctable, and it was
-// correctable only by somebody holding a shell.
+// The first belief about a flaw is written down before the analysis is
+// finished — that is the point of being able to record one early — so it has
+// to be correctable, by somebody without a shell.
 //
 // The set is stated as a whole, not edited a build at a time, because a
 // set somebody can read back and check is not the same thing as a stream of

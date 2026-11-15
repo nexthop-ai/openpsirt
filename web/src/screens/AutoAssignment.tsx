@@ -47,11 +47,10 @@ export function AutoAssignment() {
   // A rule keyed on a name nothing is called places nothing, silently — which
   // is the worst way for a rule to be wrong, because it looks like a rule.
   //
-  // One read per field rather than one shared between them. Sharing looked
-  // tidier and was wrong: the two fields are filled one after the other, so a
-  // list keyed on "whichever has something in it" showed the first field's
-  // matches under the second — names that would be refused, offered as though
-  // they were the answer.
+  // One read per field rather than one shared between them. The two fields
+  // are filled one after the other, so a list keyed on "whichever has
+  // something in it" shows the first field's matches under the second: names
+  // that would be refused, offered as though they were the answer.
   //
   // A source-package rule matches on what a component was cut from where that
   // is recorded and on its own name where it is not, which is exactly what is
@@ -119,9 +118,9 @@ export function AutoAssignment() {
         }),
       ),
   });
-  // A rule matching nothing places nothing. The preview has always said so;
-  // until this, saving it anyway was still allowed, and the resulting rule's
-  // only symptom is work quietly never being placed.
+  // A rule matching nothing places nothing, so Add is disabled while the
+  // preview reports zero: such a rule's only symptom is work quietly never
+  // being placed.
   const catchesNothing = !reports && asked && catches.isSuccess && (catches.data?.total ?? 0) === 0;
   // With a source-package term matching no source package, what it does match
   // is often component names — and those name a source package of their own,
@@ -475,15 +474,13 @@ export function AutoAssignment() {
 
 // One of a rule's two keys: a name, or a pattern for a set of them.
 //
-// One field, with the list of what exists on focus. It was a text box
-// whose lookup waited for two characters, so nothing said a list existed or
-// what was in it; then it was a mode selector, which was worse — the default
-// mode rejected patterns, so typing `linux-image*` into it matched nothing for
-// a second reason on top of the first.
+// One field, with the list of what exists on focus, so the person sees that a
+// list exists and what is in it. A name and a pattern are typed into the same
+// field, with no mode to choose, so `linux-image*` matches as a pattern.
 //
 // The list is searchable rather than a bare select: a real image carries
 // several thousand components, and a select of several thousand is a worse
-// control than the text box it replaced. Unnarrowed it offers the ones
+// control than a text box. Unnarrowed it offers the ones
 // carrying the most work, which is what an assignment rule gets written about.
 function Key({
   id,

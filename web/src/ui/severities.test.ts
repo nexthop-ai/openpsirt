@@ -5,9 +5,8 @@ import { describe, expect, it } from "vitest";
 import { BANDS, BELOW_LOW, ROLLED, bandOf, isBand, ratedAs } from "./severities";
 
 // One nothing, drawn one way. A finding whose vulnerability carries no
-// severity was counted as a medium by the chart, drawn as a low by the badge,
-// given a low's stripe by the card and its own band by the tree strip — four
-// answers about the same row, on the same screen.
+// severity is drawn as unrated by the chart, the badge, the card and the tree
+// strip, because four answers about the same row on the same screen are none.
 describe("what an unrated finding is drawn as", () => {
   it("keeps the four that are rated", () => {
     for (const band of BANDS) expect(bandOf(band)).toBe(band);
@@ -28,7 +27,8 @@ describe("what an unrated finding is drawn as", () => {
     // Somebody looked and said it is not worth much, which is not the same
     // statement as nobody having looked. `rating.BandExpr` puts both of these
     // words in the low band and `SeverityScore` gives them a low's score, so
-    // a row drawn as unrated here disagreed with everything that sorted it.
+    // a row drawn as unrated here would disagree with everything that sorted
+    // it.
     for (const word of BELOW_LOW) expect(bandOf(word)).toBe("low");
   });
 
@@ -47,8 +47,8 @@ describe("what an unrated finding is drawn as", () => {
   });
 
   it("is the test the class name is chosen by, not a second one", () => {
-    // `isBand` is false for "unrated", which is why a badge that asked it a
-    // second time drew the class of a low while reading "Unrated".
+    // `isBand` is false for "unrated", so a badge asking it a second time
+    // would draw the class of a low while reading "Unrated".
     expect(isBand("unrated")).toBe(false);
     expect(bandOf("unrated")).toBe("unrated");
   });

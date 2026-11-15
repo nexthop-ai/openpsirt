@@ -306,8 +306,7 @@
   flex: none;
 }
 /* The ring is on the box rather than on the input, which has no border of its
-   own to show one — the same shape the frame's own search already has. Taken
-   off the input and put nowhere, there was no focus state at all. */
+   own to show one — the same shape the frame's own search has. */
 .searchbox:focus-within {
   border-color: var(--accent);
   box-shadow: var(--ring);

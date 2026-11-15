@@ -192,8 +192,6 @@ export function AuditLog() {
   // outcome asked for is a dismissal. Mixed with a deferral it returns a large
   // and entirely legitimate population, and saying otherwise over those rows
   // would be telling an auditor a control had failed when it had not.
-  // The exception report is asked of dismissals alone: asked of everything it
-  // returns a large and entirely legitimate population.
   // A code finding's dismissal counts here: it always needs a second person too.
   const onlyDismissals = outcomes.length > 0 && outcomes.every((each) => classes.alwaysGated(each));
   const asked = [
@@ -234,10 +232,10 @@ export function AuditLog() {
         </h2>
         <p>Every decision made, with who made it, who agreed, and when.</p>
         <span style={{ marginLeft: "auto" }} className="noprint">
-          {/* The same answer as a file, narrowed the same way. An
-              auditor is given a document rather than a screen, and this was
-              copied out by hand. The filters travel in the address, so the
-              file is this page's own address with a suffix. */}
+          {/* The same answer as a file, narrowed the same way, because an
+              auditor is given a document rather than a screen. The filters
+              travel in the address, so the file is this page's own address
+              with a suffix. */}
           <Downloads href={(format) => fileAt(params, format)} />{" "}
           <button type="button" className="btn" onClick={() => window.print()}>
             Print

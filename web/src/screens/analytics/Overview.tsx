@@ -569,8 +569,8 @@ export function Overview() {
           )}
           {/* How many there are, not how many are listed. A capped list drawn as
             the whole of it is how "forty repeat deferrals" reads as the whole
-            shape of a program that has two hundred — and the endpoint now says
-            what the whole is, so the footer says it too. */}
+            shape of a program that has two hundred. The endpoint says what the
+            whole is, and the footer states that total. */}
           <Paged
             shown={(repeated.data?.items ?? []).length}
             total={repeated.data?.total}

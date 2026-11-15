@@ -44,10 +44,9 @@ const MARKS: Mark[] = [
 // asking: the endpoint answers with the people who can already read findings
 // of that visibility in that product, so asking as though an undisclosed
 // finding were public offers colleagues who cannot open what they are being
-// called to. Written once because four screens ask it and two of them had
-// started to answer it differently. A decision about a code finding is about security testing
-// material until its flaw is disclosed, and the server tells a mention at that
-// visibility.
+// called to. Written once so every screen asks the same visibility. A decision
+// about a code finding is about security testing material until its flaw is
+// disclosed, and the server tells a mention at that visibility.
 export function mentioning(
   product?: string,
   undisclosed?: boolean,
@@ -181,8 +180,8 @@ export function Editor({
 
   // The text on screen is stored under the key it was typed under, never under
   // a key that arrived after it. This effect runs on a change of either, so
-  // the first run after the key moves carries the old text — which wrote one
-  // thing's draft into another's.
+  // the first run after the key moves carries the old text, and is skipped
+  // rather than write one thing's draft into another's.
   const writtenUnder = useRef(draftKey);
   useEffect(() => {
     if (writtenUnder.current !== draftKey) {

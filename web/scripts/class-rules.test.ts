@@ -17,7 +17,7 @@ import {
 
 // A class used as a modifier beside another, which also has a rule of its own
 // that takes an element out of normal flow, positions anything carrying both
-// by a rule written for something else. The gate that finds those had no test.
+// by a rule written for something else. The gate finds those.
 
 describe("how a stylesheet is read", () => {
   it("reads a bare class as a declaration", () => {
@@ -40,8 +40,8 @@ describe("how a stylesheet is read", () => {
 
   it("drops comments before reading", () => {
     // A rule is read as the text before its brace, and a comment sitting above
-    // one is part of that text — so a prose paragraph above `.overpane` was
-    // read as the selector and the rule was never seen.
+    // one is part of that text, so a comment naming a class would otherwise
+    // become the selector and the rule would go unseen.
     const { declared } = rulesIn(`/* a note about .overpane */\n.overpane { position: fixed; }`);
     expect(declared.get("overpane")).toContain("position: fixed");
   });

@@ -242,8 +242,8 @@ describe("changing scope stays on the screen", () => {
   });
 
   it("refuses a partial selection on a screen that exists for one build", () => {
-    // Those five screens are about a way down and have no answer for "every
-    // branch", so there is nowhere to land.
+    // A screen about a way down has no answer for "every branch", so there is
+    // nowhere to land.
     expect(rescoped(`${BUILD}/dependencies`, { product: "sonic" })).toBe(null);
   });
 });

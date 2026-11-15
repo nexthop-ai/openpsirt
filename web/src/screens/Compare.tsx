@@ -290,8 +290,8 @@ function Columns({
       {/* Two columns, because they are two different things and the count of
           the first is what a release coordinator quotes. The server decides
           which row goes where, through the one function the release note and
-          the remediation rate also read: a column that made the decision for
-          itself put two scanner faults under "Fixed". */}
+          the remediation rate also read, so a scanner fault never lands under
+          "Fixed" by a rule of this screen's own. */}
       <Column
         kind="was-fixed"
         title="Fixed"

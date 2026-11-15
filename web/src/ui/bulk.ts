@@ -18,7 +18,7 @@ export function useBulkCap(picked: number): { cap: number; over: boolean } {
 }
 
 // overCapNotice is what a screen says when the selection is past it, in the
-// one wording all three use.
+// one wording every looping screen uses.
 export function overCapNotice(cap: number): string {
   return `${cap.toLocaleString()} at a time is what this deployment allows. Narrow the selection.`;
 }

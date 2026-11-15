@@ -15,12 +15,12 @@ import { Wide } from "../ui/Wide";
 
 // The destinations this deployment posts to, and whether anything is arriving.
 //
-// Webhooks, not "where things are sent". One signed request rather than an
+// Called Webhooks, the conventional word. One signed request rather than an
 // adapter each: Slack, Teams, a tracker driven by automation and paging all
 // take an HTTP POST with a JSON body, carrying a timestamp and an HMAC over it
 // and the body. The kind says which notifications go to a destination, never
-// how they travel, and mail is a path of its own — so the conventional word is
-// accurate as well as shorter (REQ-60). The signing secret is returned by
+// how they travel, and mail is a path of its own, so the word is accurate
+// (REQ-60). The signing secret is returned by
 // nothing, so changing one means recording the destination again.
 //
 // Two panels, because they answer to two readers. Configuring one is

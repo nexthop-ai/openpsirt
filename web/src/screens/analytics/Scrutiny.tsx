@@ -57,9 +57,10 @@ export function Scrutiny() {
   const at = useScope();
   const opener = useRowOpener();
   const { days, period } = useSheetWindow(90);
-  // A rolling window is sent as the date its links open the audit log from.
-  // Sent as a count of days the server counts from this minute, and the audit
-  // log's list from midnight, so the list held rows the figure did not count.
+  // A rolling window is sent as the date its links open the audit log from,
+  // because the server counts a count of days from this minute and the audit
+  // log's list from midnight, and the list would hold rows the figure does
+  // not count.
   const when = stated(period) ? askedFor(period, days) : { from: windowStart(days) };
   const product = at.product ?? "";
   // Approvals are of decisions on either family, narrowed by the server to

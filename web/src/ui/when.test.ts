@@ -76,9 +76,8 @@ describe("how a moment is written", () => {
     expect(since("2026-09-07T11:59:30Z", now)).toBe("just now");
     expect(since("2026-09-07T11:00:00Z", now)).toBe("1 hour ago");
     expect(since("2026-09-04T12:00:00Z", now)).toBe("3 days ago");
-    // Week and year, the two rungs of the ladder nothing reached — so a
-    // wrong divisor on either read as the unit above or below it with the
-    // suite green.
+    // Week and year are rungs of the ladder too, and a wrong divisor on
+    // either reads as the unit above or below it.
     expect(since("2026-08-24T12:00:00Z", now)).toBe("2 weeks ago");
     expect(since("2026-08-07T12:00:00Z", now)).toBe("1 month ago");
     expect(since("2024-06-07T12:00:00Z", now)).toBe("2 years ago");
