@@ -39,28 +39,6 @@ func TestASettingNobodyHasChangedReadsAsItsDefault(t *testing.T) {
 	})
 }
 
-func TestSettingSomethingTwiceRecordsTheSecondValue(t *testing.T) {
-	// A read, then an insert or a conditional update, because no upsert
-	// spelling is portable across the four engines. Setting twice exercises
-	// both arms.
-	eachSetting(t, func(t *testing.T, s *setting.Store) {
-		ctx := t.Context()
-		if _, _, err := s.Change(ctx, setting.SessionLifetime, "1h"); err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := s.Change(ctx, setting.SessionLifetime, "30m"); err != nil {
-			t.Fatal(err)
-		}
-		got, err := s.Duration(ctx, setting.SessionLifetime, 12*time.Hour)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != 30*time.Minute {
-			t.Errorf("read back %v, want 30m", got)
-		}
-	})
-}
-
 func TestAValueNobodyCanParseReadsAsTheDefault(t *testing.T) {
 	// A setting typed by hand into the database is a tuning mistake. Refusing
 	// to start over it would make that mistake an outage.
@@ -147,6 +125,10 @@ func TestASettingThatCannotBeReadIsNotReportedAsUnset(t *testing.T) {
 // TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt pins what the
 // append-only trail records.
 //
+// A change is a read, then an insert or a conditional update, because no
+// upsert spelling is portable across the four engines. Setting twice runs both
+// arms, and each answers what it replaced and stores what it was given.
+//
 // Read in a statement of its own before the write, the prior value is the
 // original for two administrators moving the same setting at once, so the
 // second records a "before" that nothing held — a trail of who changed what,
@@ -173,6 +155,9 @@ func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 		}
 		if !had || before != "high" {
 			t.Errorf("the change reports it held %q, held=%v, want \"high\"", before, had)
+		}
+		if stored, held, err := store.Get(ctx, setting.MinimumSeverity); err != nil || !held || stored != "critical" {
+			t.Errorf("the setting reads back %q, held=%v (%v), want \"critical\"", stored, held, err)
 		}
 	})
 }
