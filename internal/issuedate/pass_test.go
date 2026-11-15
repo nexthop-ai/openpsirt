@@ -5,6 +5,7 @@ package issuedate_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"sync"
@@ -15,15 +16,17 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/issuedate"
+	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
 )
 
 // osv answers what a test tells it to, so nothing reaches the network.
 type osv struct {
-	mu    sync.Mutex
-	says  map[string]issuedate.Dates
-	fails map[string]bool
-	asked []string
+	mu        sync.Mutex
+	says      map[string]issuedate.Dates
+	fails     map[string]bool
+	unaskable map[string]bool
+	asked     []string
 }
 
 func (o *osv) Dates(_ context.Context, name string) (issuedate.Dates, error) {
@@ -32,6 +35,9 @@ func (o *osv) Dates(_ context.Context, name string) (issuedate.Dates, error) {
 	o.asked = append(o.asked, name)
 	if o.fails[name] {
 		return issuedate.Dates{}, issuedate.ErrNotAnswering
+	}
+	if o.unaskable[name] {
+		return issuedate.Dates{}, issuedate.ErrUnaskable
 	}
 	dates, known := o.says[name]
 	if !known {
@@ -169,4 +175,181 @@ func TestIssueDatesStayDueWhenOSVDoesNotAnswerOrIsTurnedOff(t *testing.T) {
 			t.Fatalf("turned off, the pass answered %d and asked %v (%v), want nothing", asked, answers.asked, err)
 		}
 	})
+}
+
+// A name OSV will not answer about is passed over like one it does not know:
+// the issue is asked by its other names, and the pass goes on to the next.
+func TestANameOSVWillNotAnswerAboutIsPassedOver(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "CVE-2026-0020", Aliases: []string{"GHSA-dddd-eeee-ffff"}},
+			{Identifier: "CVE-2026-0021"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		answers := &osv{
+			unaskable: map[string]bool{"CVE-2026-0020": true},
+			says: map[string]issuedate.Dates{
+				"GHSA-DDDD-EEEE-FFFF": {Published: published},
+				"CVE-2026-0021":       {Published: published},
+			},
+		}
+		if asked, err := newPass(db, answers, &now).Once(ctx); err != nil || asked != 2 {
+			t.Fatalf("answered %d (%v), want both issues; asked %v", asked, err, answers.asked)
+		}
+		for _, identifier := range []string{"CVE-2026-0020", "CVE-2026-0021"} {
+			if got := datesOf(t, db, identifier); got.Published == nil || !got.Published.Equal(published) {
+				t.Errorf("%s holds %+v, want its published date", identifier, got)
+			}
+		}
+	})
+}
+
+// A pass asks for its lease again as it goes, and stops where another replica
+// has taken it.
+func TestAPassStopsWhereItsLeaseIsTaken(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		var named []finding.Named
+		for i := range queue.RenewEvery + 5 {
+			named = append(named, finding.Named{Identifier: fmt.Sprintf("CVE-2026-%04d", 100+i)})
+		}
+		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, named); err != nil {
+			t.Fatal(err)
+		}
+		if mine, err := queue.NewLeases(db.DB).Take(ctx, issuedate.Lease, "other", time.Hour); err != nil || !mine {
+			t.Fatalf("the other replica could not take the lease: %v (%v)", mine, err)
+		}
+		answers := &osv{}
+		if asked, err := newPass(db, answers, &now).Once(ctx); err != nil || asked != queue.RenewEvery {
+			t.Errorf("answered %d (%v), want the %d asked before the lease was asked for again",
+				asked, err, queue.RenewEvery)
+		}
+	})
+}
+
+// A pass waits between one request and the next, so OSV is asked at a pace
+// it is willing to answer.
+func TestAPassWaitsBetweenRequests(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "CVE-2026-0030", Aliases: []string{"GHSA-gggg-hhhh-jjjj"}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		pass := newPass(db, &osv{says: map[string]issuedate.Dates{"GHSA-GGGG-HHHH-JJJJ": {Published: published}}}, &now)
+		pass.Pause = 50 * time.Millisecond
+		started := time.Now()
+		if asked, err := pass.Once(ctx); err != nil || asked != 1 {
+			t.Fatalf("answered %d (%v), want the one issue", asked, err)
+		}
+		// One wait before the second name and one after its answer.
+		if took := time.Since(started); took < 2*pass.Pause {
+			t.Errorf("two requests took %s, want at least two pauses of %s", took, pass.Pause)
+		}
+	})
+}
+
+// running runs a pass on a short interval until the test ends.
+func running(t *testing.T, pass *issuedate.Pass) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pass.Run(ctx, time.Millisecond)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+}
+
+// anything reports whether OSV has been asked anything.
+func (o *osv) anything() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return len(o.asked) > 0
+}
+
+// waitFor waits for a condition, failing the test after ten seconds.
+func waitFor(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); !cond(); {
+		if time.Now().After(deadline) {
+			t.Fatalf("%s did not happen", what)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// A running pass asks nothing while the setting is off or another replica
+// holds the lease, and asks once neither stops it, every cycle reading both.
+// A pass turned off does not take the lease either, so it leaves the work to
+// a replica where it is on.
+func TestARunningPassAsksOnlyWhenOnAndHoldingTheLease(t *testing.T) {
+	for _, c := range []struct {
+		what    string
+		stop    func(t *testing.T, db *database.DB)
+		release func(t *testing.T, db *database.DB)
+	}{
+		{"turned off",
+			func(t *testing.T, db *database.DB) {
+				if _, _, err := setting.NewStore(db.DB).Change(t.Context(), setting.IssueDates, setting.Off); err != nil {
+					t.Fatal(err)
+				}
+			},
+			func(t *testing.T, db *database.DB) {
+				if _, _, err := setting.NewStore(db.DB).Change(t.Context(), setting.IssueDates, setting.On); err != nil {
+					t.Fatal(err)
+				}
+			}},
+		{"leased elsewhere",
+			func(t *testing.T, db *database.DB) {
+				if mine, err := queue.NewLeases(db.DB).Take(t.Context(), issuedate.Lease, "other", time.Hour); err != nil || !mine {
+					t.Fatalf("the other replica could not take the lease: %v (%v)", mine, err)
+				}
+			},
+			func(t *testing.T, db *database.DB) {
+				if err := queue.NewLeases(db.DB).Release(t.Context(), issuedate.Lease, "other"); err != nil {
+					t.Fatal(err)
+				}
+			}},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			dbtest.Two(t, func(t *testing.T, db *database.DB) {
+				ctx := t.Context()
+				if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
+					{Identifier: "CVE-2026-0040"},
+				}); err != nil {
+					t.Fatal(err)
+				}
+				c.stop(t, db)
+				now := time.Now().UTC().Truncate(time.Microsecond)
+				answers := &osv{says: map[string]issuedate.Dates{"CVE-2026-0040": {Published: published}}}
+				running(t, newPass(db, answers, &now))
+				// Many cycles of a millisecond each.
+				time.Sleep(100 * time.Millisecond)
+				if answers.anything() {
+					t.Fatalf("a pass %s asked %v", c.what, answers.asked)
+				}
+				if c.what == "turned off" {
+					leases := queue.NewLeases(db.DB)
+					if mine, err := leases.Take(ctx, issuedate.Lease, "other", time.Hour); err != nil || !mine {
+						t.Fatalf("a pass turned off holds the lease: %v (%v)", mine, err)
+					}
+					if err := leases.Release(ctx, issuedate.Lease, "other"); err != nil {
+						t.Fatal(err)
+					}
+				}
+				c.release(t, db)
+				waitFor(t, "the pass asking once nothing stops it", answers.anything)
+			})
+		})
+	}
 }

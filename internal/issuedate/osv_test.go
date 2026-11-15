@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,16 @@ func TestOSVAnswersAreClassified(t *testing.T) {
 		case "/v1/vulns/CVE-2026-0501":
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"id":"CVE-2026-0501"}`))
+		case "/v1/vulns/GHSA-jfh8-c2jp-5v3q":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"GHSA-jfh8-c2jp-5v3q","published":"2024-03-29T16:51:12Z"}`))
+		case "/v1/vulns/CVE-2026-0502":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":`))
+		case "/v1/vulns/CVE-2026-0503":
+			w.Header().Set("Content-Type", "application/json")
+			// Whole once cut at the bound, so only the bound refuses it.
+			_, _ = w.Write([]byte(`{"id":"CVE-2026-0503"}` + strings.Repeat(" ", 8<<20)))
 		case "/v1/vulns/CVE-2026-0200":
 			w.Header().Set("Content-Type", "text/html")
 			_, _ = w.Write([]byte(`<html>Sign in to continue</html>`))
@@ -55,7 +66,13 @@ func TestOSVAnswersAreClassified(t *testing.T) {
 	if dates.Modified.IsZero() {
 		t.Error("the modified date was not read")
 	}
+	// Stored in capitals, and asked as OSV spells it.
+	if _, err := client.Dates(ctx, "GHSA-JFH8-C2JP-5V3Q"); err != nil {
+		t.Errorf("a GitHub advisory stored in capitals answered %v", err)
+	}
 	for name, want := range map[string]error{
+		"CVE-2026-0502":  issuedate.ErrUnaskable,
+		"CVE-2026-0503":  issuedate.ErrUnaskable,
 		"CVE-1999-99999": issuedate.ErrUnknown,
 		"CVE-2026-0500":  issuedate.ErrNotAnswering,
 		"CVE-2026-0403":  issuedate.ErrNotAnswering,
