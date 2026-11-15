@@ -627,9 +627,9 @@ func (s *Store) Above(ctx context.Context, subject access.Subject, buildID,
 
 // Chains returns the way down to each of these components, root first.
 //
-// the complete chain on a finding asks a finding to show the complete chain,
-// root to component, with the version at each step, because that is where
-// somebody judges whether the vulnerable code is reached. The immediate parent
+// A finding shows the complete chain, root to component, with the version at
+// each step, because that is where somebody judges whether the vulnerable code
+// is reached. The immediate parent
 // alone cannot answer it: where a component is reached several ways the parent
 // is often the same word twice, and two identical rows are not two answers.
 //
@@ -658,9 +658,9 @@ func (s *Store) Chains(ctx context.Context, subject access.Subject, buildID int6
 	// against it. A chain is the way down to a component and carries no
 	// finding, and every caller has already narrowed the components it is
 	// asking about. Asked as the stronger question, a collaborator holding no
-	// role on the product was refused the path to the component their own case
-	// sits in — so the finding their grant is for answered as though it were
-	// not there.
+	// role on the product would be refused the path to the component their own
+	// case sits in, and the finding their grant is for would answer as though
+	// it were not there.
 	if err := s.knowsBuild(ctx, subject, buildID); err != nil {
 		return nil, err
 	}
@@ -681,8 +681,8 @@ func (s *Store) Chains(ctx context.Context, subject access.Subject, buildID int6
 // once rather than once per component. Roots, parents and starts are taken in
 // node order, so among routes of one length the same one is drawn every time.
 //
-// Apart from the statement because two callers unwind the same region: a
-// finding's own chain, and the tree the subject's own work hangs from. Two
+// Apart from the statement because a finding's own chain and the tree the
+// subject's own work hangs from unwind the same region. Two
 // copies of this would be two answers to "which way down".
 func (r region) unwind() map[int64][]Step {
 	children := map[int64][]int64{}

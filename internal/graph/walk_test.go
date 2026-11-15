@@ -412,15 +412,14 @@ func TestWhatIsBeneathANodeSaysWhatItIsMadeOf(t *testing.T) {
 
 func TestAProductsOwnRatingDrawsTheTreeTheUpgradeStripAndTheReleaseNote(t *testing.T) {
 	// One rule for what a finding's severity is: this product's word where it
-	// has stated one, the published word otherwise. Nine queries read the
-	// published word alone with no rating joined, so a product that re-rated
-	// an issue saw its own decision in the findings list and the world's in
-	// the tree, the component strip and the document it publishes — three
-	// surfaces disagreeing with the list they summarize.
+	// has stated one, the published word otherwise. A surface reading the
+	// published word alone would show a product that re-rated an issue its
+	// own decision in the findings list and the world's in the tree, the
+	// component strip and the document it publishes.
 	//
-	// The three are asserted together because what broke them is one thing:
-	// the expression is now spelled in one place and none of them can read it
-	// without joining the rating it comes from.
+	// The three are asserted together because they share one thing: the
+	// expression is spelled in one place and none of them can read it without
+	// joining the rating it comes from.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		lib := at("libshared", "1.0")
