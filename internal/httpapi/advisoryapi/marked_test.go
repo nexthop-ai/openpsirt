@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/advisoryapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -111,5 +112,40 @@ func TestAnAdvisoryIsListedByWhatItCoversAndAgreedToBySomebodyElse(t *testing.T)
 		}
 		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodDelete,
 			approval, ""), http.StatusUnprocessableEntity)
+	})
+}
+
+// A release whose open occurrence an approved decision covers names that
+// decision: its outcome, its reason and its mitigation apart, and the build
+// it was made on.
+func TestAReleaseCoveredByAnApprovedDecisionNamesIt(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		flaw := r.Embargoed(t)
+		named := httpapitest.AdvisoryOver(t, r, "private-triage", "mine", flaw)
+		decision, ids := r.Claimed(t, "private-triage", flaw, "libnl-3-200",
+			`{"outcome":"not-applicable","justification":"inline_mitigations_already_exist",`+
+				`"mitigation":"The socket is bound to loopback.",`+
+				`"reasoning":"Nothing outside the host reaches the socket."}`)
+		r.AgreedBy(t, "private-dispatcher", decision)
+
+		var releases struct {
+			Items []advisoryapi.AdvisoryReleaseBody `json:"items"`
+		}
+		httpapitest.Read(t, r, "private-triage", "/v1/advisories/"+named+"/releases", &releases)
+		if len(releases.Items) != 1 || releases.Items[0].Covered == nil {
+			t.Fatalf("the releases read %+v, want the one release covered", releases.Items)
+		}
+		covered := releases.Items[0].Covered
+		if covered.Outcome != "not-applicable" || covered.Reason != "inline_mitigations_already_exist" ||
+			covered.Mitigation != "The socket is bound to loopback." || len(ids) != 1 ||
+			covered.DecisionOccurrence != ids[0] {
+			t.Errorf("the release is covered by %+v, want decision occurrence %v with its reason and mitigation",
+				covered, ids)
+		}
+		if len(covered.MadeOn) != 1 || covered.MadeOn[0] != (advisoryapi.MadeOnBody{
+			BranchOrTag: "master", Variant: "broadcom"}) {
+			t.Errorf("the decision reads as made on %+v, want master/broadcom", covered.MadeOn)
+		}
 	})
 }

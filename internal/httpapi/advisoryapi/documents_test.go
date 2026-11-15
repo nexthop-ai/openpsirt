@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
@@ -252,6 +254,57 @@ func TestAnUploadShedAtTheSimultaneousLimitIsNotRecordedAsRefused(t *testing.T) 
 		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-documents", &vex)
 		if vex.Total != 1 || len(vex.Items) != 1 || vex.Items[0].Status != "completed" {
 			t.Errorf("the VEX list holds %+v; want the upload taken alone", vex.Items)
+		}
+	})
+}
+
+// An upload's sender reads back as a key's name where a key is recorded, as
+// a person where a person is, and as nobody where the credential is one
+// nothing spells. No route takes a document from a key, so the key's
+// credential is written straight to the row.
+func TestAnUploadsSenderIsNamedByTheKindOfCredentialRecorded(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		for _, publisher := range []string{"debian", "ubuntu", "suse"} {
+			if got := r.Vexed(t, "admin", publisher,
+				httpapitest.Said("not_affected", "vulnerable_code_not_present", "Not built.")); got.Code != http.StatusCreated {
+				t.Fatalf("uploading as %s answered %d: %s", publisher, got.Code, got.Body)
+			}
+		}
+		key, err := r.Rights.ResolveKey(t.Context(), r.Key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for publisher, credential := range map[string]string{
+			"ubuntu": access.Sender(key), "suse": "somebody:1",
+		} {
+			if _, err := r.DB.DB.NewUpdate().Model((*finding.Upload)(nil)).
+				Set(`"credential" = ?`, credential).Where(`"publisher" = ?`, publisher).
+				Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		var vex struct {
+			Items []struct {
+				Publisher      string `json:"publisher"`
+				UploadedBy     string `json:"uploaded_by"`
+				UploadedByName string `json:"uploaded_by_name"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "reader", "/v1/products/mine/vex-documents", &vex)
+		got := map[string]string{}
+		for _, each := range vex.Items {
+			got[each.Publisher] = each.UploadedBy + "|" + each.UploadedByName
+		}
+		want := map[string]string{"debian": "admin|" + httpapitest.ShownAs("admin"), "ubuntu": "nightly|", "suse": "|"}
+		if len(got) != len(want) {
+			t.Fatalf("the uploads read as %v, want %v", got, want)
+		}
+		for publisher, sender := range want {
+			if got[publisher] != sender {
+				t.Errorf("%s's upload reads as sent by %q, want %q", publisher, got[publisher], sender)
+			}
 		}
 	})
 }
