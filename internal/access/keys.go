@@ -98,11 +98,10 @@ func (s *Store) ResolveKey(ctx context.Context, secret string) (Subject, error) 
 		return Subject{}, ErrDenied
 	}
 
-	// Matched on the whole digest, which is the comparison. A constant-time
-	// compare afterwards, over the row the equality has just selected, cannot
-	// fail — and calling the lookup "not by itself a statement that the
-	// secrets match" is wrong, because a SQL equality on the whole digest is
-	// exactly that.
+	// Matched on the whole digest, which is the comparison: a SQL equality on
+	// the whole digest is a statement that the secrets match. A constant-time
+	// compare afterwards, over the row the equality has just selected, could
+	// not fail, so there is none.
 	//
 	// The presented secret is never compared byte by byte: only its digest
 	// reaches the database. The timing of this is decided by the index lookup,

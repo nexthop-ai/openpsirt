@@ -60,13 +60,12 @@ const DefaultSessionLifetime = 12 * time.Hour
 //
 // Group membership is read at sign-in and never again, so a session's lifetime
 // *is* the window in which somebody removed from a privileged provider group
-// still holds what that group gave them. Unbounded, that window was whatever an
-// administrator typed: a lifetime of 8760h made every browser sign-in last a
-// year, and the setting took it without comment.
+// still holds what that group gave them. A lifetime above this is refused, so
+// an administrator cannot stretch every browser sign-in to a year.
 //
 // Thirty days is long enough for the case the default argues for and short
 // enough that a group membership cannot outlive a month. A personal token, the
-// other thing somebody holds for a long time, has had two ceilings all along.
+// other thing somebody holds for a long time, has two ceilings of its own.
 const MaxSessionLifetime = 30 * 24 * time.Hour
 
 // StartSession signs somebody in for a bounded time.

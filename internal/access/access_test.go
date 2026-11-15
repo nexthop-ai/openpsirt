@@ -332,10 +332,10 @@ func TestACapabilityHandsOverNoVisibility(t *testing.T) {
 }
 
 func TestAReportingRoleCannotBeGranted(t *testing.T) {
-	// It was in the baseline set and gated nothing, which is the shape a
-	// capability granting nothing always has: the person is recorded, the
-	// grant is in force, and it changes no answer anywhere. What it was
-	// reaching for is breadth of view, and that is said directly now.
+	// A reporting role would gate nothing, which is the shape a capability
+	// granting nothing always has: the person is recorded, the grant is in
+	// force, and it changes no answer anywhere. What it reaches for is
+	// breadth of view, and that is said directly.
 	//
 	// Pinned as a refusal rather than as an absence from a list, because
 	// the list is what a caller reads and the refusal is what a caller
@@ -737,13 +737,12 @@ func TestACapabilityAloneNarrowsNoFindings(t *testing.T) {
 
 // A grant that grants nothing is not access, including here.
 //
-// Every other question about what somebody holds reads past an inactive
-// grant; this one counted every row. So in group-bound mode — where every
-// assigned grant is inactive by construction — withdrawing somebody's last
-// live role answered "they still hold something here", their assigned
-// findings stayed with somebody who can no longer open them, and the
-// response said nothing had been released. That is the exact outcome the
-// question exists to prevent.
+// Every question about what somebody holds reads past an inactive grant, this
+// one included. In group-bound mode every assigned grant is inactive by
+// construction, so counting every row would answer "they still hold something
+// here" after somebody's last live role is withdrawn, leave their assigned
+// findings with somebody who can no longer open them, and say nothing had
+// been released. That is the exact outcome the question exists to prevent.
 func TestAnInactiveGrantIsNotSomethingSomebodyHolds(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
@@ -776,8 +775,8 @@ func TestAnInactiveGrantIsNotSomethingSomebodyHolds(t *testing.T) {
 }
 
 // TestGrantingWhatIsAlreadyHeldSucceedsAndChangesNothing pins the branch
-// design-docs/access-grants.md states in prose and nothing executed: the arm GrantRole
-// falls into when the insert is refused was at 0.0%.
+// design-docs/access-grants.md states in prose: the arm GrantRole falls into
+// when the insert is refused.
 //
 // An administrator clicking twice, or two of them acting at once, is the
 // ordinary case. The state the caller asked for is the state that holds.

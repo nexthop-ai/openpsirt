@@ -224,10 +224,10 @@ func TestAskingWhoReadsSomethingIsAskedWithASubject(t *testing.T) {
 // TestASearchTermIsNotAPatternLanguage pins what a wildcard in a search box
 // does, on the picker where it matters most.
 //
-// Four LIKE predicates carried no ESCAPE while eight beside them did, so a "%"
-// or a "_" was a wildcard in four places and a literal in eight. This is the
-// picker that decides who may be named on an embargoed case: a term of "%"
-// answered with every person the deployment could offer, in one request.
+// Every LIKE predicate states its ESCAPE, so a "%" or a "_" is a literal
+// everywhere. This is the picker that decides who may be named on an
+// embargoed case, where a term of "%" as a wildcard would answer with every
+// person the deployment could offer, in one request.
 //
 // Every engine, because SQLite has no default escape character and the other
 // three disagree about a backslash — which is why the escape character here is

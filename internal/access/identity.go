@@ -478,8 +478,8 @@ func (s *Store) match(ctx context.Context, who Arrival) (*Account, error) {
 //
 // The username, unqualified. One provider is configured at a time and a
 // username a proxy asserts is the same person as that username at the
-// provider, so there is nothing to qualify it with — and qualifying it made
-// one human two accounts, which is the defect that settled this (REQ-41).
+// provider, so there is nothing to qualify it with; qualified, it would make
+// one human two accounts (REQ-41).
 func (a Arrival) handle() string {
 	return Folded(a.Username)
 }

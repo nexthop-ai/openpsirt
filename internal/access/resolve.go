@@ -532,9 +532,9 @@ func (s *Store) resolve(ctx context.Context, identity string, boundDerived bool)
 	// Administration a group conferred is bounded the same way the roles it
 	// conferred are, and for the same reason: a group is what says so, and a
 	// credential that never signs in never asks a group again. Without this a
-	// person a group made an administrator, who minted a year-long token and
-	// then left, went on administering through it — and administration is what
-	// decides who may read anybody's notification feed.
+	// person a group made an administrator, who mints a year-long token and
+	// then leaves, goes on administering through it — and administration is
+	// what decides who may read anybody's notification feed.
 	//
 	// A stamp that is missing on a derived flag is treated as stale rather
 	// than as fresh. It means nothing has confirmed it since the column

@@ -142,8 +142,8 @@ func TestTheProxyAssertsANameAndBindsNothing(t *testing.T) {
 	// a username on every request and has nothing else to offer. A deployment
 	// trusting it has already accepted that what it says is who somebody is.
 	//
-	// Binding a made-up identifier here is what used to keep the two paths in
-	// separate rows, and separate rows are what made one human two accounts.
+	// Binding a made-up identifier here would keep the two paths in separate
+	// rows, and separate rows make one human two accounts.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		person := authorized(t, f, "someone", "someone")
@@ -167,11 +167,10 @@ func TestTheProxyAssertsANameAndBindsNothing(t *testing.T) {
 }
 
 func TestOneUsernameIsOnePersonWhicheverWayTheyArrive(t *testing.T) {
-	// The defect that settled this. Scoping an identity by the path it
-	// arrived on made backdoor access and provider sign-in two accounts for
-	// one human — which split administration from the account being signed in
-	// as, and let one person be both the proposer and the approver of a
-	// dismissal (REQ-41).
+	// Scoping an identity by the path it arrived on would make backdoor access
+	// and provider sign-in two accounts for one human, splitting
+	// administration from the account being signed in as and letting one
+	// person be both the proposer and the approver of a dismissal (REQ-41).
 	//
 	// Run both ways round, because the order somebody first arrives in is not
 	// something a deployment controls.
