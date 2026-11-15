@@ -204,6 +204,26 @@
       "why": "an attachment is named by the identifier this deployment minted, and nothing else"
     },
     {
+      "text": "<javascript:alert(1)>",
+      "submission": "refused",
+      "why": "an autolink is a link, and a script scheme runs in the reader's session"
+    },
+    {
+      "text": "<ms-msdt:calc>",
+      "submission": "refused",
+      "why": "an autolink to an application scheme hands a click to a program on the reader's machine"
+    },
+    {
+      "text": "<attachment:../../etc/passwd>",
+      "submission": "refused",
+      "why": "an autolinked attachment is named by the identifier this deployment minted, and nothing else"
+    },
+    {
+      "text": "fetch it from ftp://mirror.example/x",
+      "submission": "refused",
+      "why": "an address the parser links on its own is a link, and ftp is not a scheme a link may use"
+    },
+    {
       "text": "[click](issue:../../secret)",
       "submission": "refused",
       "why": "an issue is named by its identifier"
