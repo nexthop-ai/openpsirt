@@ -126,24 +126,6 @@ func TestAProcessWithNoDatabaseAnswersEveryRequestButTheProbesInOneSentence(t *t
 	}
 }
 
-func TestOpenAPIDocumentDescribesTheRegisteredRoutes(t *testing.T) {
-	// This is the check that keeps the published specification honest: it is
-	// generated from the same registrations the server routes on, so a route
-	// that exists but is undocumented cannot happen.
-	_, api := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{})
-	doc := api.OpenAPI()
-	if doc.Paths["/v1/version"] == nil {
-		t.Fatal("/v1/version missing from the generated document")
-	}
-	spec, err := doc.YAML()
-	if err != nil {
-		t.Fatalf("render document: %v", err)
-	}
-	if len(spec) == 0 {
-		t.Fatal("generated document is empty")
-	}
-}
-
 func TestDocumentationIsNotServed(t *testing.T) {
 	// Documentation is published separately. Serving it here would be the only
 	// unauthenticated route in the application.
@@ -338,5 +320,10 @@ func TestNoTwoOperationsClaimOneMethodAndPath(t *testing.T) {
 		t.Errorf("%d operations are registered in the source and %d reached the document, "+
 			"so %d were claimed by another on the same method and path",
 			registered, described, registered-described)
+	}
+	// The document every registration reached is the one published, so it
+	// has to render.
+	if spec, err := api.OpenAPI().YAML(); err != nil || len(spec) == 0 {
+		t.Errorf("the document does not render: %d bytes, %v", len(spec), err)
 	}
 }
