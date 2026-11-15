@@ -83,16 +83,21 @@ func main() {
 		os.Exit(2)
 	}
 
-	if strays, err := straysInTree(string(decisions)); err != nil {
+	strays, read, err := straysInTree(string(decisions))
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "unclaimed:", err)
 		os.Exit(2)
-	} else if len(strays) > 0 {
+	}
+	if read == 0 {
+		fmt.Fprintln(os.Stderr, "unclaimed: no file was read for citations, so this checked nothing")
+		os.Exit(2)
+	}
+	if len(strays) > 0 {
 		fmt.Fprintln(os.Stderr, "decision identifiers that name no requirement:")
 		for _, stray := range strays {
 			fmt.Fprintln(os.Stderr, "  "+stray)
 		}
 		fmt.Fprintln(os.Stderr, "\nCite the REQ- row that covers the subject, or drop the citation.")
-		os.Exit(1)
 	}
 
 	var missing []string
@@ -102,6 +107,9 @@ func main() {
 		}
 	}
 	if len(missing) == 0 {
+		if len(strays) > 0 {
+			os.Exit(1)
+		}
 		fmt.Printf("every one of the %d requirements is named by a design document\n",
 			len(want))
 		return
@@ -238,19 +246,21 @@ func straysIn(text string, rows map[string]bool) []string {
 	return strays
 }
 
-// straysInTree is every stray identifier in the files git tracks, each as
-// "path: identifier". This tool's own tests are left out, because their
-// inputs are identifiers that name nothing.
-func straysInTree(decisions string) ([]string, error) {
+// straysInTree is every stray identifier in the files git tracks or would
+// add, each as "path: identifier", and how many files it read. This tool's
+// own tests are left out, because their inputs are identifiers that name
+// nothing.
+func straysInTree(decisions string) ([]string, int, error) {
 	rows := map[string]bool{}
 	for _, match := range row.FindAllStringSubmatch(decisions, -1) {
 		rows[canonical(match[1])] = true
 	}
-	files, err := walk.Tracked()
+	files, err := walk.Unignored()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	var strays []string
+	read := 0
 	for _, path := range files {
 		if strings.HasPrefix(path, "internal/tools/unclaimed/") && strings.HasSuffix(path, "_test.go") {
 			continue
@@ -260,11 +270,12 @@ func straysInTree(decisions string) ([]string, error) {
 			continue
 		}
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
+		read++
 		for _, id := range straysIn(string(body), rows) {
 			strays = append(strays, path+": "+id)
 		}
 	}
-	return strays, nil
+	return strays, read, nil
 }
