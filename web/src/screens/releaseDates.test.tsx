@@ -6,16 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 import { EndOfLife } from "../ui/EndOfLife";
 import { Branches } from "./Branches";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
+import { change } from "../test/controls";
 
 const mount = mounted();
-
-function type(field: HTMLInputElement | null, value: string) {
-  if (!field) throw new Error("no such field");
-  act(() => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(field, value);
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-}
 
 const save = () =>
   Array.from(mount.host().querySelectorAll("button")).find((b) => b.textContent === "Save");
@@ -41,9 +34,9 @@ describe("a tag's release date", () => {
     );
     await settle();
     const box = mount.host().querySelector<HTMLInputElement>('input[aria-label="Released"]');
-    type(box, "0002-01-01");
-    type(box, "0202-01-01");
-    type(box, "2026-01-01");
+    change(box, "0002-01-01");
+    change(box, "0202-01-01");
+    change(box, "2026-01-01");
     expect(put()).toHaveLength(0);
     act(() => save()?.click());
     await settle();
@@ -60,7 +53,7 @@ describe("an inherited end of support", () => {
       <EndOfLife what="v1.0 goes out of support" on="2027-01-01" inherited admin onSet={onSet} />,
     );
     expect(save()).toBeUndefined();
-    type(mount.host().querySelector<HTMLInputElement>('input[type="date"]'), "2027-01-01");
+    change(mount.host().querySelector<HTMLInputElement>('input[type="date"]'), "2027-01-01");
     act(() => save()?.click());
     expect(onSet).toHaveBeenCalledWith("2027-01-01");
   });

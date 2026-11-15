@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { Findings } from "./Findings";
 import { IssueAdvisory } from "./IssueAdvisory";
-import { readingDependencies } from "../test/reach";
+import { readerOf } from "../test/reach";
 import { screen, serve, settle, mounted } from "../test/mount";
 
 const mount = mounted();
@@ -61,13 +61,7 @@ describe("the findings search box", () => {
     serve((path) =>
       path === "/v1/session/me"
         ? {
-            data: {
-              identity: "ana",
-              name: "Ana",
-              admin: false,
-              kind: "person",
-              reach: [readingDependencies("sonic")],
-            },
+            data: readerOf("sonic"),
           }
         : { data: { items: [], total: 0 } },
     );

@@ -6,15 +6,9 @@ import { describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { mounted, screen, serve, settle } from "../test/mount";
 import { UploadDrawer } from "./Upload";
+import { change } from "../test/controls";
 
 const mount = mounted();
-
-// A controlled select moved the way a person moves it.
-function pick(select: HTMLSelectElement, value: string) {
-  const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
-  set?.call(select, value);
-  select.dispatchEvent(new Event("change", { bubbles: true }));
-}
 
 describe("an upload that is already held", () => {
   it("names the build it was sent to, whatever the form was changed to while it was on its way", async () => {
@@ -61,7 +55,7 @@ describe("an upload that is already held", () => {
     // The branch moved while the file was on its way.
     const branch = host.querySelector<HTMLSelectElement>('select[aria-label="Branch or tag"]');
     act(() => {
-      if (branch) pick(branch, "release");
+      if (branch) change(branch, "release");
     });
     expect(branch?.value).toBe("release");
 

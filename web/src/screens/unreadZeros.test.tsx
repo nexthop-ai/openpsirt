@@ -6,6 +6,7 @@ import type { Who } from "../app/session";
 import { client, mounted, screen, serve, settle } from "../test/mount";
 import { reaching, readingDependencies } from "../test/reach";
 import { PUBLISHED } from "../test/outcomes";
+import { auditDecision } from "../test/audit";
 import { AuditLog } from "./AuditLog";
 import { Component } from "./Component";
 import { Dependencies } from "./Dependencies";
@@ -421,29 +422,7 @@ describe("the audit log", () => {
     serving(collaborator, {
       "/v1/audit/decisions": {
         total: 1,
-        items: [
-          {
-            decision: 7,
-            issue: "CVE-2026-1",
-            issues: 1,
-            product: "sonic",
-            products: 1,
-            component: "libnl",
-            version: "3.7",
-            components: 1,
-            rows: 1,
-            occurrences: 1,
-            outcome: "not-affected",
-            reasoning: "Never reached.",
-            state: "approved",
-            states: { proposed: 0, approved: 1, withdrawn: 0, lapsed: 0 },
-            standing: 1,
-            proposed_by: "bob",
-            proposed_at: "2026-09-01T00:00:00Z",
-            approvals: [],
-            two_people: false,
-          },
-        ],
+        items: [auditDecision()],
       },
     });
     mount.render(screen(<AuditLog />, "/audit-log", "*", signedIn(collaborator)));
@@ -496,47 +475,27 @@ describe("the products list", () => {
   });
 });
 
-describe("the branches and tags list", () => {
+describe.each([
+  [
+    "the branches and tags list",
+    () => <Branches />,
+    "branches-and-tags",
+    { items: [{ name: "master", kind: "branch" }] },
+    "master",
+  ],
+  ["the variants list", () => <Variants />, "variants", { items: [{ name: "arm" }] }, "arm"],
+])("%s", (_, list, at, answer, row) => {
   it("draws no open column, asks for no count, and says why", async () => {
-    const spy = serving(ELSEWHERE, {
-      "/v1/products/{product}/branches-and-tags": { items: [{ name: "master", kind: "branch" }] },
-    });
+    const path = `/v1/products/{product}/${at}`;
+    const spy = serving(ELSEWHERE, { [path]: answer });
     mount.render(
-      screen(
-        <Branches />,
-        "/products/sonic/branches-and-tags",
-        "/products/:product/branches-and-tags",
-        signedIn(ELSEWHERE),
-      ),
+      screen(list(), `/products/sonic/${at}`, `/products/:product/${at}`, signedIn(ELSEWHERE)),
     );
     await settle();
-    expect(text()).toContain("master");
+    expect(text()).toContain(row);
     expect(headers()).not.toContain("Open");
     expect(text()).toContain("You don't read dependency findings in sonic.");
-    const asked = queriesAt(spy, "/v1/products/{product}/branches-and-tags");
-    expect(asked.length).toBeGreaterThan(0);
-    expect(asked.every((query) => !query?.counts)).toBe(true);
-  });
-});
-
-describe("the variants list", () => {
-  it("draws no open column, asks for no count, and says why", async () => {
-    const spy = serving(ELSEWHERE, {
-      "/v1/products/{product}/variants": { items: [{ name: "arm" }] },
-    });
-    mount.render(
-      screen(
-        <Variants />,
-        "/products/sonic/variants",
-        "/products/:product/variants",
-        signedIn(ELSEWHERE),
-      ),
-    );
-    await settle();
-    expect(text()).toContain("arm");
-    expect(headers()).not.toContain("Open");
-    expect(text()).toContain("You don't read dependency findings in sonic.");
-    const asked = queriesAt(spy, "/v1/products/{product}/variants");
+    const asked = queriesAt(spy, path);
     expect(asked.length).toBeGreaterThan(0);
     expect(asked.every((query) => !query?.counts)).toBe(true);
   });
@@ -636,27 +595,23 @@ describe("analytics", () => {
     expect(asked(spy)).not.toContain("/v1/deferrals/repeated");
   });
 
-  it("draws no decision figure in the program overview for a reader of no finding", async () => {
-    // Outcomes the server publishes, so the dismissals would be asked and
-    // drawn were the reader not turned away.
-    const spy = await report(<Overview />, { ...AUDITOR, outcomes: PUBLISHED });
-    expect(text()).not.toContain("Triage times");
-    expect(text()).not.toContain("Dismissals");
-    expect(text()).toContain("Nothing to list.");
-    expect(text()).toContain("You don't read findings in any product.");
-    expect(asked(spy)).not.toContain("/v1/measures");
-    expect(asked(spy)).not.toContain("/v1/audit");
-  });
-
-  it("draws no decision figure in the program overview for a reader of findings in another product", async () => {
-    const spy = await report(<Overview />, { ...OTHER_PRODUCT, outcomes: PUBLISHED });
-    expect(text()).not.toContain("Triage times");
-    expect(text()).not.toContain("Dismissals");
-    expect(text()).toContain("Nothing to list.");
-    expect(text()).toContain("You don't read findings in sonic.");
-    expect(asked(spy)).not.toContain("/v1/measures");
-    expect(asked(spy)).not.toContain("/v1/audit");
-  });
+  // Outcomes the server publishes, so the dismissals would be asked and drawn
+  // were the reader not turned away.
+  it.each([
+    ["no finding", AUDITOR, "any product"],
+    ["findings in another product", OTHER_PRODUCT, "sonic"],
+  ])(
+    "draws no decision figure in the program overview for a reader of %s",
+    async (_, reader, where) => {
+      const spy = await report(<Overview />, { ...reader, outcomes: PUBLISHED });
+      expect(text()).not.toContain("Triage times");
+      expect(text()).not.toContain("Dismissals");
+      expect(text()).toContain("Nothing to list.");
+      expect(text()).toContain(`You don't read findings in ${where}.`);
+      expect(asked(spy)).not.toContain("/v1/measures");
+      expect(asked(spy)).not.toContain("/v1/audit");
+    },
+  );
 
   it.each([
     [

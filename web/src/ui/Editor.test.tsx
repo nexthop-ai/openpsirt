@@ -10,6 +10,7 @@ import { Editor } from "./Editor";
 import { render } from "./markdown";
 import { Thread } from "./Thread";
 import { mounted, screen, serve, settle } from "../test/mount";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
@@ -17,17 +18,6 @@ beforeEach(() => {
   window.localStorage.clear();
   belongTo("oidc:ana");
 });
-
-function type(field: HTMLTextAreaElement | null, value: string) {
-  if (!field) throw new Error("no such field");
-  act(() => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
-      field,
-      value,
-    );
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-}
 
 function Writing({ start = "", draftKey }: { start?: string; draftKey?: string }) {
   const [value, setValue] = useState(start);
@@ -65,7 +55,7 @@ describe("the editor", () => {
     act(() => {
       chooser.dispatchEvent(new Event("change", { bubbles: true }));
     });
-    type(box, "Typed while it uploaded. ");
+    change(box, "Typed while it uploaded. ");
     await act(async () => {
       answer({
         data: { filename: "proof.png", reference: "attachment:1", inline: true },
@@ -164,7 +154,7 @@ describe("naming somebody and attaching a file", () => {
     );
     mount.render(screen(<Mentioning visibility="private" />));
     await settle();
-    type(field(), "Ask @an");
+    change(field(), "Ask @an");
     await settle();
     const asked = (reads.mock.calls as unknown as [string, { params: { query: object } }][]).at(-1);
     expect(asked?.[1].params.query).toEqual({ visibility: "private", limit: 25, q: "an" });
@@ -225,7 +215,7 @@ describe("naming somebody and attaching a file", () => {
     serve(() => undefined);
     mount.render(screen(<Mentioning />));
     await settle();
-    type(field(), "see ");
+    change(field(), "see ");
     await act(async () =>
       mount.host().querySelector<HTMLButtonElement>('button[title="Bold"]')?.click(),
     );

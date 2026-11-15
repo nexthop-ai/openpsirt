@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { mounted, screen, serve, settle } from "../../test/mount";
-import { readingDependencies } from "../../test/reach";
+import { readerOf } from "../../test/reach";
 import { Effort } from "./Effort";
 import { Overview } from "./Overview";
 import { Scrutiny } from "./Scrutiny";
@@ -42,13 +42,7 @@ describe("a printed sheet's header", () => {
     const got = serve((path) =>
       path === "/v1/session/me"
         ? {
-            data: {
-              identity: "ana",
-              name: "Ana",
-              admin: false,
-              kind: "person",
-              reach: [readingDependencies("sonic")],
-            },
+            data: readerOf("sonic"),
           }
         : path === "/v1/teams"
           ? { data: { items: [{ name: "platform", display_name: "Platform" }], total: 1 } }
@@ -79,13 +73,7 @@ describe("a printed sheet's header", () => {
     serve((path) =>
       path === "/v1/session/me"
         ? {
-            data: {
-              identity: "ana",
-              name: "Ana",
-              admin: false,
-              kind: "person",
-              reach: [readingDependencies("sonic")],
-            },
+            data: readerOf("sonic"),
           }
         : path === "/v1/effort"
           ? {

@@ -18,7 +18,7 @@ import {
 } from "../test/mount";
 import { button, change, only, press } from "../test/controls";
 import { EVERY_DECISION_KEY } from "../test/decisionKeys";
-import { readingDependencies } from "../test/reach";
+import { readerOf } from "../test/reach";
 import { belongTo } from "../app/drafts";
 import { FLOORS } from "../ui/severities";
 
@@ -122,14 +122,7 @@ describe("approving a selection", () => {
     expect(all, "no select-all control").not.toBeNull();
     act(() => all?.click());
     const batch = host.querySelector<HTMLInputElement>('input[aria-label="Batch name"]');
-    act(() => {
-      if (!batch) return;
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
-        batch,
-        "tuesday",
-      );
-      batch.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    change(batch, "tuesday");
     const approve = Array.from(host.querySelectorAll<HTMLButtonElement>("button")).find(
       (each) => each.textContent === "Approve 2 selected",
     );
@@ -315,13 +308,7 @@ describe("a product's page", () => {
         return { data: { name: "sonic", waiting: 3 } };
       if (path === "/v1/session/me") {
         return {
-          data: {
-            identity: "ana",
-            name: "Ana",
-            admin: false,
-            kind: "person",
-            reach: [readingDependencies("sonic")],
-          },
+          data: readerOf("sonic"),
         };
       }
       return { data: { items: [], total: 0 } };

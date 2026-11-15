@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SupplierAdvisoryFeeds, KNOWN_SUPPLIERS } from "./SupplierAdvisoryFeeds";
 import { api } from "../api/client";
 import { accept, screen, serve, settle, mounted } from "../test/mount";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
@@ -23,11 +24,7 @@ async function adding(already: { name: string; url: string }[]) {
   await settle();
   const select = mount.host().querySelector<HTMLSelectElement>("select[aria-label=Product]");
   if (!select) throw new Error("no product list");
-  act(() => {
-    const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
-    set?.call(select, "sonic");
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  change(select, "sonic");
   await settle();
   const open = Array.from(document.querySelectorAll("button")).find(
     (each) => each.textContent?.trim() === "Add feed",
@@ -82,15 +79,8 @@ async function picked() {
   await settle();
   const select = mount.host().querySelector<HTMLSelectElement>("select[aria-label=Product]");
   if (!select) throw new Error("no product list");
-  choose(select, "sonic");
+  change(select, "sonic");
   await settle();
-}
-
-function choose(select: HTMLSelectElement, value: string) {
-  act(() => {
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(select, value);
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
 }
 
 describe("uploading a VEX statement set", () => {
@@ -103,20 +93,14 @@ describe("uploading a VEX statement set", () => {
       Array.from(each.options).some((option) => option.value === "statements"),
     );
     if (!kind) throw new Error("no kind list");
-    choose(kind, "statements");
+    change(kind, "statements");
     await settle();
     expect(document.body.textContent).not.toContain("whole previous statement set");
     const typed = Array.from(document.querySelectorAll<HTMLLabelElement>("label.field"))
       .find((each) => each.textContent?.startsWith("Publisher"))
       ?.querySelector("input");
     if (!typed) throw new Error("no publisher box");
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
-        typed,
-        " debian-vex.json ",
-      );
-      typed.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    change(typed, " debian-vex.json ");
     const chooser = mount.host().querySelector<HTMLInputElement>('input[type="file"]');
     if (!chooser) throw new Error("no file control");
     Object.defineProperty(chooser, "files", { value: [new File(["{}"], "empty.json")] });

@@ -10,12 +10,6 @@ import { belongTo } from "../app/drafts";
 
 const mount = mounted();
 
-// A controlled field changed the way a person changes it.
-function type(field: HTMLInputElement, value: string) {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(field, value);
-  field.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 // The form with duplicate chosen and an issue typed, once typing has paused.
 async function duplicateOf(issue: string) {
   mount.render(screen(<RuleForm product="sonic" references={["sonic-R-2026-1"]} />));
@@ -31,7 +25,7 @@ async function duplicateOf(issue: string) {
   // the real clock returns never fires.
   vi.useFakeTimers();
   try {
-    act(() => type(field, issue));
+    change(field, issue);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(450);
     });

@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { api } from "../api/client";
 import { Advisories } from "./Advisories";
 import { mounted, screen, serve, settle } from "../test/mount";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
@@ -15,17 +16,6 @@ function press(label: string) {
   );
   if (!found) throw new Error(`no button ${label}`);
   act(() => found.click());
-}
-
-function change(field: HTMLInputElement | HTMLSelectElement | null, value: string) {
-  if (!field) throw new Error("no such field");
-  const proto = field instanceof HTMLSelectElement ? HTMLSelectElement : HTMLInputElement;
-  act(() => {
-    Object.getOwnPropertyDescriptor(proto.prototype, "value")?.set?.call(field, value);
-    field.dispatchEvent(
-      new Event(field instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }),
-    );
-  });
 }
 
 describe("starting an advisory", () => {

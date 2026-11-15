@@ -107,20 +107,6 @@ function button(label: string): HTMLButtonElement | undefined {
   );
 }
 
-function pick(select: HTMLSelectElement, value: string) {
-  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(select, value);
-  select.dispatchEvent(new Event("change", { bubbles: true }));
-}
-
-function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const proto =
-    field instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
-      : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(field, value);
-  field.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 describe("recording an incident from its own screen", () => {
   it("sends the request a finding sends, for the product and issue picked", async () => {
     const asked = serving([can("sonic", true), can("other", false)]);
@@ -132,8 +118,8 @@ describe("recording an incident from its own screen", () => {
     const select = mount.host().querySelector<HTMLSelectElement>(".card select");
     // Only a product the reader triages is offered: the server refuses the rest.
     expect(Array.from(select?.options ?? []).map((each) => each.value)).toEqual(["", "sonic"]);
-    act(() => pick(select!, "sonic"));
-    act(() => type(mount.host().querySelector<HTMLInputElement>("input[list]")!, " CVE-2026-1 "));
+    change(select, "sonic");
+    change(mount.host().querySelector<HTMLInputElement>("input[list]"), " CVE-2026-1 ");
     await settle();
     // An attack is often on a shipped tag or a release past its end, so the
     // suggestions ask past every default the findings list applies.
@@ -151,9 +137,7 @@ describe("recording an incident from its own screen", () => {
         },
       },
     });
-    act(() =>
-      type(mount.host().querySelector<HTMLTextAreaElement>("#grounds")!, "A customer saw it"),
-    );
+    change(mount.host().querySelector<HTMLTextAreaElement>("#grounds"), "A customer saw it");
     const record = Array.from(
       mount.host().querySelectorAll<HTMLButtonElement>(".card button"),
     ).find((each) => each.textContent === "Record");

@@ -4,18 +4,12 @@
 import { act } from "react";
 import { describe, expect, it } from "vitest";
 import { Findings } from "./Findings";
-import { readingDependencies } from "../test/reach";
+import { readerOf } from "../test/reach";
 import { location, mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
 
-const me = {
-  identity: "ana",
-  name: "Ana",
-  admin: false,
-  kind: "person",
-  reach: [readingDependencies("sonic")],
-};
+const me = readerOf("sonic");
 
 async function draw(address: string) {
   serve((path) => (path === "/v1/session/me" ? { data: me } : { data: { items: [], total: 0 } }));

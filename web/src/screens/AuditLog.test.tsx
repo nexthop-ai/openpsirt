@@ -10,6 +10,7 @@ import { screen, serve, settle, mounted } from "../test/mount";
 import { change } from "../test/controls";
 import { api } from "../api/client";
 import { readingDependencies } from "../test/reach";
+import { auditDecision } from "../test/audit";
 
 const mount = mounted();
 
@@ -338,15 +339,10 @@ describe("the audit log's list", () => {
           data: {
             total: 1,
             items: [
-              {
-                decision: 7,
-                issue: "CVE-2026-1",
-                issues: 1,
+              auditDecision({
                 product: "mine",
-                products: 1,
                 component: "openssl",
                 version: "3.0.2",
-                components: 1,
                 rows: 40,
                 occurrences: 40,
                 outcome: "upgrade-needed",
@@ -355,10 +351,7 @@ describe("the audit log's list", () => {
                 states: { proposed: 0, approved: 39, withdrawn: 0, lapsed: 1 },
                 standing: 39,
                 proposed_by: "ana",
-                proposed_at: "2026-09-01T00:00:00Z",
-                approvals: [],
-                two_people: false,
-              },
+              }),
             ],
           },
         };

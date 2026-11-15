@@ -8,6 +8,7 @@ import { Shell } from "./Shell";
 import { answer, location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 import type { Who } from "./session";
 import { keep, restore } from "./drafts";
+import { change } from "../test/controls";
 
 // A full load has no meaning in a test, and jsdom will not let one be
 // replaced, so the reload clearing this browser asks for is recorded here and
@@ -40,10 +41,7 @@ async function searched(term: string, issue: Answer): Promise<string> {
     .host()
     .querySelector<HTMLInputElement>('input[aria-label="Find an issue, or a component"]');
   if (!box) throw new Error("no top search");
-  act(() => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(box, term);
-    box.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  change(box, term);
   await act(async () => box.form?.requestSubmit());
   await settle();
   return location();

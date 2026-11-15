@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { BulkDecision } from "./BulkDecision";
 import { ROUTES, bulkDecisionAt } from "../app/routes";
 import { mounted, screen, serve, settle } from "../test/mount";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
@@ -25,13 +26,7 @@ describe("narrowing a bulk decision", () => {
     await settle();
     const box = mount.host().querySelector<HTMLInputElement>(".searchbox input");
     if (!box) throw new Error("no narrowing box");
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
-        box,
-        "driver",
-      );
-      box.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    change(box, "driver");
     act(() => {
       box.form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     });

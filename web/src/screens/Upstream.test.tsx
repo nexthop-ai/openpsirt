@@ -7,6 +7,7 @@ import { UpstreamDrawer } from "./Upstream";
 import { UpstreamOffers } from "./QueueOffers";
 import { UpstreamSaid } from "../ui/UpstreamSaid";
 import { accept, answer, mounted, screen, serve, settle } from "../test/mount";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
@@ -19,12 +20,7 @@ function button(label: string) {
 }
 
 function type(value: string) {
-  const input = document.getElementById("declare-provider-description") as HTMLInputElement;
-  act(() => {
-    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-    set?.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  change(document.getElementById("declare-provider-description") as HTMLInputElement, value);
 }
 
 describe("the upstream drawer", () => {

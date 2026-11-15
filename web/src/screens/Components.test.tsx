@@ -5,6 +5,7 @@ import { act } from "react";
 import { describe, expect, it } from "vitest";
 import { Components } from "./Components";
 import { location, mounted, screen, serve, settle } from "../test/mount";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
@@ -25,13 +26,7 @@ describe("the components screen", () => {
       .host()
       .querySelector<HTMLInputElement>('input[aria-label="Part of a component’s name"]');
     if (!box) throw new Error("no name box");
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
-        box,
-        " openssl ",
-      );
-      box.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    change(box, " openssl ");
     await act(async () => box.form?.requestSubmit());
     await settle();
     expect(location()).toBe("/search/openssl");

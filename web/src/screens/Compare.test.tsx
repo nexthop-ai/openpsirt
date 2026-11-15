@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { Compare } from "./Compare";
 import { press, tick } from "../test/controls";
 import { mounted, screen, serve, settle } from "../test/mount";
-import { readingDependencies } from "../test/reach";
+import { readerOf } from "../test/reach";
 
 const mount = mounted();
 
@@ -24,13 +24,7 @@ const comparison = {
   ],
 };
 
-const READER = {
-  identity: "ana",
-  name: "Ana",
-  admin: false,
-  kind: "person",
-  reach: [readingDependencies("sonic")],
-};
+const READER = readerOf("sonic");
 
 // The reads the screen makes, answered, and every one it asked for.
 function serving() {

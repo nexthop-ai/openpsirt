@@ -7,7 +7,8 @@ import { AnalysisCoverage } from "./AnalysisCoverage";
 import { AnalyzerPrecision } from "./AnalyzerPrecision";
 import { CodeFindingsByRelease } from "./CodeFindingsByRelease";
 import { TimeToFix, TimeToJudge } from "./CodeFindingTiming";
-import { client, mounted, screen, serve, settle } from "../../test/mount";
+import { mounted, screen, serve, settle } from "../../test/mount";
+import { codeReader } from "../../test/reach";
 
 const mount = mounted();
 
@@ -166,16 +167,7 @@ async function drawn(
   reads: boolean,
   scope: Record<string, string> = { product: "sonic" },
 ) {
-  window.sessionStorage.setItem("openpsirt.scope", JSON.stringify(scope));
-  const session = {
-    identity: "ana",
-    name: "Ana",
-    kind: "person",
-    reach: [{ product: "sonic", reads_public: true, reads_security_testing: reads }],
-    outcomes: [],
-  };
-  const queries = client();
-  queries.setQueryData(["whoami"], session);
+  const { session, queries } = codeReader(reads, scope, { reads_public: true });
   const spy = serve((path) => {
     if (path === "/v1/session/me") return { data: session };
     const answer = ANSWERS[path];

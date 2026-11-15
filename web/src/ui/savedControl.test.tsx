@@ -17,18 +17,6 @@ function Picking() {
   return <Saved onBuild={false} onPicked={(next) => setParams(next)} />;
 }
 
-// A controlled select moved the way a person moves it.
-function pick(select: HTMLSelectElement, value: string) {
-  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(select, value);
-  select.dispatchEvent(new Event("change", { bubbles: true }));
-}
-
-// A controlled field changed the way a person changes it.
-function type(field: HTMLInputElement, value: string) {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(field, value);
-  field.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 function button(label: string): HTMLButtonElement | undefined {
   return Array.from(mount.host().querySelectorAll<HTMLButtonElement>("button")).find(
     (each) => each.textContent === label,
@@ -49,7 +37,7 @@ async function save(name: string) {
   act(() => button("Save this")?.click());
   const field = mount.host().querySelector<HTMLInputElement>('input[type="text"]');
   if (!field) throw new Error("no name field");
-  act(() => type(field, name));
+  change(field, name);
   act(() => button("Save")?.click());
   await settle();
 }
@@ -66,7 +54,7 @@ describe("a saved filter", () => {
     await settle();
     const select = mount.host().querySelector<HTMLSelectElement>("select");
     if (!select) throw new Error("no saved filters control");
-    act(() => pick(select, "kernel"));
+    change(select, "kernel");
     await settle();
     expect(location()).toBe(
       "/f?component=linux&branch_or_tag=main&variant=x86&opened_by_run=4&view=components&rule=kernel",
@@ -122,21 +110,13 @@ describe("a saved filter that prepares a decision", () => {
     act(() => button("Save this")?.click());
     const field = mount.host().querySelector<HTMLInputElement>('input[type="text"]');
     if (!field) throw new Error("no name field");
-    act(() => type(field, "kernel"));
+    change(field, "kernel");
     const box = mount.host().querySelector<HTMLInputElement>('input[type="checkbox"]');
     act(() => box?.click());
     const selects = () => mount.host().querySelectorAll<HTMLSelectElement>("select");
-    act(() => pick(selects()[selects().length - 1]!, outcome));
+    change(selects()[selects().length - 1]!, outcome);
     const reasoning = mount.host().querySelector("textarea");
-    if (reasoning) {
-      act(() => {
-        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
-          reasoning,
-          "the module is not built",
-        );
-        reasoning.dispatchEvent(new Event("input", { bubbles: true }));
-      });
-    }
+    if (reasoning) change(reasoning, "the module is not built");
     await settle();
     return selects;
   }
@@ -144,7 +124,7 @@ describe("a saved filter that prepares a decision", () => {
   it("holds Save back until a reason is chosen where the outcome needs one", async () => {
     const selects = await chosen("not-applicable");
     expect(button("Save")?.disabled).toBe(true);
-    act(() => pick(selects()[selects().length - 1]!, "component_not_present"));
+    change(selects()[selects().length - 1]!, "component_not_present");
     expect(button("Save")?.disabled).toBe(false);
   });
 

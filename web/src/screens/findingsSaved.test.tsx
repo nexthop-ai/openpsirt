@@ -3,19 +3,14 @@
 
 import { act } from "react";
 import { describe, expect, it } from "vitest";
-import { readingDependencies } from "../test/reach";
+import { readerOf } from "../test/reach";
 import { Findings } from "./Findings";
 import { answer, location, mounted, screen, serve, settle } from "../test/mount";
+import { change } from "../test/controls";
 
 const mount = mounted();
 
-const me = {
-  identity: "ana",
-  name: "Ana",
-  admin: false,
-  kind: "person",
-  reach: [readingDependencies("sonic")],
-};
+const me = readerOf("sonic");
 
 // Two filters keeping one query, which only their names tell apart.
 const kept = [
@@ -47,10 +42,7 @@ const button = (label: string) =>
 const query = () => new URLSearchParams(location().split("?")[1] ?? "");
 
 function pick(value: string) {
-  const select = control();
-  if (!select) throw new Error("no saved filters control");
-  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(select, value);
-  select.dispatchEvent(new Event("change", { bubbles: true }));
+  change(control(), value);
 }
 
 describe("the saved filter a list is open under", () => {
@@ -58,7 +50,7 @@ describe("the saved filter a list is open under", () => {
     "is the one picked, of two keeping one query, and Forget takes that one (%s)",
     async (name) => {
       const forgotten = await draw("/findings");
-      act(() => pick(name));
+      pick(name);
       await settle();
       expect(query().get("component")).toBe("linux");
       expect(query().get("rule")).toBe(name);
@@ -71,7 +63,7 @@ describe("the saved filter a list is open under", () => {
 
   it("is none once a filter changes after picking, and the name leaves the address", async () => {
     await draw("/findings");
-    act(() => pick("beta"));
+    pick("beta");
     await settle();
     act(() => button("New today")?.click());
     await settle();
