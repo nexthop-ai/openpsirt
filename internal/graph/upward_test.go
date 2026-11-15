@@ -132,20 +132,8 @@ func TestWorkOnAComponentTheBuildDroppedIsDrawnAsTheBuildStatedIt(t *testing.T) 
 		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
+		f.report(t, high("CVE-2026-1", zlib))
 		findings := finding.NewStore(f.db.DB)
-		run, err := findings.Begin(ctx, finding.Run{
-			BuildID: f.buildID, Scanner: "grype", ScannerVersion: "0.100.0",
-			DatabaseVersion: "2026-08-28", RanHere: true,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := findings.Apply(ctx, f.buildID, run.ID, []finding.Reported{{
-			Issue:     finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
-			Component: zlib, FixState: finding.FixedUpstream, FixedIn: "2.0",
-		}}); err != nil {
-			t.Fatal(err)
-		}
 		const party = 77
 		boss := access.NewPerson(1, "boss", false,
 			map[int64][]access.Role{*f.scope.ProductID: {access.PublicTriage, access.Assigner}}, 1)
