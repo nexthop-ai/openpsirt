@@ -183,6 +183,18 @@ func TestAFileEditedAfterTheFreezeIsRefused(t *testing.T) {
 	}
 }
 
+// A frozen file whose license header was taken off has no digest to compare,
+// so it is a fault rather than a file passed over, even with its body changed.
+func TestAFrozenFileWithoutItsHeaderIsRefused(t *testing.T) {
+	root, migrations := tree(t)
+	atV010(t, migrations)
+	write(t, filepath.Join(migrations, "00002_second.go"), "package migrations\n\n// edited\n")
+	faults := check(t, root, migrations, "v0.1.0")
+	if len(faults) != 1 || !strings.Contains(faults[0], "00002_second.go: it does not open with the license header") {
+		t.Errorf("a file without its header answered %v", faults)
+	}
+}
+
 // A release recorded without the schema one engine builds is incomplete.
 func TestAReleaseMissingAnEngineIsRefused(t *testing.T) {
 	root, migrations := tree(t)
@@ -241,6 +253,34 @@ func TestFreezingRecordsWhatTheReleaseOwns(t *testing.T) {
 	}
 	if back.Last != r.Last || len(back.Digests) != len(r.Digests) {
 		t.Errorf("read back as %+v, froze %+v", back, r)
+	}
+}
+
+// A release not yet tagged is frozen again after its files change, and the
+// code it carries is its own, so the second freeze is not refused as a second
+// release claiming it.
+func TestFreezingAnUntaggedReleaseAgainRewritesItsRecord(t *testing.T) {
+	root, migrations := tree(t)
+	if err := os.MkdirAll(filepath.Join(root, "v0.2.0"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for _, engine := range database.Engines() {
+		write(t, filepath.Join(root, "v0.2.0", Schema(string(engine))), "column t.c int\n")
+	}
+	first, err := Freeze(root, migrations, "v0.2.0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(migrations, "00003_v020.go"), header+"package migrations\n\n// three, edited\n")
+	second, err := Freeze(root, migrations, "v0.2.0")
+	if err != nil {
+		t.Fatalf("freezing the release again was refused: %v", err)
+	}
+	if second.Digests["00003_v020.go"] == first.Digests["00003_v020.go"] {
+		t.Error("the second freeze recorded the file as it was before the edit")
+	}
+	if faults := check(t, root, migrations, "v0.2.0"); len(faults) != 0 {
+		t.Errorf("the release frozen again was refused: %v", faults)
 	}
 }
 
@@ -409,6 +449,16 @@ func TestAMalformedRecordLineIsRefused(t *testing.T) {
 	write(t, filepath.Join(root, "v0.1.0", Files), "last 2\nabc123  00001_first.go\n")
 	if _, err := Read(root, "v0.1.0"); err == nil || !strings.Contains(err.Error(), "line 2") {
 		t.Errorf("a short digest answered %v", err)
+	}
+}
+
+// A record naming no last migration says nothing of where the release ends,
+// so it is refused rather than read as ending before every migration.
+func TestARecordNamingNoLastMigrationIsRefused(t *testing.T) {
+	root, _ := tree(t)
+	write(t, filepath.Join(root, "v0.1.0", Files), "# a release\n"+strings.Repeat("a", 64)+"  00001_first.go\n")
+	if _, err := Read(root, "v0.1.0"); err == nil || !strings.Contains(err.Error(), "v0.1.0 names no last migration") {
+		t.Errorf("a record with no last migration answered %v", err)
 	}
 }
 
