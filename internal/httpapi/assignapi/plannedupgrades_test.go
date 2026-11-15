@@ -112,6 +112,12 @@ func TestThePlannedUpgradesReadTwoPackagesOfOneSource(t *testing.T) {
 			if body[1][builds] != "" {
 				t.Errorf("one build's file states a build count of %q", body[1][builds])
 			}
+			// The score column carries an unrated worst issue's score, and is
+			// empty beside a rated one.
+			if score := httpapitest.IndexOf(body[0], "score"); score < 0 || body[1][score] != "" {
+				t.Errorf("the score column is at %d in %v, want present and empty beside a rated upgrade",
+					score, body[1])
+			}
 		})
 		// A limit of zero answers the total of the planned-upgrade list and of
 		// the list by component without a row, and the totals are the ones their

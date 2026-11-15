@@ -41,7 +41,8 @@ type PlannedUpgradeItemBody struct {
 	Issues      int      `json:"issues" doc:"Distinct vulnerabilities the upgrade closes"`
 	Occurrences int      `json:"occurrences" doc:"The number of findings those sit at"`
 	Builds      int      `json:"builds,omitempty" doc:"The number of builds of the selection holding any of it. Absent where the selection is one build"`
-	Severity    string   `json:"severity,omitempty" doc:"The worst of what it closes"`
+	Severity    string   `json:"severity,omitempty" doc:"The band of the worst issue it closes, or unrated where that issue has no recognized severity word"`
+	Score       float64  `json:"score,omitempty" doc:"The score of the worst issue it closes, where that issue is unrated and has one"`
 	Exploited   bool     `json:"exploited,omitempty" doc:"Some of what it closes is being exploited"`
 	// Incident is the other exploitation signal, and the one that
 	// outranks it: an upgrade carrying it closes something this product was
@@ -171,7 +172,7 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 			About: []core.Stated{core.TriagedAtOrAbove(floor)},
 			Header: []string{
 				"upstream", "from", "to", "components", "issues", "occurrences",
-				"builds", "severity", "exploited", "incident", "in",
+				"builds", "severity", "score", "exploited", "incident", "in",
 			},
 			// Paged through the store the screen reads, so the file is the
 			// list rather than a second query that will come to disagree
@@ -193,11 +194,15 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 					if !oneBuild {
 						count = strconv.Itoa(body.Builds)
 					}
+					score := ""
+					if body.Score > 0 {
+						score = strconv.FormatFloat(body.Score, 'f', 1, 64)
+					}
 					rows = append(rows, []string{
 						body.Upstream, body.From, body.To,
 						strings.Join(body.Components, " "),
 						strconv.Itoa(body.Issues), strconv.Itoa(body.Occurrences),
-						count, body.Severity,
+						count, body.Severity, score,
 						strconv.FormatBool(body.Exploited),
 						strconv.FormatBool(body.Incident),
 						strings.Join(builds, " "),
@@ -218,9 +223,10 @@ func plannedUpgradeBodies(upgrades []finding.PlannedUpgrade, oneBuild bool) []Pl
 			Upstream: upgrade.Upstream, From: upgrade.From, To: upgrade.To,
 			Components: upgrade.Components,
 			Issues:     upgrade.Issues, Occurrences: upgrade.Occurrences,
-			Severity: upgrade.Severity, Exploited: upgrade.Exploited,
-			Incident: upgrade.Incident,
-			In:       make([]core.BuildNamed, 0, len(upgrade.In)),
+			Severity: upgrade.Severity, Score: float64(upgrade.ScoreCenti) / 100,
+			Exploited: upgrade.Exploited,
+			Incident:  upgrade.Incident,
+			In:        make([]core.BuildNamed, 0, len(upgrade.In)),
 		}
 		for _, at := range upgrade.In {
 			body.In = append(body.In, core.BuildNamed{BranchOrTag: at.BranchOrTag, Variant: at.Variant})

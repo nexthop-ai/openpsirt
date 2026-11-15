@@ -10653,8 +10653,12 @@ components:
           description: The number of findings those sit at
           format: int64
           type: integer
+        score:
+          description: The score of the worst issue it closes, where that issue is unrated and has one
+          format: double
+          type: number
         severity:
-          description: The worst of what it closes
+          description: The band of the worst issue it closes, or unrated where that issue has no recognized severity word
           type: string
         to:
           description: The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped

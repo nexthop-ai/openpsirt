@@ -61,10 +61,14 @@ type PlannedUpgrade struct {
 	// a bump is declared for releases, and the ones worth offering are the
 	// ones that have it.
 	In []Build
-	// Urgency is the worst of what it closes and Severity that as a word. A
-	// upgrade is worth doing for its worst member.
-	Urgency  int64
-	Severity string
+	// Urgency is the worst of what it closes. A upgrade is worth doing for
+	// its worst member.
+	Urgency int64
+	// Severity is the band of its worst issue, as every severity sort ranks
+	// it, or Unrated where that issue has no recognized word; ScoreCenti is
+	// then that issue's score in hundredths, zero where it has none.
+	Severity   string
+	ScoreCenti int
 	// Exploited says a feed reports somebody in the world using one of these,
 	// and Incident that somebody recorded this product being attacked
 	// through one. Different facts, so different flags: an upgrade carrying the
@@ -93,27 +97,29 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 	limit = database.AList.Of(limit)
 
 	var rows []struct {
-		Fold        string `bun:"fold"`
-		Upstream    string `bun:"upstream"`
-		From        string `bun:"shipped"`
-		To          string `bun:"fixed_in"`
-		Issues      int    `bun:"issues"`
-		Occurrences int    `bun:"places"`
-		Builds      int    `bun:"builds"`
-		Urgency     int64  `bun:"urgency"`
-		Exploited   int    `bun:"exploited"`
-		Incident    int    `bun:"incident"`
-		Worst       int    `bun:"worst"`
-		WorstSorted int    `bun:"worst_sorted"`
-		Total       int    `bun:"total"`
+		Fold         string `bun:"fold"`
+		Upstream     string `bun:"upstream"`
+		From         string `bun:"shipped"`
+		To           string `bun:"fixed_in"`
+		Issues       int    `bun:"issues"`
+		Occurrences  int    `bun:"places"`
+		Builds       int    `bun:"builds"`
+		Urgency      int64  `bun:"urgency"`
+		Exploited    int    `bun:"exploited"`
+		Incident     int    `bun:"incident"`
+		Worst        int    `bun:"worst"`
+		UnratedScore int    `bun:"unrated_score"`
+		Total        int    `bun:"total"`
 	}
 	// The worst thing in the upgrade, as a rank rather than as a word, because
-	// the four engines do not agree on how words order. Drawn folded the way
-	// the line and the deadline fold it, so an unrated issue reads as a
-	// medium, and the ELSE below cannot fire because of it. Sorted by the band
-	// every severity sort ranks in, so an unrated issue sorts by its score.
-	worst := "MAX(" + rankCase(rating.BandExpr, 0) + ")"
-	worstSorted := "MAX(" + severityRank + ")"
+	// the four engines do not agree on how words order: the band every
+	// severity sort ranks in, doubled, plus one where the worst issue carries
+	// a recognized word. A rated issue wins a tie with an unrated one in its
+	// band, and the low bit says which the label names. The worst unrated
+	// score is the score of the worst issue whenever that issue is unrated,
+	// since a higher unrated score could only rank higher.
+	worst := "MAX(" + severityRank + " * 2 + CASE WHEN " + rating.Recognized + " THEN 1 ELSE 0 END)"
+	unratedScore := `MAX(CASE WHEN ` + rating.Recognized + ` THEN 0 ELSE COALESCE("v"."score_centi", 0) END)`
 
 	page := s.bumps(buildIDs, visible, filter).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
@@ -129,7 +135,7 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
 		ColumnExpr(overParts.incident() + ` AS "incident"`).
 		ColumnExpr(worst + ` AS "worst"`).
-		ColumnExpr(worstSorted + ` AS "worst_sorted"`).
+		ColumnExpr(unratedScore + ` AS "unrated_score"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// Worst first unless somebody asks otherwise, and every order is
 		// through the allowlist above: the key selects a stored expression
@@ -149,13 +155,19 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 
 	upgrades := make([]PlannedUpgrade, 0, len(rows))
 	for _, row := range rows {
-		upgrades = append(upgrades, PlannedUpgrade{
+		upgrade := PlannedUpgrade{
 			Fold:     row.Fold,
 			Upstream: row.Upstream, From: row.From, To: row.To,
 			Issues: row.Issues, Occurrences: row.Occurrences, Builds: row.Builds,
-			Urgency: row.Urgency, Severity: worstWord(row.Worst),
+			Urgency:   row.Urgency,
 			Exploited: row.Exploited == 1, Incident: row.Incident == 1,
-		})
+		}
+		if row.Worst%2 == 1 {
+			upgrade.Severity = wordAt(row.Worst / 2)
+		} else {
+			upgrade.Severity, upgrade.ScoreCenti = Unrated, row.UnratedScore
+		}
+		upgrades = append(upgrades, upgrade)
 	}
 	if err := s.namesIn(ctx, buildIDs, visible, filter, upgrades); err != nil {
 		return nil, 0, err
@@ -248,14 +260,6 @@ type Build struct {
 	BranchOrTag string
 	Variant     string
 }
-
-// worstWord turns the rank the upgrade query folds severities to back into the
-// word, in the same four the rest of this speaks.
-//
-// Read out of the one list rather than written back out as a switch: the
-// mapping and its inverse disagreeing about a word added later is the same
-// defect twice.
-func worstWord(rank int) string { return wordAt(rank) }
 
 // namesIn fills in which component names each upgrade on the page covers.
 //
@@ -537,7 +541,8 @@ const (
 	PlannedUpgradesByUrgency PlannedUpgradeSortKey = "urgency"
 	// PlannedUpgradesBySeverity is the worst rating in the upgrade, as the band rather
 	// than the urgency — which puts what is being exploited in a band of its
-	// own above every rating. An unrated issue ranks as severityRank ranks it.
+	// own above every rating. An unrated issue ranks as severityRank ranks it,
+	// below a rated issue in the same band.
 	PlannedUpgradesBySeverity PlannedUpgradeSortKey = "severity"
 	// PlannedUpgradesByIssues is how many distinct issues the bump closes, which is
 	// the "what should I do this afternoon" order: on a seeded image one
@@ -561,7 +566,7 @@ var plannedUpgradeOrder = map[PlannedUpgradeSortKey]struct {
 	nothing bool
 }{
 	PlannedUpgradesByUrgency:     {expr: "urgency"},
-	PlannedUpgradesBySeverity:    {expr: "worst_sorted"},
+	PlannedUpgradesBySeverity:    {expr: "worst"},
 	PlannedUpgradesByIssues:      {expr: "issues"},
 	PlannedUpgradesByOccurrences: {expr: "places"},
 	PlannedUpgradesByBuilds:      {expr: "builds"},

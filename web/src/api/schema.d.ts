@@ -13915,7 +13915,12 @@ export interface components {
              * @description The number of findings those sit at
              */
             occurrences: number;
-            /** @description The worst of what it closes */
+            /**
+             * Format: double
+             * @description The score of the worst issue it closes, where that issue is unrated and has one
+             */
+            score?: number;
+            /** @description The band of the worst issue it closes, or unrated where that issue has no recognized severity word */
             severity?: string;
             /** @description The version that fixes it, as whoever packages the component wrote it. Never compared against what ships, only grouped */
             to: string;

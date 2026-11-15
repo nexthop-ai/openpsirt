@@ -606,8 +606,10 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 
 func TestThePlannedUpgradeSeverityOrderRanksAnUnratedIssueByItsScore(t *testing.T) {
 	// The severity order every list follows: an unrated issue sorts in its
-	// score's band, and below a low with no score.
-	leader := func(t *testing.T, f *fixture) string {
+	// score's band, and below a low with no score. The row names it unrated,
+	// with its score where it has one, and never as the medium the filters
+	// fold it to.
+	listed := func(t *testing.T, f *fixture) []finding.PlannedUpgrade {
 		t.Helper()
 		upgrades, _, err := f.store.PlannedUpgrades(t.Context(), f.holding(t, access.PublicTriage),
 			f.wholeProduct(), 50, 0, finding.Filter{PlannedUpgradeSort: finding.PlannedUpgradesBySeverity})
@@ -617,7 +619,14 @@ func TestThePlannedUpgradeSeverityOrderRanksAnUnratedIssueByItsScore(t *testing.
 		if len(upgrades) != 2 {
 			t.Fatalf("%d upgrades, want two: %+v", len(upgrades), upgrades)
 		}
-		return upgrades[0].Upstream
+		return upgrades
+	}
+	labelled := func(t *testing.T, got finding.PlannedUpgrade, severity string, score int) {
+		t.Helper()
+		if got.Severity != severity || got.ScoreCenti != score {
+			t.Errorf("%s is labelled %q at %d, want %q at %d", got.Upstream, got.Severity, got.ScoreCenti,
+				severity, score)
+		}
 	}
 	t.Run("scored", func(t *testing.T) {
 		each(t, func(t *testing.T, f *fixture) {
@@ -628,23 +637,34 @@ func TestThePlannedUpgradeSeverityOrderRanksAnUnratedIssueByItsScore(t *testing.
 			}); err != nil {
 				t.Fatal(err)
 			}
-			if got := leader(t, f); got != libnl.Name {
-				t.Errorf("sort=severity leads with %q rather than the bump closing the unrated 9.8", got)
+			upgrades := listed(t, f)
+			if upgrades[0].Upstream != libnl.Name {
+				t.Errorf("sort=severity leads with %q rather than the bump closing the unrated 9.8",
+					upgrades[0].Upstream)
 			}
+			labelled(t, upgrades[0], finding.Unrated, 980)
+			labelled(t, upgrades[1], "high", 0)
 		})
 	})
 	t.Run("unscored", func(t *testing.T) {
 		each(t, func(t *testing.T, f *fixture) {
 			f.shipped(t, twoConsumers())
+			// The unrated 2.5 shares the low band with the low it sits
+			// beside, and the rated issue names the band.
 			if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
 				ranked("CVE-2026-1", libnl, "unknown", 0),
 				ranked("CVE-2026-2", swss, "low", 2.0),
+				ranked("CVE-2026-3", swss, "unknown", 2.5),
 			}); err != nil {
 				t.Fatal(err)
 			}
-			if got := leader(t, f); got != swss.Name {
-				t.Errorf("sort=severity leads with %q rather than the bump closing the low", got)
+			upgrades := listed(t, f)
+			if upgrades[0].Upstream != swss.Name {
+				t.Errorf("sort=severity leads with %q rather than the bump closing the low",
+					upgrades[0].Upstream)
 			}
+			labelled(t, upgrades[0], "low", 0)
+			labelled(t, upgrades[1], finding.Unrated, 0)
 		})
 	})
 }
