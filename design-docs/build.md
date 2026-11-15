@@ -32,7 +32,7 @@ Satisfies REQ-43, REQ-61, REQ-62, REQ-63, REQ-75.
 | `internal/httpapi/scansapi/`, `internal/httpapi/findingsapi/`, `internal/httpapi/assignapi/`, `internal/httpapi/triageapi/`, `internal/httpapi/analyticsapi/`, `internal/httpapi/advisoryapi/`, `internal/httpapi/adminapi/` | One package per area: inventories, findings, assignment, decisions, reports, advisories, administration |
 | `internal/httpapi/httpapitest/`, `internal/httpapi/refusaltest/` | The shared test server over a seeded cast, and the refusal-mapper checks |
 | `internal/database/` | Opening, identifying and validating a database. See `design-docs/database.md` |
-| `internal/database/migrate/` | The migration runner and its locks |
+| `internal/database/migrate/` | The migration runner and its lease |
 | `internal/database/migrate/migrations/` | The migrations |
 | `internal/schema/` | Registers this application's migrations with the runner |
 | `internal/dbtest/` | Runs a test against every available database |

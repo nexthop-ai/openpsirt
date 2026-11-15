@@ -120,4 +120,4 @@ during an upgrade holds the rule.
 | SQLite | 0.007 ms | 0.006 ms | 0.011 ms | 0.037 ms | 0.039 ms |
 
 A whole look held to change the schema skips the count of the record, which is
-why it costs no more than one with no lease.
+why it costs about the same as one with no lease.

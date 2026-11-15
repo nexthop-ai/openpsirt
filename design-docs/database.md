@@ -70,6 +70,7 @@ every engine. Engine-specific code lives in these places and no others.
 | Reading the server's clock | A timestamp follows the session's time zone and each engine's text form; seconds since the epoch are spelled differently on each. The migration lease reads it inside its transactions (`design-docs/database-migrations.md` § Migration lease) |
 | Inserting a row another writer may already have written | `ON CONFLICT DO NOTHING` on two engines, `ON DUPLICATE KEY UPDATE` setting the key to itself on two. Never `INSERT IGNORE`, which also stores a value cut to fit, a dangling reference or a missing value as a warning. Only for a table of facts, where two writers agree |
 | The job queue's locking | The one application file outside the database package, because the queue owns the statement |
+| The migration runner: its lease, the catalog it asks, the record of a change and its pool | Each engine's catalog is its own (`design-docs/database-migrations.md` § Migrations). A SQLite holder renews on the migration's one connection, so it stops on no time, and a look there asks whether a writer holds the file. MySQL and MariaDB commit each schema change alone, so only they keep a record of a change before its first statement. SQLite migrates on a pool of one; the three servers refuse a pool of one (`design-docs/database-migrations.md` § Migration lease) |
 | Typing a composed expression as a moment | A `CASE` over bound values is untyped and PostgreSQL refuses it in a timestamp column. PostgreSQL casts to a zoned timestamp, MySQL and MariaDB to a six-digit datetime, SQLite to nothing |
 | The test harness | It names each engine to choose a connection and report which ran, never to write a query |
 | Seeing a seam's rival wait on a lock | No portable statement reports another session's lock wait. PostgreSQL's activity view names the wait; InnoDB lists a transaction waiting, joined to its session for the database, since other binaries hold databases on the same server |
@@ -268,7 +269,7 @@ The suite pins:
 - A server below the floor is refused, against a real old server
 - Migrations apply and are idempotent on every engine, and a database ahead of the binary is refused
 - One claimant holds the migration lease at a time on every engine, raced from two pools, and a waiter names the holder and when its lease lapses
-- A migration whose lock is lost part way fails, by ending the holder's session
+- A holder whose lease another instance takes stops before its next statement, and its migration fails
 - Reading the schema version changes no schema
 
 ## Not built

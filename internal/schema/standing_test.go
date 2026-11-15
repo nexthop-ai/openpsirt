@@ -14,7 +14,7 @@ import (
 // changing, pauses for one being changed or left with its record standing,
 // stops for one behind it that nothing is changing, and never serves one a
 // later release applied, even while that release is still changing it.
-func TestAStandingFollowsTheLockAndTheVersion(t *testing.T) {
+func TestAStandingFollowsTheLeaseAndTheVersion(t *testing.T) {
 	for _, c := range []struct {
 		changing         migrate.Change
 		applied, carried int64

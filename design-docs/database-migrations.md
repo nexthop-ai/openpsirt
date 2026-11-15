@@ -287,7 +287,7 @@ engines (REQ-71).
 | Every write sets a new token or a later lapse | MySQL and MariaDB skip a row whose values are unchanged, and a cluster certifies only rows written |
 | Time is the database's clock, read inside the transaction | One primary is one clock where instances are many. Reading it is spelled per engine in the database package (`design-docs/database.md` § Engine-specific code) |
 | The lease lapses 30 seconds after it was last written | A holder that died holds the next start that long at most |
-| The holder writes it again every 5 seconds, on a pooled connection, never the one the migration runs on | A data-definition statement runs for minutes, and on MySQL and MariaDB commits alone |
+| On the server engines the holder writes it again every 5 seconds on a pooled connection, never the one the migration holds; on SQLite on the pool's one connection, between the migration's statements | A data-definition statement runs for minutes, and on MySQL and MariaDB commits alone |
 | A renewal that finds the row gone or another's token stops the holder | Another instance may be migrating |
 | On the server engines each renewal is bounded by 5 seconds, and a holder whose renewals have gone unanswered for 20 seconds stops | It stops 10 seconds before the lapse it last wrote, the room for the clocks of a cluster's nodes to differ |
 | On SQLite a renewal waits as long as it takes, and the holder stops only on finding its lease gone or taken | A migration's transaction holds the file's one write, so a renewal waits for it, and so does a claimant's takeover. The migration runs on the pool's one connection, and a renewal waiting for it takes it before the migration's next statement |
@@ -349,7 +349,7 @@ outage for as long as its migrations take.
 
 | A paused instance | Reason |
 |---|---|
-| Answers every request as it answers while it migrates at start (`design-docs/packaging.md` § Starting and stopping) | Readiness fails, and every other path is 503 with `Retry-After` |
+| Answers every request as it answers while it migrates at start (`design-docs/packaging.md` § Starting and stopping) | Liveness answers, readiness fails, and every other path is 503 with `Retry-After` |
 | Ends every request the router was answering | Its transaction rolls back |
 | Answers a request it ended as upgrading where the handler's answer is a refusal, a failure or nothing | A handler whose context ended may answer its failed lookup as a refusal |
 | Keeps the answer of a request whose handler wrote a success | What it did took effect, and a retry would repeat it |
