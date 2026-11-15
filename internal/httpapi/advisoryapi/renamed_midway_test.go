@@ -61,7 +61,7 @@ func TestAProductRenamedBeforeARetryIsWhatTheRetryReads(t *testing.T) {
 				t.Fatal(err)
 			}
 			renamed = func() {
-				if err := names.RenameProduct(ctx, product.ID, "ours"); err != nil {
+				if err := catalog.NewStore(race.Other().DB).RenameProduct(ctx, product.ID, "ours"); err != nil {
 					t.Errorf("renaming between the attempts: %v", err)
 				}
 			}

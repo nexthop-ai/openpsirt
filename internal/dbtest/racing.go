@@ -38,7 +38,18 @@ type Race struct {
 	// between runs after the commit is refused and before the retry, which is
 	// where a test puts whatever the other worker did in the meantime.
 	between func()
+	// other is a second handle over the same database, for between to act
+	// through.
+	other *database.DB
 }
+
+// Other is a handle over the same database as the racing one, for what the
+// other worker does between attempts.
+//
+// The racing handle has one connection, and the losing transaction still
+// holds it while between runs, so a write through the racing handle there
+// waits forever.
+func (l *Race) Other() *database.DB { return l.other }
 
 func (l *Race) Connect(ctx context.Context) (driver.Conn, error) {
 	conn, err := l.Connector.Connect(ctx)
@@ -130,7 +141,14 @@ func (t *raceTx) Commit() error {
 // of its own with the schema applied.
 //
 // between runs after the commit is refused and before the retry, which is
-// where a caller puts whatever another worker did in the meantime.
+// where a caller puts whatever another worker did in the meantime. It acts
+// through Other.
+//
+// One connection, as Open gives every other SQLite handle: a read through the
+// racing handle inside one of its transactions then waits for the connection
+// the transaction holds, and the test hangs rather than passing on an answer
+// from a second connection. That is what keeps a closure under a retry test
+// reading only through its transaction.
 func Racing(t *testing.T, between func()) (*database.DB, *Race) {
 	t.Helper()
 	// The migrated template every other SQLite test copies, so a racing
@@ -152,13 +170,25 @@ func Racing(t *testing.T, between func()) (*database.DB, *Race) {
 		t.Fatal(err)
 	}
 	owner := &Race{Connector: base, between: between}
-	query, err := database.Query(sql.OpenDB(owner), database.SQLite)
+	handle := sqliteHandle(t, owner)
+	owner.other = sqliteHandle(t, base)
+	return handle, owner
+}
+
+// sqliteHandle is a handle of one connection over connector, closed when the
+// test ends.
+func sqliteHandle(t *testing.T, connector driver.Connector) *database.DB {
+	t.Helper()
+	pool := sql.OpenDB(connector)
+	pool.SetMaxOpenConns(1)
+	query, err := database.Query(pool, database.SQLite)
 	if err != nil {
 		t.Fatal(err)
 	}
 	handle := &database.DB{DB: query, Server: database.Server{Engine: database.SQLite}}
+	handle.Pool.MaxOpen, handle.Pool.MaxIdle = 1, 1
 	t.Cleanup(func() { _ = handle.Close() })
-	return handle, owner
+	return handle
 }
 
 // sqliteConnector reaches the registered driver without importing it twice.

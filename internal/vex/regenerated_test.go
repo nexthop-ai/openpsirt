@@ -115,7 +115,7 @@ func TestAnIssuanceRetriedAfterADecisionWasWithdrawnRecordsTheDocumentAsItNowSta
 	}
 
 	between = func() {
-		if _, err := decisions.Withdraw(ctx, proposer, occurrence.DecisionID); err != nil {
+		if _, err := triage.NewStore(race.Other().DB).Withdraw(ctx, proposer, occurrence.DecisionID); err != nil {
 			t.Errorf("withdrawing between the attempts: %v", err)
 		}
 	}
