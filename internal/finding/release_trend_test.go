@@ -59,6 +59,35 @@ func TestATrendOverReleasesHasOnePointPerReleaseOldestFirst(t *testing.T) {
 	})
 }
 
+func TestAReleaseTrendPastItsCapKeepsTheMostRecentReleases(t *testing.T) {
+	// The releases somebody compares are the recent ones, so the oldest are
+	// the ones left off the chart.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		for _, tag := range []string{"v1.0", "v1.1", "v1.2"} {
+			build := f.anotherBuild(t, tag)
+			f.shippedTo(t, build, through(libnl))
+			if _, err := f.store.Apply(ctx, build, f.runOn(t, build), []finding.Reported{
+				found("CVE-2026-1", libnl),
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		points, err := f.store.ReleaseTrend(ctx, f.holding(t, access.PublicRead),
+			f.wholeProduct(), 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var plotted []string
+		for _, p := range points {
+			plotted = append(plotted, p.BranchOrTag)
+		}
+		if len(plotted) != 2 || plotted[0] != "v1.1" || plotted[1] != "v1.2" {
+			t.Errorf("a trend capped at two plotted %q, want the two most recent [v1.1 v1.2]", plotted)
+		}
+	})
+}
+
 func TestABranchIsNotAPointOnAReleaseTrend(t *testing.T) {
 	// A branch moves and is scanned nightly; it has no place on an axis whose
 	// points are things that never move again.
