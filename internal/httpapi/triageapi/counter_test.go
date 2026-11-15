@@ -10,9 +10,9 @@ import (
 )
 
 func TestTheQueueCardCarriesWhatWouldMakeAnApproverDisagree(t *testing.T) {
-	// An approver was shown the decision and the reasoning and nothing that
-	// argues against them, which is the rubber stamp the queue's shape was
-	// written against — a weakness in a control rather than a card layout.
+	// The card shows an approver what argues against the decision as well as
+	// the decision and its reasoning, because an approver shown only those
+	// two is a rubber stamp: a weakness in a control rather than a card layout.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
 

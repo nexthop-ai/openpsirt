@@ -17,9 +17,8 @@ import (
 // TestReadinessSaysWhatIsBlocking is the list behind the count.
 //
 // "8 criticals now, v2.4.1 shipped with 4" is read at the moment there is no
-// time to go and assemble what the 8 are, and the answer carried no list at
-// all — so the one screen a release conversation happens in sent everybody
-// back to the findings list to rebuild the same narrowing by hand.
+// time to go and assemble what the 8 are, so readiness lists the work behind
+// the blocker count and the panel names what the count is made of.
 func TestReadinessSaysWhatIsBlocking(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
@@ -75,9 +74,9 @@ func TestReadinessSaysWhatIsBlocking(t *testing.T) {
 //
 // A group is keyed on the issue and the fold, and a fold is the source package
 // at the version it was built at — so one issue on one component at two
-// versions is two rows. Named by component alone they arrive identical: the
-// panel drew the same line twice, under the same React key, and a reader had
-// no way to tell which of the two a row was about.
+// versions is two rows. Named by component alone they would arrive identical,
+// drawn as the same line twice under the same React key, so each row carries
+// its version.
 func TestBlockingRowsOfOneComponentAreToldApart(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedOneIssueAtTwoVersions(t)
