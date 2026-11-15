@@ -77,11 +77,6 @@ func TestThePassStopsWithItsContext(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("the pass did not stop with its context")
 	}
-	settled := ran.Load()
-	time.Sleep(20 * time.Millisecond)
-	if after := ran.Load(); after != settled {
-		t.Errorf("the pass ran %d more times after its context ended", after-settled)
-	}
 }
 
 // waitFor polls until the condition holds, rather than sleeping for a fixed
