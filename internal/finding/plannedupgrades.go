@@ -104,14 +104,16 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 		Exploited   int    `bun:"exploited"`
 		Incident    int    `bun:"incident"`
 		Worst       int    `bun:"worst"`
+		WorstSorted int    `bun:"worst_sorted"`
 		Total       int    `bun:"total"`
 	}
 	// The worst thing in the upgrade, as a rank rather than as a word, because
-	// the four engines do not agree on how words order. Folded exactly the way
-	// the line and the deadline fold them, so an unrated issue is a medium
-	// here as it is everywhere else — which is what asking the fold rather
-	// than the raw word buys, and the ELSE below cannot fire because of it.
+	// the four engines do not agree on how words order. Drawn folded the way
+	// the line and the deadline fold it, so an unrated issue reads as a
+	// medium, and the ELSE below cannot fire because of it. Sorted by the band
+	// every severity sort ranks in, so an unrated issue sorts by its score.
 	worst := "MAX(" + rankCase(rating.BandExpr, 0) + ")"
+	worstSorted := "MAX(" + severityRank + ")"
 
 	page := s.bumps(buildIDs, visible, filter).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
@@ -127,6 +129,7 @@ func (s *Store) PlannedUpgrades(ctx context.Context, subject access.Subject, sco
 		ColumnExpr(overParts.exploited() + ` AS "exploited"`).
 		ColumnExpr(overParts.incident() + ` AS "incident"`).
 		ColumnExpr(worst + ` AS "worst"`).
+		ColumnExpr(worstSorted + ` AS "worst_sorted"`).
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		// Worst first unless somebody asks otherwise, and every order is
 		// through the allowlist above: the key selects a stored expression
@@ -534,7 +537,7 @@ const (
 	PlannedUpgradesByUrgency PlannedUpgradeSortKey = "urgency"
 	// PlannedUpgradesBySeverity is the worst rating in the upgrade, as the band rather
 	// than the urgency — which puts what is being exploited in a band of its
-	// own above every rating.
+	// own above every rating. An unrated issue ranks as severityRank ranks it.
 	PlannedUpgradesBySeverity PlannedUpgradeSortKey = "severity"
 	// PlannedUpgradesByIssues is how many distinct issues the bump closes, which is
 	// the "what should I do this afternoon" order: on a seeded image one
@@ -558,7 +561,7 @@ var plannedUpgradeOrder = map[PlannedUpgradeSortKey]struct {
 	nothing bool
 }{
 	PlannedUpgradesByUrgency:     {expr: "urgency"},
-	PlannedUpgradesBySeverity:    {expr: "worst"},
+	PlannedUpgradesBySeverity:    {expr: "worst_sorted"},
 	PlannedUpgradesByIssues:      {expr: "issues"},
 	PlannedUpgradesByOccurrences: {expr: "places"},
 	PlannedUpgradesByBuilds:      {expr: "builds"},

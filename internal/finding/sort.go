@@ -51,12 +51,26 @@ const (
 // sorts above a high scored 8.1. One number, because a grouped page selects one
 // expression to sort by.
 //
-// An issue with no recognized word sorts in the band of its score, and below
-// every band with no score, as urgency ranks it and as the row reads. The
-// filters and the clocks fold it to medium instead, so it never leaves the list
-// or the clock; a sort only orders.
-var bySeverity = `MAX((CASE WHEN ` + rating.Recognized + ` THEN ` + rankCase(rating.BandExpr, 0) +
-	` ELSE ` + scoreRank(`"v"."score_centi"`) + ` END) * 10000 + COALESCE("v"."score_centi", 0))`
+// The band is severityRank's, so an unrated issue sorts by its score.
+var bySeverity = `MAX(` + severityRank + ` * 10000 + COALESCE("v"."score_centi", 0))`
+
+// severityRank is the band every severity sort ranks an issue in, numbered as
+// rankCase numbers it: a recognized word's band, the band its score falls in
+// for any other word, and zero, below every band, with no score either. It is
+// how urgency ranks an unrated issue and how its row reads. The filters and
+// the clocks fold it to medium instead, so it never leaves the list or the
+// clock; a sort only orders. SortRank is the same rule in Go.
+var severityRank = `(CASE WHEN ` + rating.Recognized + ` THEN ` + rankCase(rating.BandExpr, 0) +
+	` ELSE ` + scoreRank(`"v"."score_centi"`) + ` END)`
+
+// SortRank is severityRank for a rating already read: the word in force and
+// the issue's score in hundredths, zero where it has none.
+func SortRank(word string, centi int) int {
+	if band, recognized := rating.Folded(word); recognized {
+		return Ranks(band)
+	}
+	return Ranks(SeverityWord(centi))
+}
 
 // scoreRank is the band a score in hundredths falls in, numbered as rankCase
 // numbers it, and zero for no score.

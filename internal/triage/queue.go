@@ -95,6 +95,8 @@ type Outlier struct {
 	Description           string
 	// Why names which of the things made it stand out.
 	Why []string
+	// rank is where it sorts by severity, as every severity sort ranks it.
+	rank int
 }
 
 // outlierRows is how many outliers a queue card carries. Enough to read;
@@ -657,10 +659,15 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 		// decision was made in.
 		word := issue.RatedIn(rated[finding.RatedKey{ProductID: productID,
 			VulnerabilityID: issue.ID}]).InForce()
-		if word == "" && issue.ScoreCenti != nil {
-			word = finding.SeverityWord(*issue.ScoreCenti)
+		score := 0
+		if issue.ScoreCenti != nil {
+			score = *issue.ScoreCenti
+		}
+		if word == "" && score > 0 {
+			word = finding.SeverityWord(score)
 		}
 		one := Outlier{
+			rank:                 finding.SortRank(word, score),
 			DecisionOccurrenceID: occurrencesOf[issue.ID][0], DecisionOccurrenceIDs: occurrencesOf[issue.ID],
 			Vulnerability: issue.Identifier, Severity: word,
 			Incident: attacked[issue.ID], Exploited: issue.Exploited,
@@ -700,8 +707,8 @@ func outliersOf(decision Decision, productID int64, occurrencesOf map[int64][]in
 		if a.Exploited != b.Exploited {
 			return a.Exploited
 		}
-		if finding.Ranks(a.Severity) != finding.Ranks(b.Severity) {
-			return finding.Ranks(a.Severity) > finding.Ranks(b.Severity)
+		if a.rank != b.rank {
+			return a.rank > b.rank
 		}
 		return a.Vulnerability < b.Vulnerability
 	})

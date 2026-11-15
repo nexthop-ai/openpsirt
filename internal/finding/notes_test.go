@@ -388,3 +388,31 @@ func TestNothingAThirdPartyNamedBecomesMarkupInANote(t *testing.T) {
 		t.Errorf("the note has %d headings, want its own one:\n%s", headings, notes)
 	}
 }
+
+func TestAReleaseNoteRanksAnUnratedFixByItsScore(t *testing.T) {
+	// Worst first, as every severity sort ranks: an unrated issue in its
+	// score's band, and below a low with no score.
+	notes := finding.Notes(about("2.4.0"), &finding.Comparison{
+		Fixed: []finding.Changed{
+			{Vulnerability: "CVE-2026-1", Component: "zlib", Severity: "low", ScoreCenti: 200,
+				Because: finding.Upgraded, MovedTo: "1.3"},
+			{Vulnerability: "CVE-2026-2", Component: "curl", Severity: "unknown",
+				Because: finding.Upgraded, MovedTo: "8.1"},
+			{Vulnerability: "CVE-2026-3", Component: "busybox", Severity: "high", ScoreCenti: 700,
+				Because: finding.Upgraded, MovedTo: "1.37"},
+			{Vulnerability: "CVE-2026-4", Component: "libnl", Severity: "unknown", ScoreCenti: 980,
+				Because: finding.Upgraded, MovedTo: "3.9"},
+		},
+	})
+	order := []string{"CVE-2026-4", "CVE-2026-3", "CVE-2026-1", "CVE-2026-2"}
+	for _, one := range order {
+		if !strings.Contains(notes, one) {
+			t.Fatalf("%s is missing from the note:\n%s", one, notes)
+		}
+	}
+	for i := 1; i < len(order); i++ {
+		if strings.Index(notes, order[i-1]) > strings.Index(notes, order[i]) {
+			t.Errorf("%s is listed after %s, want the order %v:\n%s", order[i-1], order[i], order, notes)
+		}
+	}
+}

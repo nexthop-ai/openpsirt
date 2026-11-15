@@ -68,7 +68,7 @@ type PlannedUpgradeQuery struct {
 	Search      string             `query:"q" maxLength:"200" doc:"Keep only rows whose component or issue name contains this"`
 	Ecosystem   string             `query:"ecosystem" doc:"Keep only components of one package kind"`
 	State       core.Standing      `query:"state" doc:"Keep only groups this far decided"`
-	Sort        plannedUpgradeSort `query:"sort" doc:"The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for"`
+	Sort        plannedUpgradeSort `query:"sort" doc:"The order to page in. Worst first by default. Severity orders by the worst band of the rating in force among what it closes; an issue with no recognized severity word ranks in the band of its score, and below low with no score. An upgrade with no deadline sorts last whichever direction is asked for"`
 	Ascending   bool               `query:"asc" doc:"Order the other way — fewest, least urgent, nearest deadline first"`
 }
 

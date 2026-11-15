@@ -83,9 +83,15 @@ func repositoryOf(name string) string {
 // a patch.
 func issue(t *testing.T, db *database.DB, identifier, severity string, links ...string) {
 	t.Helper()
+	scoredIssue(t, db, identifier, severity, 0, links...)
+}
+
+// scoredIssue is issue with a score as well as a word.
+func scoredIssue(t *testing.T, db *database.DB, identifier, severity string, score float64, links ...string) {
+	t.Helper()
 	ctx := t.Context()
 	interned, err := finding.NewVulnerabilities(db.DB).Intern(ctx,
-		[]finding.Named{{Identifier: identifier, Severity: severity}})
+		[]finding.Named{{Identifier: identifier, Severity: severity, Score: score}})
 	if err != nil {
 		t.Fatalf("record %s: %v", identifier, err)
 	}
@@ -431,6 +437,36 @@ func TestTheRepositoryBehindTheWorstIssueIsVisitedFirst(t *testing.T) {
 		if visited != repositoryOf("severe") {
 			t.Errorf("visited %q first, want the one behind the critical", visited)
 		}
+	})
+}
+
+func TestAnUnratedIssueOrdersTheVisitsByItsScore(t *testing.T) {
+	// The visits follow the order every severity sort follows: an unrated
+	// issue scored 9.8 is a critical, above a high scored 7.0, and one with no
+	// score sorts below a low.
+	t.Run("scored", func(t *testing.T) {
+		dbtest.Each(t, func(t *testing.T, db *database.DB) {
+			scored, high := project(t), project(t)
+			scoredIssue(t, db, "CVE-2025-0010", "high", 7.0, link("high", high.fix))
+			scoredIssue(t, db, "CVE-2025-0011", "unknown", 9.8, link("scored", scored.fix))
+			pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
+				map[string]upstream{"high": high, "scored": scored})
+			if visited, err := pass.Once(t.Context()); err != nil || visited != repositoryOf("scored") {
+				t.Errorf("visited %q, %v first; want the one behind the unrated 9.8", visited, err)
+			}
+		})
+	})
+	t.Run("unscored", func(t *testing.T) {
+		dbtest.Each(t, func(t *testing.T, db *database.DB) {
+			unscored, low := project(t), project(t)
+			scoredIssue(t, db, "CVE-2025-0012", "unknown", 0, link("unscored", unscored.fix))
+			scoredIssue(t, db, "CVE-2025-0013", "low", 2.0, link("low", low.fix))
+			pass := passOver(t, db, patchbranch.DefaultQuota, outward.Excluded{},
+				map[string]upstream{"unscored": unscored, "low": low})
+			if visited, err := pass.Once(t.Context()); err != nil || visited != repositoryOf("low") {
+				t.Errorf("visited %q, %v first; want the one behind the low", visited, err)
+			}
+		})
 	})
 }
 

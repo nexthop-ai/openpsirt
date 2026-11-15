@@ -33441,12 +33441,12 @@ paths:
               - agreed
               - lapsed
             type: string
-        - description: The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for
+        - description: The order to page in. Worst first by default. Severity orders by the worst band of the rating in force among what it closes; an issue with no recognized severity word ranks in the band of its score, and below low with no score. An upgrade with no deadline sorts last whichever direction is asked for
           explode: false
           in: query
           name: sort
           schema:
-            description: The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for
+            description: The order to page in. Worst first by default. Severity orders by the worst band of the rating in force among what it closes; an issue with no recognized severity word ranks in the band of its score, and below low with no score. An upgrade with no deadline sorts last whichever direction is asked for
             enum:
               - urgency
               - severity
@@ -33593,12 +33593,12 @@ paths:
               - agreed
               - lapsed
             type: string
-        - description: The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for
+        - description: The order to page in. Worst first by default. Severity orders by the worst band of the rating in force among what it closes; an issue with no recognized severity word ranks in the band of its score, and below low with no score. An upgrade with no deadline sorts last whichever direction is asked for
           explode: false
           in: query
           name: sort
           schema:
-            description: The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for
+            description: The order to page in. Worst first by default. Severity orders by the worst band of the rating in force among what it closes; an issue with no recognized severity word ranks in the band of its score, and below low with no score. An upgrade with no deadline sorts last whichever direction is asked for
             enum:
               - urgency
               - severity

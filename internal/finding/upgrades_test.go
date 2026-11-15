@@ -604,6 +604,51 @@ func TestBumpsOrderByWhatEachWouldClose(t *testing.T) {
 	})
 }
 
+func TestThePlannedUpgradeSeverityOrderRanksAnUnratedIssueByItsScore(t *testing.T) {
+	// The severity order every list follows: an unrated issue sorts in its
+	// score's band, and below a low with no score.
+	leader := func(t *testing.T, f *fixture) string {
+		t.Helper()
+		upgrades, _, err := f.store.PlannedUpgrades(t.Context(), f.holding(t, access.PublicTriage),
+			f.wholeProduct(), 50, 0, finding.Filter{PlannedUpgradeSort: finding.PlannedUpgradesBySeverity})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(upgrades) != 2 {
+			t.Fatalf("%d upgrades, want two: %+v", len(upgrades), upgrades)
+		}
+		return upgrades[0].Upstream
+	}
+	t.Run("scored", func(t *testing.T) {
+		each(t, func(t *testing.T, f *fixture) {
+			f.shipped(t, twoConsumers())
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
+				ranked("CVE-2026-1", libnl, "unknown", 9.8),
+				ranked("CVE-2026-2", swss, "high", 7.0),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if got := leader(t, f); got != libnl.Name {
+				t.Errorf("sort=severity leads with %q rather than the bump closing the unrated 9.8", got)
+			}
+		})
+	})
+	t.Run("unscored", func(t *testing.T) {
+		each(t, func(t *testing.T, f *fixture) {
+			f.shipped(t, twoConsumers())
+			if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
+				ranked("CVE-2026-1", libnl, "unknown", 0),
+				ranked("CVE-2026-2", swss, "low", 2.0),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if got := leader(t, f); got != swss.Name {
+				t.Errorf("sort=severity leads with %q rather than the bump closing the low", got)
+			}
+		})
+	})
+}
+
 func TestAnOrderedSetIsRankedAndOneUnplaceableEntryUnranksItAll(t *testing.T) {
 	// Two things at once, because the second only means something if the
 	// first holds. An ecosystem with a scheme reaches the per-version check in

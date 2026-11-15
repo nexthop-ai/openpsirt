@@ -26106,7 +26106,7 @@ export interface operations {
                 ecosystem?: string;
                 /** @description Keep only groups this far decided */
                 state?: "undecided" | "waiting" | "agreed" | "lapsed";
-                /** @description The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Worst first by default. Severity orders by the worst band of the rating in force among what it closes; an issue with no recognized severity word ranks in the band of its score, and below low with no score. An upgrade with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "severity" | "issues" | "occurrences" | "builds" | "deadline";
                 /** @description Order the other way — fewest, least urgent, nearest deadline first */
                 asc?: boolean;
@@ -26162,7 +26162,7 @@ export interface operations {
                 ecosystem?: string;
                 /** @description Keep only groups this far decided */
                 state?: "undecided" | "waiting" | "agreed" | "lapsed";
-                /** @description The order to page in. Worst first by default. An upgrade with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Worst first by default. Severity orders by the worst band of the rating in force among what it closes; an issue with no recognized severity word ranks in the band of its score, and below low with no score. An upgrade with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "severity" | "issues" | "occurrences" | "builds" | "deadline";
                 /** @description Order the other way — fewest, least urgent, nearest deadline first */
                 asc?: boolean;
