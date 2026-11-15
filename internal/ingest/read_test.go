@@ -622,6 +622,97 @@ func TestAScanOvertakenByOneThatThenFailsIsReadAgain(t *testing.T) {
 	})
 }
 
+// A failed scan the graph already names is taken again under its own
+// identifier, because the rows it opened point at it.
+func TestAFailedScanTheGraphNamesIsRetakenUnderItsOwnIdentifier(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		at := time.Now().UTC().Add(-time.Hour)
+		applied := f.accept(t, f.branch, at, anInventory)
+		if result, err := f.reader.Once(ctx); err != nil || result == nil || result.ScanID != applied {
+			t.Fatalf("the scan was not applied: %+v %v", result, err)
+		}
+		// Something after the write failed, so the graph names a failed scan.
+		scans := ingest.NewStore(f.db.DB)
+		if err := scans.MarkFailed(ctx, applied, errors.New("the connection dropped")); err != nil {
+			t.Fatal(err)
+		}
+		retaken, outcome, err := scans.Record(ctx, ingest.Arriving{
+			BuildID: f.branch, ContentHash: anInventory[:16] + at.String(),
+			BuiltAt: at, ParserVersion: "again",
+		})
+		if err != nil || outcome != ingest.Retake {
+			t.Fatalf("sending it again answered %v %v, want a retake", outcome, err)
+		}
+		if retaken.ID != applied {
+			t.Errorf("retaken as scan %d, want its own identifier %d", retaken.ID, applied)
+		}
+		held, err := scans.ByID(ctx, applied)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if held.Status != ingest.Accepted || held.Failure != "" || held.ParserVersion != "again" {
+			t.Errorf("the retaken scan holds %q %q %q, want accepted for the new reader",
+				held.Status, held.Failure, held.ParserVersion)
+		}
+	})
+}
+
+// A failed scan whose build already shows the newest scan standing asks for
+// nothing to be read again.
+func TestAFailureBehindTheScanTheBuildShowsQueuesNothing(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		now := time.Now().UTC()
+		shown := f.accept(t, f.branch, now.Add(-2*time.Hour), anInventory)
+		if result, err := f.reader.Once(ctx); err != nil || result == nil || result.ScanID != shown {
+			t.Fatalf("the first scan was not applied: %+v %v", result, err)
+		}
+		unreadable := f.store(t, f.branch, now.Add(-time.Hour),
+			`{"bomFormat": "CycloneDX", "specVersion": "1.6", "components": [{"version": "1"}]}`)
+		once := queue.DefaultOptions()
+		once.MaxAttempts = 1
+		if _, err := queue.New(f.db, once).Add(ctx, queue.Parse, strconv.FormatInt(unreadable, 10)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.reader.Once(ctx); err == nil {
+			t.Fatal("the unreadable scan was read successfully")
+		}
+		if n := f.jobsFor(t, shown); n != 1 {
+			t.Errorf("the scan the build shows has %d jobs, want its one read and no other", n)
+		}
+	})
+}
+
+// A failed scan whose overtaken predecessor is still waiting to be read asks
+// for no second read of it.
+func TestAFailureBeforeItsPredecessorIsReadQueuesNoSecondRead(t *testing.T) {
+	eachReader(t, func(t *testing.T, f *readerFixture) {
+		ctx := t.Context()
+		now := time.Now().UTC()
+		older := f.store(t, f.branch, now.Add(-2*time.Hour), anInventory)
+		newer := f.store(t, f.branch, now.Add(-time.Hour),
+			`{"bomFormat": "CycloneDX", "specVersion": "1.6", "components": [{"version": "1"}]}`)
+		once := queue.DefaultOptions()
+		once.MaxAttempts = 1
+		// The newer one is queued first, so it fails while the older one waits.
+		for _, id := range []int64{newer, older} {
+			if _, err := queue.New(f.db, once).Add(ctx, queue.Parse, strconv.FormatInt(id, 10)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := f.reader.Once(ctx); err == nil {
+			t.Fatal("the unreadable newer scan was read successfully")
+		}
+		if state := f.jobState(t, older); state != queue.Pending {
+			t.Fatalf("the older scan's job is %s, want it still waiting", state)
+		}
+		if n := f.jobsFor(t, older); n != 1 {
+			t.Errorf("the older scan has %d jobs, want the one already waiting", n)
+		}
+	})
+}
+
 func TestTheReaderDrainsABacklogInsideOneWakeAndReturnsWhenCancelled(t *testing.T) {
 	// Run is what cmd/openpsirt starts and what reads every scan this server
 	// takes in. Every other test here drives Once, and what lives only in the
