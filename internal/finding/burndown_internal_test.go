@@ -14,9 +14,10 @@ func TestAZeroDateMoreThanTenYearsAwayIsNotGiven(t *testing.T) {
 		left int
 		date bool
 	}{
-		// One done a day over the fourteen: 3,650 left is ten years exactly.
-		{3650, true},
-		{3651, false},
+		// One done a day over the fourteen: the bound in days left is the
+		// bound exactly.
+		{mostProjectionDays, true},
+		{mostProjectionDays + 1, false},
 	} {
 		points := make([]BurnPoint, ProjectionDays)
 		for i := range points {
