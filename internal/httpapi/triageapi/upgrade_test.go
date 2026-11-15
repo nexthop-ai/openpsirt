@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -329,6 +332,69 @@ func TestAPromiseStoresADecisionAtEveryOccurrenceItReports(t *testing.T) {
 				t.Errorf("a stored row is %s with live key %v, want a live proposal",
 					row.State, row.LiveKey)
 			}
+		}
+	})
+}
+
+func TestAnUpgradeOverAnOccurrencePublicInOneBuildAndUndisclosedInAnotherIsUndisclosed(t *testing.T) {
+	// One occurrence held by two builds is decided once. Where it is
+	// undisclosed in either, the one decision is undisclosed: written at the
+	// first build's public visibility, it would show the undisclosed
+	// finding's decision to somebody who reads public work alone. Each build
+	// takes a turn as the undisclosed one, so the merge is reached whichever
+	// the plan reads first.
+	for _, variant := range []string{"broadcom", "mellanox"} {
+		t.Run("undisclosed in "+variant, func(t *testing.T) {
+			upgradeOverMixedVisibility(t, variant)
+		})
+	}
+}
+
+func upgradeOverMixedVisibility(t *testing.T, variant string) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		r.AlsoIn(t, "mellanox")
+		lib := graph.Described{Purl: "pkg:deb/debian/libyang@2.1", Name: "libyang", Version: "2.1"}
+		r.ScanAt(t, httpapitest.SeededBuild, "shared-broadcom", graph.Snapshot{
+			Root: httpapitest.SeededRoot, Components: []graph.Described{lib},
+			Dependencies: []graph.Dependency{{Parent: httpapitest.SeededRoot, Child: lib}},
+		}, []finding.Reported{{Issue: finding.Named{Identifier: "CVE-2026-1", Severity: "high"},
+			Component: lib, FixState: finding.NoFix}})
+		undisclosed := r.BuildOf(t, httpapitest.Build{Product: "mine", BranchOrTag: "master", Variant: variant})
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"finding"`).Set(`"visibility" = ?`, string(access.Private)).
+			Where(`"build_id" = ?`, undisclosed).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		soon := time.Now().UTC().Add(24 * time.Hour).Format(time.DateOnly)
+		body := fmt.Sprintf(`{"to":"2.2","by":%q,
+			"builds":[{"branch_or_tag":"master","variant":"broadcom"},{"branch_or_tag":"master","variant":"mellanox"}],
+			"reasoning":"Moving the package in both builds."}`, soon)
+		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/components/libyang/upgrade", body)
+		if made.Code != http.StatusCreated {
+			t.Fatalf("planning answered %d: %s", made.Code, made.Body.String())
+		}
+
+		var rows []struct {
+			DecisionID int64  `bun:"decision_id"`
+			Visibility string `bun:"visibility"`
+		}
+		if err := r.DB.DB.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
+			ColumnExpr(`"de"."decision_id", "de"."visibility"`).
+			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "de"."vulnerability_id"`).
+			Where(`"v"."identifier" = ?`, "CVE-2026-1").Scan(ctx, &rows); err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].Visibility != string(access.Private) {
+			t.Fatalf("the occurrence is decided as %+v, want one undisclosed row", rows)
+		}
+		decision := fmt.Sprintf("/v1/decisions/%d", rows[0].DecisionID)
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, decision, ""); got.Code != http.StatusNotFound {
+			t.Errorf("somebody who reads public work alone read the decision: %d %s", got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, decision, ""); got.Code != http.StatusOK {
+			t.Errorf("somebody who reads undisclosed work could not read the decision: %d %s", got.Code, got.Body.String())
 		}
 	})
 }
