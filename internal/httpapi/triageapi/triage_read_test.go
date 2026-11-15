@@ -445,6 +445,32 @@ func TestWhatAppliesToAFindingIsReadableWithItsHistory(t *testing.T) {
 		if after.Standing.DecisionOccurrence.Outcome != "not-applicable" || after.Standing.Reasoning == "" {
 			t.Errorf("what stands here reads as %+v", after.Standing)
 		}
+
+		// Withdrawn and decided again, the second decision stands and the
+		// first is what was decided here before it, listed once.
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodDelete,
+			fmt.Sprintf("/v1/decisions/%d", decision), ""); got.Code != http.StatusNoContent {
+			t.Fatalf("withdrawing the decision answered %d: %s", got.Code, got.Body.String())
+		}
+		_, again := r.DecidedAt(t, occurrence)
+		r.Agreed(t, again)
+		type decided struct {
+			DecisionOccurrence struct {
+				DecisionID int64 `json:"decision_id"`
+			} `json:"decision_occurrence"`
+		}
+		var redecided struct {
+			Standing   *decided  `json:"standing"`
+			Previously []decided `json:"previously"`
+		}
+		httpapitest.Read(t, r, "triager", path, &redecided)
+		if redecided.Standing == nil || redecided.Standing.DecisionOccurrence.DecisionID != again {
+			t.Fatalf("decision %d was agreed and does not stand: %+v", again, redecided.Standing)
+		}
+		if len(redecided.Previously) != 1 || redecided.Previously[0].DecisionOccurrence.DecisionID != decision {
+			t.Errorf("previously reads %+v, want the withdrawn decision %d alone",
+				redecided.Previously, decision)
+		}
 	})
 }
 
