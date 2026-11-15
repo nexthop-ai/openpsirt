@@ -5,8 +5,9 @@ import { act } from "react";
 import { useSearchParams } from "react-router-dom";
 import { describe, expect, it } from "vitest";
 import { answer, location, mounted, screen, serve, settle } from "../test/mount";
-import { Saved } from "./Saved";
+import { change, only, press, tick } from "../test/controls";
 import { PUBLISHED } from "../test/outcomes";
+import { Saved } from "./Saved";
 
 const mount = mounted();
 
@@ -108,7 +109,7 @@ describe("a saved filter", () => {
 });
 
 describe("a saved filter that prepares a decision", () => {
-  async function preparing(outcome: string) {
+  async function chosen(outcome: string) {
     serve((path) => {
       if (path === "/v1/session/me") {
         return { data: { identity: "ana", name: "Ana", kind: "person", outcomes: PUBLISHED } };
@@ -141,16 +142,88 @@ describe("a saved filter that prepares a decision", () => {
   }
 
   it("holds Save back until a reason is chosen where the outcome needs one", async () => {
-    const selects = await preparing("not-applicable");
+    const selects = await chosen("not-applicable");
     expect(button("Save")?.disabled).toBe(true);
     act(() => pick(selects()[selects().length - 1]!, "component_not_present"));
     expect(button("Save")?.disabled).toBe(false);
   });
 
   it("offers no reason that needs mitigation text a filter cannot carry", async () => {
-    const selects = await preparing("not-applicable");
+    const selects = await chosen("not-applicable");
     const offered = Array.from(selects()[selects().length - 1]!.options).map((each) => each.value);
     expect(offered).toContain("component_not_present");
     expect(offered).not.toContain("inline_mitigations_already_exist");
+  });
+
+  // The person's filters and outcomes, and every PUT the control sends.
+  function preparing() {
+    serve((path) => {
+      if (path === "/v1/session/me/saved-filters") return { data: { items: [], total: 0 } };
+      if (path === "/v1/session/me") {
+        return {
+          data: { identity: "ana", name: "Ana", admin: false, kind: "person", outcomes: PUBLISHED },
+        };
+      }
+      return undefined;
+    });
+    return answer("PUT", () => ({ status: 204 }));
+  }
+
+  const field = <T extends Element>(label: string): T => {
+    const found = Array.from(mount.host().querySelectorAll("label")).find(
+      (each) => each.querySelector(".l")?.textContent === label,
+    );
+    const control = found?.querySelector<T>("input, select, textarea" as never);
+    if (!control) throw new Error(`no field ${label}`);
+    return control;
+  };
+
+  async function prepared(days: string) {
+    mount.render(screen(<Saved onBuild={false} onPicked={() => {}} />, "/f?exploited=1"));
+    await settle();
+    await press(mount.host(), "Save this");
+    change(field<HTMLInputElement>("Call it"), "quarter");
+    tick(mount.host(), "And prepare a decision for what it catches");
+    change(field<HTMLSelectElement>("It would say"), "not-applicable");
+    change(field<HTMLSelectElement>("Because"), "component_not_present");
+    change(field<HTMLSelectElement>("It would say"), "deferred");
+    change(field<HTMLInputElement>("For how long"), days);
+    change(field<HTMLTextAreaElement>("In these words"), " Waiting on the vendor. ");
+  }
+
+  it("sends a deferral's length and drops the reason an earlier outcome chose", async () => {
+    const sent = preparing();
+    await prepared("90");
+    await press(mount.host(), "Save");
+    await settle();
+    expect(only(sent)[1].body).toEqual({
+      query: "exploited=1",
+      prepares: { outcome: "deferred", reasoning: "Waiting on the vendor.", defer_days: 90 },
+    });
+  });
+
+  it("sends no length beside an outcome other than a deferral", async () => {
+    const sent = preparing();
+    await prepared("90");
+    change(field<HTMLSelectElement>("It would say"), "not-applicable");
+    change(field<HTMLSelectElement>("Because"), "component_not_present");
+    await press(mount.host(), "Save");
+    await settle();
+    expect(only(sent)[1].body).toEqual({
+      query: "exploited=1",
+      prepares: {
+        outcome: "not-applicable",
+        justification: "component_not_present",
+        reasoning: "Waiting on the vendor.",
+      },
+    });
+  });
+
+  it("saves no deferral of part of a day", async () => {
+    preparing();
+    await prepared("1.5");
+    expect(button("Save")?.disabled).toBe(true);
+    change(field<HTMLInputElement>("For how long"), "2");
+    expect(button("Save")?.disabled).toBe(false);
   });
 });
