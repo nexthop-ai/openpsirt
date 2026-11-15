@@ -76,6 +76,16 @@ func TestTheRecordNarrowsToOneBuildAndCarriesEveryAgreement(t *testing.T) {
 			t.Errorf("a branch or tag with no variant answered %d", got.Code)
 		}
 
+		// A build belongs to one product, so a build named under no product,
+		// or under two, is refused.
+		for _, products := range []string{"", "product=mine&product=mine&"} {
+			if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
+				"/v1/audit?"+products+"branch_or_tag=master&variant=broadcom", ""); got.Code != http.StatusUnprocessableEntity ||
+				!strings.Contains(got.Body.String(), "name exactly one product with a build") {
+				t.Errorf("a build under %q answered %d: %s", products, got.Code, got.Body.String())
+			}
+		}
+
 		// And the file carries the whole of the agreement record.
 		file := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, "/v1/audit.csv", "")
 		if file.Code != http.StatusOK {

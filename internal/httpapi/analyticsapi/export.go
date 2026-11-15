@@ -172,7 +172,8 @@ func registerAnywhereExport(api huma.API, in core.Deps) {
 }
 
 // everyProductsCodeFindings is the open code findings of every product the
-// subject reads, one product after another by name.
+// subject knows, one product after another by name. A product it knows and
+// may not read is a part holding no row, as codeFindingRows answers it.
 //
 // The products are read on the first page asked, through the handle that page
 // is read through, so a product's name on its code findings is the name its
@@ -188,9 +189,7 @@ func everyProductsCodeFindings(subject access.Subject) core.Paged {
 			}
 			parts := make([]core.Paged, 0, len(products))
 			for _, p := range products {
-				if _, err := access.Readable(subject, p.ID); err == nil {
-					parts = append(parts, codeFindingRows(subject, analysis.Scope{ProductID: p.ID}, p.Name))
-				}
+				parts = append(parts, codeFindingRows(subject, analysis.Scope{ProductID: p.ID}, p.Name))
 			}
 			each = core.InTurn(parts...)
 		}

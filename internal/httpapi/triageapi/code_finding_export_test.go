@@ -129,6 +129,19 @@ func TestAFindingsFileReadsOneSeededCodeFinding(t *testing.T) {
 					}
 				}
 			}
+			// An administrator knows every product and reads nothing in any, so
+			// the file across products holds none of its code findings, and is
+			// whole: a product it may not read is a part holding no row.
+			code, said, header, rows := findingsFile(t, r, "admin", "/v1/findings.csv")
+			if code != http.StatusOK {
+				t.Fatalf("an administrator exporting across products answered %d", code)
+			}
+			if _, stopped := said["this export stopped early and is incomplete"]; stopped {
+				t.Error("an administrator's file across products stopped at a product it may not read")
+			}
+			if codeFindings := codeFindingRowsIn(t, header, rows); len(codeFindings) != 0 {
+				t.Errorf("an administrator granted no reading exports the code findings %v", codeFindings)
+			}
 			if code, _, _, _ := findingsFile(t, r, "outsider", "/v1/products/mine/findings.csv"); code != http.StatusNotFound {
 				t.Errorf("an outsider exporting the product's findings was answered %d", code)
 			}

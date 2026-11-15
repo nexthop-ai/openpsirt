@@ -5,12 +5,16 @@ package analyticsapi
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
@@ -60,5 +64,48 @@ func TestAReleaseNoteWhoseBuildsCouldNotBeNamedIsAFault(t *testing.T) {
 	}
 	if logged.n == 0 {
 		t.Error("a build lookup that failed was not logged")
+	}
+}
+
+// A closed row whose record lines cannot be read says so, in the row and in
+// the file's cell, and the fault is logged; lines that read are carried as
+// they were stated.
+func TestARegisterRowWhoseRecordLinesCannotBeReadSaysSo(t *testing.T) {
+	closed := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+	stated, err := json.Marshal([]cverecord.Stated{{Entry: "libnl",
+		Line: cverecord.Line{Version: "3.7.0", Status: "unaffected"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name, lines string
+		unreadable  bool
+	}{
+		{"unreadable", "[{not json", true},
+		{"readable", string(stated), false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			logged := &tally{}
+			in := core.Deps{Logger: slog.New(logged)}
+			body := disposedBody(t.Context(), in, finding.Disposed{
+				Vulnerability: "CVE-2026-9999", Component: "libnl-3-200",
+				ClosedAt: &closed, UnaffectedBy: c.lines,
+			})
+			if body.UnaffectedUnreadable != c.unreadable {
+				t.Errorf("the row says its lines are unreadable: %v, want %v",
+					body.UnaffectedUnreadable, c.unreadable)
+			}
+			if logged.n > 0 != c.unreadable {
+				t.Errorf("%d lines were logged, want a line only where the record lines do not read", logged.n)
+			}
+			cell := saidLines(body)
+			if c.unreadable && cell != core.UnreadableLines {
+				t.Errorf("the file's cell says %q, want %q", cell, core.UnreadableLines)
+			}
+			if !c.unreadable && (len(body.Unaffected) != 1 || body.Unaffected[0].Version != "3.7.0" ||
+				body.Unaffected[0].Status != "unaffected") {
+				t.Errorf("the row carries %+v, want the one line stated", body.Unaffected)
+			}
+		})
 	}
 }
