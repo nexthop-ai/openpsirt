@@ -540,8 +540,8 @@ export function Finding() {
           thing somebody reads first to work out whether the rest is worth
           reading, and in a narrow column a paragraph of a CVE description runs
           four words to a line. Full width and first; the evidence and the
-          action follow it, ahead of the chains and the links, which is what
-          keeping the primary action above the fold is for. */}
+          action follow it, ahead of the notes, the timeline and the chains,
+          which is what keeping the primary action above the fold is for. */}
       {it.description && (
         <div className="card described">
           <h3>Description</h3>

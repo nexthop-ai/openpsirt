@@ -28,7 +28,7 @@ type Release struct {
 	// Not a row count. Rows are occurrences, and a component reached twenty
 	// ways carries the same issue twenty times — counting them reports
 	// 241,161 for a build every other screen reports at 7,546. The trend
-	// chart counts the same way.
+	// chart also counts one per issue at a component.
 	Open int
 	// BySeverity is that total split the four ways everything else here ranks
 	// by, folded through the one expression the line and the deadline use so a

@@ -16,8 +16,9 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
-// The three statuses a statement states, as both formats this deployment
-// publishes spell them: the exchange format's words, which sbom names.
+// The three statuses a statement states, in the exchange format's words, which
+// sbom names. OpenVEX writes them as they are; CSAF files each under its
+// product status list.
 const (
 	NotAffected = string(sbom.NotAffected)
 	Fixed       = string(sbom.AlreadyFixed)

@@ -294,7 +294,7 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 	})
 }
 
-func TestTheVersionWorthTakingCodeFindingsRatherThanTheOneThatFixedMost(t *testing.T) {
+func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
 	// Measured on the demo's kernel: of 168 open, the 6.12.100-1 release fixed
 	// 49 and the newest named, 6.12.107-1, fixed 2 — so ranked on what each
 	// release fixed, the version that closes everything sorts near the bottom

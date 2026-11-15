@@ -127,8 +127,8 @@ type Stated struct {
 const triagedAtOrAbove = "triaged at or above"
 
 // BranchOrTagColumn heads the column naming a row's branch or tag, in every
-// export that carries one. Column names are words as read on paper; the JSON
-// form keys it with underscores, as it does every column.
+// export that carries one. The JSON form keys it with underscores, as it does
+// every column.
 const BranchOrTagColumn = "branch or tag"
 
 // TriagedAtOrAbove is the minimum severity a file of findings was read at, as
