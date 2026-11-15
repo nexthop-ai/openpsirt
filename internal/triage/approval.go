@@ -219,7 +219,7 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, decisionID
 			return err
 		}
 		reopened = nil
-		if decision.Outcome == Dismissed || decision.Outcome == NotSecurity {
+		if slices.Contains(CodeFindingOutcomesDismissing(), decision.Outcome) {
 			if err := tx.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 				ColumnExpr(`DISTINCT "de"."product_id" AS "product_id", "de"."occurrence_identity" AS "occurrence_identity"`).
 				Where(`"de"."decision_id" = ?`, decisionID).

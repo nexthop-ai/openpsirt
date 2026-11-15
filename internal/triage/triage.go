@@ -110,6 +110,13 @@ func VulnerabilityOutcomes() []Outcome {
 // the vulnerability outcomes, which are about how a known issue applies, fits.
 func CodeFindingOutcomes() []Outcome { return []Outcome{Dismissed, NotSecurity, Confirmed} }
 
+// CodeFindingOutcomesDismissing are the code-finding outcomes that say the
+// flaw needs no work: the ones that hide risk. A probable pairing lapses them,
+// and undoing their approval reopens what they closed.
+func CodeFindingOutcomesDismissing() []Outcome {
+	return slices.DeleteFunc(CodeFindingOutcomes(), func(o Outcome) bool { return !o.HidesRisk() })
+}
+
 // OutcomesFor are the outcomes a decision about a finding of this kind records.
 func OutcomesFor(k kind.Kind) []Outcome {
 	if k == kind.Analysis {

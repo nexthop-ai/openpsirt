@@ -30,3 +30,13 @@ func TestTheFindingPackageNamesTheSameDismissalsAsTriage(t *testing.T) {
 		t.Errorf("triage dismisses %v and the finding package spells %v", owned, spelled)
 	}
 }
+
+func TestACodeFindingDismissalIsOneThatSaysTheFlawNeedsNoWork(t *testing.T) {
+	// A probable pairing lapses these and undoing an approval reopens what
+	// they closed; a confirmation closes nothing, so it is neither.
+	got := triage.CodeFindingOutcomesDismissing()
+	want := []triage.Outcome{triage.Dismissed, triage.NotSecurity}
+	if !slices.Equal(got, want) {
+		t.Errorf("the code-finding dismissals are %v, want %v", got, want)
+	}
+}

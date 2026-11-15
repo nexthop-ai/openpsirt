@@ -237,7 +237,7 @@ func LapseCodeFindings(ctx context.Context, tx bun.IDB, productID int64, occurre
 			Where(`"de"."product_id" = ?`, productID).
 			Where(`"de"."occurrence_identity" IN (?)`, bun.List(batch)).
 			Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
-			Where(`"lc"."outcome" IN (?, ?)`, Dismissed, NotSecurity).
+			Where(`"lc"."outcome" IN (?)`, bun.List(CodeFindingOutcomesDismissing())).
 			Scan(ctx, &ids); err != nil {
 			return out, fmt.Errorf("read the decisions on code findings paired probably: %w", err)
 		}
