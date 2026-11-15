@@ -203,3 +203,89 @@ func TestTwoLapsedRowsAtOneOccurrenceAreOneReAffirmation(t *testing.T) {
 		}
 	})
 }
+
+// Re-affirming at one occurrence records a new decision there, standing
+// on the earlier agreement or waiting for a second person where the issue
+// was rated a band worse since, and the answer says which.
+func TestReAffirmingAtOneOccurrenceRecordsItAndSaysWhetherItWaits(t *testing.T) {
+	for name, ratedWorse := range map[string]bool{"stands": false, "waits": true} {
+		t.Run(name, func(t *testing.T) {
+			httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+				ctx := t.Context()
+				occurrence := r.Scanned(t)
+				r.AgreedAt(t, occurrence, `{"outcome":"not-applicable","justification":"vulnerable_code_cannot_be_controlled_by_adversary",`+
+					`"reasoning":"Only the daemon writes the socket."}`)
+				var previous int64
+				if err := r.DB.DB.NewSelect().Table("decision_occurrence").ColumnExpr(`MAX("id")`).
+					Scan(ctx, &previous); err != nil {
+					t.Fatal(err)
+				}
+				if ratedWorse {
+					if _, err := r.DB.DB.NewUpdate().Table("decision_occurrence").
+						Set(`"severity_centi" = ?`, 550).Where(`"id" = ?`, previous).Exec(ctx); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := r.DB.DB.NewUpdate().Table("vulnerability").
+						Set(`"score_centi" = ?`, 980).Set(`"severity" = ?`, "critical").
+						Where(`"identifier" = ?`, "CVE-2026-9999").Exec(ctx); err != nil {
+						t.Fatal(err)
+					}
+				}
+				// The component moves, which lapses the dismissal.
+				if _, err := r.DB.DB.NewUpdate().Table("component").
+					Set(`"version" = ?`, "3.8.0-1").Set(`"upstream_version" = ?`, "3.8.0").
+					Where(`"name" = ?`, "libnl-3-200").Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				var builds []int64
+				if err := r.DB.DB.NewSelect().TableExpr(`"build" AS "t"`).ColumnExpr(`"t"."id"`).
+					Scan(ctx, &builds); err != nil {
+					t.Fatal(err)
+				}
+				for _, build := range builds {
+					if _, err := triage.NewStore(r.DB.DB).Lapse(ctx, build); err != nil {
+						t.Fatal(err)
+					}
+				}
+
+				at := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999/occurrences/" +
+					occurrence + "/decision"
+				got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at+"/reaffirmation",
+					fmt.Sprintf(`{"previous":%d,"reasoning":"Checked again at 3.8.0; still closed."}`, previous))
+				if got.Code != http.StatusCreated {
+					t.Fatalf("re-affirming at the occurrence answered %d: %s", got.Code, got.Body.String())
+				}
+				var made struct {
+					ID            int64  `json:"id"`
+					DecisionID    int64  `json:"decision_id"`
+					NeedsApproval bool   `json:"needs_approval"`
+					Reasoning     string `json:"reasoning"`
+				}
+				if err := json.Unmarshal(got.Body.Bytes(), &made); err != nil {
+					t.Fatal(err)
+				}
+				if made.ID == previous || made.ID == 0 || made.NeedsApproval != ratedWorse ||
+					made.Reasoning != "Checked again at 3.8.0; still closed." {
+					t.Errorf("re-affirming answered %+v; want a new row after %d, needing approval %v, with the reasoning given",
+						made, previous, ratedWorse)
+				}
+				var standing struct {
+					Standing *struct {
+						DecisionOccurrence struct {
+							ID         int64 `json:"id"`
+							DecisionID int64 `json:"decision_id"`
+						} `json:"decision_occurrence"`
+					} `json:"standing"`
+				}
+				httpapitest.Read(t, r, "triager", at, &standing)
+				switch {
+				case ratedWorse && standing.Standing != nil:
+					t.Errorf("a re-affirmation waiting for a second person stands: %+v", standing.Standing)
+				case !ratedWorse && (standing.Standing == nil || standing.Standing.DecisionOccurrence.ID != made.ID ||
+					standing.Standing.DecisionOccurrence.DecisionID != made.DecisionID):
+					t.Errorf("the occurrence's standing decision is %+v; want the re-affirmation %d", standing.Standing, made.ID)
+				}
+			})
+		})
+	}
+}
