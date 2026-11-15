@@ -6,9 +6,22 @@ package httpapi
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 )
+
+// directive is the sources one directive of a policy names, wherever in the
+// directive they sit, and nil where the policy has no such directive.
+func directive(policy, name string) []string {
+	for _, entry := range strings.Split(policy, ";") {
+		tokens := strings.Fields(entry)
+		if len(tokens) > 0 && tokens[0] == name {
+			return tokens[1:]
+		}
+	}
+	return nil
+}
 
 func TestEveryResponseCarriesTheBrowserHeaders(t *testing.T) {
 	// On the probes, on a refusal and on a route nothing serves alike: the
@@ -44,8 +57,8 @@ func TestEveryResponseCarriesTheBrowserHeaders(t *testing.T) {
 				t.Errorf("GET %s: the policy lacks %q: %q", path, directive, policy)
 			}
 		}
-		if strings.Contains(policy, "script-src 'self' 'unsafe-inline'") ||
-			strings.Contains(policy, "'unsafe-eval'") {
+		if script := directive(policy, "script-src"); slices.Contains(script, "'unsafe-inline'") ||
+			slices.Contains(script, "'unsafe-eval'") {
 			t.Errorf("GET %s: the policy lets inline script run: %q", path, policy)
 		}
 	}

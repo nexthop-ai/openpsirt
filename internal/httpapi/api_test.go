@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -257,14 +258,14 @@ func TestThePagesOwnInlineScriptIsAllowedByHashAndNothingWider(t *testing.T) {
 
 	sum := sha256.Sum256([]byte(`document.documentElement.setAttribute("data-look","dark");`))
 	want := "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
-	if !strings.Contains(policy, want) {
+	if !slices.Contains(directive(policy, "script-src"), want) {
 		t.Errorf("the policy does not allow the page's own script: %s", policy)
 	}
 	// The hash and nothing wider: unsafe-inline would allow every inline
 	// script, including one somebody smuggled past the sanitizer, which is
 	// what this policy is a second line against.
-	if strings.Contains(policy, "unsafe-inline") &&
-		!strings.Contains(policy, "style-src 'self' 'unsafe-inline'") {
+	if script := directive(policy, "script-src"); slices.Contains(script, "'unsafe-inline'") ||
+		slices.Contains(script, "'unsafe-eval'") {
 		t.Errorf("the policy allows inline scripts wholesale: %s", policy)
 	}
 	if strings.Count(policy, "'sha256-") != 1 {
