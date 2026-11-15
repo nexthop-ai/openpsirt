@@ -63,7 +63,7 @@ func TestNothingOfferedComesBackWithoutAValue(t *testing.T) {
 					"nothing applying", each.Name, each.Default)
 			}
 		}
-		// And the three that were blank carry what the readers actually use.
+		// And the disclosure settings carry what their readers fall back to.
 		want := map[string]string{
 			"disclosure.after":              "2160h0m0s",
 			"disclosure.movement-threshold": "720h0m0s",
@@ -79,12 +79,12 @@ func TestNothingOfferedComesBackWithoutAValue(t *testing.T) {
 }
 
 func TestWhatTheDocumentSaysAFindingWithNoDeadlineCarries(t *testing.T) {
-	// Two response bodies published the same field with different words. The
-	// evidence body declared `past-end-of-life`, which nothing in the tree
-	// produces, and omitted `out-of-support`, which the store emits on every
-	// finding whose release is past end of life — so a consumer validating
-	// against the published document rejected the body it was actually sent,
-	// and a TypeScript one could not narrow on the value.
+	// Every response body publishing the field declares the same words, and
+	// they are the words the store emits: `out-of-support` on every finding
+	// whose release is past end of life. A body declaring a word nothing
+	// produces, or omitting one the store emits, makes a consumer validating
+	// against the published document reject the body it is actually sent, and
+	// leaves a TypeScript one unable to narrow on the value.
 	//
 	// Read from the document the server builds, because that is what a
 	// consumer is held to.

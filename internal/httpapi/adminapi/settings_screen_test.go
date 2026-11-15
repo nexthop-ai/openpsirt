@@ -119,13 +119,13 @@ func TestEverySettingCarriesATitleASectionAndOneLine(t *testing.T) {
 	}
 }
 
-// TestEverySettingOfferedReportsWhatIsInForce is the guard that stops the
-// twenty-eighth setting being added without a default.
+// TestEverySettingOfferedReportsWhatIsInForce pins that every offered setting
+// carries what applies where nobody has set it, so no setting is added
+// without a default.
 //
-// `shipped()` was a 22-arm switch with a bare `return ""`, beside a list of 27
-// names — so the three disclosure settings reported blank on the administration
-// screen while 90 days, 30 days and 14 days were what the deployment enforced.
-// An operator reading the blank as "unset" read it as "nothing applies".
+// A setting reporting blank on the administration screen while the deployment
+// enforces a value reads to an operator as "unset", which they read as
+// "nothing applies".
 func TestEverySettingOfferedReportsWhatIsInForce(t *testing.T) {
 	if len(settable) < 20 {
 		t.Fatalf("%d settings are offered, so this checked almost nothing", len(settable))
@@ -227,12 +227,10 @@ func TestAWordSettingOffersTheListItIsCheckedAgainst(t *testing.T) {
 }
 
 func TestEverySettingNameThePackageDeclaresIsOfferedOrExempt(t *testing.T) {
-	// The three disclosure settings were read by the application and could not
-	// be set, and nothing caught it because the test named them by hand — so
-	// the twenty-eighth would have gone the same way.
-	//
-	// Read out of the package that declares them: a name added there and left
-	// out of `settable` fails this rather than waiting for somebody to notice.
+	// A setting the application reads and nobody can set is invisible to a
+	// test that names the settings by hand. Read out of the package that
+	// declares them instead: a name added there and left out of `settable`
+	// fails this rather than waiting for somebody to notice.
 	source, err := os.ReadFile(filepath.Join("..", "..", "setting", "setting.go"))
 	if err != nil {
 		t.Fatal(err)

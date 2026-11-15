@@ -13,10 +13,8 @@ import (
 
 // A personal token may be narrowed to one product when it is made, and the
 // narrowing intersects rather than adds: pinning it to something its owner
-// cannot read reaches nothing rather than granting it.
-//
-// All of this was implemented and none of it could be asked for — the one
-// screen that mints a token sent only a name and a lifetime.
+// cannot read reaches nothing rather than granting it. The narrowing is asked
+// for through the request that mints the token.
 func TestAPersonalTokenIsNarrowedWhenItIsMade(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		made := httpapitest.AsPerson(t, r, "private", http.MethodPost, "/v1/tokens",
@@ -40,12 +38,10 @@ func TestAPersonalTokenIsNarrowedWhenItIsMade(t *testing.T) {
 		if err := json.Unmarshal(listed.Body.Bytes(), &out); err != nil {
 			t.Fatalf("decode: %v (%s)", err, listed.Body.String())
 		}
-		// The address, in the field minting resolves. This asserted the
-		// display name, with a comment saying an answer shows what a person
-		// reads — which is true of a field beside it and not of this one: a
-		// product declared "acme-router" and displayed "Acme Router" was
-		// listed under a word that matches no row, so a token could not be
-		// remade from what the list said it covered.
+		// The address, in the field minting resolves, never the display name:
+		// a product declared "acme-router" and displayed "Acme Router" listed
+		// under the display name would match no row, so a token could not be
+		// remade from what the list says it covers.
 		if len(out.Items) != 1 || out.Items[0].Product != "mine" {
 			t.Fatalf("the narrowing is not read back as the name that resolves it: %s",
 				listed.Body.String())

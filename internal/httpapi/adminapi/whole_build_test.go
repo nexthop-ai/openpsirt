@@ -12,10 +12,10 @@ import (
 // A request that names one whole build has already said which release it means,
 // so the two filters that choose between releases have nothing left to choose.
 //
-// Applied anyway, their defaults — branches, in support — answered "0 of 0"
-// about a tag holding twenty-five findings: correct filters answering a
-// question the caller did not ask. A release past its end of life read the same
-// way, which is worse, because that is the pile nothing else counts.
+// Applied anyway, their defaults — branches, in support — would answer "0 of 0"
+// about a tag holding findings: correct filters answering a question the
+// caller did not ask. A release past its end of life would read the same way,
+// which is worse, because that is the pile nothing else counts.
 func TestNamingOneWholeBuildIsNotNarrowedByWhatKindOfReleaseItIs(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := r.Scanned(t)
