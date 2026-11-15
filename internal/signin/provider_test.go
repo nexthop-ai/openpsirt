@@ -240,11 +240,14 @@ func TestATokenNamingNobodyIsRefused(t *testing.T) {
 	// relies on the adapters to make this check.
 	p := standing(t)
 	adapter, pending := p.begun(t, OIDCConfig{})
+	// Everything else the token needs is there, so the subject is the one
+	// thing it can be refused for.
 	p.claims["nonce"] = pending.Nonce
+	p.claims["preferred_username"] = "ana"
 	p.claims["sub"] = "   "
 	if _, err := adapter.Complete(t.Context(), "a-code", pending,
-		"https://here.example/back"); err == nil {
-		t.Error("a token naming no subject was accepted")
+		"https://here.example/back"); err == nil || !strings.Contains(err.Error(), "names no subject") {
+		t.Errorf("a token naming no subject answered %v, want the refusal saying it names no subject", err)
 	}
 }
 
