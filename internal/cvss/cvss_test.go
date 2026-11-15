@@ -5,7 +5,6 @@ package cvss_test
 
 import (
 	"errors"
-	"strings"
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/cvss"
@@ -100,13 +99,15 @@ func TestNoVectorIsNotAScoreOfZero(t *testing.T) {
 	}
 }
 
+// Every metric stays, in the order given, a metric outside the base and a
+// base metric out of the specification's order included.
 func TestTheVectorIsKeptAsGivenApartFromItsCase(t *testing.T) {
-	got, err := cvss.Score("cvss:3.1/av:n/ac:l/pr:n/ui:n/s:u/c:h/i:h/a:h")
+	got, err := cvss.Score("cvss:3.1/a:h/av:n/ac:l/pr:n/ui:n/s:u/c:h/i:h/e:p")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(got.Vector, "CVSS:3.1/") {
-		t.Errorf("the vector came back as %q", got.Vector)
+	if want := "CVSS:3.1/A:H/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/E:P"; got.Vector != want {
+		t.Errorf("the vector came back as %q, want %q", got.Vector, want)
 	}
 }
 
