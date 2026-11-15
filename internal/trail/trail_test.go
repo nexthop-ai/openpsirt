@@ -133,6 +133,15 @@ func TestTheTrailRecordsAndPagesOnEveryEngine(t *testing.T) {
 			nil, trail.Said("low", true)); err == nil {
 			t.Error("a change with nobody behind it was recorded")
 		}
+		// And so is one made by something that is not a person, even holding
+		// the number of a person's row, which it would otherwise be recorded
+		// against.
+		pipeline := access.NewPipeline(by.ID, "a build", access.Scope{})
+		if err := s.Record(ctx, pipeline, trail.Setting, "minimum-severity",
+			nil, trail.Said("low", true)); err == nil ||
+			!strings.Contains(err.Error(), "recorded against whoever made it") {
+			t.Errorf("a change a pipeline made answered %v, want the refusal saying who records one", err)
+		}
 	})
 }
 
