@@ -68,11 +68,9 @@ func triageBaseline(t *columnTypes) []string {
 			"selected_matched" INTEGER NULL,
 			"selected_named"   INTEGER NULL,
 			-- What the claim says. One act is one argument, so the argument
-			-- is here and not once per row underneath. It was on the row, and a
-			-- judgment reaching forty-four places was forty-four copies of one
-			-- sentence that could each be revised on their own: revising one
-			-- returned that row to the queue and left the other forty-three
-			-- saying the old thing while the claim read as agreed.
+			-- is here and not once per row underneath: a copy per row could be
+			-- revised on its own, returning that row to the queue while the
+			-- others said the old thing and the claim read as agreed.
 			--
 			-- Every one of these was constant across every row of every claim
 			-- in the measured deployment. Nothing has ever produced a claim
