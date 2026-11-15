@@ -40,9 +40,10 @@ back.
 
 | Rule | Reason |
 |---|---|
-| Every transaction runs through one helper that retries it whole on a lost race: deadlock, lock-wait timeout, serialization failure, an error during commit, and a busy or locked SQLite database | |
+| Every transaction runs through one helper that retries it whole on a lost race: deadlock, lock-wait timeout, serialization failure, an error during commit, a row changed since it was read, and a busy or locked SQLite database | |
 | A file read a page at a time runs in one read-only snapshot, begun on the database handle and never inside a transaction, the one transaction a request makes outside that helper, ended by rolling back | It writes nothing, so nothing certifies it and it loses no race; a file written as it reads cannot be read again. A transaction already open reads at its own isolation, which on PostgreSQL moves between statements. Every engine takes the same options, and SQLite begins it without the write lock. On PostgreSQL it lifts the server's bounds on an idle transaction and on a transaction's length for itself, and its caller's context bounds it (`design-docs/analytics-exports.md` § Exports) |
 | An error during commit is retried on MySQL and MariaDB | Some cluster certification failures arrive as it rather than as a deadlock |
+| A row changed since it was read is retried on MariaDB | Under snapshot isolation, the default from MariaDB 11.6.2, a transaction writing a row another committed after its read is refused with it |
 | A busy or locked SQLite database is retried | A writer arriving while another holds the file is told so, and goes again once it is free |
 | Any other failure is reported, never retried | A constraint violation retried hammers the database and hangs |
 | Nothing a transaction depends on is read outside it | A retry re-runs the closure against a moved database |

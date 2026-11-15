@@ -118,6 +118,7 @@ func WorthRetrying(err error) bool {
 		switch my.Number {
 		case 1213, // deadlock found, and what a cluster says when it could not certify
 			1205, // lock wait timeout
+			1020, // MariaDB under snapshot isolation: a row read changed before the write
 			1180: // an error during commit, which is how some cluster failures arrive
 			return true
 		}

@@ -246,9 +246,11 @@ func TestAHolderThatLostItsLeaseStopsBeforeItsNextStatement(t *testing.T) {
 			if _, err := thief.ExecContext(t.Context(), `UPDATE "`+LeaseTable+`" SET "token" = 'thief'`); err != nil {
 				t.Fatal(err)
 			}
+			// Sooner than stopAfter, so only a renewal finding the lease
+			// taken ends it in time, never the unanswered bound.
 			select {
 			case <-ctx.Done():
-			case <-time.After(10 * renewEvery):
+			case <-time.After(5 * renewEvery):
 				t.Fatal("a holder whose lease was taken went on holding it")
 			}
 			if !errors.Is(context.Cause(ctx), errLeaseLost) {
@@ -299,13 +301,118 @@ func TestAHolderWhoseRenewalsGoUnansweredStops(t *testing.T) {
 		case <-time.After(leaseFor + stopAfter):
 			t.Fatal("a holder whose renewals went unanswered went on holding the lease")
 		}
-		if waited := time.Since(blocked); waited >= leaseFor {
-			t.Errorf("the holder stopped %s after its renewals stopped answering, past the lapse", waited)
+		// Halfway between stopping and the lapse, so a holder stopping at
+		// the lapse, with no room for the clocks to differ, fails.
+		if waited := time.Since(blocked); waited >= (stopAfter+leaseFor)/2 {
+			t.Errorf("the holder stopped %s after its renewals stopped answering, leaving the clocks no room", waited)
 		}
 		if !errors.Is(context.Cause(lock.ctx), errLeaseLost) {
 			t.Errorf("the holder stopped for %v, not the lost lease", context.Cause(lock.ctx))
 		}
 	})
+}
+
+// A release that finds the lease no longer its own reports it lost, so a
+// migration whose lease was taken between two renewals fails, which on
+// SQLite, where no time stops a holder, nothing else catches.
+func TestAReleaseOfALeaseTakenSinceTheLastRenewalReportsItLost(t *testing.T) {
+	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
+		ctx := t.Context()
+		db, thief := open(t, address), open(t, address)
+		freshLease(t, db)
+		lock, err := acquire(ctx, db)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := thief.ExecContext(ctx, `UPDATE "`+LeaseTable+`" SET "token" = 'thief'`); err != nil {
+			t.Fatal(err)
+		}
+		if err := lock.release(ctx); !errors.Is(err, errLeaseLost) {
+			t.Errorf("letting go of a lease another instance took answered %v", err)
+		}
+	})
+}
+
+// Instances making the lease table at once all find it made, whichever way
+// the engine refuses the ones that lose: PostgreSQL may answer a racing
+// create as a duplicate or as a table that already exists. The create is
+// raced on its own, since asking the catalog first narrows the window to
+// where a race seldom lands.
+func TestInstancesMakingTheLeaseTableAtOnceAllFindItMade(t *testing.T) {
+	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
+		ctx := t.Context()
+		pools := []*database.DB{open(t, address), open(t, address), open(t, address), open(t, address)}
+		drop := func() { _, _ = pools[0].ExecContext(context.Background(), `DROP TABLE IF EXISTS "`+LeaseTable+`"`) }
+		t.Cleanup(drop)
+		for round := range 100 {
+			drop()
+			start := make(chan struct{})
+			var wg sync.WaitGroup
+			for _, db := range pools {
+				wg.Go(func() {
+					<-start
+					if err := makeLeaseTable(ctx, db); err != nil {
+						t.Errorf("round %d: %v", round, err)
+					}
+				})
+			}
+			close(start)
+			wg.Wait()
+		}
+	})
+}
+
+// Claimants racing for a lapsed lease under MariaDB's snapshot isolation,
+// the default from 11.6.2, get one lease between them: the loser is refused
+// as having read a row that changed, and tries again.
+func TestARaceUnderSnapshotIsolationIsTriedAgain(t *testing.T) {
+	engines.SkipUnless(t, database.MariaDB)
+	address := os.Getenv(mariadbURLEnv)
+	if address == "" {
+		t.Skipf("%s is not set", mariadbURLEnv)
+	}
+	ctx := t.Context()
+	isolated := func() *database.DB {
+		db := open(t, address)
+		db.SetMaxOpenConns(1)
+		db.SetConnMaxLifetime(0)
+		if _, err := db.ExecContext(ctx, `SET SESSION innodb_snapshot_isolation = ON`); err != nil {
+			t.Skipf("this server has no snapshot isolation to set (%v)", err)
+		}
+		return db
+	}
+	first, second := isolated(), isolated()
+	freshLease(t, first)
+	for round := range 20 {
+		leftBy(t, first, holdingMigrate, -time.Second)
+		claimants := []*lease{
+			{db: first, token: newToken(), holder: "first"},
+			{db: second, token: newToken(), holder: "second"},
+		}
+		var wins atomic.Int32
+		var wg sync.WaitGroup
+		start := make(chan struct{})
+		for _, c := range claimants {
+			wg.Go(func() {
+				<-start
+				won, _, _, err := c.claim(ctx)
+				if err != nil {
+					t.Errorf("round %d: a claim failed: %v", round, err)
+				}
+				if won {
+					wins.Add(1)
+				}
+			})
+		}
+		close(start)
+		wg.Wait()
+		if got := wins.Load(); got != 1 {
+			t.Fatalf("round %d: %d claimants took the lease", round, got)
+		}
+		if _, err := first.ExecContext(ctx, `DELETE FROM "`+LeaseTable+`"`); err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 // A waiter stops waiting when its context ends, between two claims, so a

@@ -159,14 +159,21 @@ func acquire(ctx context.Context, db *database.DB) (*held, error) {
 
 // leaseTable makes the lease table where it is absent. Asked first, so a
 // credential without the right to make tables passes where it is there.
-// Two instances making it at once on PostgreSQL may see the loser refused as
-// a duplicate, which is the table made.
+// Two instances making it at once on PostgreSQL may see the loser refused,
+// as a duplicate or as a table that already exists, so a refusal is followed
+// by asking again, and a table there is the table made.
 func leaseTable(ctx context.Context, db *database.DB) error {
 	there, err := tableExists(ctx, db, LeaseTable)
 	if err != nil || there {
 		return err
 	}
-	_, err = db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS "`+LeaseTable+`" (
+	return makeLeaseTable(ctx, db)
+}
+
+// makeLeaseTable makes the lease table, and answers a refusal only where the
+// table is still not there once it is refused.
+func makeLeaseTable(ctx context.Context, db *database.DB) error {
+	_, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS "`+LeaseTable+`" (
 		"name"       VARCHAR(32) NOT NULL,
 		"token"      VARCHAR(64) NOT NULL,
 		"holding"    VARCHAR(16) NOT NULL,
@@ -174,7 +181,10 @@ func leaseTable(ctx context.Context, db *database.DB) error {
 		"expires_at" BIGINT NOT NULL,
 		PRIMARY KEY ("name")
 	)`)
-	if err != nil && !database.IsDuplicate(err) {
+	if err != nil {
+		if there, again := tableExists(ctx, db, LeaseTable); again == nil && there {
+			return nil
+		}
 		return fmt.Errorf("make the migration lease table: %w", err)
 	}
 	return nil
@@ -283,9 +293,10 @@ func (l *lease) start(ctx context.Context, began time.Time) *held {
 	return &held{ctx: l.ctx, release: l.release, change: l.change}
 }
 
-// renewing writes the lease every renewEvery until stopped, on a connection
-// of its own, never the one a migration runs on: a data-definition statement
-// runs for minutes, and on MySQL and MariaDB commits alone.
+// renewing writes the lease every renewEvery until stopped. On the server
+// engines it renews on a pooled connection, never the one a migration holds:
+// a data-definition statement runs for minutes, and on MySQL and MariaDB
+// commits alone.
 //
 // A renewal finding the lease gone or taken ends the lease's context, and the
 // holder sends no further statement. On the server engines so does stopAfter
