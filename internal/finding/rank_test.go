@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/cvss"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
@@ -152,6 +153,29 @@ func TestAWordStandsInWhereThereIsNoNumber(t *testing.T) {
 	}
 	if finding.SeverityScore("") != 0 || finding.SeverityScore("unknown") != 0 {
 		t.Error("an unrated issue was given a score")
+	}
+}
+
+func TestAWordScoresAtTheMidpointOfItsBand(t *testing.T) {
+	// The band is read from the scoring standard's cut points as BandOf draws
+	// them: from its lowest score up to the next band's lowest.
+	for _, word := range []string{"low", "medium", "high", "critical"} {
+		lowest, highest := 0, 0
+		for centi := 1; centi <= 1000; centi++ {
+			if cvss.BandOf(float64(centi)/100) != word {
+				continue
+			}
+			if lowest == 0 {
+				lowest = centi
+			}
+			highest = centi
+		}
+		if lowest == 0 {
+			t.Fatalf("no score falls in %q, so this checked nothing", word)
+		}
+		if got, want := finding.SeverityScore(word), (lowest+highest+1)/2; got != want {
+			t.Errorf("%q scores %d, want %d, the midpoint of %d to %d", word, got, want, lowest, highest)
+		}
 	}
 }
 

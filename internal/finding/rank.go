@@ -256,7 +256,7 @@ func SeverityScore(word string) int {
 	case "high":
 		return 800
 	case "low":
-		return 300
+		return 200
 	default:
 		return 550
 	}
