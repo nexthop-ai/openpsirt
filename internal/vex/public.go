@@ -12,15 +12,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // The three statuses a statement states, as both formats this deployment
-// publishes spell them.
+// publishes spell them: the exchange format's words, which sbom names.
 const (
-	NotAffected = "not_affected"
-	Fixed       = "fixed"
-	Affected    = "affected"
+	NotAffected = string(sbom.NotAffected)
+	Fixed       = string(sbom.AlreadyFixed)
+	Affected    = string(sbom.Affected)
 )
 
 // The action an affected statement carries where the decision named none. The

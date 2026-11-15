@@ -221,14 +221,15 @@ func Sources() []string {
 // depend on it: what a caller may narrow a list by, and which of them offers a
 // prefill.
 func VexStatuses() []string {
-	return []string{"not_affected", "affected", "fixed", "under_investigation"}
+	return []string{string(sbom.NotAffected), string(sbom.Affected), string(sbom.AlreadyFixed),
+		string(sbom.UnderInvestigation)}
 }
 
 // BuildSayings are what the build's own claims say about an open finding, in
 // the format's vocabulary. A claim that the shipped code is fixed closes every
 // finding it covers, so it is never one an open finding is narrowed by.
 func BuildSayings() []string {
-	return []string{"not_affected", "affected", "under_investigation"}
+	return []string{string(sbom.NotAffected), string(sbom.Affected), string(sbom.UnderInvestigation)}
 }
 
 // OutcomesOffered are the outcomes a publisher's statement can prefill.
@@ -257,16 +258,16 @@ func OutcomesOffered() []string {
 // help.
 func (s Statement) Prefills() (outcome string, offers bool) {
 	switch s.Status {
-	case "not_affected":
+	case string(sbom.NotAffected):
 		// The one status that *is* a claim of non-applicability, and the
 		// justification is the publisher's own term from the same vocabulary
 		// ours uses.
 		return OutcomeNotApplicable, true
-	case "affected":
+	case string(sbom.Affected):
 		// They say it applies and they are not fixing it here, which is a
 		// will-not-fix in our vocabulary and never a dismissal.
 		return OutcomeWontFix, true
-	case "fixed":
+	case string(sbom.AlreadyFixed):
 		return OutcomeAlreadyFixed, true
 	}
 	// Under investigation offers nothing: it is a publisher saying they do not
