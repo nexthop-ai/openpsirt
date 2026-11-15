@@ -310,3 +310,18 @@ func TestTheBaseIsWrittenFromItsCommitAndTheRepositoryIsLeftAlone(t *testing.T) 
 		t.Errorf("the repository's worktrees read %q, %v; want its own alone", listed, err)
 	}
 }
+
+func TestAGitArchiveDyingPartwayReportsWhatGitSaid(t *testing.T) {
+	bin := t.TempDir()
+	// A git that starts a tar stream, stops partway through its first header,
+	// and says why on standard error, as git does when an object is unreadable.
+	script := "#!/bin/sh\nprintf 'inner/a.go'\necho 'fatal: unable to read 0123abcd' >&2\nexit 128\n"
+	if err := os.WriteFile(filepath.Join(bin, "git"), []byte(script), 0o700); err != nil { //nolint:gosec // G306: an executable this test runs
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	err := extract(t.TempDir(), "HEAD", filepath.Join(t.TempDir(), "base"))
+	if err == nil || !strings.Contains(err.Error(), "fatal: unable to read 0123abcd") {
+		t.Errorf("the failure read %v; want git's own message in it", err)
+	}
+}

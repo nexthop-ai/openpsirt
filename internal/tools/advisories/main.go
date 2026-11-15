@@ -617,8 +617,12 @@ func extract(root, commit, dir string) error {
 	if written != nil {
 		// Nothing reads the rest of the stream, so git blocks on a full pipe
 		// and Wait never returns unless the process is stopped.
+		// git's own line, where it wrote one, says why the stream stopped.
 		_ = archive.Process.Kill()
 		_ = archive.Wait()
+		if said := strings.TrimSpace(stderr.String()); said != "" {
+			return fmt.Errorf("%w\n%s", written, said)
+		}
 		return written
 	}
 	if err := archive.Wait(); err != nil {
