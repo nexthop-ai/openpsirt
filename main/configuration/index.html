@@ -2389,7 +2389,11 @@ connected to the database, and then applies the schema. Until it serves:</p>
 </table>
 <p>A second process started while one applies the schema waits for it, answers
 the same way, and logs about once a minute which process holds the migration
-lock. Where the holder stops part way, the waiter applies the schema itself.</p>
+lock. Where the holder stops part way, the waiter applies the schema itself.
+The lock is the server's own, so any account on a MySQL or MariaDB server,
+or any role allowed to connect to the PostgreSQL database, can take it and
+hold every start behind it. The waiter's log line names that connection; end
+it to let the start go on.</p>
 <p>A check on <code>/readyz</code> that ends the process ends a long migration part way, and
 the next process starts it again from the beginning. An AWS Application Load
 Balancer in front of ECS has one health check, which both routes traffic and
@@ -4639,6 +4643,10 @@ from, and every section after it.</p>
 <tr>
 <td>Deploy this release</td>
 <td>It migrates at startup, answering its health check on <code>/healthz</code> meanwhile (<a href="#health-checks">Health checks</a>). With <code>autoMigrate: false</code>, run <code>openpsirt migrate up</code> first</td>
+</tr>
+<tr>
+<td>Watch the log while it migrates</td>
+<td>A schema change waits three seconds at a time for a table another session holds, and tries again with no total limit, logging <code>a migration is waiting for a table something else holds</code> with every other session holding a transaction open. A wait logged again and again names the session to end</td>
 </tr>
 </tbody>
 </table>
