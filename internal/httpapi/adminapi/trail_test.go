@@ -883,41 +883,79 @@ func TestEveryAdministrativeChangeIsRecorded(t *testing.T) {
 // TestADeactivationIsRecordedEvenWhenTheRestOfTheActFails pins the order the
 // note is written in.
 //
-// Deactivating somebody ends their sessions and hands their work back, and
-// both of those can answer 500 with the deactivation already written. The note
-// is written first: recorded afterwards, a failure leaves a person who cannot
-// sign in and nothing saying who stopped them, permanently, because the second
-// attempt finds nothing to move and returns before reaching the note at all.
+// Deactivating somebody hands their work back after the deactivation has
+// committed, and the hand-back can answer 500 with the deactivation already
+// written. The note is written with the deactivation: recorded afterwards, a
+// failure leaves a person who cannot sign in and nothing saying who stopped
+// them, permanently, because the second attempt finds nothing to move and
+// returns before reaching the note at all. The finding table is taken away
+// for the first attempt, which fails the hand-back and nothing before it.
 func TestADeactivationIsRecordedEvenWhenTheRestOfTheActFails(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
 			`{"identity":"leaver"}`); got.Code >= 300 {
 			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
 		}
-		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			"/v1/people/leaver/deactivation", ""); got.Code >= 300 {
-			t.Fatalf("deactivating answered %d: %s", got.Code, got.Body.String())
+		restore := dbtest.Hide(t, r.DB, "finding")
+		got := httpapitest.AsPerson(t, r, "admin", http.MethodPut, "/v1/people/leaver/deactivation", "")
+		restore()
+		if got.Code != http.StatusInternalServerError {
+			t.Fatalf("a deactivation whose hand-back failed answered %d: %s", got.Code, got.Body.String())
+		}
+		leaver, err := r.Rights.ByIdentity(t.Context(), "leaver")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if leaver.DeactivatedAt == nil {
+			t.Fatal("the deactivation did not stand, so nothing here tests its record")
+		}
+		if n := deactivationsOf(t, r, "leaver"); n != 1 {
+			t.Errorf("a deactivation whose hand-back failed recorded %d rows, want 1", n)
 		}
 
-		// Again: nothing moves, and nothing is recorded a second time. A row
-		// per attempt would say somebody was deactivated twice.
+		// Asking again finishes the hand-back, and moves nothing.
 		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
-			"/v1/people/leaver/deactivation", ""); got.Code >= 300 {
+			"/v1/people/leaver/deactivation", ""); got.Code != http.StatusOK {
 			t.Fatalf("deactivating again answered %d: %s", got.Code, got.Body.String())
 		}
-
-		var trail httpapitest.Changed
-		httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=account&limit=200", &trail)
-		deactivations := 0
-		for _, row := range trail.Items {
-			if row.About == "leaver" && row.Became == "deactivated" {
-				deactivations++
-			}
-		}
-		if deactivations != 1 {
-			t.Errorf("deactivating twice recorded %d rows, want 1", deactivations)
+		if n := deactivationsOf(t, r, "leaver"); n != 1 {
+			t.Errorf("deactivating again recorded %d rows, want 1", n)
 		}
 	})
+}
+
+// A second deactivation moves nothing and records nothing: a row per attempt
+// would say somebody was deactivated twice.
+func TestDeactivatingTwiceRecordsOneRow(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		if got := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/people",
+			`{"identity":"leaver"}`); got.Code >= 300 {
+			t.Fatalf("recording somebody answered %d: %s", got.Code, got.Body.String())
+		}
+		for range 2 {
+			if got := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
+				"/v1/people/leaver/deactivation", ""); got.Code != http.StatusOK {
+				t.Fatalf("deactivating answered %d: %s", got.Code, got.Body.String())
+			}
+		}
+		if n := deactivationsOf(t, r, "leaver"); n != 1 {
+			t.Errorf("deactivating twice recorded %d rows, want 1", n)
+		}
+	})
+}
+
+// deactivationsOf counts the trail's rows saying somebody was deactivated.
+func deactivationsOf(t *testing.T, r *httpapitest.Reach, identity string) int {
+	t.Helper()
+	var trail httpapitest.Changed
+	httpapitest.Read(t, r, "admin", "/v1/administration/changes?kind=account&limit=200", &trail)
+	n := 0
+	for _, row := range trail.Items {
+		if row.About == identity && row.Became == "deactivated" {
+			n++
+		}
+	}
+	return n
 }
 
 func TestTheTrailIsAnAdministratorsToRead(t *testing.T) {
