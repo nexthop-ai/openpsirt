@@ -5,8 +5,8 @@ import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildsWords, DisclosureDeadlines, embargoKey } from "./DisclosureDeadlines";
 import { remember } from "../app/scope";
-import { answer, screen, serve, settle, mounted } from "../test/mount";
-import { change, press } from "../test/controls";
+import { accept, answer, screen, serve, settle, mounted } from "../test/mount";
+import { change, only, press } from "../test/controls";
 
 const mount = mounted();
 
@@ -110,6 +110,80 @@ describe("the disclosure deadlines screen", () => {
       (each) => each.textContent === "Record a reported flaw",
     );
     expect(shortcut?.getAttribute("href")).toBe("/record-a-flaw?product=sonic&source=outside");
+  });
+});
+
+describe("moving or disclosing an embargo", () => {
+  const ISSUE = "/v1/products/{product}/issues/{issue}";
+
+  // The row leaves the list once an act in force lands.
+  async function asked(act: string, inForce: boolean) {
+    let landed = false;
+    serve((path) => {
+      if (path === "/v1/session/me") return { data: me };
+      if (path === "/v1/disclosure-deadlines") {
+        const items = landed && inForce ? [] : [row("openpsirt")];
+        return { data: { items, total: items.length } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    const sent = accept(() => {
+      landed = true;
+      return { data: { in_force: inForce } };
+    });
+    mount.render(screen(<DisclosureDeadlines />, "/disclosure-deadlines"));
+    await settle();
+    await press(mount.host(), "Move or disclose");
+    const choice = Array.from(mount.host().querySelectorAll("label")).find(
+      (each) => each.querySelector("span")?.textContent === "Act",
+    );
+    change(choice?.querySelector("select") ?? null, act);
+    if (act !== "disclosure") {
+      change(mount.host().querySelector<HTMLInputElement>('input[type="date"]'), "2027-02-01");
+    }
+    change(mount.host().querySelector("textarea"), "The vendor asked.");
+    await press(mount.host(), "Ask");
+    await settle();
+    return sent;
+  }
+
+  it.each([
+    [
+      "extension",
+      `${ISSUE}/disclosure/extension`,
+      { until: "2027-02-01", reason: "The vendor asked." },
+    ],
+    [
+      "shortening",
+      `${ISSUE}/disclosure/shortening`,
+      { until: "2027-02-01", reason: "The vendor asked." },
+    ],
+    ["disclosure", `${ISSUE}/disclosure`, { reason: "The vendor asked." }],
+  ])("sends the %s to its own route with what it takes", async (act, route, body) => {
+    const sent = await asked(act, true);
+    const [path, init] = only(sent);
+    expect(path).toBe(route);
+    expect(init.params?.path).toEqual({ product: "openpsirt", issue: "OPENPSIRT-2026-1" });
+    expect(init.body).toEqual(body);
+  });
+
+  it("says a movement past the threshold waits in the review queue", async () => {
+    await asked("extension", false);
+    expect(mount.host().textContent).toContain(
+      "Recorded. Nothing changes until a second person agrees.",
+    );
+    const waiting = Array.from(mount.host().querySelectorAll("a")).find(
+      (each) => each.textContent === "Waiting in the review queue →",
+    );
+    expect(waiting?.getAttribute("href")).toBe("/review-queue#embargoes");
+  });
+
+  it("says a disclosure in force is public once its row has left the list", async () => {
+    await asked("disclosure", true);
+    expect(mount.host().textContent).toContain("Nothing is approaching a disclosure date.");
+    expect(mount.host().textContent).toContain(
+      "Disclosed. The findings and everything on them are public.",
+    );
   });
 });
 
