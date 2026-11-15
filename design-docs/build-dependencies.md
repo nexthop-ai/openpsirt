@@ -49,7 +49,7 @@ Every Go tool the gate or image runs is required by its own module under
 |---|---|
 | The version is a requirement in the module's `go.mod`, checksummed in its `go.sum` | Dependency updates move requirements |
 | One module per tool | A bump never moves another tool's libraries |
-| A build-constrained file imports the tool's command | The requirement is direct, which updates move |
+| A build-constrained file imports the tool's command, the path the `tool` directive names, enforced by `pins-check` | `go mod tidy` marks a requirement only the `tool` directive names as indirect; a direct one is what updates move |
 | A tool's directory is named for its command, enforced by `pins-check` | Targets call tools by directory |
 | The image builds the inventory generator from the makefile's module | |
 

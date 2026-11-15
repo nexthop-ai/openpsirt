@@ -374,6 +374,12 @@ pins-check:
 	    echo "$$mod declares the tool \"$$named\" and sits in tools/$$dir, so the targets"; \
 	    echo "calling it by its directory reach nothing. One tool per module, named for it."; \
 	    fail=1; }; \
+	  tool=$$(awk '/^tool /{print $$2}' "$$mod"); \
+	  imported=$$(sed -n 's/^import _ "\(.*\)"$$/\1/p' "tools/$$dir/tools.go" 2>/dev/null); \
+	  [ "$$imported" = "$$tool" ] || { \
+	    echo "tools/$$dir/tools.go imports \"$$imported\" and $$mod declares the tool \"$$tool\"."; \
+	    echo "The import keeps the tool's module a direct requirement; it names the tool."; \
+	    fail=1; }; \
 	done; \
 	[ "$$tools" -gt 0 ] || { echo "tools/ holds no module, so no tool's pin was compared."; fail=1; }; \
 	[ -n "$$($(MAKE) -s --no-print-directory node-version)" ] || { \
