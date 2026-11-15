@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/yuin/goldmark/ast"
-	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
 )
@@ -18,8 +17,8 @@ import (
 // Text is markdown reduced to the words it shows: emphasis, headings, lists
 // and quotes without their markers, a link and an image as the words they
 // show, escapes and character references resolved, code as written, and raw
-// HTML left out. Blocks are separated by a
-// line feed.
+// HTML left out. Blocks are separated by a line feed, and a table cell is a
+// block.
 //
 // It is for markdown somebody else wrote that is kept as text, such as an
 // analyzer's message, which is shown encoded and never rendered.
@@ -44,10 +43,6 @@ func Text(source string) string {
 					b.WriteByte(' ')
 				}
 			}
-		case *ast.String:
-			if entering {
-				b.Write(node.Value)
-			}
 		case *ast.AutoLink:
 			if entering {
 				b.Write(node.Label(src))
@@ -59,10 +54,6 @@ func Text(source string) string {
 					line := lines.At(i)
 					b.Write(line.Value(src))
 				}
-			}
-		case *extast.TableCell:
-			if !entering {
-				b.WriteByte(' ')
 			}
 		}
 		if !entering && n.Type() == ast.TypeBlock && n.Kind() != ast.KindDocument {
