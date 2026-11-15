@@ -6,9 +6,11 @@ package migrate
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
-	"sync/atomic"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
@@ -21,23 +23,19 @@ import (
 // changed is still changing it while its record stands.
 //
 // Asking reads rows, and takes nothing an instance migrating waits for.
+//
+// It reads the lease table and the record of schema changes, which a
+// database at a version holding the record has, and asks no catalog first:
+// on MySQL and MariaDB the catalog shows a credential only the tables it may
+// read, so a table it may not read would look absent and every look answer
+// Unchanged. A table it may not read fails the look.
 type Observer struct {
 	db *database.DB
-	// recorded is whether the database keeps a record of schema changes. A
-	// serving instance's database does, being at its build's version.
-	recorded bool
-	// leased is whether the lease table has been seen. A migrator makes it
-	// before it migrates, so once seen it stays.
-	leased atomic.Bool
 }
 
 // NewObserver is an Observer of db.
-func NewObserver(ctx context.Context, db *database.DB) (*Observer, error) {
-	recorded, err := tableExists(ctx, db, ChangeTable)
-	if err != nil {
-		return nil, err
-	}
-	return &Observer{db: db, recorded: recorded}, nil
+func NewObserver(db *database.DB) *Observer {
+	return &Observer{db: db}
 }
 
 // Change is what a look found of a schema change.
@@ -91,16 +89,13 @@ func (o *Observer) Look(ctx context.Context, acquireWithin, lookWithin time.Dura
 // which it does from before its first migration's statements to after its
 // last, or else whether a record stands of an upgrade reaching a version
 // later than applied.
-func (o *Observer) changing(ctx context.Context, q database.RowQuerier, applied int64) (Change, error) {
+func (o *Observer) changing(ctx context.Context, q bun.Conn, applied int64) (Change, error) {
 	held, err := o.leasedToChange(ctx, q)
 	if err != nil {
 		return Unchanged, err
 	}
 	if held {
 		return Held, nil
-	}
-	if !o.recorded {
-		return Unchanged, nil
 	}
 	var records int
 	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+ChangeTable+`" WHERE "target_version" > ?`,
@@ -116,14 +111,13 @@ func (o *Observer) changing(ctx context.Context, q database.RowQuerier, applied 
 // leasedToChange reports whether the lease is held to change the schema and
 // has not lapsed. The database's clock is read only where a lease is held to
 // change it, which is only during an upgrade.
-func (o *Observer) leasedToChange(ctx context.Context, q database.RowQuerier) (bool, error) {
-	if !o.leased.Load() {
-		there, err := tableExistsOn(ctx, q, o.db.Server.Engine, LeaseTable)
-		if err != nil || !there {
-			return false, err
-		}
-		o.leased.Store(true)
-	}
+//
+// On SQLite a lapsed lease held to change the schema still counts while a
+// writer holds the file: a migration's transaction holds the file's one
+// write, so its holder cannot renew the lease until the transaction ends,
+// and a migration running past the lapse is still changing the schema. A
+// holder that died holds nothing, so its lease stops counting at the lapse.
+func (o *Observer) leasedToChange(ctx context.Context, q bun.Conn) (bool, error) {
 	var holding string
 	var expires int64
 	switch err := q.QueryRowContext(ctx, `SELECT "holding", "expires_at" FROM "`+LeaseTable+`" WHERE "name" = ?`,
@@ -140,12 +134,61 @@ func (o *Observer) leasedToChange(ctx context.Context, q database.RowQuerier) (b
 	if err != nil {
 		return false, fmt.Errorf("ask whether the schema is changing: %w", err)
 	}
-	return expires > now.UnixMicro(), nil
+	if expires > now.UnixMicro() {
+		return true, nil
+	}
+	if o.db.Server.Engine != database.SQLite {
+		return false, nil
+	}
+	writing, err := writerHolds(ctx, q)
+	if err != nil {
+		return false, fmt.Errorf("ask whether a migration holds the file: %w", err)
+	}
+	return writing, nil
+}
+
+// writerHolds reports whether another connection holds a SQLite file's one
+// write, by asking for it without waiting and letting it go at once.
+//
+// The connection's busy timeout is put back as it was. A connection left
+// part way, its timeout unrestored or its transaction open, is discarded
+// rather than returned to the pool.
+func writerHolds(ctx context.Context, conn bun.Conn) (held bool, err error) {
+	var wait int64
+	if err := conn.QueryRowContext(ctx, `PRAGMA busy_timeout`).Scan(&wait); err != nil {
+		return false, err
+	}
+	defer func() {
+		if err != nil {
+			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
+		}
+	}()
+	if _, err := conn.ExecContext(ctx, `PRAGMA busy_timeout = 0`); err != nil {
+		return false, err
+	}
+	_, begun := conn.ExecContext(ctx, `BEGIN IMMEDIATE`)
+	if begun == nil {
+		if _, err := conn.ExecContext(ctx, `ROLLBACK`); err != nil {
+			return false, err
+		}
+	}
+	// A pragma takes no placeholder; the value is the integer read above.
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf(`PRAGMA busy_timeout = %d`, wait)); err != nil {
+		return false, err
+	}
+	switch {
+	case begun == nil:
+		return false, nil
+	case database.WorthRetrying(begun):
+		// SQLite's answer to a write another connection holds.
+		return true, nil
+	}
+	return false, begun
 }
 
 // applied reports the highest schema version applied, in one query on the
 // migration library's bookkeeping table.
-func (o *Observer) applied(ctx context.Context, q database.RowQuerier) (int64, error) {
+func (o *Observer) applied(ctx context.Context, q bun.Conn) (int64, error) {
 	var applied sql.NullInt64
 	if err := q.QueryRowContext(ctx,
 		`SELECT MAX("version_id") FROM "`+VersionTable+`" WHERE "is_applied"`).Scan(&applied); err != nil {

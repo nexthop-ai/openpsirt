@@ -30,9 +30,14 @@ func everyEngine(t *testing.T, each func(t *testing.T, engine database.Engine, a
 // and fails the test naming what it last answered.
 func changingWithin(t *testing.T, o *Observer, want bool, doing string) {
 	t.Helper()
+	conn, err := o.db.Conn(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		change, err := o.changing(t.Context(), o.db, 0)
+		change, err := o.changing(t.Context(), conn, 0)
 		got := change != Unchanged
 		if err != nil {
 			t.Fatalf("%s: asking whether the schema is changing: %v", doing, err)
@@ -56,10 +61,8 @@ func TestAServingInstanceSeesALeaseHeldToChangeTheSchema(t *testing.T) {
 		ctx := t.Context()
 		migrating, serving := open(t, address), open(t, address)
 		freshLease(t, migrating)
-		observer, err := NewObserver(ctx, serving)
-		if err != nil {
-			t.Fatal(err)
-		}
+		recordTable(t, migrating)
+		observer := NewObserver(serving)
 		changingWithin(t, observer, false, "before any lease")
 
 		lock, err := acquire(ctx, migrating)
@@ -96,13 +99,10 @@ func TestAServingInstanceSeesALeaseHeldToChangeTheSchema(t *testing.T) {
 // PostgreSQL and SQLite, and on MySQL and MariaDB the record keeps them paused.
 func TestServingInstancesResumeWhenALeaseHeldToChangeTheSchemaLapses(t *testing.T) {
 	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
-		ctx := t.Context()
 		db, serving := open(t, address), open(t, address)
 		freshLease(t, db)
-		observer, err := NewObserver(ctx, serving)
-		if err != nil {
-			t.Fatal(err)
-		}
+		recordTable(t, db)
+		observer := NewObserver(serving)
 		leftBy(t, db, holdingChange, 2*time.Second)
 		changingWithin(t, observer, true, "before the lease lapsed")
 		lapsed := time.Now().Add(2 * time.Second)
@@ -172,10 +172,7 @@ func TestAFailedUpgradeKeepsServingInstancesPausedWhereItLeftThePartChanged(t *t
 		recordTable(t, migrating)
 		applied := versionTable(t, migrating)
 		applied(0)
-		observer, err := NewObserver(ctx, serving)
-		if err != nil {
-			t.Fatal(err)
-		}
+		observer := NewObserver(serving)
 		begin := func() func(error) {
 			lock, err := acquire(ctx, migrating)
 			if err != nil {
@@ -225,10 +222,11 @@ func TestALookWaitsForABusyPool(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `INSERT INTO "`+VersionTable+`" VALUES (7, TRUE)`); err != nil {
 		t.Fatal(err)
 	}
-	observer, err := NewObserver(ctx, db)
-	if err != nil {
+	if err := leaseTable(ctx, db); err != nil {
 		t.Fatal(err)
 	}
+	recordTable(t, db)
+	observer := NewObserver(db)
 	db.SetMaxOpenConns(1)
 	busy, err := db.DB.DB.Conn(ctx)
 	if err != nil {
@@ -276,4 +274,83 @@ func TestNoRecordIsWrittenDuringTheNotice(t *testing.T) {
 			t.Error("an upgrade stopped during the notice reported going on")
 		}
 	})
+}
+
+// A look whose lease table or record of schema changes cannot be read fails,
+// whether the table is absent or the credential may not read it: on MySQL and
+// MariaDB the catalog shows a credential only what it may read, so asking it
+// first would read an unreadable table as no change.
+func TestALookThatCannotReadWhatItAsksFails(t *testing.T) {
+	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
+		ctx := t.Context()
+		db := open(t, address)
+		versionTable(t, db)(1)
+		dropLease := func() { _, _ = db.ExecContext(context.Background(), `DROP TABLE IF EXISTS "`+LeaseTable+`"`) }
+		dropLease()
+		t.Cleanup(dropLease)
+		dropRecord := func() { _, _ = db.ExecContext(context.Background(), `DROP TABLE IF EXISTS "`+ChangeTable+`"`) }
+		dropRecord()
+		observer := NewObserver(db)
+		if change, _, err := observer.Look(ctx, time.Minute, time.Minute); err == nil {
+			t.Errorf("a look with no lease table to read answered %v and no failure", change)
+		}
+		freshLease(t, db)
+		if change, _, err := observer.Look(ctx, time.Minute, time.Minute); err == nil {
+			t.Errorf("a look with no record of schema changes to read answered %v and no failure", change)
+		}
+		recordTable(t, db)
+		if change, _, err := observer.Look(ctx, time.Minute, time.Minute); err != nil || change != Unchanged {
+			t.Errorf("a look with both tables to read answered %v, %v", change, err)
+		}
+	})
+}
+
+// On SQLite a lapsed lease held to change the schema still counts while
+// another connection holds the file's one write, as a migration running past
+// the lapse does, and stops counting once the write ends. The look puts the
+// connection's busy timeout back as it was.
+func TestALapsedLeaseCountsWhileAMigrationHoldsTheSQLiteFile(t *testing.T) {
+	engines.SkipUnless(t, database.SQLite)
+	ctx := t.Context()
+	address := "sqlite://" + filepath.Join(t.TempDir(), "long.db")
+	db, migrating := open(t, address), open(t, address)
+	versionTable(t, db)(1)
+	freshLease(t, db)
+	recordTable(t, db)
+	leftBy(t, db, holdingChange, -time.Second)
+	observer := NewObserver(db)
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	var before int64
+	if err := conn.QueryRowContext(ctx, `PRAGMA busy_timeout`).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	if change, err := observer.changing(ctx, conn, 1); err != nil || change != Unchanged {
+		t.Fatalf("a lapsed lease with no writer holding the file: %v, %v; want Unchanged", change, err)
+	}
+
+	writer, err := migrating.DB.DB.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = writer.Close() }()
+	if _, err := writer.ExecContext(ctx, `BEGIN IMMEDIATE`); err != nil {
+		t.Fatal(err)
+	}
+	if change, err := observer.changing(ctx, conn, 1); err != nil || change != Held {
+		t.Errorf("a lapsed lease while a migration holds the file: %v, %v; want Held", change, err)
+	}
+	if _, err := writer.ExecContext(ctx, `ROLLBACK`); err != nil {
+		t.Fatal(err)
+	}
+	if change, err := observer.changing(ctx, conn, 1); err != nil || change != Unchanged {
+		t.Errorf("a lapsed lease once the write ended: %v, %v; want Unchanged", change, err)
+	}
+	var after int64
+	if err := conn.QueryRowContext(ctx, `PRAGMA busy_timeout`).Scan(&after); err != nil || after != before {
+		t.Errorf("the look left the busy timeout at %d (%v), not %d", after, err, before)
+	}
 }

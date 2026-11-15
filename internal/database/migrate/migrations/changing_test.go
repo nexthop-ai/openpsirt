@@ -31,19 +31,20 @@ func servingBeside(t *testing.T, db *database.DB) *database.DB {
 }
 
 // An upgrade holds the lease to change the schema from before its first
-// statement, through the notice it gives, to after its last; a serving
-// instance sees it while the version is still the one it served, and the
-// version moved once it is let go. An upgrade with nothing to apply never
-// holds it to change the schema.
+// statement, through the notice it gives and every migration's statements, to
+// after its last; a serving instance sees it while the version is still the
+// one it served, and the version moved once it is let go. An upgrade with
+// nothing to apply never holds it to change the schema.
+//
+// Until the upgrade holds the lease, a look at the v0.12.0 schema fails,
+// since the record of schema changes is not there yet; a serving instance of
+// this build never looks at it.
 func TestAnUpgradeHoldsTheLeaseToChangeTheSchemaFromBeforeItsFirstStatement(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v0120)
-		observer, err := migrate.NewObserver(ctx, servingBeside(t, db))
-		if err != nil {
-			t.Fatal(err)
-		}
+		observer := migrate.NewObserver(servingBeside(t, db))
 		expected, err := migrations.Expected()
 		if err != nil {
 			t.Fatal(err)
@@ -58,11 +59,7 @@ func TestAnUpgradeHoldsTheLeaseToChangeTheSchemaFromBeforeItsFirstStatement(t *t
 		go func() { done <- migrate.Up(context.WithoutCancel(ctx), db, quiet(), notice) }()
 		deadline := time.Now().Add(30 * time.Second)
 		for {
-			changing, _, err := look()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if changing {
+			if changing, _, err := look(); err == nil && changing {
 				break
 			}
 			select {
@@ -77,6 +74,20 @@ func TestAnUpgradeHoldsTheLeaseToChangeTheSchemaFromBeforeItsFirstStatement(t *t
 		}
 		if _, applied, err := look(); err != nil || applied != v0120 {
 			t.Errorf("as the lease was held to change the schema, the schema was at %d (%v), not %d", applied, err, v0120)
+		}
+		// Every look while the upgrade runs, its statements included, sees
+		// the schema changing until the version is this build's.
+		for watching := true; watching; {
+			select {
+			case err := <-done:
+				done <- err
+				watching = false
+			default:
+				if changing, applied, err := look(); err != nil || (!changing && applied < expected) {
+					t.Fatalf("while the upgrade ran a serving instance saw changing %v at %d (%v)", changing, applied, err)
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
 		}
 		if err := <-done; err != nil {
 			t.Fatalf("the upgrade: %v", err)
@@ -128,10 +139,7 @@ func TestARecordTheVersionHasReachedPausesNobody(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		observer, err := migrate.NewObserver(ctx, servingBeside(t, db))
-		if err != nil {
-			t.Fatal(err)
-		}
+		observer := migrate.NewObserver(servingBeside(t, db))
 		record := func(target int64) {
 			t.Helper()
 			if _, err := db.ExecContext(ctx, `INSERT INTO "schema_change" ("started_at", "started_by", "target_version")
@@ -188,10 +196,7 @@ func TestAnUpgradeCommittedWithoutItsVersionKeepsInstancesPaused(t *testing.T) {
 		if err := migrations.RunV0130Unrecorded(ctx, db); err != nil {
 			t.Fatal(err)
 		}
-		observer, err := migrate.NewObserver(ctx, servingBeside(t, db))
-		if err != nil {
-			t.Fatal(err)
-		}
+		observer := migrate.NewObserver(servingBeside(t, db))
 		look := func() (bool, int64) {
 			t.Helper()
 			change, applied, err := observer.Look(ctx, time.Minute, time.Minute)

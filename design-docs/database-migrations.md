@@ -332,11 +332,12 @@ outage for as long as its migrations take.
 | `openpsirt migrate up` holds the lease to change the schema and waits the same way | It is the same upgrade under other credentials |
 | A serving instance looks every second: is the lease held to change the schema and not lapsed, or a record standing, and which version is applied, read before and after | One look costs under a millisecond on every engine: 0.71 ms on PostgreSQL, the slowest (`design-docs/database-measurements.md` § Schema watch looks) |
 | A look reads rows, and reads the database's clock only where the lease is held to change the schema | It takes nothing an upgrade waits for, and outside an upgrade asks no clock |
-| A lease held to change the schema that has lapsed pauses nobody | Its holder is gone: on PostgreSQL and SQLite its transaction rolled back, and on MySQL and MariaDB the record keeps instances paused |
+| A look reads the lease table and the record without asking the catalog, and a table it cannot read fails it | Both stand at every version an instance serves. On MySQL and MariaDB the catalog shows a credential only the tables it may read, so an unreadable table would read as no change |
+| A lease held to change the schema that has lapsed pauses nobody, except on SQLite while a writer holds the file | Its holder is gone: on PostgreSQL and SQLite its transaction rolled back, and on MySQL and MariaDB the record keeps instances paused. A SQLite migration's transaction holds the file's one write, so its holder cannot renew until it ends; a look asks for the write without waiting, and lets it go at once |
 | A look takes a connection of its own from the pool, waiting up to ten seconds, then asks within two | A pool busy with requests delays a look without failing it |
 | A look that cannot take a connection, fails, or overruns either bound reads as Changes, logged once until a look succeeds | An instance that cannot tell whether the schema is changing does not serve it |
 | A look reads the version first, and a version ahead is Superseded even where asking about a change then fails | A later release may have reshaped what that asks |
-| A start looks once more just before its router opens, and refuses to start unless the look finds Serves | Preparing to serve takes up to the startup deadline, longer than the notice |
+| A start looks before it prepares to serve, and again just before its router opens, and refuses to start unless each look finds Serves | Preparing writes the administrators and group mappings configuration names, and takes up to the startup deadline, longer than the notice |
 
 | Standing | When | The instance |
 |---|---|---|

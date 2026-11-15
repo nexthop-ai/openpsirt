@@ -7,7 +7,10 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -441,5 +444,78 @@ func TestAStuckPassHoldsBackOnlyThePasses(t *testing.T) {
 		case <-time.After(30 * time.Second):
 			t.Fatal("an instance whose stopped pass never ended had not stopped within 30s")
 		}
+	})
+}
+
+// A start into a schema another instance is changing refuses before it
+// prepares to serve, so it writes nothing there: not the administrators
+// configuration names, not the group mappings. Both ways the schema comes to
+// be in place, migrated by the start itself or by somebody else.
+func TestAStartIntoASchemaBeingChangedWritesNothing(t *testing.T) {
+	holdToChange := func(t *testing.T, db *database.DB) {
+		t.Helper()
+		if _, err := db.ExecContext(t.Context(), `INSERT INTO "schema_lease"
+			("name", "token", "holding", "holder", "expires_at") VALUES (?, ?, ?, ?, ?)`,
+			"schema", "another", "change", "another instance", time.Now().Add(time.Hour).UnixMicro()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	nobodyNamed := func(t *testing.T, url string) {
+		t.Helper()
+		var named int
+		if err := dbtest.Open(t, url).QueryRowContext(t.Context(),
+			`SELECT COUNT(*) FROM "person" WHERE "is_bootstrap"`).Scan(&named); err != nil {
+			t.Fatal(err)
+		}
+		if named != 0 {
+			t.Errorf("a start into a schema being changed named %d administrators before refusing", named)
+		}
+	}
+	refusedForTheChange := func(t *testing.T, err error) {
+		t.Helper()
+		if err == nil || !strings.Contains(err.Error(), "changing the schema") {
+			t.Errorf("a start into a schema being changed answered %v", err)
+		}
+	}
+
+	t.Run("migrated by the start", func(t *testing.T) {
+		s := startHeld(t, freeAddress(t), func(ctx context.Context, db *database.DB, logger *slog.Logger) error {
+			if err := schema.Up(ctx, db, logger); err != nil {
+				return err
+			}
+			holdToChange(t, db)
+			return nil
+		})
+		close(s.release)
+		select {
+		case err := <-s.done:
+			s.done <- err
+			refusedForTheChange(t, err)
+		case <-time.After(30 * time.Second):
+			t.Fatal("the start had not ended 30s after its migration")
+		}
+		nobodyNamed(t, s.url)
+	})
+
+	t.Run("migrated by somebody else", func(t *testing.T) {
+		url := "sqlite://" + filepath.Join(t.TempDir(), "changing.db")
+		db := dbtest.Open(t, url)
+		if err := schema.Up(t.Context(), db, discard()); err != nil {
+			t.Fatal(err)
+		}
+		holdToChange(t, db)
+		t.Setenv("OPENPSIRT_DATABASE_URL", url)
+		t.Setenv("OPENPSIRT_ADDR", freeAddress(t))
+		t.Setenv("OPENPSIRT_AUTO_MIGRATE", "false")
+		t.Setenv("OPENPSIRT_RECORDS_UPDATE", "false")
+		t.Setenv("OPENPSIRT_RECORDS_DIR", t.TempDir())
+		t.Setenv("OPENPSIRT_BOOTSTRAP_ADMINS", "root")
+		quiet, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = quiet.Close() }()
+		refusedForTheChange(t, run(nil, os.Environ(), quiet, quiet))
+		nobodyNamed(t, url)
 	})
 }

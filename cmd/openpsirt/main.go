@@ -229,13 +229,18 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 		if err := schemaIsCurrent(ctx, db, logger); err != nil {
 			return startupFailed(err, "checking the schema version", cfg)
 		}
+		watcher, err := schema.NewWatcher(db)
+		if err != nil {
+			return startupFailed(err, "preparing to watch the schema", cfg)
+		}
+		// Looked at before preparing, which writes, and again before
+		// serving, since preparing can outlast an upgrade's notice.
+		if err := lookBeforeServing(ctx, watcher.Look); err != nil {
+			return startupFailed(err, "checking the schema before preparing to serve", cfg)
+		}
 		handler, beside, err := prepare(ctx, cfg, logger, db)
 		if err != nil {
 			return err
-		}
-		watcher, err := schema.NewWatcher(ctx, db)
-		if err != nil {
-			return startupFailed(err, "preparing to watch the schema", cfg)
 		}
 		if err := lookBeforeServing(startup, watcher.Look); err != nil {
 			return startupFailed(err, "checking the schema before serving", cfg)
@@ -262,7 +267,7 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	// adding an index to a large finding table takes longer than a deployment
 	// starts in, so bounded at 60s it gives up, restarts, and begins the
 	// migration again — for ever. A second replica waits on the migration
-	// lock for as long as the first holds it, answering the same way.
+	// lease for as long as the first holds it, answering the same way.
 	//
 	// Every refusal that reads no database comes before the port opens and
 	// before the migration, so a bad value is refused in seconds. The ones
@@ -285,13 +290,18 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	settled()
 	startup, settled = context.WithTimeout(stopping, cfg.StartupTimeout)
 	defer settled()
+	watcher, err := schema.NewWatcher(db)
+	if err != nil {
+		return server.abandon(cfg, logger, startupFailed(err, "preparing to watch the schema", cfg))
+	}
+	// Looked at before preparing, which writes, and again before serving,
+	// since preparing can outlast an upgrade's notice.
+	if err := lookBeforeServing(startup, watcher.Look); err != nil {
+		return server.abandon(cfg, logger, startupFailed(err, "checking the schema before preparing to serve", cfg))
+	}
 	handler, beside, err := prepareFrom(startup, cfg, logger, db, from)
 	if err != nil {
 		return server.abandon(cfg, logger, err)
-	}
-	watcher, err := schema.NewWatcher(startup, db)
-	if err != nil {
-		return server.abandon(cfg, logger, startupFailed(err, "preparing to watch the schema", cfg))
 	}
 	if err := lookBeforeServing(startup, watcher.Look); err != nil {
 		return server.abandon(cfg, logger, startupFailed(err, "checking the schema before serving", cfg))

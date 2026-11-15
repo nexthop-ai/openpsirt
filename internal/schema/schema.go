@@ -98,16 +98,12 @@ type Watcher struct {
 }
 
 // NewWatcher is a Watcher of db for this build.
-func NewWatcher(ctx context.Context, db *database.DB) (*Watcher, error) {
+func NewWatcher(db *database.DB) (*Watcher, error) {
 	expected, err := Expected()
 	if err != nil {
 		return nil, err
 	}
-	observer, err := migrate.NewObserver(ctx, db)
-	if err != nil {
-		return nil, err
-	}
-	return &Watcher{observer: observer, expected: expected}, nil
+	return &Watcher{observer: migrate.NewObserver(db), expected: expected}, nil
 }
 
 // Look reports the schema's standing, with the version applied and the one
