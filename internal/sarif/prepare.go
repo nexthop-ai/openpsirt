@@ -6,6 +6,7 @@ package sarif
 import (
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -208,7 +209,7 @@ func (pl *Placer) Place(run *Run, root string) []Placed {
 			pl.dropped.Outside++
 			continue
 		}
-		key := strings.Join([]string{res.RuleID, rel, itoa(first.StartLine), itoa(first.StartColumn), res.Message}, "\x00")
+		key := strings.Join([]string{res.RuleID, rel, strconv.Itoa(first.StartLine), strconv.Itoa(first.StartColumn), res.Message}, "\x00")
 		if pl.seen[key] {
 			pl.dropped.Repeats++
 			continue
@@ -273,26 +274,4 @@ func (pl *Placer) placedStep(paths Paths, loc Location, depth *int) PlacedStep {
 	}
 	step.Snippet, step.SnippetLine = pl.snippet(rel, loc)
 	return step
-}
-
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var b [20]byte
-	i := len(b)
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	for n > 0 {
-		i--
-		b[i] = byte('0' + n%10)
-		n /= 10
-	}
-	if neg {
-		i--
-		b[i] = '-'
-	}
-	return string(b[i:])
 }
