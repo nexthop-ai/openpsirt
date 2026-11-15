@@ -69,10 +69,9 @@ func datesOf(t *testing.T, db *database.DB, identifier string) held {
 	return out
 }
 
-func newPass(db *database.DB, asker issuedate.Asker, now *time.Time) *issuedate.Pass {
+func newPass(db *database.DB, asker issuedate.Asker, clock *dbtest.Clock) *issuedate.Pass {
 	p := issuedate.NewPass(db.DB, slog.New(slog.NewTextHandler(io.Discard, nil)), "test")
-	p.Asker, p.Pause = asker, 0
-	p.Now = func() time.Time { return *now }
+	p.Asker, p.Pause, p.Now = asker, 0, clock.Now
 	return p
 }
 
@@ -83,9 +82,9 @@ func newPass(db *database.DB, asker issuedate.Asker, now *time.Time) *issuedate.
 func TestIssueDatesAreAskedOnceAndAgainWhenStale(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		// Starts at the real time, because Intern stamps first_seen_at from the
-		// real clock and an unknown issue's freshness is measured from it.
-		now := time.Now().UTC().Truncate(time.Microsecond)
+		// Intern stamps first_seen_at from the real clock, and an unknown
+		// issue's freshness is measured from it.
+		clock := dbtest.NewClock()
 		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-0001"},
 			{Identifier: "CVE-2026-0002", Aliases: []string{"GHSA-aaaa-bbbb-cccc"}},
@@ -97,7 +96,7 @@ func TestIssueDatesAreAskedOnceAndAgainWhenStale(t *testing.T) {
 			"CVE-2026-0001":       {Published: published, Modified: modified},
 			"GHSA-AAAA-BBBB-CCCC": {Published: published},
 		}}
-		pass := newPass(db, answers, &now)
+		pass := newPass(db, answers, clock)
 		asked, err := pass.Once(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -121,16 +120,16 @@ func TestIssueDatesAreAskedOnceAndAgainWhenStale(t *testing.T) {
 		if asked, err := pass.Once(ctx); err != nil || asked != 0 {
 			t.Fatalf("a second pass at once answered %d (%v), want none due", asked, err)
 		}
-		now = now.Add(25 * time.Hour)
+		clock.Advance(25 * time.Hour)
 		if asked, err := pass.Once(ctx); err != nil || asked != 1 {
 			t.Fatalf("a day later answered %d (%v), want the fresh unknown issue alone", asked, err)
 		}
-		now = now.Add(20 * 24 * time.Hour)
+		clock.Advance(20 * 24 * time.Hour)
 		answers.asked = nil
 		if asked, err := pass.Once(ctx); err != nil || asked != 0 {
 			t.Fatalf("past the fortnight a day after asking answered %d (%v), want none: %v", asked, err, answers.asked)
 		}
-		now = now.Add(11 * 24 * time.Hour)
+		clock.Advance(11 * 24 * time.Hour)
 		// OSV no longer serves the first: the dates it gave are kept.
 		answers.mu.Lock()
 		delete(answers.says, "CVE-2026-0001")
@@ -149,14 +148,14 @@ func TestIssueDatesAreAskedOnceAndAgainWhenStale(t *testing.T) {
 func TestIssueDatesStayDueWhenOSVDoesNotAnswerOrIsTurnedOff(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		now := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+		clock := dbtest.NewClock()
 		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-0010"}, {Identifier: "CVE-2026-0011"},
 		}); err != nil {
 			t.Fatal(err)
 		}
 		answers := &osv{fails: map[string]bool{"CVE-2026-0010": true, "CVE-2026-0011": true}}
-		pass := newPass(db, answers, &now)
+		pass := newPass(db, answers, clock)
 		if asked, err := pass.Once(ctx); err != nil || asked != 0 {
 			t.Fatalf("an unwell OSV answered %d (%v), want none", asked, err)
 		}
@@ -182,7 +181,7 @@ func TestIssueDatesStayDueWhenOSVDoesNotAnswerOrIsTurnedOff(t *testing.T) {
 func TestANameOSVWillNotAnswerAboutIsPassedOver(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		now := time.Now().UTC().Truncate(time.Microsecond)
+		clock := dbtest.NewClock()
 		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-0020", Aliases: []string{"GHSA-dddd-eeee-ffff"}},
 			{Identifier: "CVE-2026-0021"},
@@ -196,7 +195,7 @@ func TestANameOSVWillNotAnswerAboutIsPassedOver(t *testing.T) {
 				"CVE-2026-0021":       {Published: published},
 			},
 		}
-		if asked, err := newPass(db, answers, &now).Once(ctx); err != nil || asked != 2 {
+		if asked, err := newPass(db, answers, clock).Once(ctx); err != nil || asked != 2 {
 			t.Fatalf("answered %d (%v), want both issues; asked %v", asked, err, answers.asked)
 		}
 		for _, identifier := range []string{"CVE-2026-0020", "CVE-2026-0021"} {
@@ -212,7 +211,7 @@ func TestANameOSVWillNotAnswerAboutIsPassedOver(t *testing.T) {
 func TestAPassStopsWhereItsLeaseIsTaken(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		now := time.Now().UTC().Truncate(time.Microsecond)
+		clock := dbtest.NewClock()
 		var named []finding.Named
 		for i := range queue.RenewEvery + 5 {
 			named = append(named, finding.Named{Identifier: fmt.Sprintf("CVE-2026-%04d", 100+i)})
@@ -224,7 +223,7 @@ func TestAPassStopsWhereItsLeaseIsTaken(t *testing.T) {
 			t.Fatalf("the other replica could not take the lease: %v (%v)", mine, err)
 		}
 		answers := &osv{}
-		if asked, err := newPass(db, answers, &now).Once(ctx); err != nil || asked != queue.RenewEvery {
+		if asked, err := newPass(db, answers, clock).Once(ctx); err != nil || asked != queue.RenewEvery {
 			t.Errorf("answered %d (%v), want the %d asked before the lease was asked for again",
 				asked, err, queue.RenewEvery)
 		}
@@ -236,13 +235,13 @@ func TestAPassStopsWhereItsLeaseIsTaken(t *testing.T) {
 func TestAPassWaitsBetweenRequests(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		now := time.Now().UTC().Truncate(time.Microsecond)
+		clock := dbtest.NewClock()
 		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
 			{Identifier: "CVE-2026-0030", Aliases: []string{"GHSA-gggg-hhhh-jjjj"}},
 		}); err != nil {
 			t.Fatal(err)
 		}
-		pass := newPass(db, &osv{says: map[string]issuedate.Dates{"GHSA-GGGG-HHHH-JJJJ": {Published: published}}}, &now)
+		pass := newPass(db, &osv{says: map[string]issuedate.Dates{"GHSA-GGGG-HHHH-JJJJ": {Published: published}}}, clock)
 		pass.Pause = 50 * time.Millisecond
 		started := time.Now()
 		if asked, err := pass.Once(ctx); err != nil || asked != 1 {
@@ -330,9 +329,9 @@ func TestARunningPassAsksOnlyWhenOnAndHoldingTheLease(t *testing.T) {
 					t.Fatal(err)
 				}
 				c.stop(t, db)
-				now := time.Now().UTC().Truncate(time.Microsecond)
+				clock := dbtest.NewClock()
 				answers := &osv{says: map[string]issuedate.Dates{"CVE-2026-0040": {Published: published}}}
-				running(t, newPass(db, answers, &now))
+				running(t, newPass(db, answers, clock))
 				// Many cycles of a millisecond each.
 				time.Sleep(100 * time.Millisecond)
 				if answers.anything() {
