@@ -652,13 +652,7 @@ func Deriving(t *testing.T, r *Reach, groups bool) *Reach {
 	// the guard and neither can deadlock, which is the difference between
 	// testing what the guard decides and testing where it reads from.
 	deps := r.Deps
-	deps.Mode = func(ctx context.Context) access.Mode {
-		stored, _, err := settings.Get(ctx, setting.RoleMode)
-		if err != nil {
-			return access.Direct
-		}
-		return access.AsMode(stored)
-	}
+	deps.Mode = settings.Mode()
 	with := *r
 	with.Handler = r.built.Serving(deps)
 	with.Deps = deps

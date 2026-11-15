@@ -65,23 +65,35 @@ func TestAVectorIsScoredTheWayThePublishedFormulaScoresIt(t *testing.T) {
 func TestAVectorThisDoesNotUnderstandIsRefusedRatherThanScored(t *testing.T) {
 	// A number that came out of the wrong formula looks exactly like every
 	// other number here, and nothing downstream could tell.
-	for _, c := range []struct{ what, vector string }{
-		{"version 2, a different scheme entirely", "AV:N/AC:L/Au:N/C:P/I:P/A:P"},
-		{"a version this does not implement", "CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
+	for _, c := range []struct{ what, vector, names string }{
+		{"version 2, a different scheme entirely", "AV:N/AC:L/Au:N/C:P/I:P/A:P", ""},
+		{"a version this does not implement", "CVSS:3.2/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", ""},
 		{"version 4's metrics under a version 3 heading",
-			"CVSS:3.1/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N"},
-		{"a metric missing", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H"},
-		{"a value that metric does not take", "CVSS:3.1/AV:Z/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
-		{"a metric given twice", "CVSS:3.1/AV:N/AV:L/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
-		{"nonsense", "not a vector"},
+			"CVSS:3.1/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N", ""},
+		{"a metric missing", "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H", ""},
+		{"a value that metric does not take", "CVSS:3.1/AV:Z/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", ""},
+		{"a scope that metric does not take",
+			"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:X/C:H/I:H/A:H", "S:X is not a value that metric takes"},
+		{"a part that is not a metric and a value",
+			"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/JUNK", `"JUNK" is not a metric and a value`},
+		{"a part with an empty value",
+			"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H/E:", `"E:" is not a metric and a value`},
+		{"a metric given twice", "CVSS:3.1/AV:N/AV:L/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", ""},
+		{"nonsense", "not a vector", ""},
 	} {
 		t.Run(c.what, func(t *testing.T) {
 			// Pinned to the sentinel, not to there being an error. Two
 			// callers branch on it to answer the caller rather than reporting
 			// a fault, so an unwrapped refusal turns a malformed vector into
 			// a 500 where a sibling test demands a 422.
-			if _, err := cvss.Score(c.vector); !errors.Is(err, cvss.ErrNotAVector) {
+			_, err := cvss.Score(c.vector)
+			if !errors.Is(err, cvss.ErrNotAVector) {
 				t.Errorf("%s answered %v, want it named as the caller's to fix", c.what, err)
+			}
+			// A refusal reached only by one guard names that guard's reason,
+			// so a later guard refusing the same vector does not stand in.
+			if c.names != "" && err != nil && !strings.Contains(err.Error(), c.names) {
+				t.Errorf("%s answered %v, want it to say %s", c.what, err, c.names)
 			}
 		})
 	}
@@ -100,13 +112,15 @@ func TestNoVectorIsNotAScoreOfZero(t *testing.T) {
 	}
 }
 
+// Every metric stays, in the order given, a metric outside the base and a
+// base metric out of the specification's order included.
 func TestTheVectorIsKeptAsGivenApartFromItsCase(t *testing.T) {
-	got, err := cvss.Score("cvss:3.1/av:n/ac:l/pr:n/ui:n/s:u/c:h/i:h/a:h")
+	got, err := cvss.Score("cvss:3.1/a:h/av:n/ac:l/pr:n/ui:n/s:u/c:h/i:h/e:p")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(got.Vector, "CVSS:3.1/") {
-		t.Errorf("the vector came back as %q", got.Vector)
+	if want := "CVSS:3.1/A:H/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/E:P"; got.Vector != want {
+		t.Errorf("the vector came back as %q, want %q", got.Vector, want)
 	}
 }
 

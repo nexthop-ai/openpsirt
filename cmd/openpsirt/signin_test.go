@@ -5,8 +5,6 @@ package main
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"strings"
 	"testing"
 
@@ -14,10 +12,6 @@ import (
 )
 
 // quiet is a logger for a test that is not about what was logged.
-func quiet() *slog.Logger {
-	return slog.New(slog.NewTextHandler(io.Discard, nil))
-}
-
 // An identity here is a username, so two providers issuing usernames
 // independently cannot be told apart: the same name from each is either one
 // person or two, and nothing in the record says which. The process stops
@@ -32,7 +26,7 @@ func TestTwoSignInProvidersAreRefused(t *testing.T) {
 		OIDCClientSecret:   "b",
 		GitHubClientID:     "c",
 		GitHubClientSecret: "d",
-	}, quiet())
+	}, discard())
 	if err == nil {
 		t.Fatal("two providers were accepted; one is configured at a time")
 	}
@@ -53,7 +47,7 @@ func TestTwoSignInProvidersAreRefused(t *testing.T) {
 func TestOneSignInProviderIsAccepted(t *testing.T) {
 	providers, err := signInProviders(context.Background(), config.Config{
 		GitHubClientID: "c", GitHubClientSecret: "d",
-	}, quiet())
+	}, discard())
 	if err != nil {
 		t.Fatalf("one provider was refused: %v", err)
 	}
@@ -66,7 +60,7 @@ func TestOneSignInProviderIsAccepted(t *testing.T) {
 // authenticates instead, and a deployment running that way configures no
 // provider at all.
 func TestNoSignInProviderIsNotAFault(t *testing.T) {
-	providers, err := signInProviders(context.Background(), config.Config{}, quiet())
+	providers, err := signInProviders(context.Background(), config.Config{}, discard())
 	if err != nil {
 		t.Fatalf("configuring no provider was refused: %v", err)
 	}

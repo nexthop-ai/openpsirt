@@ -19,13 +19,7 @@ import (
 func TestAFailureQuotingANULIsRecorded(t *testing.T) {
 	each(t, queue.DefaultOptions(), func(t *testing.T, db *database.DB, q *queue.Queue) {
 		ctx := t.Context()
-		if _, err := q.Add(ctx, "ingest", "x"); err != nil {
-			t.Fatal(err)
-		}
-		job, err := q.Claim(ctx, "worker", "ingest")
-		if err != nil || job == nil {
-			t.Fatalf("claim: %v %+v", err, job)
-		}
+		job := claimed(t, q, "ingest", "x", "worker")
 		if err := q.Fail(ctx, job.ID, "worker", errors.New("grype said \x00 and stopped")); err != nil {
 			t.Fatalf("a failure quoting a NUL was not recorded: %v", err)
 		}

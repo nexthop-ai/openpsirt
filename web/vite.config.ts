@@ -41,6 +41,10 @@ export default defineConfig({
     // key warnings and a render that threw arrive there, and a passing run
     // prints them where nobody reads.
     setupFiles: ["src/test/console.ts"],
+    // Every spy is restored before each test, so a fake server one test
+    // installs never answers the next. A spy a test needs is installed in
+    // that test or in a beforeEach.
+    restoreMocks: true,
     coverage: {
       provider: "v8",
       reporter: ["text-summary"],

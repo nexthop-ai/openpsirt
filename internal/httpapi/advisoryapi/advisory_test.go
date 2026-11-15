@@ -422,3 +422,37 @@ func TestAnAdvisoryIsReadWholeBeforeAndAfterItGoesOut(t *testing.T) {
 		}
 	})
 }
+
+// Taking an issue off an advisory takes off the one named in the path and
+// leaves the rest; an issue it does not cover is not there.
+func TestTakingAnIssueOffAnAdvisoryLeavesTheOthers(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		first, second := r.Embargoed(t), r.Embargoed(t)
+		named := httpapitest.AdvisoryOver(t, r, "private-triage", "mine", first)
+		at := "/v1/advisories/" + named
+		if added := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at+"/issues",
+			`{"product":"mine","vulnerability":"`+second+`"}`); added.Code != http.StatusCreated {
+			t.Fatalf("adding the second flaw answered %d: %s", added.Code, added.Body)
+		}
+
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private", http.MethodDelete,
+			at+"/issues/mine/"+first, ""), http.StatusForbidden)
+		if got := httpapitest.AsPerson(t, r, "private-triage", http.MethodDelete,
+			at+"/issues/mine/"+first, ""); got.Code != http.StatusNoContent {
+			t.Fatalf("taking an issue off answered %d: %s", got.Code, got.Body)
+		}
+		var read struct {
+			Covers []struct {
+				Product       string `json:"product"`
+				Vulnerability string `json:"vulnerability"`
+			} `json:"covers"`
+		}
+		httpapitest.Read(t, r, "private-triage", at, &read)
+		if len(read.Covers) != 1 || read.Covers[0].Vulnerability != second || read.Covers[0].Product != "mine" {
+			t.Errorf("after taking %s off, the advisory covers %+v, want %s alone", first, read.Covers, second)
+		}
+		httpapitest.RefusedWith(t, httpapitest.AsPerson(t, r, "private-triage", http.MethodDelete,
+			at+"/issues/mine/"+first, ""), http.StatusNotFound)
+	})
+}

@@ -240,11 +240,14 @@ func TestATokenNamingNobodyIsRefused(t *testing.T) {
 	// relies on the adapters to make this check.
 	p := standing(t)
 	adapter, pending := p.begun(t, OIDCConfig{})
+	// Everything else the token needs is there, so the subject is the one
+	// thing it can be refused for.
 	p.claims["nonce"] = pending.Nonce
+	p.claims["preferred_username"] = "ana"
 	p.claims["sub"] = "   "
 	if _, err := adapter.Complete(t.Context(), "a-code", pending,
-		"https://here.example/back"); err == nil {
-		t.Error("a token naming no subject was accepted")
+		"https://here.example/back"); err == nil || !strings.Contains(err.Error(), "names no subject") {
+		t.Errorf("a token naming no subject answered %v, want the refusal saying it names no subject", err)
 	}
 }
 
@@ -573,8 +576,7 @@ func TestAnOrganizationIsMatchedHoweverItWasTyped(t *testing.T) {
 	// group-bound mode.
 	// Both spellings vary: what the operator typed, and what GitHub hands
 	// back. GitHub answers with the organization's canonical casing, which is
-	// whatever its owner registered — so folding the operator's input at
-	// construction is half the rule and folding at the compare is the other.
+	// whatever its owner registered, so the compare folds both sides.
 	for _, c := range []struct{ typed, canonical string }{
 		{"nexthop-ai", "nexthop-ai"},
 		{"Nexthop-AI", "nexthop-ai"},
@@ -632,6 +634,47 @@ func TestAPublicAddressIsNotTakenForAVerifiedOne(t *testing.T) {
 	}
 	if who.Email != "verified@example.test" || !who.EmailVerified {
 		t.Errorf("the verified address was not used: %q verified=%v", who.Email, who.EmailVerified)
+	}
+}
+
+func TestAGitHubAnswerPastTheBoundIsRefused(t *testing.T) {
+	// A profile is a few hundred bytes, so an answer past the bound is read
+	// no further, even where the whole of it would have been a profile.
+	for _, c := range []struct {
+		name   string
+		signed bool
+	}{{strings.Repeat("a", mostFromGitHub-64), true}, {strings.Repeat("a", mostFromGitHub), false}} {
+		adapter := forgeAnswering(t, "", map[string]any{"login": "ana", "id": 42, "name": c.name}, []any{}, nil)
+		_, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"}, "https://here.example/back")
+		switch {
+		case c.signed && err != nil:
+			t.Errorf("a profile of %d bytes inside the bound was refused: %v", len(c.name), err)
+		case !c.signed && (err == nil || !strings.Contains(err.Error(), "read what github answered")):
+			t.Errorf("a profile of %d bytes past the bound answered %v, want it refused unread", len(c.name), err)
+		}
+	}
+}
+
+func TestAGitHubSignInCompletesWithoutTheAddressesItCouldNotRead(t *testing.T) {
+	// Where to reach somebody later is not part of who they are, so an
+	// address list that fails leaves the identity without an address.
+	adapter := forge(t, "", func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			writeJSON(w, map[string]any{"access_token": "a-token", "token_type": "Bearer"})
+		case "/user":
+			writeJSON(w, ana)
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+	who, err := adapter.Complete(t.Context(), "a-code", Pending{Verifier: "v"}, "https://here.example/back")
+	if err != nil {
+		t.Fatalf("a sign-in whose address list failed was refused: %v", err)
+	}
+	if who.Subject != "42" || who.Email != "" || who.EmailVerified {
+		t.Errorf("signed in as %q with address %q verified=%v, want 42 with no address",
+			who.Subject, who.Email, who.EmailVerified)
 	}
 }
 

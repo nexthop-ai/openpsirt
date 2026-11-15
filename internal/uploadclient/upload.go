@@ -55,8 +55,13 @@ type Answer struct {
 const attempts = 5
 
 // longestWait bounds how long one wait between attempts may be, whatever
-// the deployment asks for.
-const longestWait = 2 * time.Minute
+// the deployment asks for, and firstPause is the first wait after a
+// deployment that could not be reached. Variables so a test does not spend
+// real minutes waiting on a fake.
+var (
+	longestWait = 2 * time.Minute
+	firstPause  = 2 * time.Second
+)
 
 // Send uploads a document, compressed, with its fields. A deployment that
 // answers 503 is asked again after the time it names, and one that cannot be
@@ -70,7 +75,7 @@ func Send(ctx context.Context, client *http.Client, to Target, doc []byte, field
 	if err != nil {
 		return Answer{}, err
 	}
-	pause := 2 * time.Second
+	pause := firstPause
 	for attempt := 1; ; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, address, bytes.NewReader(body))
 		if err != nil {

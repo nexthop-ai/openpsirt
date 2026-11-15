@@ -102,3 +102,4 @@ parent build's.
 | A result equal to a moved code finding's first whole key, on another build, opens at its occurrence | Occurrences mint from the first key; it is one flaw reported twice |
 | A renamed file's results open as new | The path is in every key, so decisions do not follow |
 | Coverity is matched as plain SARIF | Its `mergeKey` is lost outside its JSON |
+| A markdown-only message holding a table is matched as the upload client reduced it, and clients reducing it differently disagree | A code finding whose message holds a table re-matches once on the first analysis a client reducing it otherwise sends, and its decision is asked again; REQ-76 covers it |

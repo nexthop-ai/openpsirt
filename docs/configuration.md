@@ -1695,6 +1695,7 @@ v0.10.2 named `reaffirm-claim`.
 | A stop whose requests or background work outlast `server.shutdown_grace` after the signal exits 1, which v0.12.0 exited 0 | Nothing, unless stops routinely exit 1: raise `server.shutdown_grace`, and `TimeoutStopSec` or `terminationGracePeriodSeconds` with it |
 | A request refused by the cross-site request check is answered 403, which v0.12.0 answered 401 | Nothing for the interface. A client treating 401 as a lapsed session no longer reads this refusal as one |
 | The releases out of support leave out a retired release and every release of a retired product. The download adds `product name` and `branch or tag name` beside `product` and `branch_or_tag` | A script reading the download by column position reads them by name |
+| `openpsirt-upload` reduces an analyzer's markdown-only message holding a table one row a line, its cells joined by a vertical bar with a space either side, where v0.12.0's reduced it one cell a line. The message is part of how a code finding is matched | Nothing the upgrade can do. Each code finding whose message holds a table re-matches once, on the first analysis this release's `openpsirt-upload` sends: it opens as a new finding, its decision stays on the earlier one, and that decision is asked again. Upgrade `openpsirt-upload` wherever it sends for one series, since a v0.12.0 client and this one disagree on such a message |
 
 #### VEX statements from v0.12.0
 

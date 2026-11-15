@@ -3,7 +3,7 @@
 
 import { act } from "react";
 import type { Who } from "../app/session";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Uploads } from "./Uploads";
 import { InventoryCompare } from "./InventoryCompare";
 import { Incidents } from "./Incidents";
@@ -13,6 +13,7 @@ import { Revisions, Standing } from "./FindingDecision";
 import { Products } from "./Products";
 import { Decide } from "../ui/Decide";
 import { PUBLISHED } from "../test/outcomes";
+import { DECIDING_AT } from "../test/deciding";
 import { Notices } from "../ui/Notices";
 import { screen, serve, settle, mounted } from "../test/mount";
 import { readingDependencies } from "../test/reach";
@@ -21,8 +22,6 @@ import { readingDependencies } from "../test/reach";
 // their main list. Drawn as its empty answer, a failure states something
 // nobody computed.
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const BUILD = "/products/:product/branches-and-tags/:branch_or_tag/variants/:variant";
 
@@ -136,14 +135,7 @@ describe("a secondary read that fails", () => {
     mount.render(
       screen(
         <Decide
-          at={{
-            product: "sonic",
-            branch_or_tag: "master",
-            variant: "broadcom",
-            vulnerability: "CVE-2026-1",
-            component: "openssl",
-            version: "3.0.2",
-          }}
+          at={DECIDING_AT}
           occurrences={[{ occurrence: "p1", component: "openssl" }]}
           onDone={() => undefined}
         />,

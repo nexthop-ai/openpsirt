@@ -1,14 +1,12 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Advisory } from "./Advisory";
 import { button, change, press } from "../test/controls";
 import { answer, mounted, screen, serve, settle, type Sent } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const ADDRESS = "/advisories/SONIC-2026-1";
 const PATTERN = "/advisories/:advisory";

@@ -4,56 +4,22 @@
 package scansapi_test
 
 import (
-	"io"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi"
-	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
 
-// limitedIngest is the ingest fixture with a document limit small enough to
-// exceed from a test.
-func limitedIngest(t *testing.T, limits sbom.Limits, fn func(t *testing.T, f *httpapitest.IngestFixture)) {
-	t.Helper()
-	dbtest.Two(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-		product := fixture.New(t, db).Product
-		rights := access.NewStore(db.DB)
-		_, secret, err := rights.NewKey(ctx, "nightly", access.Scope{ProductID: product.ID})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		q := queue.New(db, queue.DefaultOptions())
-		handler, _ := httpapi.New(quiet, nil, core.Deps{
-			DB: db, Queue: q, Limits: limits,
-			Access: access.NewResolver(rights, access.Trust{}),
-		})
-		fn(t, &httpapitest.IngestFixture{
-			Handler: handler, DB: db, Queue: q, Key: secret,
-			Path: "/v1/products/" + fixture.ProductName + "/branches-and-tags/" + fixture.BranchName +
-				"/variants/" + fixture.CustomerVariant + "/sboms",
-		})
-	})
-}
-
 func TestAFormLargerThanTheUploadLimitIsRefusedBeforeItIsRead(t *testing.T) {
 	// The operation's body limit only applies to a body read whole. A form is
 	// read part by part, and without a cap on the request a part of any size
 	// is spooled to disk in full before the document limit sees it.
-	limitedIngest(t, sbom.Limits{MaxBytes: 4096}, func(t *testing.T, f *httpapitest.IngestFixture) {
+	httpapitest.IngestLimited(t, dbtest.Two, sbom.Limits{MaxBytes: 4096}, func(t *testing.T, f *httpapitest.IngestFixture) {
 		// Well-formed, so that reaching the parser would be refused for its
 		// size by the document limit — as a 422 — rather than as a request
 		// that was never read. The padding is whitespace the parser accepts.

@@ -3,7 +3,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Thread } from "./Thread";
 import { belongTo } from "../app/drafts";
 import { mounted, screen, serve, settle } from "../test/mount";
@@ -15,8 +15,6 @@ beforeEach(() => {
   window.localStorage.clear();
   belongTo("oidc:ana");
 });
-afterEach(() => vi.restoreAllMocks());
-
 const ITEMS = [
   {
     id: 1,

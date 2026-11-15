@@ -132,16 +132,17 @@ func TestOutOfSupportSaysWhenTheFileWasTaken(t *testing.T) {
 	})
 }
 
-// TestNothingWarnedBeforeAReleaseCrossed is the warning half.
+// TestAReleaseAboutToEndIsListedApartWithDaysLeft is the warning half.
 //
 // The day a release goes out of support the deadline comes off every open
 // finding on it, so a pile of work leaves every overdue count at once with
-// nobody having decided anything. The report was past-only, so the first sight
-// of it was the figures moving.
-func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
+// nobody having decided anything. A horizon asked for lists what is about to
+// cross before the figures move.
+func TestAReleaseAboutToEndIsListedApartWithDaysLeft(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		soon := time.Now().UTC().AddDate(0, 0, 20).Format(time.DateOnly)
+		started := time.Now().UTC()
+		soon := started.AddDate(0, 0, 20).Format(time.DateOnly)
 		ending := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
 			"/v1/products/mine/branches-and-tags/master/end-of-life",
 			fmt.Sprintf(`{"on":%q}`, soon))
@@ -177,7 +178,7 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 			return out
 		}
 
-		// Asked for nothing, this is the past-only report it has always been.
+		// Asked for nothing, the report holds only releases already ended.
 		// A second population appearing unasked would change what every figure
 		// on the screen counts.
 		if now := asked(t, ""); len(now.Items) != 0 || len(now.Ending) != 0 {
@@ -197,11 +198,12 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		}
 		// Negative, which is the same figure read the other way: how long is
 		// left rather than how long ago — and it is the whole number of days
-		// somebody plans in. Counted from the instant rather than from today,
-		// a release ending tomorrow read as zero days left.
-		if ahead.Ending[0].EndedDays != -20 {
-			t.Errorf("a date twenty days ahead reads as %d days",
-				ahead.Ending[0].EndedDays)
+		// somebody plans in. Days are counted from today, so a release ending
+		// tomorrow reads as one day left. A run crossing midnight since the
+		// date was set reads one day fewer.
+		crossed := time.Now().UTC().Format(time.DateOnly) != started.Format(time.DateOnly)
+		if days := ahead.Ending[0].EndedDays; days != -20 && (!crossed || days != -19) {
+			t.Errorf("a date twenty days ahead reads as %d days", days)
 		}
 		// And what leaves every overdue count on the day it crosses, which is
 		// the number the warning is for.
@@ -224,7 +226,9 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		if len(ordered.Ending) != 2 {
 			t.Fatalf("two releases are about to go and %d came back", len(ordered.Ending))
 		}
-		if ordered.Ending[0].BranchOrTag != "v1.0" || ordered.Ending[0].EndedDays != -3 {
+		crossed = time.Now().UTC().Format(time.DateOnly) != started.Format(time.DateOnly)
+		if days := ordered.Ending[0].EndedDays; ordered.Ending[0].BranchOrTag != "v1.0" ||
+			(days != -3 && (!crossed || days != -2)) {
 			t.Errorf("the soonest is not first: %+v", ordered.Ending)
 		}
 
@@ -249,6 +253,52 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		}
 		if len(body) < 2 || body[1][at] != "ending" {
 			t.Errorf("the file does not say which population the row is: %v", body)
+		}
+	})
+}
+
+// The report narrowed to a product, or to one of its branches or tags, lists
+// those releases alone and counts what is open on them alone; across the
+// estate, the release with the most open is first.
+func TestOutOfSupportNarrowedToAScopeListsOnlyItsReleases(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedTwoIssues(t)
+		httpapitest.SeedTheirs(t, r)
+		r.EndingIn(t, "v1.0", -400)
+		for product, on := range map[string]string{"mine": "2020-01-01", "theirs": "2021-01-01"} {
+			ended := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
+				"/v1/products/"+product+"/branches-and-tags/master/end-of-life", `{"on":"`+on+`"}`)
+			if ended.Code != http.StatusNoContent {
+				t.Fatalf("ending %s's master answered %d: %s", product, ended.Code, ended.Body.String())
+			}
+		}
+
+		listed := func(query string) ([]string, int) {
+			var out struct {
+				Items []analyticsapi.RetiredBody `json:"items"`
+				Open  int                        `json:"open"`
+			}
+			httpapitest.Read(t, r, "estate-reader", "/v1/releases/out-of-support"+query, &out)
+			var releases []string
+			for _, row := range out.Items {
+				releases = append(releases, row.Product+"/"+row.BranchOrTag)
+			}
+			return releases, out.Open
+		}
+		for _, c := range []struct {
+			query string
+			want  string
+			open  int
+		}{
+			{"", "mine/master theirs/master mine/v1.0", 3},
+			{"?product=mine", "mine/master mine/v1.0", 2},
+			{"?product=mine&branch_or_tag=v1.0", "mine/v1.0", 0},
+			{"?product=theirs", "theirs/master", 1},
+		} {
+			got, open := listed(c.query)
+			if strings.Join(got, " ") != c.want || open != c.open {
+				t.Errorf("%q lists %v with %d open, want %s with %d", c.query, got, open, c.want, c.open)
+			}
 		}
 	})
 }

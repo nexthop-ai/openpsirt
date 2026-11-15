@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Review, type Plan } from "./Review";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const PLAN: Plan = {
   build: "sonic · master · broadcom",
@@ -36,36 +34,32 @@ function button(label: string) {
   return found;
 }
 
+// The review sheet open on the plan, with what it confirms readable.
+function renderReview() {
+  const onConfirm = vi.fn();
+  mount.render(
+    <Review
+      open
+      plan={PLAN}
+      busy={false}
+      error={null}
+      onCancel={() => undefined}
+      onConfirm={onConfirm}
+    />,
+  );
+  return onConfirm;
+}
+
 describe("the review sheet's Enter", () => {
   it("confirms from the sheet itself", () => {
-    const onConfirm = vi.fn();
-    mount.render(
-      <Review
-        open
-        plan={PLAN}
-        busy={false}
-        error={null}
-        onCancel={() => undefined}
-        onConfirm={onConfirm}
-      />,
-    );
+    const onConfirm = renderReview();
     enter();
     enter();
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
   it("leaves a focused Back button to go back", () => {
-    const onConfirm = vi.fn();
-    mount.render(
-      <Review
-        open
-        plan={PLAN}
-        busy={false}
-        error={null}
-        onCancel={() => undefined}
-        onConfirm={onConfirm}
-      />,
-    );
+    const onConfirm = renderReview();
     enter();
     act(() => button("Back").focus());
     enter();

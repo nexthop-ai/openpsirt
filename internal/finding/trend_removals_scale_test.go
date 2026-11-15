@@ -22,6 +22,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 // removedShare is the one in so many leaf packages a night drops; what a
@@ -43,7 +44,7 @@ func TestMeasureTheTrendOverAYearOfNightlyRemovals(t *testing.T) {
 }
 
 func measureNightlyRemovals(t *testing.T, removalNights int) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := world.New(t, db)

@@ -709,32 +709,30 @@ func TestBeingOnACaseIsNotReadingTheProduct(t *testing.T) {
 // A non-administrator with the same grant was correctly excluded, which is
 // what makes it a widening rather than a policy.
 func TestACapabilityAloneNarrowsNoFindings(t *testing.T) {
-	each(t, func(t *testing.T, f *fixture) {
-		sonic, onie := f.products["sonic"], f.products["onie"]
+	sonic, onie := int64(4), int64(5)
 
-		boss := access.NewPerson(1, "boss", true, map[int64][]access.Role{
-			sonic: {access.Assigner},
-			onie:  {access.PublicRead},
-		}, 0)
-		products, all := boss.Products()
-		if all {
-			t.Fatal("an administrator narrows to every product, which is not what Products is")
+	boss := access.NewPerson(1, "boss", true, map[int64][]access.Role{
+		sonic: {access.Assigner},
+		onie:  {access.PublicRead},
+	}, 0)
+	products, all := boss.Products()
+	if all {
+		t.Fatal("an administrator narrows to every product, which is not what Products is")
+	}
+	for _, id := range products {
+		if id == sonic {
+			t.Error("a product held by nothing but a capability narrows findings")
 		}
-		for _, id := range products {
-			if id == sonic {
-				t.Error("a product held by nothing but a capability narrows findings")
-			}
-		}
-		if len(products) != 1 || products[0] != onie {
-			t.Errorf("the products whose findings they read are %v, want the one read role", products)
-		}
+	}
+	if len(products) != 1 || products[0] != onie {
+		t.Errorf("the products whose findings they read are %v, want the one read role", products)
+	}
 
-		// And they still know the product exists, which is what administering
-		// the catalog means.
-		if !boss.Sees(sonic) {
-			t.Error("an administrator cannot see a product they administer")
-		}
-	})
+	// And they still know the product exists, which is what administering
+	// the catalog means.
+	if !boss.Sees(sonic) {
+		t.Error("an administrator cannot see a product they administer")
+	}
 }
 
 // A grant that grants nothing is not access, including here.

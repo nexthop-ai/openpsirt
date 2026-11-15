@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { belongTo } from "../app/drafts";
 import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
 import { Disclose } from "./FindingDisclose";
@@ -27,8 +27,6 @@ beforeEach(() => {
   window.localStorage.clear();
   belongTo("oidc:ana");
 });
-
-afterEach(() => vi.restoreAllMocks());
 
 const issue = { product: "sonic", vulnerability: "OPENPSIRT-2026-1" };
 // The same issue as the API addresses it.

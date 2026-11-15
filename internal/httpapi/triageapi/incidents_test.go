@@ -349,6 +349,10 @@ func TestAWindowOrANoticeRefusedSaysWhy(t *testing.T) {
 			{"a notice with no moment", "private-triage", http.MethodPost, told,
 				`{"recipient":"ENISA","told_at":"yesterday","said":"An attack."}`,
 				http.StatusUnprocessableEntity},
+			{"a second record while one stands", "private-triage", http.MethodPost,
+				"/v1/products/mine/issues/CVE-2026-9999/incidents",
+				`{"known_at":"` + now + `","grounds":"Another customer sent captures."}`,
+				http.StatusConflict},
 		} {
 			if got := httpapitest.AsPerson(t, r, tc.who, tc.method, tc.path, tc.body); got.Code != tc.want {
 				t.Errorf("%s answered %d, want %d: %s", tc.what, got.Code, tc.want, got.Body.String())

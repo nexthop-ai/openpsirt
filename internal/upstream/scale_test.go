@@ -12,8 +12,6 @@ package upstream_test
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -25,53 +23,16 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
-	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
-
-// fullSizeImage reads the full-size fixture the inventory reader is tested
-// against.
-func fullSizeImage(t *testing.T) *sbom.Document {
-	t.Helper()
-	if _, err := exec.LookPath("xz"); err != nil {
-		t.Skip("xz is not available, so the full-size fixture cannot be read here")
-	}
-	dir, err := os.OpenRoot(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = dir.Close() })
-	out, err := dir.Create("image.cdx.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.Command("xz", "--decompress", "--stdout", "../sbom/testdata/switch-image.cdx.json.xz")
-	cmd.Stdout = out
-	runErr := cmd.Run()
-	if err := out.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if runErr != nil {
-		t.Fatalf("decompress the fixture: %v", runErr)
-	}
-	in, err := dir.Open("image.cdx.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = in.Close() })
-	doc, err := sbom.Read(in, sbom.Limits{})
-	if err != nil {
-		t.Fatalf("read the fixture: %v", err)
-	}
-	return doc
-}
 
 // The switch image shipped by the upstream and by a fork, every component with
 // a package identifier carrying one issue, and a tenth of the distribution
 // packages' issues agreed by the upstream not to apply because the code is not
 // there, published. The fork reads it and runs its build. On PostgreSQL alone.
 func TestMeasureAForkReadingARealImagesDocuments(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Only(t, database.Postgres, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		w := bare(t, fixture.New(t, db))

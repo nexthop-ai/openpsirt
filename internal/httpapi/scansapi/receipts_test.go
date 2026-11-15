@@ -15,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -558,6 +559,118 @@ func TestAReceiptSaysWhatItsUploadChangedAboutTheInventory(t *testing.T) {
 		}
 		if older := out.Body.Items[1].Inventory; older != nil {
 			t.Errorf("the first upload reports %+v once a second one exists", older)
+		}
+	})
+}
+
+// checkedAfterReplacement checks a build's first upload against an issue
+// published while it was current, held at a component its replacement no
+// longer holds, as the scanner's check pass does, and answers the check run.
+func checkedAfterReplacement(t *testing.T, db *database.DB, build int64, held graph.Described) int64 {
+	t.Helper()
+	ctx := t.Context()
+	var scans []struct {
+		ID         int64     `bun:"id"`
+		ReceivedAt time.Time `bun:"received_at"`
+	}
+	if err := db.DB.NewSelect().TableExpr(`"scan"`).ColumnExpr(`"id", "received_at"`).
+		Where(`"build_id" = ?`, build).OrderExpr(`"id"`).Scan(ctx, &scans); err != nil {
+		t.Fatal(err)
+	}
+	if len(scans) != 2 {
+		t.Fatalf("the build holds %d uploads; want an inventory and its replacement", len(scans))
+	}
+	issue := finding.Named{Identifier: "CVE-2026-0007", Severity: "high"}
+	if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{issue}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.DB.NewUpdate().Table("vulnerability").
+		Set(`"published_at" = ?`, scans[0].ReceivedAt.Add(-time.Hour)).Set(`"dates_asked_at" = ?`, time.Now().UTC()).
+		Where(`"identifier" = ?`, issue.Identifier).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	findings := finding.NewStore(db.DB)
+	run, err := findings.Begin(ctx, finding.Run{
+		BuildID: build, Scanner: "grype", RanHere: true, CheckedScanID: &scans[0].ID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	checked, err := findings.CheckReplaced(ctx, finding.Replaced{
+		BuildID: build, ScanID: scans[0].ID, ReplacementID: scans[1].ID,
+		ArrivedAt: scans[0].ReceivedAt, ReplacedAt: scans[1].ReceivedAt,
+	}, run.ID, []finding.Reported{{Issue: issue, Component: held}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked.Recorded != 1 {
+		t.Fatalf("the check recorded %+v; want the one issue found after the inventory was replaced", checked)
+	}
+	if err := findings.Finish(ctx, run.ID, "0.112.0", "2026-08-28", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	return run.ID
+}
+
+// The replaced upload's receipt names the check made of it and how many
+// findings it recorded; the replacement's names none.
+func TestAReplacedInventoryReceiptSaysWhatItsCheckFound(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		root := graph.Described{Purl: "pkg:deb/debian/mine@1.0", Name: "mine", Version: "1.0"}
+		before := graph.Described{Purl: "pkg:deb/debian/libnl-3-200@3.7.0", Name: "libnl-3-200", Version: "3.7.0"}
+		after := graph.Described{Purl: "pkg:deb/debian/libnl-3-200@3.9.0", Name: "libnl-3-200", Version: "3.9.0"}
+		for i, held := range []graph.Described{before, after} {
+			r.Shipped(t, httpapitest.SeededBuild, "upload-"+strconv.Itoa(i), graph.Snapshot{
+				Root: root, Components: []graph.Described{held},
+				Dependencies: []graph.Dependency{{Parent: root, Child: held}},
+			})
+		}
+		run := checkedAfterReplacement(t, r.DB, r.BuildOf(t, httpapitest.SeededBuild), before)
+
+		var out scansapi.ReceiptsOutput
+		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms", &out.Body)
+		if len(out.Body.Items) != 2 {
+			t.Fatalf("got %d receipts, want the two that were sent", len(out.Body.Items))
+		}
+		replacement, replaced := out.Body.Items[0], out.Body.Items[1]
+		if c := replaced.Checked; c == nil || c.RunID != run || c.At == "" || c.FoundAfter == nil || *c.FoundAfter != 1 {
+			t.Errorf("the replaced upload's receipt carries the check %+v; want run %d, when it finished, and one found", c, run)
+		}
+		if replacement.Checked != nil {
+			t.Errorf("the replacement's receipt carries a check %+v; want none", replacement.Checked)
+		}
+	})
+}
+
+// A pipeline key reads that its replaced upload was checked, and nothing of
+// what the check found, which is a count of findings.
+func TestAKeyIsToldACheckRanAndNotWhatItFound(t *testing.T) {
+	twoIngest(t, queue.DefaultOptions(), func(t *testing.T, f *httpapitest.IngestFixture) {
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		reader := ingest.NewReader(f.DB, f.Queue, sbom.Limits{}, quiet, "test")
+		built := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+		for i, version := range []string{"8.4.0", "8.5.0"} {
+			doc := httpapitest.Carrying(built.Add(time.Duration(i)*time.Minute), map[string]string{"curl": version})
+			if code, _ := f.Send(t, httpapitest.Upload(t, f.Path, doc)); code != http.StatusAccepted {
+				t.Fatalf("upload %d was not taken", i)
+			}
+			if _, err := reader.Once(t.Context()); err != nil {
+				t.Fatalf("reading: %v", err)
+			}
+		}
+		var build int64
+		if err := f.DB.DB.NewSelect().TableExpr(`"build"`).Column("id").Limit(1).Scan(t.Context(), &build); err != nil {
+			t.Fatal(err)
+		}
+		run := checkedAfterReplacement(t, f.DB, build,
+			graph.Described{Purl: "pkg:deb/debian/curl@8.4.0", Name: "curl", Version: "8.4.0"})
+
+		_, out := httpapitest.Receipts(t, f, f.Key, f.Path)
+		if len(out.Body.Items) != 2 {
+			t.Fatalf("got %d receipts, want the two that were sent", len(out.Body.Items))
+		}
+		if c := out.Body.Items[1].Checked; c == nil || c.RunID != run || c.FoundAfter != nil {
+			t.Errorf("the key reads the replaced upload's check as %+v; want run %d and no count", c, run)
 		}
 	})
 }

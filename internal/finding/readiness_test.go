@@ -119,12 +119,18 @@ func TestAReleaseNobodyScannedIsNotComparedAgainstAsZero(t *testing.T) {
 	// answers a person acts on differently. Reporting the second as the first
 	// says a release was clean when nothing ever looked at it.
 	each(t, func(t *testing.T, f *fixture) {
-		// Declared and never built, which is the ordinary state of a tag
-		// between being cut and its pipeline running.
-		f.cutFrom(t, "v2.5.0")
+		// Declared, and its scan begun and never finished, which is the
+		// ordinary state of a tag while its pipeline runs.
+		f.runOn(t, f.cutFrom(t, "v2.5.0"))
 		f.shipped(t, twoConsumers())
-		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
+		here := f.run(t)
+		if _, err := f.store.Apply(t.Context(), f.build, here,
 			[]finding.Reported{critical("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		// The branch itself is scanned, so the answer comes from the release
+		// lookup rather than from the branch having nothing to count.
+		if err := f.store.Finish(t.Context(), here, "0.100.0", "2026-09-03", "", nil); err != nil {
 			t.Fatal(err)
 		}
 
@@ -147,8 +153,8 @@ func TestAReleaseNobodyScannedIsNotComparedAgainstAsZero(t *testing.T) {
 			t.Errorf("a release nothing has scanned was compared against as %+v",
 				ready.Shipped.ByBand)
 		}
-		if ready.Why == "" {
-			t.Error("nothing to compare against, and nothing said about why")
+		if ready.Why != finding.NoScannedRelease {
+			t.Errorf("why reads %q, want %q", ready.Why, finding.NoScannedRelease)
 		}
 		if ready.Now.ByBand["critical"] != 1 {
 			t.Errorf("the branch's own count is %v", ready.Now.ByBand)
@@ -189,6 +195,19 @@ func TestAReleaseBuiltAnotherWayIsNotTheComparison(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		// The branch is scanned for its own variant, so the answer comes from
+		// the release lookup rather than from the branch having nothing to
+		// count.
+		f.shipped(t, twoConsumers())
+		here := f.run(t)
+		if _, err := f.store.Apply(t.Context(), f.build, here,
+			[]finding.Reported{critical("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.Finish(t.Context(), here, "0.100.0", "2026-09-03", "", nil); err != nil {
+			t.Fatal(err)
+		}
+
 		broadcom, err := cat.VariantByName(t.Context(), f.productID, "broadcom")
 		if err != nil {
 			t.Fatal(err)
@@ -201,6 +220,9 @@ func TestAReleaseBuiltAnotherWayIsNotTheComparison(t *testing.T) {
 		if ready.Shipped != nil {
 			t.Errorf("a release built another way was used as the comparison: %+v",
 				ready.Shipped)
+		}
+		if ready.Why != finding.NoScannedRelease {
+			t.Errorf("why reads %q, want %q", ready.Why, finding.NoScannedRelease)
 		}
 	})
 }

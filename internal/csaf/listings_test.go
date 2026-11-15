@@ -60,3 +60,50 @@ func TestAFeedNamesWhatSitsBesideEachDocument(t *testing.T) {
 		}
 	}
 }
+
+// Two documents released in the same moment are listed by path, so an
+// unchanged list is the same bytes on every request.
+func TestChangesReleasedTogetherAreOrderedByPath(t *testing.T) {
+	same := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	got := string(csaf.Changes([]csaf.Listed{
+		{Path: "2026/b.json", Released: same},
+		{Path: "2026/a.json", Released: same},
+	}))
+	want := `"2026/a.json","2026-03-01T00:00:00Z"` + "\n" +
+		`"2026/b.json","2026-03-01T00:00:00Z"` + "\n"
+	if got != want {
+		t.Errorf("changes are\n%s\nwant\n%s", got, want)
+	}
+}
+
+// Two documents released in the same moment are entered by identifier, so an
+// unchanged feed is the same bytes on every request.
+func TestFeedEntriesReleasedTogetherAreOrderedByIdentifier(t *testing.T) {
+	at := func(path string) string { return "https://example.com/" + path }
+	same := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	feed := csaf.FeedOf("example-feed", "Example", at("feed.json"), at, nil,
+		[]csaf.Listed{
+			{Path: "2026/b.json", ID: "B", Released: same},
+			{Path: "2026/a.json", ID: "A", Released: same},
+		})
+	var ids []string
+	for _, entry := range feed.Feed.Entries {
+		ids = append(ids, entry.ID)
+	}
+	if strings.Join(ids, ",") != "A,B" {
+		t.Errorf("entries are %v, want A then B", ids)
+	}
+}
+
+// A feed is named with the deployment's prefix in lower case, and with the
+// bare name where there is no prefix.
+func TestAFeedIsNamedForTheDeploymentsPrefix(t *testing.T) {
+	for prefix, want := range map[string]string{
+		"":      "csaf-feed-tlp-white",
+		"EXNET": "exnet-csaf-feed-tlp-white",
+	} {
+		if got := csaf.FeedName(prefix); got != want {
+			t.Errorf("a prefix of %q names the feed %q, want %q", prefix, got, want)
+		}
+	}
+}

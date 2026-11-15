@@ -56,3 +56,34 @@ func TestAnAuditFileOpenAtTheEndStatesTheMomentItEnds(t *testing.T) {
 		}
 	})
 }
+
+// TestTheAuditLogAnswersTheDecisionsProposedInThePeriodAsked pins the period
+// to the proposal's date: from is the first day held and to the first day
+// after it, so a period ending on the day a decision was proposed leaves it out.
+func TestTheAuditLogAnswersTheDecisionsProposedInThePeriodAsked(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedTwoIssues(t)
+		decision, _ := r.Claimed(t, "triager", "CVE-2026-9999", "linux-image", httpapitest.Dismissal)
+		r.Aged(t, decision, "proposed_at", time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC))
+		for _, c := range []struct {
+			period string
+			want   int
+		}{
+			{"from=2026-03-01&to=2026-04-01", 1},
+			{"from=2026-03-10&to=2026-03-11", 1},
+			{"from=2026-04-01&to=2026-05-01", 0},
+			{"from=2026-02-01&to=2026-03-10", 0},
+			{"from=2026-03-11", 0},
+		} {
+			for _, path := range []string{"/v1/audit", "/v1/audit/decisions"} {
+				var got struct {
+					Total int `json:"total"`
+				}
+				httpapitest.Read(t, r, "private-triage", path+"?"+c.period, &got)
+				if got.Total != c.want {
+					t.Errorf("%s?%s holds %d decisions, want %d", path, c.period, got.Total, c.want)
+				}
+			}
+		}
+	})
+}

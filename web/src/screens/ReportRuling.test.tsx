@@ -2,21 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RuleForm } from "./ReportRuling";
 import { accept, mounted, screen, serve, settle } from "../test/mount";
 import { change, pick, press } from "../test/controls";
 import { belongTo } from "../app/drafts";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
-
-// A controlled field changed the way a person changes it.
-function type(field: HTMLInputElement, value: string) {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(field, value);
-  field.dispatchEvent(new Event("input", { bubbles: true }));
-}
 
 // The form with duplicate chosen and an issue typed, once typing has paused.
 async function duplicateOf(issue: string) {
@@ -33,7 +25,7 @@ async function duplicateOf(issue: string) {
   // the real clock returns never fires.
   vi.useFakeTimers();
   try {
-    act(() => type(field, issue));
+    change(field, issue);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(450);
     });

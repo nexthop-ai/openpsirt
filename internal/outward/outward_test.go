@@ -94,30 +94,6 @@ func TestAProviderIsReachedOverHTTPSOnly(t *testing.T) {
 	}
 }
 
-func TestAProviderIsNotFollowedToSomewhereElse(t *testing.T) {
-	// A redirect is the provider telling us to fetch somewhere else, and
-	// somewhere else is the thing being guarded against.
-	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "should never be reached", http.StatusTeapot)
-	}))
-	defer elsewhere.Close()
-
-	moved := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, elsewhere.URL, http.StatusFound)
-	}))
-	defer moved.Close()
-
-	// Pointed at the test server directly, so what is being measured is the
-	// redirect policy rather than the host and scheme guards.
-	client := Guarded()
-	client.Transport = http.DefaultTransport
-	if _, err := client.Get(moved.URL); err == nil {
-		t.Error("a redirect was followed")
-	} else if !strings.Contains(err.Error(), "refused a redirect") {
-		t.Errorf("refused for the wrong reason: %v", err)
-	}
-}
-
 func TestTheAddressGuardSeesAnAddressAndNotAName(t *testing.T) {
 	// The test whose absence hid a total failure. Everything else here calls
 	// Reachable() with address literals, so nothing noticed that a request
@@ -301,7 +277,9 @@ func TestEveryRequestOutCarriesOneAgent(t *testing.T) {
 }
 
 // A configured address is reached inside this network, and is still refused
-// over plain http, with a user in it, or through a redirect.
+// over plain http, with a user in it, or through a redirect. Every client
+// shares the one redirect refusal, so the redirect here pins it for all of
+// them.
 func TestAConfiguredAddressIsReachedWhereverItIs(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/moved" {
@@ -316,15 +294,19 @@ func TestAConfiguredAddressIsReachedWhereverItIs(t *testing.T) {
 	}
 	_ = resp.Body.Close()
 	at := strings.TrimPrefix(server.URL, "https://")
-	for _, address := range []string{"http://" + at, "https://user:pw@" + at, server.URL + "/moved"} {
+	for address, reason := range map[string]string{
+		"http://" + at:          "reached over https",
+		"https://user:pw@" + at: "carries no user",
+		server.URL + "/moved":   "a redirect",
+	} {
 		resp, err := client.Get(address)
 		if err == nil {
 			_ = resp.Body.Close()
 			t.Errorf("%s was reached", address)
 			continue
 		}
-		if !errors.Is(err, ErrRefused) {
-			t.Errorf("%s was refused for another reason: %v", address, err)
+		if !errors.Is(err, ErrRefused) || !strings.Contains(err.Error(), reason) {
+			t.Errorf("%s was refused for another reason than %q: %v", address, reason, err)
 		}
 	}
 }

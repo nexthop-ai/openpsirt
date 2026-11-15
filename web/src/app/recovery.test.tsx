@@ -3,14 +3,12 @@
 
 import { act, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Boundary } from "./Boundary";
 import { retrying } from "./retrying";
 import { mounted, serve, settle } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("a screen whose chunk failed to arrive", () => {
   it("is asked for again when Try again is pressed, and is logged", async () => {

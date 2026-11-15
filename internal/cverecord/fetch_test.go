@@ -4,6 +4,7 @@
 package cverecord_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -223,4 +224,107 @@ func TestAFetchRemovesWhatAKilledOneLeftBehind(t *testing.T) {
 	if _, err := os.Stat(fresh); err != nil {
 		t.Error("a file still being written was removed")
 	}
+}
+
+func TestAnUnreadableSnapshotHeldIsFetchedAgain(t *testing.T) {
+	// A damaged snapshot names no archive it came from, so the day's archive
+	// is fetched over it rather than the fetch failing on it for ever.
+	archive := listArchive(t, map[string][]byte{
+		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry),
+	})
+	l := &list{tag: "cve_2026-10-07_0000Z", archives: map[string]string{
+		"2026-10-06_all_CVEs_at_midnight.zip.zip": archive,
+	}}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, cverecord.FileName), []byte("not gzip"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if replaced, err := fetcherFor(t, l.serve(t), dir).Once(t.Context()); err != nil || !replaced {
+		t.Fatalf("replaced %v, %v; want the damaged snapshot replaced", replaced, err)
+	}
+	if held, err := cverecord.NewHeld(dir).Current(); err != nil || held.Len() != 1 {
+		t.Errorf("held %v, %v; want the archive's one record", held, err)
+	}
+}
+
+// lockedBuffer is a buffer written by one goroutine and read by another.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// running runs a fetcher reaching server until the test ends, logging to
+// logged, and returns a function that stops it and waits for it to return.
+func running(t *testing.T, server *httptest.Server, dir string, logged io.Writer) func() {
+	t.Helper()
+	f := fetcherFor(t, server, dir)
+	logging := cverecord.NewFetcher(dir, slog.New(slog.NewTextHandler(logged, nil)))
+	logging.Client, logging.Repository = f.Client, f.Repository
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		logging.Run(ctx, time.Hour)
+	}()
+	stop := func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the fetcher went on running after its context ended")
+		}
+	}
+	t.Cleanup(cancel)
+	return stop
+}
+
+// eventually waits for a condition, failing the test after ten seconds.
+func eventually(t *testing.T, what string, cond func() bool) {
+	t.Helper()
+	for deadline := time.Now().Add(10 * time.Second); !cond(); {
+		if time.Now().After(deadline) {
+			t.Fatalf("%s did not happen", what)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestARunningFetcherBuildsTheSnapshotAndStopsWithItsContext(t *testing.T) {
+	archive := listArchive(t, map[string][]byte{
+		"CVE-2026-31589.json": published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry),
+	})
+	l := &list{tag: "cve_2026-10-07_0000Z", archives: map[string]string{
+		"2026-10-06_all_CVEs_at_midnight.zip.zip": archive,
+	}}
+	dir := t.TempDir()
+	stop := running(t, l.serve(t), dir, io.Discard)
+	eventually(t, "the snapshot being built", func() bool {
+		held, err := cverecord.NewHeld(dir).Current()
+		return err == nil && held != nil && held.Len() == 1
+	})
+	stop()
+}
+
+func TestARunningFetcherReportsAFailedPass(t *testing.T) {
+	// A pass that fails is logged and the fetcher goes on, so a release with
+	// no archive is seen in the log rather than in snapshots that stop moving.
+	l := &list{tag: "cve_2026-10-07_0500Z", archives: map[string]string{}}
+	var logged lockedBuffer
+	stop := running(t, l.serve(t), t.TempDir(), &logged)
+	eventually(t, "the failed pass being logged", func() bool {
+		return strings.Contains(logged.String(), "could not bring the CVE record snapshot up to date")
+	})
+	stop()
 }

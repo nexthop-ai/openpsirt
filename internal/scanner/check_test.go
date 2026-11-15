@@ -216,6 +216,110 @@ func TestAReplacedInventoryRecordsWhatWasPublishedWhileItWasCurrent(t *testing.T
 	})
 }
 
+func TestTheRunnerChecksAReplacedInventoryWhenNoScanWaits(t *testing.T) {
+	// The runner's loop is the one production path to a check: it asks for a
+	// check only when no scan waits. The interval is longer than the test, so
+	// only the first pass can be what checks.
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx, stop := context.WithCancel(t.Context())
+		defer stop()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0007", f.arrived.Add(24*time.Hour))
+		if _, err := f.queue.Add(ctx, queue.Check, strconv.FormatInt(f.old, 10)); err != nil {
+			t.Fatal(err)
+		}
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0007", libnl)}}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		returned := make(chan struct{})
+		go func() {
+			defer close(returned)
+			scanner.NewRunner(f.db, f.queue, s, quiet, "test").Run(ctx, time.Hour)
+		}()
+
+		var runs []finding.Run
+		read := func() bool {
+			runs = nil
+			if err := f.db.NewSelect().Model(&runs).Where(`"checked_scan_id" = ?`, f.old).
+				Where(`"finished_at" IS NOT NULL`).Scan(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			return len(runs) > 0
+		}
+		waitFor(t, read, "the runner to check the replaced inventory")
+		stop()
+		select {
+		case <-returned:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the loop did not return when its context ended")
+		}
+		if len(runs) != 1 || runs[0].Failure != "" {
+			t.Fatalf("check runs %+v, want one that did not fail", runs)
+		}
+		n, err := f.db.NewSelect().Table("finding").Where(`"build_id" = ?`, f.build).
+			Where(`"opened_run_id" = ?`, runs[0].ID).Count(t.Context())
+		if err != nil || n != 1 {
+			t.Errorf("the check recorded %d findings, %v; want the one published while the inventory was current", n, err)
+		}
+	})
+}
+
+func TestAReplacementItsRecordClearsClosesTheCheckedRowAsUnaffected(t *testing.T) {
+	// The replacement holds the occurrence at a version the issue's CVE
+	// record states unaffected: the row is closed for that reason, carrying
+	// the lines that say so.
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		f.published(t, "CVE-2026-0007", f.arrived.Add(24*time.Hour))
+		const lines = `[{"version":"3.9.0","status":"unaffected"}]`
+		cleared := reportAt("CVE-2026-0007", libnlFixed)
+		cleared.Unaffected = lines
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{
+			reportAt("CVE-2026-0007", libnl), cleared,
+		}}
+		if checking := f.check(t, s); checking == nil || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want one recorded", checking)
+		}
+		var got finding.Finding
+		if err := f.db.NewSelect().Model(&got).Where(`"build_id" = ?`, f.build).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if got.ClosedBecause != finding.Unaffected || got.UnaffectedBy != lines || got.MovedTo != "" {
+			t.Errorf("closed because %q by %q moving to %q, want unaffected by %q and no move",
+				got.ClosedBecause, got.UnaffectedBy, got.MovedTo, lines)
+		}
+	})
+}
+
+func TestACheckLeavesAnIssueNothingHereHoldsAlone(t *testing.T) {
+	// With the date pass off nothing files an issue the check is first to
+	// report, so it has no date and is no finding of the replaced inventory.
+	// The inventory was never scanned, so no data date bounds the stretch
+	// it was current from below.
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		if _, err := f.db.NewDelete().Table("scan_run").Where(`"build_id" = ?`, f.build).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := setting.NewStore(f.db.DB).Change(ctx, setting.IssueDates, "off"); err != nil {
+			t.Fatal(err)
+		}
+		f.published(t, "CVE-2026-0007", f.arrived.Add(24*time.Hour))
+		s := &dated{at: time.Now().UTC(), reported: []finding.Reported{
+			reportAt("CVE-2026-0007", libnl), reportAt("CVE-2026-0010", libnl),
+		}}
+		checking := f.check(t, s)
+		if checking == nil || checking.Checked.Dated != 1 || checking.Checked.Recorded != 1 {
+			t.Fatalf("checked %+v, want the one issue held here dated and recorded", checking)
+		}
+		n, err := f.db.NewSelect().Table("vulnerability").Where(`"identifier" = ?`, "CVE-2026-0010").Count(ctx)
+		if err != nil || n != 0 {
+			t.Fatalf("the issue nothing held is filed %d times, %v; want not at all", n, err)
+		}
+	})
+}
+
 func TestACheckWritesNothingAnExistingRowAlreadyCovers(t *testing.T) {
 	fixture.Each(t, func(t *testing.T, w *fixture.World) {
 		ctx := t.Context()
@@ -358,6 +462,85 @@ func TestEveryReplacedBranchInventoryIsOwedOneCheck(t *testing.T) {
 		}
 		if refs := owed(); len(refs) != 1 {
 			t.Fatalf("checks asked for %v after the one owed finished, want it alone", refs)
+		}
+	})
+}
+
+// owedOne leaves the replaced inventory owed its check, with newer data dated
+// past the settle delay and the schedule's lease free.
+func owedOne(t *testing.T, f *checkFixture) {
+	t.Helper()
+	ctx := t.Context()
+	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+	f.published(t, "CVE-2026-0007", f.arrived.Add(24*time.Hour))
+	s := &dated{at: time.Now().UTC(), reported: []finding.Reported{reportAt("CVE-2026-0007", libnl)}}
+	f.waiting(t)
+	if _, err := scanner.NewRunner(f.db, f.queue, s, quiet, "test").Once(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := queue.NewLeases(f.db.DB).Release(ctx, scanner.ScheduleLease, "test"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// checksOf is what the check jobs name.
+func checksOf(t *testing.T, f *checkFixture) []string {
+	t.Helper()
+	var refs []string
+	if err := f.db.NewSelect().Table("job").Column("reference").
+		Where(`"kind" = ?`, queue.Check).OrderExpr(`"reference"`).Scan(t.Context(), &refs); err != nil {
+		t.Fatal(err)
+	}
+	return refs
+}
+
+// A pass's worth of checks already waiting stops the asking, so an owed
+// check waits for the next pass rather than deepening the queue.
+func TestAPassWorthOfChecksAlreadyWaitingStopsTheAsking(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		owedOne(t, f)
+		roomy := queue.New(f.db, queue.Options{
+			MaxAttempts: 5, MaxBacklog: 10_000, ClaimTimeout: 30 * time.Minute,
+			Heartbeat: 5 * time.Minute, Backoff: 30 * time.Second,
+		})
+		// Numbered, because only a reference naming an inventory is counted.
+		for i := range scanner.ChecksLimit {
+			if _, err := roomy.Add(ctx, queue.Check, strconv.Itoa(1_000_000+i)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if _, err := scanner.NewSchedule(f.db, roomy, quiet, "test").Once(ctx); err != nil {
+			t.Fatalf("a pass's worth of checks waiting was reported as a failure: %v", err)
+		}
+		if refs := checksOf(t, f); len(refs) != scanner.ChecksLimit {
+			t.Errorf("%d checks queued, want the %d already waiting and no more", len(refs), scanner.ChecksLimit)
+		}
+	})
+}
+
+// A full queue stops the asking for checks without failing the pass, and the
+// owed check stays owed.
+func TestAFullQueueStopsTheAskingForChecksRatherThanFailing(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, w *fixture.World) {
+		ctx := t.Context()
+		f := replacedInventory(t, w)
+		owedOne(t, f)
+		full := queue.New(f.db, queue.Options{
+			MaxAttempts: 5, MaxBacklog: 1, ClaimTimeout: 30 * time.Minute,
+			Heartbeat: 5 * time.Minute, Backoff: 30 * time.Second,
+		})
+		if _, err := full.Add(ctx, queue.Check, "999999"); err != nil {
+			t.Fatal(err)
+		}
+		quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
+		if _, err := scanner.NewSchedule(f.db, full, quiet, "test").Once(ctx); err != nil {
+			t.Fatalf("a full queue was reported as a failure: %v", err)
+		}
+		if refs := checksOf(t, f); len(refs) != 1 || refs[0] != "999999" {
+			t.Errorf("checks queued %v, want the one already waiting alone", refs)
 		}
 	})
 }

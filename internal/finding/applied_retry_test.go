@@ -119,7 +119,7 @@ func TestALabelRetriedAfterALostCommitAsksTheRightAgain(t *testing.T) {
 	issue := f.issueID(t, "CVE-2026-1")
 	component := f.componentID(t, libnl.Name)
 	between = func() {
-		if _, err := db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+		if _, err := race.Other().NewUpdate().Model((*finding.Finding)(nil)).
 			Set(`"visibility" = ?`, access.Private).
 			Where(`"vulnerability_id" = ?`, issue).Exec(ctx); err != nil {
 			t.Error(err)

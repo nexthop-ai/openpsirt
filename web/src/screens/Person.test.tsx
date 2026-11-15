@@ -1,13 +1,11 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Person } from "./Person";
 import { screen, serve, settle, mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("one person's roles", () => {
   it("names a role held across every product as every product", async () => {

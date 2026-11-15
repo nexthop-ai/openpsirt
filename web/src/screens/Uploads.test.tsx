@@ -14,7 +14,6 @@ const mount = mounted();
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.restoreAllMocks();
 });
 
 const SCANS = "/v1/products/{product}/branches-and-tags/{branch_or_tag}/variants/{variant}/sboms";

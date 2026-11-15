@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { Scope } from "./Scope";
 import { location, mounted, screen, serve, settle, type Answer } from "../test/mount";
 
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
-
 function options(): HTMLButtonElement[] {
   return Array.from(mount.host().querySelectorAll<HTMLButtonElement>("button.opt"));
 }

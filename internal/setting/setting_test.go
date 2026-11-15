@@ -10,6 +10,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -35,28 +36,6 @@ func TestASettingNobodyHasChangedReadsAsItsDefault(t *testing.T) {
 		}
 		if _, set, err := s.Get(t.Context(), setting.SessionLifetime); err != nil || set {
 			t.Errorf("unset reported as set=%v (%v)", set, err)
-		}
-	})
-}
-
-func TestSettingSomethingTwiceRecordsTheSecondValue(t *testing.T) {
-	// A read, then an insert or a conditional update, because no upsert
-	// spelling is portable across the four engines. Setting twice exercises
-	// both arms.
-	eachSetting(t, func(t *testing.T, s *setting.Store) {
-		ctx := t.Context()
-		if _, _, err := s.Change(ctx, setting.SessionLifetime, "1h"); err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := s.Change(ctx, setting.SessionLifetime, "30m"); err != nil {
-			t.Fatal(err)
-		}
-		got, err := s.Duration(ctx, setting.SessionLifetime, 12*time.Hour)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != 30*time.Minute {
-			t.Errorf("read back %v, want 30m", got)
 		}
 	})
 }
@@ -147,6 +126,10 @@ func TestASettingThatCannotBeReadIsNotReportedAsUnset(t *testing.T) {
 // TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt pins what the
 // append-only trail records.
 //
+// A change is a read, then an insert or a conditional update, because no
+// upsert spelling is portable across the four engines. Setting twice runs both
+// arms, and each answers what it replaced and stores what it was given.
+//
 // Read in a statement of its own before the write, the prior value is the
 // original for two administrators moving the same setting at once, so the
 // second records a "before" that nothing held — a trail of who changed what,
@@ -173,6 +156,9 @@ func TestWhatASettingHeldIsAnsweredByTheWriteThatReplacedIt(t *testing.T) {
 		}
 		if !had || before != "high" {
 			t.Errorf("the change reports it held %q, held=%v, want \"high\"", before, had)
+		}
+		if stored, held, err := store.Get(ctx, setting.MinimumSeverity); err != nil || !held || stored != "critical" {
+			t.Errorf("the setting reads back %q, held=%v (%v), want \"critical\"", stored, held, err)
 		}
 	})
 }
@@ -321,6 +307,28 @@ func TestARenamedSettingIsReadInOneStatement(t *testing.T) {
 		}
 		if count.n != 1 {
 			t.Errorf("a renamed setting was read in %d statements", count.n)
+		}
+	})
+}
+
+// The role mode is read at each use, and a read that fails answers with the
+// mode that derives nothing: a store that cannot answer must not keep deriving
+// roles from groups somebody turned off.
+func TestARoleModeThatCannotBeReadDerivesNothing(t *testing.T) {
+	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
+		store := setting.NewStore(db.DB)
+		if _, _, err := store.Change(t.Context(), setting.RoleMode, string(access.GroupBound)); err != nil {
+			t.Fatal(err)
+		}
+		mode := store.Mode()
+		if got := mode(t.Context()); got != access.GroupBound {
+			t.Fatalf("a stored mode read as %q", got)
+		}
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if got := mode(t.Context()); got != access.Direct {
+			t.Errorf("a mode that could not be read answered %q, want %q", got, access.Direct)
 		}
 	})
 }

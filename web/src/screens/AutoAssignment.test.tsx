@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { AutoAssignment } from "./AutoAssignment";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
 import { button, change, only, press, type Init } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const RULES = [
   { id: 3, order: 1, name: "kernel", team: "platform", upstream: "linux", beneath: "sonic" },

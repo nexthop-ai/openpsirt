@@ -230,3 +230,52 @@ func TestEveryPageOfWaitingRatingsCarriesTheStoresTotal(t *testing.T) {
 		}
 	})
 }
+
+// The list of ratings narrowed to a product holds that product's alone, and a
+// second rating of one issue in one product is refused while the first
+// stands, so the product has one answer.
+func TestRatingsNarrowedToAProductAreThatProductsAndOneIssueIsRatedOnce(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		disclosed, _ := httpapitest.SeedTheirs(t, r)
+		const worse = `{"severity":"critical","reasoning":"Reachable from the data plane here."}`
+		for product, issue := range map[string]string{"mine": "CVE-2026-9999", "theirs": disclosed} {
+			made := httpapitest.AsPerson(t, r, "wide-triager", http.MethodPost,
+				"/v1/products/"+product+"/issues/"+issue+"/assessment", worse)
+			if made.Code != http.StatusCreated {
+				t.Fatalf("rating in %s answered %d: %s", product, made.Code, made.Body.String())
+			}
+		}
+		again := httpapitest.AsPerson(t, r, "wide-triager", http.MethodPost,
+			"/v1/products/mine/issues/CVE-2026-9999/assessment", worse)
+		if again.Code != http.StatusConflict {
+			t.Errorf("a second rating of one issue answered %d, want 409: %s", again.Code, again.Body.String())
+		}
+
+		products := func(query string) []string {
+			var page struct {
+				Items []struct {
+					Product string `json:"product"`
+				} `json:"items"`
+				Total int `json:"total"`
+			}
+			httpapitest.Read(t, r, "wide-triager", "/v1/assessments"+query, &page)
+			var out []string
+			for _, row := range page.Items {
+				out = append(out, row.Product)
+			}
+			if page.Total != len(out) {
+				t.Errorf("%s totals %d over %d rows", query, page.Total, len(out))
+			}
+			return out
+		}
+		if got := products(""); len(got) != 2 {
+			t.Errorf("across the estate the ratings are of %v, want one in each product", got)
+		}
+		for _, product := range []string{"mine", "theirs"} {
+			if got := products("?product=" + product); len(got) != 1 || got[0] != product {
+				t.Errorf("narrowed to %s the ratings are of %v, want its one", product, got)
+			}
+		}
+	})
+}

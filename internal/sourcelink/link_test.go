@@ -88,6 +88,12 @@ func TestACustomHostWritesItsTemplate(t *testing.T) {
 	if got := c.File(checkout, "src/elsewhere/z.go", 9, 9); got.URL != "https://code.example.org/x/y/view/"+top+"/z.go?line=9" {
 		t.Errorf("linked %q", got.URL)
 	}
+	after := append([]Module(nil), checkout...)
+	after[6].Revision = sai
+	address, unchanged := c.Compare(checkout, after, "src/elsewhere/z.go")
+	if want := "https://code.example.org/x/y/diff/" + top + "/" + sai; address != want || unchanged {
+		t.Errorf("compared %q, unchanged %v; want %q", address, unchanged, want)
+	}
 }
 
 func TestARepositoryOnNoNamedHostIsShownAsText(t *testing.T) {
@@ -122,8 +128,9 @@ func TestAPathIsEscapedSoNothingInItSteersTheLink(t *testing.T) {
 }
 
 func TestALocationWithNoLineOpensTheFile(t *testing.T) {
-	if got := hosted(t).File(checkout, "src/forged/a.c", 0, 0); strings.Contains(got.URL, "#") {
-		t.Errorf("linked %q; want no line fragment", got.URL)
+	want := "https://forge.example.com/net/forged/src/commit/" + top + "/a.c"
+	if got := hosted(t).File(checkout, "src/forged/a.c", 0, 0); got.URL != want {
+		t.Errorf("linked %q; want %q, with no line fragment", got.URL, want)
 	}
 }
 
@@ -279,27 +286,48 @@ func TestTheNearestPrefixStatingItDecidesWhetherSnippetsAreKept(t *testing.T) {
 
 func TestAConfigurationThatCannotBeUsedIsRefusedNamingTheEntry(t *testing.T) {
 	yes := true
-	for name, c := range map[string]Config{
-		"plain http":        {Hosts: []Host{{Remote: "github.com", Web: "http://github.com", Style: GitHub}}},
-		"a credential":      {Hosts: []Host{{Remote: "github.com", Web: "https://u:p@github.com", Style: GitHub}}}, //nolint:gosec // G101: a placeholder credential the check refuses
-		"no remote":         {Hosts: []Host{{Web: "https://github.com", Style: GitHub}}},
-		"twice":             {Hosts: []Host{{Remote: "github.com", Web: "https://github.com", Style: GitHub}, {Remote: "GitHub.com/", Web: "https://github.com", Style: GitHub}}},
-		"unknown style":     {Hosts: []Host{{Remote: "github.com", Web: "https://github.com", Style: "svn"}}},
-		"another host":      {Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "https://evil.example/{path}"}}},
-		"a placeholder":     {Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "{repo}/{secret}"}}},
-		"a compare one":     {Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "{repo}/{path}", CompareTemplate: "{repo}/{path}"}}},
-		"climbing":          {Paths: []Path{{Prefix: "src/../..", Snippets: &yes}}},
-		"half a repo":       {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b"}}},
-		"nothing said":      {Paths: []Path{{Prefix: "src"}}},
-		"not a repository":  {Paths: []Path{{Prefix: "src", Remote: "github.com", Branch: "main"}}},
-		"not a branch":      {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "a b"}}},
-		"a climbing branch": {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "../x"}}},
-		"an empty segment":  {Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "a//b"}}},
-		"a long path":       {Paths: []Path{{Prefix: strings.Repeat("a", MostPathBytes+1), Snippets: &yes}}},
-		"a path twice":      {Paths: []Path{{Prefix: "src", Snippets: &yes}, {Prefix: "/src/", Snippets: &yes}}},
+	type refused struct {
+		c    Config
+		want string
+	}
+	for name, r := range map[string]refused{
+		"plain http": {Config{Hosts: []Host{{Remote: "github.com", Web: "http://github.com", Style: GitHub}}},
+			`host "github.com": "http://github.com" is not https`},
+		"a credential": {Config{Hosts: []Host{{Remote: "github.com", Web: "https://u:p@github.com", Style: GitHub}}}, //nolint:gosec // G101: a placeholder credential the check refuses
+			`host "github.com": "https://u:p@github.com" carries a credential`},
+		"no remote": {Config{Hosts: []Host{{Web: "https://github.com", Style: GitHub}}},
+			"host 1 names no remote"},
+		"twice": {Config{Hosts: []Host{{Remote: "github.com", Web: "https://github.com", Style: GitHub}, {Remote: "GitHub.com/", Web: "https://github.com", Style: GitHub}}},
+			`the remote "github.com" is named twice`},
+		"unknown style": {Config{Hosts: []Host{{Remote: "github.com", Web: "https://github.com", Style: "svn"}}},
+			`host "github.com" is of style "svn"`},
+		"another host": {Config{Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "https://evil.example/{path}"}}},
+			`host "a.example", file template`},
+		"a placeholder": {Config{Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "{repo}/{secret}"}}},
+			`host "a.example", file template`},
+		"a compare one": {Config{Hosts: []Host{{Remote: "a.example", Web: "https://a.example", Style: Custom, FileTemplate: "{repo}/{path}", CompareTemplate: "{repo}/{path}"}}},
+			`host "a.example", compare template`},
+		"climbing": {Config{Paths: []Path{{Prefix: "src/../..", Snippets: &yes}}},
+			`path 1, "src/../..", is not a path`},
+		"half a repo": {Config{Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b"}}},
+			`path "src": a repository and its branch`},
+		"nothing said": {Config{Paths: []Path{{Prefix: "src"}}},
+			`path "src" says nothing`},
+		"not a repository": {Config{Paths: []Path{{Prefix: "src", Remote: "github.com", Branch: "main"}}},
+			`path "src": "github.com" names no repository`},
+		"not a branch": {Config{Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "a b"}}},
+			`path "src": "a b" is not a branch name`},
+		"a climbing branch": {Config{Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "../x"}}},
+			`path "src": "../x" is not a branch name`},
+		"an empty segment": {Config{Paths: []Path{{Prefix: "src", Remote: "https://github.com/a/b", Branch: "a//b"}}},
+			`path "src": "a//b" is not a branch name`},
+		"a long path": {Config{Paths: []Path{{Prefix: strings.Repeat("a", MostPathBytes+1), Snippets: &yes}}},
+			"path 1 is longer than"},
+		"a path twice": {Config{Paths: []Path{{Prefix: "src", Snippets: &yes}, {Prefix: "/src/", Snippets: &yes}}},
+			`the path "src" is named twice`},
 	} {
-		if err := c.Valid(); err == nil {
-			t.Errorf("%s: accepted", name)
+		if err := r.c.Valid(); err == nil || !strings.Contains(err.Error(), r.want) {
+			t.Errorf("%s: answered %v; want a refusal saying %q", name, err, r.want)
 		}
 	}
 }
@@ -320,11 +348,25 @@ func TestAComparisonNeedsAnExactCommitOnEachSideOfOneRepository(t *testing.T) {
 		"approximate":            {nil, nil, "src/approximate/a.c"},
 		"another repository":     {checkout, moved, "src/sonic-sairedis/SAI/inc/saiport.h"},
 		"no repository after":    {checkout, nil, "src/forged/a.c"},
-		"a host with no compare": {checkout, checkout[:1], "src/elsewhere/a.c"},
 	} {
 		if address, unchanged := c.Compare(c2.before, c2.after, c2.path); address != "" || unchanged {
 			t.Errorf("%s: compared %q, unchanged %v; want neither", name, address, unchanged)
 		}
+	}
+}
+
+func TestACustomHostWithNoCompareTemplateComparesNothing(t *testing.T) {
+	// Two commits of one repository on a host that names how to open a file
+	// and not how to compare two commits.
+	c := Config{Hosts: []Host{{Remote: "code.example.org", Web: "https://code.example.org", Style: Custom,
+		FileTemplate: "{repo}/{path}"}}}
+	if err := c.Valid(); err != nil {
+		t.Fatal(err)
+	}
+	after := append([]Module(nil), checkout...)
+	after[6].Revision = sai
+	if address, unchanged := c.Compare(checkout, after, "src/elsewhere/a.c"); address != "" || unchanged {
+		t.Errorf("compared %q, unchanged %v; want neither", address, unchanged)
 	}
 }
 

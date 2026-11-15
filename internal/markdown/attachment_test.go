@@ -20,7 +20,9 @@ var tokenShape = fmt.Sprintf("%d hexadecimal characters", 2*markdown.TokenBytes)
 func TestAnImageMayComeFromAnAttachmentAndNowhereElse(t *testing.T) {
 	// An image loaded from a third party reports who read a finding and when,
 	// which on an undisclosed one is a disclosure channel. A file held here is
-	// fetched through a path that asks who is looking.
+	// fetched through a path that asks who is looking. A refusal names the
+	// thing to do instead: somebody told only that their image is not allowed
+	// writes no image and no explanation either.
 	for _, c := range []struct {
 		what    string
 		source  string
@@ -37,22 +39,13 @@ func TestAnImageMayComeFromAnAttachmentAndNowhereElse(t *testing.T) {
 			if c.refused && err == nil {
 				t.Errorf("an image from %s was accepted", c.what)
 			}
+			if c.refused && err != nil && !strings.Contains(err.Error(), "Attach the file") {
+				t.Errorf("the refusal of an image from %s does not say what to do instead: %v", c.what, err)
+			}
 			if !c.refused && err != nil {
 				t.Errorf("an image from %s was refused: %v", c.what, err)
 			}
 		})
-	}
-}
-
-func TestARefusedImageSaysToAttachTheFile(t *testing.T) {
-	// The refusal has to name the thing to do instead. Somebody told only that
-	// their image is not allowed writes no image and no explanation either.
-	err := markdown.Check("![shot](https://example.org/s.png)")
-	if err == nil {
-		t.Fatal("a remote image was accepted")
-	}
-	if !strings.Contains(err.Error(), "Attach the file") {
-		t.Errorf("the refusal does not say what to do instead: %v", err)
 	}
 }
 

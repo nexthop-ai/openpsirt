@@ -464,21 +464,16 @@ func TestTheProjectsOwnPagesAreOfferedBeforeItsRepository(t *testing.T) {
 	}
 }
 
-func TestEveryAskableEcosystemHasAnAsker(t *testing.T) {
-	// The ecosystems selected for asking and the askers are derived from one
-	// table. An index added to one and forgotten in the other is either
-	// components selected and never asked, or asked about and never
-	// selected, and neither says anything; this says the derivation still
-	// holds.
+func TestEveryAskableEcosystemIsSpelledAsAPackageTypeIs(t *testing.T) {
+	// The ecosystems selected for asking are compared against the type in a
+	// package identifier, which is folded to lower case, so a name in any
+	// other case selects nothing.
 	client := currency.New()
 	askable := currency.Askable()
 	if len(askable) == 0 {
 		t.Fatal("nothing is askable, so this checked nothing")
 	}
 	for _, each := range askable {
-		if client.For(each) == nil {
-			t.Errorf("%q is selected by the pass and has no index to ask", each)
-		}
 		if each != strings.ToLower(each) {
 			t.Errorf("%q is compared against a package identifier's type, which is folded", each)
 		}

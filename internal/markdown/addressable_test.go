@@ -97,8 +97,14 @@ func TestTextPastTheBoundIsMatchableAsWhatItIs(t *testing.T) {
 	}
 	// And it still reads as a sentence, with the size in it: the sentinel is
 	// for a caller and the reason is for a person.
-	if !strings.Contains(err.Error(), "limit") {
-		t.Errorf("the refusal does not say what the limit is: %q", err)
+	if !strings.Contains(err.Error(), "limit") || !strings.Contains(err.Error(), "longer than") {
+		t.Errorf("the refusal does not say what is wrong and what the limit is: %q", err)
+	}
+	// A fault about the whole text carries no line, which is the branch every
+	// whole-text refusal takes, so the message somebody sees for "too long" is
+	// a sentence rather than a line number and a blank.
+	if strings.Contains(err.Error(), "line ") {
+		t.Errorf("a fault about the whole text names a line: %q", err)
 	}
 
 	// The other direction. A refusal for something else must not match it, or

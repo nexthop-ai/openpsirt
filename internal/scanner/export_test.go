@@ -11,3 +11,6 @@ import "github.com/nexthop-ai/openpsirt/internal/finding"
 // asks for, and the alternative is a test in this package that reaches past
 // what the parse returns.
 func KindOf(address string) finding.ReferenceKind { return kindOf(address) }
+
+// ChecksLimit is how many owed checks one pass asks for.
+const ChecksLimit = checksLimit

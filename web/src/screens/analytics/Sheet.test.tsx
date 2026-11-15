@@ -1,9 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { mounted, screen, serve, settle } from "../../test/mount";
-import { readingDependencies } from "../../test/reach";
+import { readerOf } from "../../test/reach";
 import { Effort } from "./Effort";
 import { Overview } from "./Overview";
 import { Scrutiny } from "./Scrutiny";
@@ -11,8 +11,6 @@ import { Sheet } from "./Sheet";
 import { windowStart } from "./Window";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const printed = () => mount.host().querySelector(".printhead p")?.textContent ?? "";
 
@@ -44,13 +42,7 @@ describe("a printed sheet's header", () => {
     const got = serve((path) =>
       path === "/v1/session/me"
         ? {
-            data: {
-              identity: "ana",
-              name: "Ana",
-              admin: false,
-              kind: "person",
-              reach: [readingDependencies("sonic")],
-            },
+            data: readerOf("sonic"),
           }
         : path === "/v1/teams"
           ? { data: { items: [{ name: "platform", display_name: "Platform" }], total: 1 } }
@@ -81,13 +73,7 @@ describe("a printed sheet's header", () => {
     serve((path) =>
       path === "/v1/session/me"
         ? {
-            data: {
-              identity: "ana",
-              name: "Ana",
-              admin: false,
-              kind: "person",
-              reach: [readingDependencies("sonic")],
-            },
+            data: readerOf("sonic"),
           }
         : path === "/v1/effort"
           ? {
@@ -104,7 +90,7 @@ describe("a printed sheet's header", () => {
     );
     mount.render(screen(<Effort />, "/analytics/effort-by-component"));
     await settle();
-    expect(mount.host().textContent).toContain("80");
+    expect(mount.host().textContent).toContain("Showing 1–50 of 80");
   });
 });
 

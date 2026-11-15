@@ -128,26 +128,60 @@ func TestWhatTwoPeopleAgreedToIsNotReportedAsStandingAlone(t *testing.T) {
 	})
 }
 
-func TestScrutinyRefusesAProductTheAskerMayNotRead(t *testing.T) {
-	// Resolved against what the caller may see, and refused the same way a
-	// name nobody ever declared is. Answering "no approvals there" for a real
-	// product and 404 for an invented one would turn this into a way to ask
-	// which products a deployment has, one guess at a time.
-	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+func TestScrutinyNarrowedToAProductCountsThatProductAlone(t *testing.T) {
+	// The analytics sheet narrowed to one product asks this with its name,
+	// and a sheet headed with one product reports that product's approvals
+	// alone. Somebody triaging across the estate stands a short deferral
+	// in each of two products.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
-		r.Claimed(t, "triager", "CVE-2026-9999", "libnl-3-200", shortDeferral())
-
-		real := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
-			"/v1/approvals/scrutiny?product=theirs", "")
-		invented := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
-			"/v1/approvals/scrutiny?product=no-such-product", "")
-		if real.Code != http.StatusNotFound {
-			t.Errorf("a product they may not read answered %d, want 404: %s",
-				real.Code, real.Body.String())
+		disclosed, _ := httpapitest.SeedTheirs(t, r)
+		r.Claimed(t, "wide-triager", "CVE-2026-9999", "libnl-3-200", shortDeferral())
+		theirs := httpapitest.AsPerson(t, r, "wide-triager", http.MethodPost,
+			"/v1/products/theirs/branches-and-tags/master/variants/mellanox/findings/"+disclosed+
+				"/components/libestate/decision", shortDeferral())
+		if theirs.Code != http.StatusCreated {
+			t.Fatalf("deciding in the other product answered %d: %s", theirs.Code, theirs.Body.String())
 		}
-		if invented.Code != real.Code {
-			t.Errorf("a real product answers %d and an invented one %d, which tells "+
-				"somebody which names exist", real.Code, invented.Code)
+
+		alone := func(query string) int {
+			n := 0
+			for _, row := range scrutiny(t, r, "wide-triager", query).Alone {
+				n += row.Decisions
+			}
+			return n
+		}
+		if got := alone(""); got != 2 {
+			t.Errorf("across the estate %d decisions stand alone, want one in each product", got)
+		}
+		for _, product := range []string{"mine", "theirs"} {
+			if got := alone("?product=" + product); got != 1 {
+				t.Errorf("narrowed to %s, %d decisions stand alone, want its one", product, got)
+			}
+		}
+	})
+}
+
+func TestScrutinyCountsOnlyTheProductsTheAskerReads(t *testing.T) {
+	// Somebody triaging across the estate stands a short deferral in each of
+	// two products; a reader of one is told about that one alone.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		disclosed, _ := httpapitest.SeedTheirs(t, r)
+		r.Claimed(t, "wide-triager", "CVE-2026-9999", "libnl-3-200", shortDeferral())
+		theirs := httpapitest.AsPerson(t, r, "wide-triager", http.MethodPost,
+			"/v1/products/theirs/branches-and-tags/master/variants/mellanox/findings/"+disclosed+
+				"/components/libestate/decision", shortDeferral())
+		if theirs.Code != http.StatusCreated {
+			t.Fatalf("deciding in the other product answered %d: %s", theirs.Code, theirs.Body.String())
+		}
+
+		n := 0
+		for _, row := range scrutiny(t, r, "triager", "").Alone {
+			n += row.Decisions
+		}
+		if n != 1 {
+			t.Errorf("a reader of mine alone sees %d decisions standing alone, want mine's one", n)
 		}
 	})
 }

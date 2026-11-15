@@ -555,13 +555,13 @@ func prepareFrom(ctx context.Context, cfg config.Config, logger *slog.Logger,
 			access.Trust{
 				Header: cfg.TrustedHeader, From: cfg.TrustedSources,
 				GroupsHeader: cfg.TrustedGroupsHeader, GroupsDelimiter: cfg.TrustedGroupsDelimiter,
-			}).WithLogger(logger).WithMode(roleMode(settings)).OverPlainHTTP(cfg.PlainHTTP),
+			}).WithLogger(logger).WithMode(settings.Mode()).OverPlainHTTP(cfg.PlainHTTP),
 		Providers:       providers,
 		BaseURL:         cfg.BaseURL,
 		PlainHTTP:       cfg.PlainHTTP,
 		SessionLifetime: cfg.SessionLifetime,
 		Publisher:       publishesAs(cfg),
-		Mode:            roleMode(settings),
+		Mode:            settings.Mode(),
 		Files:           files,
 		// The names that never leave, derived once here and read by the pass
 		// that asks and by the report saying what it held back. Two

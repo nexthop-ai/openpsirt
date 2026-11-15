@@ -210,10 +210,13 @@ func TestALineWithStatusChangesReadFromAnArchiveNarrowsNothing(t *testing.T) {
 	}
 }
 
+// Read directly: building from it is refused anyway, for the zero moment
+// nothing read leaves, which says nothing about this refusal.
 func TestAnArchiveHoldingNoRecordsIsRefused(t *testing.T) {
 	archive := listArchive(t, map[string][]byte{"README.md": []byte("nothing")})
-	if _, err := cverecord.Build(archive, t.TempDir(), ""); err == nil {
-		t.Error("an archive with no records built a snapshot")
+	if _, _, _, err := cverecord.FromArchive(archive, t.TempDir()); err == nil ||
+		!strings.Contains(err.Error(), "holds no records") {
+		t.Errorf("an archive with no records answered %v, want it refused as holding none", err)
 	}
 }
 
@@ -319,12 +322,15 @@ func TestRecordsLeftOutAreCountedAndOnlyTheFirstKept(t *testing.T) {
 	}
 }
 
-// An archive in which no record could be read builds nothing.
+// An archive in which no record could be read is refused, naming the first
+// that could not. Read directly, for the reason the empty archive is.
 func TestAnArchiveOfOnlyUnreadableRecordsIsRefused(t *testing.T) {
-	if _, err := cverecord.Build(listArchive(t, map[string][]byte{
+	_, _, _, err := cverecord.FromArchive(listArchive(t, map[string][]byte{
 		"CVE-2026-8.json": []byte("not a record"),
-	}), t.TempDir(), ""); err == nil {
-		t.Error("an archive with nothing readable built a snapshot")
+	}), t.TempDir())
+	if err == nil || !strings.Contains(err.Error(), "no record in the CVE List archive could be read") ||
+		!strings.Contains(err.Error(), "CVE-2026-8") {
+		t.Errorf("an archive with nothing readable answered %v, want it refused naming the first", err)
 	}
 }
 
@@ -344,5 +350,30 @@ func TestAMomentOfUpdateWithNoOffsetIsReadAsUTC(t *testing.T) {
 	}
 	if snapshot.Version() != "2026-10-08T10:00:00Z" {
 		t.Errorf("taken %q, want the moment read as UTC", snapshot.Version())
+	}
+}
+
+func TestAnArchiveHoldingTheRecordsDirectlyIsBuilt(t *testing.T) {
+	// An operator's import may be an archive of record files with no
+	// archive inside it.
+	var raw bytes.Buffer
+	w := zip.NewWriter(&raw)
+	f, err := w.Create("cves/2026/31xxx/CVE-2026-31589.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(published("CVE-2026-31589", "PUBLISHED", "2026-10-06T21:58:40Z", kernelEntry)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(t.TempDir(), "records.zip")
+	if err := os.WriteFile(archive, raw.Bytes(), 0o600); err != nil { //nolint:gosec // G703: a path under the test's own directory
+		t.Fatal(err)
+	}
+	snapshot := built(t, archive)
+	if snapshot.Len() != 1 || !snapshot.Decide([]string{"CVE-2026-31589"}, kernel("6.18.55")).Narrows() {
+		t.Errorf("built %d records, want the one the archive holds, narrowing what it states", snapshot.Len())
 	}
 }

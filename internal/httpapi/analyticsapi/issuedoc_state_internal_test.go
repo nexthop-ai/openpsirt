@@ -30,3 +30,17 @@ func TestEveryStandingIsSaidInWordsOfItsOwn(t *testing.T) {
 		}
 	}
 }
+
+// The count of occurrences a decision stands at is said for none, for one and
+// for several, each in its own words.
+func TestTheStandingCountIsSaidForNoneOneAndSeveral(t *testing.T) {
+	for n, want := range map[int]string{
+		0: "No decision stands at any occurrence",
+		1: "A decision stands at 1 occurrence",
+		2: "Decisions stand at 2 occurrences",
+	} {
+		if got := decisionsStand(n); got != want {
+			t.Errorf("%d standing is said as %q, want %q", n, got, want)
+		}
+	}
+}

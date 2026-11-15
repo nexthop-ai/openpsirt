@@ -68,12 +68,12 @@ func TestTextInReachesEveryStringADecodedDocumentHolds(t *testing.T) {
 		Ptr    *inner
 		Map    map[string]string
 		Any    map[string]any
-		hidden string
+		hidden map[string]string
 	}{
 		Name: "a\x00", Many: []string{"c\x00"}, Nested: []inner{{"d\x00"}}, Ptr: &inner{"e\x00"},
 		Map:    map[string]string{"k": "f\x00"},
 		Any:    map[string]any{"s": "g\x00", "list": []any{"h\x00", map[string]any{"deep": "i\x00"}}},
-		hidden: "j\x00",
+		hidden: map[string]string{"k": "j\x00"},
 	}
 	bound.TextIn(&doc)
 	list := doc.Any["list"].([]any)
@@ -86,7 +86,9 @@ func TestTextInReachesEveryStringADecodedDocumentHolds(t *testing.T) {
 			t.Errorf("%s came back as %q", name, got)
 		}
 	}
-	if doc.hidden != "j\x00" {
+	// A map behind an unexported field is passed over: reflection may read
+	// it and never write it, so writing it would panic.
+	if doc.hidden["k"] != "j\x00" {
 		t.Errorf("an unexported field was reached: %q", doc.hidden)
 	}
 }

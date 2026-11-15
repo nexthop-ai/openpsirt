@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 // Each producer states a container image its own way, and each is read as an
@@ -73,7 +74,7 @@ func TestARebuiltSwitchImageMovesOnlyWhatItsImagesAreStampedWith(t *testing.T) {
 	}
 	// Read once for every engine: storing a document does not change it, and
 	// reading twenty megabytes is most of what this test costs.
-	original := readFullSize(t)
+	original := sbomtest.FullSizeImage(t)
 	rebuilt, err := sbom.Read(bytes.NewReader(
 		bytes.ReplaceAll(first, []byte(stamp), []byte("sbom-consumer-metadata.1-0ddba11"))), sbom.Limits{})
 	if err != nil {

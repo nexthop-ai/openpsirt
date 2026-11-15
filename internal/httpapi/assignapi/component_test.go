@@ -7,8 +7,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -115,10 +118,50 @@ func TestTheByComponentViewSaysWhatItsWeightIsMadeOf(t *testing.T) {
 			t.Errorf("the split sums to %d and the count says %d", sum, one.Issues)
 		}
 
-		// And asking for the worst first is answered rather than ignored.
-		httpapitest.Read(t, r, "triager", at+"?sort=severity", &page)
-		if len(page.Items) != 1 {
-			t.Errorf("asking for the worst first returned %+v", page.Items)
+	})
+}
+
+func TestTheByComponentViewOrdersByTheWorstWhenAsked(t *testing.T) {
+	// One package holds a high and a low, the other a single critical, so the
+	// two orders by severity disagree about which comes first and a route
+	// that drops the sort answers one of them wrongly.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		kernel := graph.Described{Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image", Version: "5.10"}
+		expat := graph.Described{Purl: "pkg:deb/debian/libexpat1@2.5.0-1", Name: "libexpat1", Version: "2.5.0-1"}
+		r.Scan(t, "two-components", graph.Snapshot{
+			Root:       httpapitest.SeededRoot,
+			Components: []graph.Described{kernel, expat},
+			Dependencies: []graph.Dependency{
+				{Parent: httpapitest.SeededRoot, Child: kernel},
+				{Parent: httpapitest.SeededRoot, Child: expat},
+			},
+		}, []finding.Reported{
+			{Issue: finding.Named{Identifier: "CVE-2026-9999", Severity: "high", Score: 8.1},
+				Component: kernel, FixState: finding.NoFix},
+			{Issue: finding.Named{Identifier: "CVE-2026-1000", Severity: "low", Score: 3.1},
+				Component: kernel, FixState: finding.NoFix},
+			{Issue: finding.Named{Identifier: "CVE-2026-2000", Severity: "critical", Score: 9.8},
+				Component: expat, FixState: finding.NoFix},
+		})
+		const at = "/v1/products/mine/findings/components"
+		order := func(query string) []string {
+			var page struct {
+				Items []struct {
+					Component string `json:"component"`
+				} `json:"items"`
+			}
+			httpapitest.Read(t, r, "triager", at+query, &page)
+			names := make([]string, 0, len(page.Items))
+			for _, one := range page.Items {
+				names = append(names, one.Component)
+			}
+			return names
+		}
+		if got := order("?sort=severity"); !slices.Equal(got, []string{"libexpat1", "linux-image"}) {
+			t.Errorf("the worst first reads %v, want the critical's package first", got)
+		}
+		if got := order("?sort=severity&asc=true"); !slices.Equal(got, []string{"linux-image", "libexpat1"}) {
+			t.Errorf("the least worst first reads %v, want the high's package first", got)
 		}
 	})
 }

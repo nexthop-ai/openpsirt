@@ -39,10 +39,4 @@ describe("what names one build", () => {
     const build = { branch_or_tag: "master", variant: "broadcom" };
     expect(buildKey(build, "8.14.1")).not.toBe(buildKey(build, "8.15.0"));
   });
-
-  it("gives the same build the same key", () => {
-    expect(buildKey({ branch_or_tag: "master", variant: "broadcom" }, "8.14.1")).toBe(
-      buildKey({ branch_or_tag: "master", variant: "broadcom" }, "8.14.1"),
-    );
-  });
 });

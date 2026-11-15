@@ -10,6 +10,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -171,4 +172,72 @@ func TestReadinessForATagNotYetBuiltSaysNothingHasBeenScanned(t *testing.T) {
 			})
 		})
 	}
+}
+
+// Readiness compares a branch with the last release cut from it, built the
+// same way and scanned, and says the least severity it counts where the
+// product hides what is below it.
+func TestReadinessComparesWithTheLastReleaseCutFromTheBranch(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		r.ScannedTwoIssues(t)
+		names := catalog.NewStore(r.DB.DB)
+		product, err := names.ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		master, err := names.BranchOrTagByName(ctx, product.ID, "master")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := names.DeclareBranchOrTag(ctx, product.ID, "v1.0", catalog.Tag, &master.ID); err != nil {
+			t.Fatal(err)
+		}
+		kernel := graph.Described{Purl: "pkg:deb/debian/linux-image@5.10", Name: "linux-image", Version: "5.10"}
+		r.ScanAt(t, httpapitest.Build{Product: "mine", BranchOrTag: "v1.0", Variant: "broadcom"},
+			"released", graph.Snapshot{Root: httpapitest.SeededRoot, Components: []graph.Described{kernel},
+				Dependencies: []graph.Dependency{{Parent: httpapitest.SeededRoot, Child: kernel}}},
+			[]finding.Reported{{Issue: finding.Named{Identifier: "CVE-2026-9999", Severity: "high"},
+				Component: kernel, FixState: finding.NoFix}})
+		// A build is compared once a scan of it has finished.
+		if _, err := r.DB.DB.NewUpdate().TableExpr(`"scan_run"`).Set(`"finished_at" = "started_at"`).
+			Where(`"finished_at" IS NULL`).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		type counts struct {
+			BranchOrTag string `json:"branch_or_tag"`
+			High        int    `json:"high"`
+			Low         int    `json:"low"`
+			Total       int    `json:"total"`
+		}
+		read := func(t *testing.T) (now counts, shipped *counts, minimum string) {
+			t.Helper()
+			var out struct {
+				Now             counts  `json:"now"`
+				Shipped         *counts `json:"shipped"`
+				MinimumSeverity string  `json:"minimum_severity"`
+			}
+			httpapitest.Read(t, r, "private-triage",
+				"/v1/products/mine/branches-and-tags/master/variants/broadcom/readiness", &out)
+			return out.Now, out.Shipped, out.MinimumSeverity
+		}
+		now, shipped, minimum := read(t)
+		if now.Total != 2 || shipped == nil || shipped.BranchOrTag != "v1.0" ||
+			shipped.Total != 1 || shipped.High != 1 {
+			t.Fatalf("now %+v against shipped %+v, want two now against the release's one high", now, shipped)
+		}
+		if minimum != "" {
+			t.Errorf("a product hiding nothing says it counts from %q", minimum)
+		}
+
+		if err := names.SetMinimumSeverity(ctx, product.ID, "medium"); err != nil {
+			t.Fatal(err)
+		}
+		now, shipped, minimum = read(t)
+		if minimum != "medium" || now.Total != 1 || now.Low != 0 || shipped == nil || shipped.Total != 1 {
+			t.Errorf("from medium up, now %+v against shipped %+v counted from %q, want the low left out",
+				now, shipped, minimum)
+		}
+	})
 }

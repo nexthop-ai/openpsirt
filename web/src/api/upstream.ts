@@ -100,8 +100,9 @@ export function useUpstreamSaid(product: string, component: string) {
 }
 
 // Declining one of an upstream's statements, or taking that back. Either
-// changes what closes findings, so every read of findings and statements is
-// asked again.
+// changes what closes findings at the next run, so the statements and the
+// finding that shows them are asked again; the findings lists move with the
+// run.
 export function useDecline() {
   const queries = useQueryClient();
   return useMutation({

@@ -27,16 +27,9 @@ func TestAClaimThatWasRolledBackIsNotReturned(t *testing.T) {
 	// already succeeded.
 	ctx := t.Context()
 
-	var handle *database.DB
-	var owner *dbtest.Race
-	handle, owner = dbtest.Racing(t, func() {
-		// The other worker's own act while the first attempt was losing: it
-		// finished the job, so there is nothing left for the retry to claim.
-		if _, err := handle.ExecContext(context.WithoutCancel(ctx),
-			`UPDATE "job" SET "state" = 'done'`); err != nil {
-			t.Errorf("marking the job done between attempts: %v", err)
-		}
-	})
+	// The other worker's own act while the first attempt was losing: it
+	// finished the job, so there is nothing left for the retry to claim.
+	handle, owner := racingWith(t, `UPDATE "job" SET "state" = 'done'`)
 
 	q := queue.New(handle, queue.DefaultOptions())
 	if _, err := q.Add(ctx, "ingest", "the-only-job"); err != nil {
@@ -129,14 +122,7 @@ func TestWorkWhoseEndingCannotBeRecordedSaysSo(t *testing.T) {
 // a commit that went through and whose answer was lost is not a lost claim.
 func TestFinishingWorkAlreadyRecordedAsFinishedIsNotALostClaim(t *testing.T) {
 	ctx := t.Context()
-	var handle *database.DB
-	var owner *dbtest.Race
-	handle, owner = dbtest.Racing(t, func() {
-		if _, err := handle.ExecContext(context.WithoutCancel(ctx),
-			`UPDATE "job" SET "state" = 'done', "claimed_by" = NULL`); err != nil {
-			t.Errorf("recording the job done between attempts: %v", err)
-		}
-	})
+	handle, owner := racingWith(t, `UPDATE "job" SET "state" = 'done', "claimed_by" = NULL`)
 	q := queue.New(handle, queue.DefaultOptions())
 	job := claimed(t, q, "ingest", "answer-lost", "worker")
 	owner.Arm(1)
@@ -211,11 +197,10 @@ func TestAClaimTakenAgainReadsTheMomentAgain(t *testing.T) {
 func TestALeaseTakenAgainIsMadeAndTimedByTheAttemptThatCommits(t *testing.T) {
 	ctx := t.Context()
 	now := time.Now().UTC().Truncate(time.Second)
-	var handle *database.DB
 	var owner *dbtest.Race
-	handle, owner = dbtest.Racing(t, func() {
+	handle, owner := dbtest.Racing(t, func() {
 		now = now.Add(time.Hour)
-		if _, err := handle.ExecContext(context.WithoutCancel(ctx), `DELETE FROM "lease"`); err != nil {
+		if _, err := owner.Other().ExecContext(context.WithoutCancel(ctx), `DELETE FROM "lease"`); err != nil {
 			t.Errorf("take the lease's row away between attempts: %v", err)
 		}
 	})
@@ -278,22 +263,9 @@ func TestEndingsAlreadyRecordedAreNotALostClaim(t *testing.T) {
 			}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
-			ctx := t.Context()
-			var handle *database.DB
-			var owner *dbtest.Race
-			handle, owner = dbtest.Racing(t, func() {
-				if _, err := handle.ExecContext(context.WithoutCancel(ctx), c.landed); err != nil {
-					t.Errorf("recording the ending between attempts: %v", err)
-				}
-			})
+			handle, owner := racingWith(t, c.landed)
 			q := queue.New(handle, queue.DefaultOptions())
-			if _, err := q.Add(ctx, "ingest", "answer-lost"); err != nil {
-				t.Fatal(err)
-			}
-			job, err := q.Claim(ctx, "worker", "ingest")
-			if err != nil || job == nil {
-				t.Fatalf("claiming: %v", err)
-			}
+			job := claimed(t, q, "ingest", "answer-lost", "worker")
 			owner.Arm(1)
 			if err := c.act(q, job.ID); err != nil {
 				t.Errorf("%s work whose ending reads recorded answered %v", c.name, err)
@@ -309,14 +281,7 @@ func TestEndingsAlreadyRecordedAreNotALostClaim(t *testing.T) {
 // queue, which is what was asked.
 func TestPuttingBackWorkAlreadyPutBackIsNotRefused(t *testing.T) {
 	ctx := t.Context()
-	var handle *database.DB
-	var owner *dbtest.Race
-	handle, owner = dbtest.Racing(t, func() {
-		if _, err := handle.ExecContext(context.WithoutCancel(ctx),
-			`UPDATE "job" SET "state" = 'pending', "attempts" = 0`); err != nil {
-			t.Errorf("putting the job back between attempts: %v", err)
-		}
-	})
+	handle, owner := racingWith(t, `UPDATE "job" SET "state" = 'pending', "attempts" = 0`)
 	q := queue.New(handle, queue.DefaultOptions())
 	job, err := q.Add(ctx, "ingest", "answer-lost")
 	if err != nil {
@@ -333,4 +298,17 @@ func TestPuttingBackWorkAlreadyPutBackIsNotRefused(t *testing.T) {
 	if err := q.Requeue(ctx, admin, job.ID); !errors.Is(err, queue.ErrNotFailed) {
 		t.Errorf("putting back a job that is waiting answered %v", err)
 	}
+}
+
+// racingWith is a racing handle whose lost commit is followed by stmt, run by
+// another worker before the retry.
+func racingWith(t *testing.T, stmt string) (*database.DB, *dbtest.Race) {
+	t.Helper()
+	var race *dbtest.Race
+	handle, race := dbtest.Racing(t, func() {
+		if _, err := race.Other().ExecContext(context.WithoutCancel(t.Context()), stmt); err != nil {
+			t.Errorf("running %s between attempts: %v", stmt, err)
+		}
+	})
+	return handle, race
 }

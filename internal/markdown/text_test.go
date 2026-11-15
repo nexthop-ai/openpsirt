@@ -23,6 +23,9 @@ func TestMarkdownIsReducedToTheWordsItShows(t *testing.T) {
 		{"&#38;lt; b", "&lt; b"},
 		{"\\&amp; b", "&amp; b"},
 		{"a &quot;b&quot; &#x3C;c&#x3E;", "a \"b\" <c>"},
+		{"| a | b |\n|---|---|\n| c | d |", "a | b\nc | d"},
+		{"| one cell | two words |\n|---|---|\n| `x` | [y](https://example.com) |", "one cell | two words\nx | y"},
+		{"| a | |\n|---|---|\n| | d |", "a |\n| d"},
 	} {
 		if got := Text(c.in); got != c.want {
 			t.Errorf("Text(%q) = %q; want %q", c.in, got, c.want)

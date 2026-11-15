@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   editReportNote,
   handedBack,
@@ -20,8 +20,6 @@ import { acted } from "../test/acted";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 // Everything a change to a report or a ruling moves.
 const EVERY_REPORT_KEY = [

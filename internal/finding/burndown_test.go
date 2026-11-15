@@ -396,3 +396,84 @@ func TestABurndownMarksAReturnAfterASharpRemovalAndCountsASmallOneAsReturned(t *
 		})
 	}
 }
+
+func TestADismissalSetAsideWithItsAgreementOpenIsNotDone(t *testing.T) {
+	// Setting a row aside writes no withdrawal, so the agreement reads as
+	// open still; the row no longer standing is what says it holds nothing.
+	each(t, func(t *testing.T, f *fixture) {
+		f.fourIssues(t)
+		agreed := ago(8)
+		f.dismissed(t, dismissal{issue: "CVE-2026-2", proposed: ago(9), agreed: &agreed, state: "proposed"})
+
+		if got := burnedOver(f.burndown(t, "", finding.Within{})); got.dismissed != 0 || got.returned != 0 || got.left != 4 {
+			t.Errorf("counted %+v, want nothing dismissed or returned and four left", got)
+		}
+	})
+}
+
+func TestADismissalAgreedAfterNowIsNotDone(t *testing.T) {
+	// An agreement stamped later than this server's clock reads as not yet
+	// taken effect, though the day it falls on is the one drawn last.
+	each(t, func(t *testing.T, f *fixture) {
+		f.fourIssues(t)
+		now := time.Now().UTC()
+		f.store.Clock(func() time.Time { return now })
+		endOfToday := now.Truncate(24 * time.Hour).Add(24 * time.Hour)
+		agreed := now.Add(endOfToday.Sub(now) / 2)
+		f.dismissed(t, dismissal{issue: "CVE-2026-2", proposed: ago(1), agreed: &agreed})
+
+		if got := burnedOver(f.burndown(t, "", finding.Within{})); got.dismissed != 0 || got.left != 4 {
+			t.Errorf("counted %+v, want nothing dismissed and four left", got)
+		}
+	})
+}
+
+func TestAnIssueClosedOnTwoDaysIsJudgedByTheClosureOnTheDayItLeft(t *testing.T) {
+	// CVE-2026-1 sits on libnl under swss and under teamd. Fixed under one
+	// first and stated not affected under the other later, it left the
+	// backlog by the statement; the earlier fix left nothing.
+	each(t, func(t *testing.T, f *fixture) {
+		f.fourIssues(t)
+		var first int64
+		for _, row := range f.open(t) {
+			if row.VulnerabilityID == f.issueID(t, "CVE-2026-1") {
+				first = row.ID
+				break
+			}
+		}
+		if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
+			Set(`"closed_at" = ?`, ago(10)).Set(`"closed_because" = ?`, finding.Upgraded).
+			Where(`"id" = ?`, first).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		f.closeIt(t, "CVE-2026-1", finding.Disclaimed, ago(5))
+
+		b := f.burndown(t, "", finding.Within{})
+		if got := burnedOver(b); got.fixed != 0 || got.dismissed != 1 || got.left != 3 {
+			t.Errorf("counted %+v, want one dismissed by the statement, nothing fixed and three left", got)
+		}
+		if p := pointOn(b, ago(5)); p.Dismissed != 1 {
+			t.Errorf("the day of the statement says %d dismissed, want one", p.Dismissed)
+		}
+	})
+}
+
+func TestADismissalThatLapsedBeforeTheIssueClosedIsNotDone(t *testing.T) {
+	// The issue was answered while the dismissal stood and left again when
+	// it lapsed, so the day it was agreed is no progress; the closure after
+	// it, a supersession, is none either.
+	each(t, func(t *testing.T, f *fixture) {
+		f.fourIssues(t)
+		agreed, lapsed := ago(8), ago(6)
+		f.dismissed(t, dismissal{issue: "CVE-2026-3", proposed: agreed, agreed: &agreed, ended: &lapsed, state: "lapsed"})
+		f.closeIt(t, "CVE-2026-3", finding.Superseded, ago(4))
+
+		b := f.burndown(t, "", finding.Within{})
+		if got := burnedOver(b); got.dismissed != 0 || got.returned != 1 || got.left != 3 {
+			t.Errorf("counted %+v, want nothing dismissed, one returned and three left", got)
+		}
+		if p := pointOn(b, lapsed); p.Returned != 1 {
+			t.Errorf("the day it lapsed says %d returned, want one", p.Returned)
+		}
+	})
+}

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -414,7 +415,7 @@ func TestWithdrawingSomethingNobodyHoldsRecordsNothingAndReleasesNothing(t *test
 // sideways off a list of everybody, and a deployment with two hundred people
 // in it is one where that is not answered at all.
 func TestTheUserListNarrowsToWhoHoldsWhat(t *testing.T) {
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		held := func(query string) []string {
 			t.Helper()
 			var out struct {
@@ -430,26 +431,27 @@ func TestTheUserListNarrowsToWhoHoldsWhat(t *testing.T) {
 			return names
 		}
 
-		everybody := held("")
+		// Exactly who holds the role on that product, whatever else they hold
+		// and wherever else they hold it.
 		approvers := held("?product=mine&role=approver")
-		if len(approvers) == 0 {
-			t.Fatal("nobody approves on the product, so this narrowing was not exercised")
+		slices.Sort(approvers)
+		if want := []string{"approver", "reviewer", "security-testing-code-finding",
+			"security-testing-reviewer"}; !slices.Equal(approvers, want) {
+			t.Errorf("narrowing to approvers on mine answered %q, want %q", approvers, want)
 		}
-		if len(approvers) >= len(everybody) {
-			t.Errorf("narrowing to approvers on one product kept %d of %d people",
-				len(approvers), len(everybody))
-		}
-		for _, who := range approvers {
-			if who == "triager" || who == "reader" {
-				t.Errorf("%q holds no approval here and is in the narrowed list", who)
-			}
+		// A role held across every product is held on this one.
+		readers := held("?product=theirs&role=public-read")
+		slices.Sort(readers)
+		if want := []string{"estate-reader", "outsider"}; !slices.Equal(readers, want) {
+			t.Errorf("narrowing to readers on theirs answered %q, want %q", readers, want)
 		}
 
 		// A role nobody holds on a product answers empty rather than
 		// everybody: a narrowing that silently does nothing is the one that
-		// makes a review report the wrong population.
-		if narrowed := held("?product=mine&role=assigner"); len(narrowed) >= len(everybody) {
-			t.Errorf("narrowing to assigners kept %d of %d people", len(narrowed), len(everybody))
+		// makes a review report the wrong population. Nobody assigns on
+		// theirs.
+		if narrowed := held("?product=theirs&role=assigner"); len(narrowed) != 0 {
+			t.Errorf("narrowing to assigners on theirs answered %q, want nobody", narrowed)
 		}
 
 		// And a product nobody declared is said, rather than answered with an

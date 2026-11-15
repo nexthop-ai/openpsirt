@@ -209,32 +209,14 @@ func TestTheMergedReachAnswersEveryOccurrenceRatherThanASample(t *testing.T) {
 	})
 }
 
-func TestTheMergedReachAnswersNothingToSomebodyWhoMayNotSeeTheProduct(t *testing.T) {
-	// Every query carries a subject, and this one produces the list of other
-	// builds a decision is written into. An answer that named a build somebody
-	// may not see would be a directory of what exists, and ticking it would
-	// write a decision where they hold nothing.
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.Scanned(t)
-		r.ScannedAlso(t, "arista", "3.7.0")
-		got := httpapitest.AsPerson(t, r, "outsider", http.MethodGet,
-			"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-				"/findings/CVE-2026-9999/components/libnl-3-200/reach", "")
-		if got.Code != http.StatusNotFound {
-			t.Errorf("somebody who may not see the product was answered %d: %s",
-				got.Code, got.Body.String())
-		}
-	})
-}
-
 func TestACollaboratorIsToldHowFarTheirOwnDecisionWouldReach(t *testing.T) {
-	// Both reach reads asked whether the subject may read the product, where
-	// every other read of one finding asks about the issue. A collaborator
-	// holds nothing on the product and holds exactly the case, so the product
-	// question refused them — and the route answers a refusal from the store
-	// as a fault, so the two screens offering to carry a decision across
-	// builds answered with a fault for the one person whose only finding they
-	// are about.
+	// Both reach reads ask whether the subject may read the issue, as every
+	// other read of one finding does. A collaborator holds nothing on the
+	// product and holds exactly the case, so a product question would refuse
+	// the one person whose only finding the two screens are about. Somebody
+	// with neither is refused as though the product were not declared, since
+	// the answer lists the builds a decision is written into and would
+	// otherwise be a directory of what exists.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence := r.Scanned(t)
 		build := "/v1/products/mine/branches-and-tags/master/variants/broadcom/findings/CVE-2026-9999"

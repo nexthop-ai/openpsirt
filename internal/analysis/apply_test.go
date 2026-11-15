@@ -377,6 +377,35 @@ func TestARunShortOfItsUnitsMarksNothingNoLongerDetected(t *testing.T) {
 	})
 }
 
+func TestARunThatFailedOrStoppedMarksNothingNoLongerDetected(t *testing.T) {
+	// A run whose tool exited with a failure, or said it did not finish,
+	// missed what it never reached: its absences close nothing.
+	for name, c := range map[string]struct {
+		invocation string
+		want       series.Reason
+	}{
+		"exited with a failure":  {`{"exitCode":1,"executionSuccessful":true}`, series.ExitStatus},
+		"said it did not finish": {`{"exitCode":0,"executionSuccessful":false}`, series.Incomplete},
+	} {
+		t.Run(name, func(t *testing.T) {
+			eachWorld(t, func(t *testing.T, w *world) {
+				w.inventory(t, w.Build.ID)
+				start := time.Now().UTC().Add(-3 * time.Hour)
+				w.send(t, w.Build.ID, start, document([]sent{inFRR, inSWSS}, 10))
+				doc := strings.Replace(document([]sent{inSWSS}, 10),
+					`"results":[`, `"invocations":[`+c.invocation+`],"results":[`, 1)
+				run, _ := w.send(t, w.Build.ID, start.Add(time.Hour), doc)
+				if run.Comparable == nil || *run.Comparable || run.Reason != c.want {
+					t.Errorf("comparable %v for %q; want not comparable, %q", run.Comparable, run.Reason, c.want)
+				}
+				if r := receiptOf(t, run); r.NoLongerDetected != 0 || r.Seen != 1 {
+					t.Errorf("receipt %+v; want one seen and none marked", r)
+				}
+			})
+		})
+	}
+}
+
 func TestARunBuiltBeforeTheLastAppliedIsSuperseded(t *testing.T) {
 	eachWorld(t, func(t *testing.T, w *world) {
 		w.inventory(t, w.Build.ID)

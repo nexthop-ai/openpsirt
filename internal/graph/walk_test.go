@@ -112,6 +112,9 @@ func TestWhatIsBeneathACountsEachComponentOnce(t *testing.T) {
 		if top == nil || top.Beneath != 3 {
 			t.Fatalf("the root reads %+v beneath, wanted 3 distinct issues", top)
 		}
+		if len(kids) != 2 {
+			t.Fatalf("%d children of the root, want the two containers: %+v", len(kids), kids)
+		}
 		for _, kid := range kids {
 			want := 2
 			if kid.Name == a.Name {
@@ -252,8 +255,14 @@ func TestADocumentInALoopIsWalkedOnceAndStops(t *testing.T) {
 		if _, err := fixtures.ApplyGraph(t.Context(), f.db, f.buildID, f.scan(t), snap); err != nil {
 			t.Fatal(err)
 		}
-		aID, _ := f.store.ComponentAs(t.Context(), f.buildID, "a", graph.Choice{})
-		bID, _ := f.store.ComponentAs(t.Context(), f.buildID, "b", graph.Choice{})
+		aID, err := f.store.ComponentAs(t.Context(), f.buildID, "a", graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		bID, err := f.store.ComponentAs(t.Context(), f.buildID, "b", graph.Choice{})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		chains, err := f.store.Chains(t.Context(), everyone(f), f.buildID, []int64{aID, bID})
 		if err != nil {

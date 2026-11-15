@@ -376,3 +376,72 @@ func TestEveryFlagTheUsageNamesIsDefined(t *testing.T) {
 		}
 	}
 }
+
+// A rules file names one rule a line, trimmed, with blank lines and those
+// opening with # left out, and each rule it names is sent.
+func TestARulesFileSendsEachRuleItNames(t *testing.T) {
+	_, sarif := checkout(t)
+	var sent []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(1 << 20); err != nil { //nolint:gosec // G120: a test server reading the client's own request
+			t.Errorf("the upload is not a form: %v", err)
+		}
+		sent = r.MultipartForm.Value["rules"]
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"status":"queued"}`))
+	}))
+	t.Cleanup(srv.Close)
+	t.Setenv("OPENPSIRT_KEY", "secret")
+	listed := filepath.Join(t.TempDir(), "rules")
+	if err := os.WriteFile(listed, []byte("# c\n\n r1 \nr2"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := run(context.Background(), upload(srv.URL, "--rules-file", listed, sarif),
+		&bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(sent, ",") != "r1,r2" {
+		t.Errorf("sent rules %q, want r1 and r2", sent)
+	}
+}
+
+// A compilation database's entries are the units expected, written beside
+// the count analyzed.
+func TestACompilationDatabaseCountsTheUnitsExpected(t *testing.T) {
+	_, sarif := checkout(t)
+	database := filepath.Join(t.TempDir(), "compile_commands.json")
+	if err := os.WriteFile(database, []byte("[{},{},{}]"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "out.sarif")
+	if err := run(context.Background(), []string{"write", "--series", "lint", "--compile-commands", database,
+		"--units-analyzed", "3", "--output", out, sarif}, &bytes.Buffer{}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := os.ReadFile(out) //nolint:gosec // G304: a path under the test's own directory
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := `"openpsirt/unitsExpected":3`; !bytes.Contains(doc, []byte(want)) {
+		t.Errorf("the document does not carry %s: %s", want, doc)
+	}
+}
+
+// A file named as a compilation database that is not one is refused naming
+// it, before anything is written.
+func TestAFileThatIsNotACompilationDatabaseIsRefused(t *testing.T) {
+	_, sarif := checkout(t)
+	database := filepath.Join(t.TempDir(), "compile_commands.json")
+	if err := os.WriteFile(database, []byte(`{"directory":"/"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(t.TempDir(), "out.sarif")
+	err := run(context.Background(), []string{"write", "--series", "lint", "--compile-commands", database,
+		"--output", out, sarif}, &bytes.Buffer{}, &bytes.Buffer{})
+	if err == nil || !strings.Contains(err.Error(), database+" is not a compilation database") {
+		t.Errorf("err %v; want the file refused as no compilation database", err)
+	}
+	if _, statErr := os.Stat(out); !os.IsNotExist(statErr) {
+		t.Errorf("a document was written for a refused compilation database: %v", statErr)
+	}
+}

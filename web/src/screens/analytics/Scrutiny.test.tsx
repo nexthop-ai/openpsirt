@@ -1,15 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Scrutiny } from "./Scrutiny";
 import { PUBLISHED } from "../../test/outcomes";
 import { mounted, screen, serve, settle } from "../../test/mount";
 import { reaching } from "../../test/reach";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("risk standing on one person", () => {
   it("files a code finding's dismissal standing alone as a control that did not hold", async () => {

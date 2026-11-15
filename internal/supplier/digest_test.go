@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -322,4 +323,79 @@ func TestAPassThatLosesTheLeaseStopsAndLeavesTheSupplierDue(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestAPassThatLosesTheLeaseBeforeADocumentStopsAndLeavesTheSupplierDue(t *testing.T) {
+	// Kept through the listing and lost before the first document: the pass
+	// stops there, and the supplier stays due so whichever replica reads next
+	// starts from the mark this one reached.
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		p.publishes("/2026/EL-141.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0141", "libnl-3-200", "3.7.1", "CVE-2026-1141"))
+
+		fetch := fetching(t, f, p)
+		asked := 0
+		fetch.Keep = func(context.Context) (bool, error) {
+			asked++
+			return asked == 1, nil
+		}
+		took, err := fetch.From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if took.Documents != 0 || !took.Filled {
+			t.Errorf("a pass that lost the lease before a document read as %+v", took)
+		}
+		if asked != 2 {
+			t.Errorf("the lease was asked after %d times, want once for the listing and once for the document", asked)
+		}
+		for _, path := range p.asked {
+			if path == "/2026/EL-141.json" {
+				t.Error("a document was fetched after the lease was lost")
+			}
+		}
+	})
+}
+
+func TestAPassThatCannotAskForTheLeaseStops(t *testing.T) {
+	// Asked before the listing and before each document, a failure to ask is
+	// the pass's to report, and nothing past it is fetched.
+	failed := errors.New("the lease could not be asked for")
+	for _, c := range []struct {
+		what  string
+		after int
+	}{{"before the listing", 0}, {"before a document", 1}} {
+		t.Run(c.what, func(t *testing.T) {
+			shipping(t, func(t *testing.T, f *ships) {
+				ctx := t.Context()
+				p := serving(t)
+				p.publishes("/2026/EL-142.json", "2026-09-20T00:00:00Z",
+					advisory("EL-2026-0142", "libnl-3-200", "3.7.1", "CVE-2026-1142"))
+
+				fetch := fetching(t, f, p)
+				asked := 0
+				fetch.Keep = func(context.Context) (bool, error) {
+					asked++
+					if asked > c.after {
+						return false, failed
+					}
+					return true, nil
+				}
+				took, err := fetch.From(ctx, f.by, from(t, f, p))
+				if !errors.Is(err, failed) {
+					t.Fatalf("a pass whose lease could not be asked for answered %v", err)
+				}
+				if took.Documents != 0 {
+					t.Errorf("read %+v after the lease could not be asked for", took)
+				}
+				for _, path := range p.asked {
+					if path == "/2026/EL-142.json" || (c.after == 0 && path == "/feed.json") {
+						t.Errorf("%s was fetched after the lease could not be asked for", path)
+					}
+				}
+			})
+		})
+	}
 }

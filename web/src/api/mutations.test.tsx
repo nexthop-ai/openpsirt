@@ -1,15 +1,20 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { useComment, useEditComment, useEditNote, useRevise, useWithdraw } from "./mutations";
+import { describe, expect, it } from "vitest";
+import {
+  useComment,
+  useEditComment,
+  useEditNote,
+  useNote,
+  useRevise,
+  useWithdraw,
+} from "./mutations";
 import { acted } from "../test/acted";
 import { EVERY_DECISION_KEY } from "../test/decisionKeys";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 describe("an edit to a decision, once it lands", () => {
   it("revising the reasoning sends it to the decision named and moves every decision read", async () => {
@@ -50,6 +55,24 @@ describe("a remark, once it lands", () => {
       body: "Asked upstream twice.",
     });
     expect(invalidated).toEqual(["comment/9/history", "comments"]);
+  });
+
+  it("writing a note sends it to the issue named and moves the notes", async () => {
+    const { sent, invalidated } = await acted(mount.render, mount.host, "POST", useNote, {
+      product: "sonic",
+      vulnerability: "CVE-2026-1",
+      body: "Vendor says next month.",
+    });
+    expect(sent).toEqual([
+      [
+        "/v1/products/{product}/issues/{issue}/notes",
+        {
+          params: { path: { product: "sonic", issue: "CVE-2026-1" } },
+          body: { body: "Vendor says next month." },
+        },
+      ],
+    ]);
+    expect(invalidated).toEqual(["notes"]);
   });
 
   it("editing a note moves the notes and that note's earlier wording", async () => {

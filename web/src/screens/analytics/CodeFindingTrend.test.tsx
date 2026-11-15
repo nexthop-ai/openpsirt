@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { CodeFindingTrend } from "./CodeFindingTrend";
-import { client, mounted, screen, serve, settle } from "../../test/mount";
+import { mounted, screen, serve, settle } from "../../test/mount";
+import { codeReader } from "../../test/reach";
 
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
-
 const TREND = "/v1/products/{product}/code-finding-trend";
 
 const POINT = (at: string, notFixed: number, opened: number, fixed: number) => ({
@@ -51,18 +50,9 @@ async function drawn(
   readsSecurityTesting: boolean,
   at = "/analytics/code-findings-over-time",
   answer: object = ANSWER,
-  picked: object = { product: "sonic" },
+  picked: Record<string, string> = { product: "sonic" },
 ) {
-  window.sessionStorage.setItem("openpsirt.scope", JSON.stringify(picked));
-  const session = {
-    identity: "ana",
-    name: "Ana",
-    kind: "person",
-    reach: [{ product: "sonic", reads_security_testing: readsSecurityTesting }],
-    outcomes: [],
-  };
-  const queries = client();
-  queries.setQueryData(["whoami"], session);
+  const { session, queries } = codeReader(readsSecurityTesting, picked);
   const spy = serve((path) => {
     if (path === "/v1/session/me") return { data: session };
     if (path === TREND) return { data: answer };

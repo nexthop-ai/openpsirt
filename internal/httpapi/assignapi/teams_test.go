@@ -75,9 +75,9 @@ func TestATeamIsManagedAndGrantsNothing(t *testing.T) {
 
 		// Somebody who is not an administrator does not manage teams.
 		refused := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/teams", `{"name":"other"}`)
-		if refused.Code != http.StatusForbidden && refused.Code != http.StatusNotFound {
-			t.Errorf("a triager recording a team answered %d: %s",
-				refused.Code, refused.Body.String())
+		if refused.Code != http.StatusForbidden {
+			t.Errorf("a triager recording a team answered %d, want %d: %s",
+				refused.Code, http.StatusForbidden, refused.Body.String())
 		}
 
 		// A team cannot bring somebody into the deployment.

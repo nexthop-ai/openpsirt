@@ -10,8 +10,6 @@ import { location, mounted, screen, serve, settle, type Answer } from "../test/m
 
 const mount = mounted();
 
-afterEach(() => vi.restoreAllMocks());
-
 const WHO = {
   identity: "ana",
   name: "Ana",

@@ -98,13 +98,23 @@ func TestWhetherAnyRowIsUndisclosedIsNeverAskedByOrderingTheWords(t *testing.T) 
 	}
 }
 
-func TestAPrivateCountIsAskedOnlyOfAVisibilityColumn(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Error("a column that is not a visibility was accepted into the statement")
-		}
-	}()
-	access.PrivateCount("f.visibility; DROP TABLE finding")
+func TestACountIsAskedOnlyOfAVisibilityColumn(t *testing.T) {
+	const hostile = "f.visibility; DROP TABLE finding"
+	for name, ask := range map[string]func(){
+		"PrivateCount":           func() { access.PrivateCount(hostile) },
+		"WithheldCount":          func() { access.WithheldCount(hostile) },
+		"WithheldCountAs":        func() { access.WithheldCountAs(hostile, "withheld") },
+		"SecurityTestingCountAs": func() { access.SecurityTestingCountAs(hostile, "testing") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Error("a column that is not a visibility was accepted into the statement")
+				}
+			}()
+			ask()
+		})
+	}
 }
 
 func TestAPrivateCountIsSelectedOnlyUnderAPlainName(t *testing.T) {

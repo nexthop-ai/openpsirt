@@ -275,14 +275,15 @@ func TestARefusedInsertIsForgivenOnlyAsADuplicate(t *testing.T) {
 			t.Error("a duplicate was reported as a row written")
 		}
 
-		// Anything else, with the row there just the same. Forgiving this is
-		// reporting a grant the failure may well have prevented.
-		gone, cancel := context.WithCancel(ctx)
-		cancel()
-		if _, err := store.insertOnce(gone, "claim", row(), present); err == nil {
-			t.Fatal("a failure that was not a duplicate was reported as success")
-		} else if !errors.Is(err, context.Canceled) {
-			t.Errorf("the refusal loses what actually failed: %v", err)
+		// Anything else, with the predicate saying the state holds just the
+		// same. Forgiving this is reporting a grant the failure may well have
+		// prevented. The insert itself fails, naming a person who does not
+		// exist, so the transaction around it began.
+		ghost := &Identity{PersonID: person.ID + 1000000, Username: "ghost", CreatedAt: store.now()}
+		if wrote, err := store.insertOnce(ctx, "claim", ghost, present); err == nil {
+			t.Fatalf("a foreign-key failure was reported as success (written %v)", wrote)
+		} else if database.IsDuplicate(err) {
+			t.Errorf("a foreign-key failure reads as a duplicate: %v", err)
 		}
 
 		// And a duplicate whose row does not satisfy the caller's predicate

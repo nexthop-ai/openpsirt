@@ -45,7 +45,18 @@ describe("a text box that suggests", () => {
     expect(shown()).toEqual(["linux", "libnl"]);
   });
 
-  it("picks from the keyboard, wrapping past either end", () => {
+  it("wraps to the first on ArrowDown past the last", () => {
+    const { box, onPick } = drawn();
+    change(box, "li");
+    key(box, "ArrowDown");
+    key(box, "ArrowDown");
+    key(box, "ArrowDown");
+    key(box, "Enter");
+    expect(onPick).toHaveBeenCalledWith("linux");
+    expect(mount.host().querySelector("output")?.textContent).toBe("linux");
+  });
+
+  it("wraps to the last on ArrowUp from the top", () => {
     const { box, onPick } = drawn();
     change(box, "li");
     key(box, "ArrowUp");

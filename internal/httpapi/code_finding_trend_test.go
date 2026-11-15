@@ -145,18 +145,34 @@ func TestATrendCountsWhatIsNotFixedBySplitAndMarksWhatChanged(t *testing.T) {
 func TestATrendInDaysCountsEachDay(t *testing.T) {
 	// Two hundred days need more than two words of the per-step bits.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// The server dates each step by its own clock. A run crossing UTC
+		// midnight between seeding and reading moves today's events across
+		// the last two steps, and the arrival back by one.
+		seeding := time.Now().UTC().Format(time.DateOnly)
 		trendSeeded(t, r)
 		got := readTrend(t, r, "security-testing-reader", "?days=200")
+		read := time.Now().UTC().Format(time.DateOnly)
+		crossed := seeding != read
 		if len(got.Points) != 200 {
 			t.Fatalf("two hundred days are %d points", len(got.Points))
 		}
 		today := got.Points[199]
-		if today.At != time.Now().UTC().Format(time.DateOnly) || today.NotFixed != 3 ||
-			today.Opened != 1 || today.Fixed != 1 {
-			t.Errorf("today is %+v; want three not fixed, one opened and one fixed", today)
+		if (today.At != seeding && today.At != read) || today.NotFixed != 3 {
+			t.Errorf("today is %+v; want it dated %s with three not fixed", today, read)
 		}
-		if arrived := got.Points[189]; arrived.Opened != 3 || got.Points[188].NotFixed != 0 {
-			t.Errorf("ten days ago is %+v after %+v; want the hub's three arriving that day", arrived, got.Points[188])
+		opened, fixed := today.Opened, today.Fixed
+		if crossed {
+			opened, fixed = opened+got.Points[198].Opened, fixed+got.Points[198].Fixed
+		}
+		if opened != 1 || fixed != 1 {
+			t.Errorf("today is %+v; want one opened and one fixed", today)
+		}
+		arrival := 189
+		if crossed && got.Points[arrival].Opened != 3 {
+			arrival--
+		}
+		if arrived := got.Points[arrival]; arrived.Opened != 3 || got.Points[arrival-1].NotFixed != 0 {
+			t.Errorf("ten days ago is %+v after %+v; want the hub's three arriving that day", arrived, got.Points[arrival-1])
 		}
 	})
 }

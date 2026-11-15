@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReasonEditor } from "./ReasonEditor";
 import { belongTo } from "../app/drafts";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
@@ -13,8 +13,6 @@ beforeEach(() => {
   window.localStorage.clear();
   belongTo("oidc:ana");
 });
-afterEach(() => vi.restoreAllMocks());
-
 async function drawn(state: string, approved = true) {
   serve(() => ({ data: { items: [] } }));
   const writes = {

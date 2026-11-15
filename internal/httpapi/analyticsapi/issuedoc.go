@@ -211,8 +211,10 @@ func issueDocument(ctx context.Context, in core.Deps, subject access.Subject,
 		if len(audited) == 1 {
 			below = "The most recent is below."
 		}
-		fmt.Fprintf(&out, "%s, of %s recorded. %s\n\n",
-			decisionsStand(standing), decisions(decided), below)
+		// A page shorter than the record holds one at least, so the record
+		// holds two at least.
+		fmt.Fprintf(&out, "%s, of %d decided occurrences recorded. %s\n\n",
+			decisionsStand(standing), decided, below)
 	}
 	// Newest first, which is how the record reads: what stands now is what
 	// somebody is looking for, and the history is under it.
@@ -314,15 +316,6 @@ func urlsOf(references []finding.Reference) []string {
 		out = append(out, one.URL)
 	}
 	return out
-}
-
-// decisions says a count of decided occurrences in its singular and plural
-// forms.
-func decisions(n int) string {
-	if n == 1 {
-		return "1 decided occurrence"
-	}
-	return fmt.Sprintf("%d decided occurrences", n)
 }
 
 // decisionsStand says at how many occurrences a decision is in force.

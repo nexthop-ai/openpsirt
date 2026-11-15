@@ -5,8 +5,6 @@ package main
 
 import (
 	"context"
-	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -19,8 +17,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
-
-func silent() *slog.Logger { return slog.New(slog.NewTextHandler(io.Discard, nil)) }
 
 func TestServingIsRefusedWhenTheSchemaIsBehindThisBuild(t *testing.T) {
 	// Applying migrations separately is supported and is the whole reason the
@@ -35,11 +31,11 @@ func TestServingIsRefusedWhenTheSchemaIsBehindThisBuild(t *testing.T) {
 	// read through the same portable path on all four.
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		if err := schema.Up(ctx, db, silent()); err != nil {
+		if err := schema.Up(ctx, db, discard()); err != nil {
 			t.Fatalf("migrate up: %v", err)
 		}
 		// Current, so serving is allowed.
-		if err := schemaIsCurrent(ctx, db, silent()); err != nil {
+		if err := schemaIsCurrent(ctx, db, discard()); err != nil {
 			t.Fatalf("a current schema was refused: %v", err)
 		}
 
@@ -53,7 +49,7 @@ func TestServingIsRefusedWhenTheSchemaIsBehindThisBuild(t *testing.T) {
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, short-1)
 
-		err := schemaIsCurrent(ctx, db, silent())
+		err := schemaIsCurrent(ctx, db, discard())
 		if err == nil {
 			t.Fatal("serving against a schema this build is ahead of was allowed")
 		}
@@ -128,7 +124,7 @@ func TestStartingWithoutMigratingChecksTheSchemaFirst(t *testing.T) {
 func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 	dbtest.Two(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		if err := schema.Up(ctx, db, silent()); err != nil {
+		if err := schema.Up(ctx, db, discard()); err != nil {
 			t.Fatalf("migrate up: %v", err)
 		}
 		wanted, err := schema.Expected()
@@ -149,8 +145,8 @@ func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 		})
 
 		for what, err := range map[string]error{
-			"serving":   schemaIsCurrent(ctx, db, silent()),
-			"migrating": schema.Up(ctx, db, silent()),
+			"serving":   schemaIsCurrent(ctx, db, discard()),
+			"migrating": schema.Up(ctx, db, discard()),
 		} {
 			if err == nil {
 				t.Errorf("%s a schema ahead of this build was allowed", what)
@@ -204,8 +200,8 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 				t.Fatalf("record version %d: %v", earlier, err)
 			}
 			for what, err := range map[string]error{
-				"serving":   schemaIsCurrent(ctx, db, silent()),
-				"migrating": schema.Up(ctx, db, silent()),
+				"serving":   schemaIsCurrent(ctx, db, discard()),
+				"migrating": schema.Up(ctx, db, discard()),
 			} {
 				if err == nil {
 					t.Errorf("%s a schema at version %d was allowed", what, earlier)

@@ -5,14 +5,17 @@ package assignapi_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -423,13 +426,11 @@ func TestARuleWhoseSweepCannotBeQueuedIsNotRecorded(t *testing.T) {
 }
 
 func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
-	// The three routes built on the shared lookup carry no version to choose
-	// with, and the lookup answered "no open finding is recorded there" for a
-	// name the build ships at two versions. The finding is there — the caller
-	// had just read it on a screen that resolved the same name — so a 404 was
-	// wrong twice over. Narrowed to the versions carrying the issue first,
-	// exactly as the finding's own route does it, since most versions of a
-	// name carry nothing.
+	// Marking and assigning carry no version to choose with, and the build
+	// ships the name at two versions. Each is narrowed to the versions
+	// carrying the issue first, exactly as the finding's own route is, since
+	// most versions of a name carry nothing: the finding the caller just read
+	// under the bare name is the one they mark and assign.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		r.ShipsTwice(t)
@@ -441,13 +442,15 @@ func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, ""); got.Code != http.StatusOK {
 			t.Fatalf("reading the finding answered %d: %s", got.Code, got.Body.String())
 		}
-		// So marking it must not answer that it is not there.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			at+"/labels/waiting-on-vendor", ""); got.Code == http.StatusNotFound {
-			t.Errorf("marking a finding the same name resolves to answered 404: %s",
-				got.Body.String())
-		} else if got.Code >= 300 && got.Code != http.StatusConflict {
-			t.Errorf("marking answered %d: %s", got.Code, got.Body.String())
+			at+"/labels/waiting-on-vendor", ""); got.Code >= 300 {
+			t.Errorf("marking a finding the same name resolves to answered %d: %s",
+				got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
+			at+"/assignment", `{"person":"triager"}`); got.Code >= 300 {
+			t.Errorf("assigning a finding the same name resolves to answered %d: %s",
+				got.Code, got.Body.String())
 		}
 	})
 }
@@ -542,6 +545,102 @@ func TestSomebodyWhoTriagesCodeFindingsAloneReadsAndPreviewsTheAssignmentRules(t
 					t.Errorf("%s reading %s answered %d; want %d: %s", who, path, got.Code, want, got.Body)
 				}
 			}
+		}
+	})
+}
+
+// refusedSaying fails unless the answer is the status given and its body says
+// the words given, so a refusal is told apart from another sharing its status.
+func refusedSaying(t *testing.T, got *httptest.ResponseRecorder, status int, says string) {
+	t.Helper()
+	httpapitest.RefusedWith(t, got, status)
+	if !strings.Contains(got.Body.String(), says) {
+		t.Errorf("refused without saying %q: %s", says, got.Body.String())
+	}
+}
+
+// A rule placing reports names no key, previews the reports nobody holds as
+// the reader may read them, and places a report recorded before it on the
+// next sweep.
+func TestARulePlacingReportsPlacesTheReportsNobodyHolds(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedSiblings(t)
+		reference := r.Reported(t, "The management socket answers before anyone has authenticated.")
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"intake","members":["private-triage"]}`); made.Code != http.StatusCreated {
+			t.Fatal(made.Body.String())
+		}
+
+		before := r.PreviewAs(t, "private-dispatcher", "reports=true")
+		if before.Work != 1 || before.Unheld != 1 || before.Total != 0 || len(before.Components) != 0 {
+			t.Errorf("a rule placing reports would catch %+v, want the one report nobody holds", before)
+		}
+		if hidden := r.PreviewAs(t, "triager", "reports=true"); hidden.Work != 0 || hidden.Unheld != 0 {
+			t.Errorf("somebody who reads no reports is shown %+v", hidden)
+		}
+
+		const preview = "/v1/products/mine/assignment-rules/preview"
+		const keyed = "a rule placing reports names no package"
+		for _, query := range []string{"?reports=true&upstream=curl", "?reports=true&beneath=libcurl4t64"} {
+			refusedSaying(t, httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodGet,
+				preview+query, ""), http.StatusUnprocessableEntity, keyed)
+		}
+		refusedSaying(t, httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodGet, preview, ""),
+			http.StatusUnprocessableEntity, "a rule that matches nothing places nothing")
+
+		const rules = "/v1/products/mine/assignment-rules"
+		refusedSaying(t, httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost, rules,
+			`{"name":"reports","team":"intake","reports":true,"upstream":"curl"}`),
+			http.StatusUnprocessableEntity, keyed)
+		if made := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPost, rules,
+			`{"name":"reports","team":"intake","reports":true}`); made.Code != http.StatusCreated {
+			t.Fatalf("adding a rule placing reports answered %d: %s", made.Code, made.Body)
+		}
+
+		if placed := r.Swept(t); placed != 1 {
+			t.Errorf("the sweep placed %d, want the one report", placed)
+		}
+		var queued heldReports
+		httpapitest.Read(t, r, "private-triage", "/v1/teams/intake/assignments/reports", &queued)
+		if queued.Total != 1 || len(queued.Items) != 1 || queued.Items[0].Reference != reference {
+			t.Errorf("the team's queue reads as %+v, want report %s", queued, reference)
+		}
+		if after := r.PreviewAs(t, "private-dispatcher", "reports=true"); after.Work != 1 || after.Unheld != 0 {
+			t.Errorf("after the sweep a rule placing reports would catch %+v, want it held", after)
+		}
+	})
+}
+
+// A pattern naming more places in one build than a rule may reach is refused
+// by the preview and by adding the rule, in the same words.
+func TestAPatternNamingMostOfABuildIsRefusedByThePreviewAndTheRule(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		padding := make([]graph.Described, 0, finding.AssignmentRuleReach+1)
+		edges := make([]graph.Dependency, 0, cap(padding))
+		for i := range cap(padding) {
+			name := fmt.Sprintf("pad%04d", i)
+			one := graph.Described{Purl: "pkg:deb/debian/" + name + "@1.0", Name: name, Version: "1.0"}
+			padding = append(padding, one)
+			edges = append(edges, graph.Dependency{Parent: httpapitest.SeededRoot, Child: one})
+		}
+		r.ScanAt(t, httpapitest.SeededBuild, "padded", graph.Snapshot{
+			Root: httpapitest.SeededRoot, Components: padding, Dependencies: edges,
+		}, nil)
+		if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams",
+			`{"name":"padders","members":["assigner"]}`); made.Code != http.StatusCreated {
+			t.Fatal(made.Body.String())
+		}
+
+		refusedSaying(t, httpapitest.AsPerson(t, r, "assigner", http.MethodGet,
+			"/v1/products/mine/assignment-rules/preview?beneath=pad*", ""),
+			http.StatusUnprocessableEntity, finding.ErrTooBroad.Error())
+		refusedSaying(t, httpapitest.AsPerson(t, r, "assigner", http.MethodPost,
+			"/v1/products/mine/assignment-rules", `{"name":"pads","team":"padders","beneath":"pad*"}`),
+			http.StatusUnprocessableEntity, finding.ErrTooBroad.Error())
+		// Half of them is within the reach, and answered.
+		if narrower := httpapitest.AsPerson(t, r, "assigner", http.MethodGet,
+			"/v1/products/mine/assignment-rules/preview?beneath=pad1*", ""); narrower.Code != http.StatusOK {
+			t.Errorf("a pattern within the reach answered %d: %s", narrower.Code, narrower.Body)
 		}
 	})
 }

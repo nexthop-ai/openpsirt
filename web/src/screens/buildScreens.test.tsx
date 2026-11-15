@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DecisionOccurrence } from "./DecisionOccurrence";
 import { InventoryChanges } from "./InventoryChanges";
 import { Run } from "./Run";
@@ -11,8 +11,6 @@ import { press, type Init } from "../test/controls";
 import { readingDependencies } from "../test/reach";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const text = () => mount.host().textContent ?? "";
 const BUILD = "/products/sonic/branches-and-tags/master/variants/arm";

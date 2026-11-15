@@ -13,12 +13,10 @@ package finding_test
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
@@ -26,6 +24,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 // checkedImage is the full-size image's build with its first inventory
@@ -143,7 +142,7 @@ func checkedImage(t *testing.T, doc *sbom.Document, db *database.DB) *world.Worl
 }
 
 func TestMeasureTheCheckOfAReplacedInventory(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		checkedImage(t, doc, db)
 	})
@@ -153,71 +152,15 @@ func TestMeasureTheCheckOfAReplacedInventory(t *testing.T) {
 // history: a run opening fifteen issues at every component of the replacement,
 // a third of them closed by a later run as upgraded.
 func TestMeasureRemediationBesideACheck(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
 		w := checkedImage(t, doc, db)
-		store := finding.NewStore(db.DB)
-		opened, err := store.Begin(ctx, finding.Run{BuildID: w.Build.ID, Scanner: "measure", RanHere: true})
-		if err != nil {
-			t.Fatal(err)
-		}
-		closed, err := store.Begin(ctx, finding.Run{BuildID: w.Build.ID, Scanner: "measure", RanHere: true})
-		if err != nil {
-			t.Fatal(err)
-		}
-		var components []struct {
-			ID       int64  `bun:"id"`
-			Identity string `bun:"identity"`
-		}
-		if err := db.DB.NewSelect().TableExpr(`"component" AS "c"`).
-			ColumnExpr(`"c"."id", "c"."identity"`).Where(`"c"."purl" <> ''`).
-			Scan(ctx, &components); err != nil {
-			t.Fatal(err)
-		}
-		const issues = 15
-		var names []finding.Named
-		for i := range issues {
-			names = append(names, finding.Named{Identifier: fmt.Sprintf("CVE-2028-%05d", i), Severity: "high"})
-		}
-		interned, err := finding.NewVulnerabilities(db.DB).Intern(ctx, names)
-		if err != nil {
-			t.Fatal(err)
-		}
-		at := time.Now().UTC().Add(-30 * 24 * time.Hour).Truncate(time.Microsecond)
-		fixed := at.Add(10 * 24 * time.Hour)
-		var rows []finding.Finding
-		for i, name := range names {
-			for n, c := range components {
-				row := finding.Finding{BuildID: w.Build.ID, Kind: finding.Vulnerable, Visibility: access.Public,
-					VulnerabilityID: interned[name.Identifier], ComponentID: c.ID, OccurrenceIdentity: c.Identity,
-					OpenedAt: at, OpenedRunID: &opened.ID}
-				if (n+i)%3 == 0 {
-					row.ClosedAt, row.ClosedRunID, row.ClosedBecause = &fixed, &closed.ID, finding.Upgraded
-				}
-				rows = append(rows, row)
-			}
-		}
-		if err := database.InBatches(ctx, db.DB, rows); err != nil {
-			t.Fatal(err)
-		}
-		dbtest.SettleStatistics(t, db)
-
-		productID := w.Product.ID
-		who := access.NewPerson(1, "a reader", false, map[int64][]access.Role{productID: {access.PublicRead}}, 0)
-		var took []time.Duration
-		var got *finding.Remediation
-		for range 5 {
-			started := time.Now()
-			got, err = store.Remediation(ctx, who, finding.Scope{ProductID: &productID}, time.Time{}, time.Now().UTC())
-			if err != nil {
-				t.Fatal(err)
-			}
-			took = append(took, time.Since(started))
-		}
-		slices.Sort(took)
+		rows := seedIssuesAtEveryComponent(t, db, w.Build.ID, 15,
+			func(issue, component int) bool { return (component+issue)%3 == 0 },
+			func(int) bool { return false })
+		got, took := medianRemediation(t, finding.NewStore(db.DB), w.Product.ID)
 		t.Logf("%s: %d findings; remediation (fixed %d, opened %d) median of five %s",
-			db.Server.Engine, len(rows), got.Fixed, got.Opened, took[2].Round(time.Millisecond))
+			db.Server.Engine, rows, got.Fixed, got.Opened, took.Round(time.Millisecond))
 		if got.Opened == 0 {
 			t.Fatal("nothing opened, so this measured nothing")
 		}

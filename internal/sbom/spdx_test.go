@@ -56,6 +56,22 @@ func TestTheHeaderOfTheSecondFormatIsReadWithoutItsContents(t *testing.T) {
 	}
 }
 
+func TestTheFilesOfTheSecondFormatAreWalkedPastOnAHeaderRead(t *testing.T) {
+	// A header read answers a question about the document's own record, so
+	// its files are not walked, and charged, as the full read charges them.
+	withFiles := strings.Replace(minimalSPDX, `"relationships"`,
+		`"files": [{"SPDXID": "SPDXRef-f1", "fileName": "a"}, {"SPDXID": "SPDXRef-f2", "fileName": "b"}],
+  "relationships"`, 1)
+	if _, err := sbom.Read(strings.NewReader(withFiles), sbom.Limits{MaxFiles: 1}); err == nil {
+		t.Fatal("a full read of two files under a bound of one was not refused, so this tests nothing")
+	}
+	header, err := sbom.ReadHeader(strings.NewReader(withFiles), sbom.Limits{MaxFiles: 1})
+	if err != nil {
+		t.Fatalf("a header read was refused for the files it walks past: %v", err)
+	}
+	assertMinimalHeader(t, header.Serial, header.BuiltAt)
+}
+
 func TestBothFormatsAreRefusedByNameRatherThanAtAField(t *testing.T) {
 	for _, tc := range []struct {
 		name, body, want string
@@ -105,6 +121,15 @@ func TestTheFormatsClaimNoKeyInCommon(t *testing.T) {
 	// has necessarily said which format it is — a producer sorting its keys
 	// puts one format's packages ahead of its own version statement. That is
 	// only safe while no key means two things.
+	claimed := sbom.TopLevelKeys()
+	if len(claimed) == 0 {
+		t.Fatal("no vocabularies were found, so this checked nothing")
+	}
+	for name, keys := range claimed {
+		if len(keys) == 0 {
+			t.Errorf("the vocabulary %q claims no top-level key, so nothing is routed to it", name)
+		}
+	}
 	shared := sbom.VocabularyOverlap()
 	for key, by := range shared {
 		t.Errorf("the top-level key %q is claimed by %v, so which one reads it "+
@@ -352,15 +377,41 @@ func TestAnEdgeNamingAFileIsNotAnEdgeNamingNothing(t *testing.T) {
 	}
 }
 
+// twoEdgesSPDX is minimalSPDX with a second package under the root, so that
+// a bound of one edge has two to count rather than one.
+func twoEdgesSPDX() string {
+	doc := strings.Replace(minimalSPDX, `"packages": [`,
+		`"packages": [{"SPDXID": "SPDXRef-b", "name": "zlib", "versionInfo": "1.3", "downloadLocation": "NONE"},`, 1)
+	return strings.Replace(doc, `"relationships": [`, `"relationships": [`+
+		`{"spdxElementId": "SPDXRef-root", "relatedSpdxElement": "SPDXRef-b", "relationshipType": "DEPENDS_ON"},`, 1)
+}
+
+// A deployment sets one bound and leaves the rest unset, which reads as zero.
+// Every bound left unset takes its default, never zero, which would refuse
+// every document carrying what it bounds.
+func TestEveryBoundLeftUnsetTakesItsDefault(t *testing.T) {
+	want := sbom.DefaultLimits()
+	want.MaxDepth = 8
+	if got := (sbom.Limits{MaxDepth: 8}).OrDefault(); got != want {
+		t.Errorf("unset bounds read as %+v, want the defaults %+v", got, want)
+	}
+}
+
+// The reader applies those defaults, so a document within them is read.
+func TestTheReaderHoldsAnUnsetBoundAtItsDefault(t *testing.T) {
+	read, err := sbom.Read(strings.NewReader(twoEdgesSPDX()), sbom.Limits{MaxDepth: 8})
+	if err != nil {
+		t.Fatalf("a document within every default was refused: %v", err)
+	}
+	if len(read.Components) != 2 {
+		t.Errorf("read %d components, want 2", len(read.Components))
+	}
+}
+
 func TestTheSecondFormatChargesTheSameBounds(t *testing.T) {
 	// A bound that holds on one format and not the other is a bound somebody
 	// routes around by changing which one they send.
-	// A second package under the root, so that a bound of one edge has two to
-	// count rather than one.
-	twoEdges := strings.Replace(minimalSPDX, `"packages": [`,
-		`"packages": [{"SPDXID": "SPDXRef-b", "name": "zlib", "versionInfo": "1.3", "downloadLocation": "NONE"},`, 1)
-	twoEdges = strings.Replace(twoEdges, `"relationships": [`, `"relationships": [`+
-		`{"spdxElementId": "SPDXRef-root", "relatedSpdxElement": "SPDXRef-b", "relationshipType": "DEPENDS_ON"},`, 1)
+	twoEdges := twoEdgesSPDX()
 
 	for _, tc := range []struct {
 		name  string

@@ -215,3 +215,66 @@ func TestANoteOnAReportIsToldToItsHolderAndNotToItsAuthor(t *testing.T) {
 		}
 	})
 }
+
+// A report goes to a team only where one member reads reports in the
+// product. The team's queue lists it for somebody who reads reports and for
+// nobody else, a team nobody declared holds nothing, and the totals list the
+// team for the report it holds though it holds no finding.
+func TestAReportGoesToATeamOnlyWhereAMemberReadsReports(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		at := recordReport(t, r)
+		for _, team := range []string{
+			`{"name":"intake","members":["private-triage"]}`,
+			`{"name":"readers","members":["triager"]}`,
+		} {
+			if made := httpapitest.AsPerson(t, r, "admin", http.MethodPost, "/v1/teams", team); made.Code != http.StatusCreated {
+				t.Fatalf("declaring %s answered %d: %s", team, made.Code, made.Body)
+			}
+		}
+
+		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPut, at+"/assignment",
+			`{"team":"readers"}`); got.Code != http.StatusUnprocessableEntity {
+			t.Errorf("giving a report to a team nobody on which reads reports answered %d: %s",
+				got.Code, got.Body)
+		}
+		if got := httpapitest.AsPerson(t, r, "private-dispatcher", http.MethodPut, at+"/assignment",
+			`{"team":"intake"}`); got.Code != http.StatusNoContent {
+			t.Fatalf("giving a report to a team that reads reports answered %d: %s", got.Code, got.Body)
+		}
+
+		queue := func(who, team string) heldReports {
+			var out heldReports
+			httpapitest.Read(t, r, who, "/v1/teams/"+team+"/assignments/reports", &out)
+			return out
+		}
+		if held := queue("private-triage", "intake"); held.Total != 1 || len(held.Items) != 1 ||
+			"/v1/products/mine/reports/"+held.Items[0].Reference != at {
+			t.Errorf("the team's queue reads as %+v, want the one report at %s", held, at)
+		}
+		if held := queue("triager", "intake"); held.Total != 0 || len(held.Items) != 0 {
+			t.Errorf("somebody who reads no reports was shown the team's queue: %+v", held)
+		}
+		if held := queue("private-triage", "readers"); held.Total != 0 || len(held.Items) != 0 {
+			t.Errorf("a team that was refused the report holds %+v", held)
+		}
+		if held := queue("private-triage", "no-such-team"); held.Total != 0 || len(held.Items) != 0 {
+			t.Errorf("a team nobody declared holds %+v", held)
+		}
+
+		var holding struct {
+			Items []struct {
+				Person  string `json:"person"`
+				Team    bool   `json:"team"`
+				Open    int    `json:"open"`
+				Reports int    `json:"reports"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "private-dispatcher", "/v1/assignments", &holding)
+		if len(holding.Items) != 1 || !holding.Items[0].Team || holding.Items[0].Open != 0 ||
+			holding.Items[0].Reports != 1 {
+			t.Errorf("the totals read as %+v, want the team alone holding one report and no finding",
+				holding.Items)
+		}
+	})
+}

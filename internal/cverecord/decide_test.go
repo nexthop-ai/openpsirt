@@ -354,6 +354,24 @@ func TestABranchFixIsTheFirstUnaffectedReleaseOnTheComponentsBranch(t *testing.T
 	}
 }
 
+func TestTheEarliestBranchFixAmongTiedEntriesIsNamed(t *testing.T) {
+	// The numbering authority and a third party can each name a fix on the
+	// same branch. The release that fixes the component is the earlier, in
+	// whichever order the entries are written.
+	entry := func(fix string) cverecord.Entry {
+		return cverecord.Entry{Vendor: "Linux", Product: "Linux", DefaultStatus: "affected", Versions: []cverecord.Line{
+			{Version: fix, LessThanOrEqual: "6.18.*", Status: "unaffected", VersionType: "semver"},
+		}}
+	}
+	for _, order := range [][]string{{"6.18.30", "6.18.27"}, {"6.18.27", "6.18.30"}} {
+		record := cverecord.Record{ID: "CVE-2026-31589", Affected: []cverecord.Entry{entry(order[0]), entry(order[1])}}
+		verdict := snapshotOf(t, record).Decide([]string{"CVE-2026-31589"}, kernel("6.18.20"))
+		if verdict.BranchFix != "6.18.27" {
+			t.Errorf("fixes stated as %v named branch fix %q, want 6.18.27", order, verdict.BranchFix)
+		}
+	}
+}
+
 func TestNoSnapshotDecidesNothing(t *testing.T) {
 	var none *cverecord.Snapshot
 	if none.Decide([]string{"CVE-2026-31589"}, kernel("6.18.55")).Narrows() {

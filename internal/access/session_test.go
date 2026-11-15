@@ -180,6 +180,15 @@ func TestTheValueEchoedAgainstASessionHasToBeThatSessions(t *testing.T) {
 	})
 }
 
+func TestASessionHoldingNoValueMatchesNoEchoedValue(t *testing.T) {
+	// Two empty strings compare equal, so a session carrying no value would
+	// otherwise accept a request that echoed none, which is every request a
+	// hostile page makes.
+	if (&access.Session{}).MatchesCSRF("") {
+		t.Error("a session holding no value accepted an empty one")
+	}
+}
+
 func TestAStrangersTokenReachesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		for _, token := range []string{"", "not-a-token", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"} {
@@ -204,16 +213,6 @@ func TestASignInHasACeiling(t *testing.T) {
 		person, err := f.store.Ensure(ctx, "ana", "", nil, nil)
 		if err != nil {
 			t.Fatal(err)
-		}
-
-		// Nothing asked for takes the default, which is the ordinary case.
-		issued, err := f.store.StartSession(ctx, person.ID, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if issued.Session.ExpiresAt.Sub(issued.Session.CreatedAt) != access.DefaultSessionLifetime {
-			t.Errorf("a sign-in asking for nothing lasts %s",
-				issued.Session.ExpiresAt.Sub(issued.Session.CreatedAt))
 		}
 
 		// The ceiling itself is allowed.

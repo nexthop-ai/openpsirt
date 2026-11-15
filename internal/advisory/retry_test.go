@@ -65,7 +65,7 @@ func TestAChangeTakenAgainAsksAgainWhoMayWriteTheAdvisory(t *testing.T) {
 			more := f.recorded(t, f.tagged)
 			named := f.covering(t, [2]string{"sonic", here})
 			between = func() {
-				if _, err := f.store.Add(t.Context(), f.who, named, "switchd", there); err != nil {
+				if _, err := advisory.NewStore(race.Other().DB).Add(t.Context(), f.who, named, "switchd", there); err != nil {
 					t.Error(err)
 				}
 			}
@@ -108,7 +108,7 @@ func TestAChangeTakenAgainAsksAgainWhatTheAdvisoryCovers(t *testing.T) {
 			here := f.recorded(t, f.master)
 			named := f.covering(t, [2]string{"sonic", here})
 			between = func() {
-				if err := f.store.Drop(t.Context(), f.who, named, "sonic", here); err != nil {
+				if err := advisory.NewStore(race.Other().DB).Drop(t.Context(), f.who, named, "sonic", here); err != nil {
 					t.Error(err)
 				}
 			}

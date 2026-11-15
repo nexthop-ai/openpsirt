@@ -6,6 +6,7 @@ package assignapi_test
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
@@ -350,16 +351,23 @@ func TestWithdrawingSomebodysLastRoleHandsBackWhatTheyHeld(t *testing.T) {
 
 func TestHandingWorkBackToYourselfDoesNotNeedTheRightToGiveItAway(t *testing.T) {
 	// An identity is stored folded and a person types their own name with the
-	// capitals they use. Compared exactly, "Triager" was not "triager", so
-	// somebody taking their own work — or handing it back — was told they
-	// needed the right that names giving work to somebody else.
+	// capitals they use, so their own name in any capitals is themselves and
+	// needs no right to give work away.
 	//
-	// Two sites, because the same comparison is made twice: assigning one
+	// Both routes that hand work to a person are driven: assigning one
 	// finding, and planning an upgrade across a component.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		occurrence := r.Scanned(t)
+		r.Scanned(t)
 		at := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
 			"/findings/CVE-2026-9999/components/libnl-3-200/assignment"
+		const upgrade = "/v1/products/mine/components/libnl-3-200/upgrade"
+		plan := func(person string) *httptest.ResponseRecorder {
+			return httpapitest.AsPerson(t, r, "triager", http.MethodPost, upgrade,
+				`{"to":"3.9.0","by":"`+httpapitest.AheadOfUs+`",`+
+					`"reasoning":"Taking the 3.9.0 bump in the next build.",`+
+					`"person":`+strconv.Quote(person)+`,`+
+					`"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`)
+		}
 
 		// "triager" holds triage and deliberately not the right to give work
 		// away, which is what makes this the case being pinned.
@@ -371,14 +379,18 @@ func TestHandingWorkBackToYourselfDoesNotNeedTheRightToGiveItAway(t *testing.T) 
 					spelled, got.Code, got.Body.String())
 			}
 		}
+		if got := plan("Triager"); got.Code != http.StatusCreated {
+			t.Errorf("planning an upgrade for themselves as %q answered %d: %s",
+				"Triager", got.Code, got.Body.String())
+		}
 
-		// And the rule still holds for somebody else, which is what makes the
-		// above a spelling rather than a hole.
+		// The rule still holds for somebody else, on both routes, which is
+		// what makes the above a spelling rather than a hole.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut, at,
 			`{"person":"reader"}`); got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("somebody without the right gave work away, answering %d", got.Code)
 		}
-		_ = occurrence
+		httpapitest.RefusedWith(t, plan("reader"), http.StatusUnprocessableEntity)
 	})
 }
 

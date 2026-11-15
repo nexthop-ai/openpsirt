@@ -54,7 +54,9 @@ type Served = (path: string, init: unknown) => Answer | undefined;
 // asked for and the parameters it was asked with.
 //
 // A path the function does not answer is a 500, so a test that forgets a
-// read sees the screen's failure branch rather than a hang.
+// read sees the screen's failure branch rather than a hang. The run restores
+// the real client before each test (`restoreMocks` in vite.config.ts), so a
+// test file never restores it by hand.
 export function serve(answer: Served) {
   return vi.spyOn(api, "GET").mockImplementation(answering(answer));
 }

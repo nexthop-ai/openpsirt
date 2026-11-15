@@ -1,29 +1,18 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { CodeFindingSeries } from "./CodeFindingSeries";
-import { client, mounted, screen, serve, settle } from "../../test/mount";
+import { mounted, screen, serve, settle } from "../../test/mount";
+import { codeReader } from "../../test/reach";
 
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
-
 const COUNTS = "/v1/products/{product}/code-finding-series";
 
 async function drawn(readsSecurityTesting: boolean) {
-  window.sessionStorage.setItem("openpsirt.scope", JSON.stringify({ product: "sonic" }));
-  const session = {
-    identity: "ana",
-    name: "Ana",
-    kind: "person",
-    reach: [{ product: "sonic", reads_security_testing: readsSecurityTesting }],
-    outcomes: [],
-  };
-  // The session held already, as the app's is by the time a screen draws.
-  const queries = client();
-  queries.setQueryData(["whoami"], session);
+  const { session, queries } = codeReader(readsSecurityTesting);
   const spy = serve((path) => {
     if (path === "/v1/session/me") return { data: session };
     if (path === COUNTS)

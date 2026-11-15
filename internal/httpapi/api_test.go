@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -122,24 +123,6 @@ func TestAProcessWithNoDatabaseAnswersEveryRequestButTheProbesInOneSentence(t *t
 				t.Errorf("%s: the probe %s answered %d", name, path, rec.Code)
 			}
 		}
-	}
-}
-
-func TestOpenAPIDocumentDescribesTheRegisteredRoutes(t *testing.T) {
-	// This is the check that keeps the published specification honest: it is
-	// generated from the same registrations the server routes on, so a route
-	// that exists but is undocumented cannot happen.
-	_, api := New(slog.New(slog.NewTextHandler(io.Discard, nil)), nil, core.Deps{})
-	doc := api.OpenAPI()
-	if doc.Paths["/v1/version"] == nil {
-		t.Fatal("/v1/version missing from the generated document")
-	}
-	spec, err := doc.YAML()
-	if err != nil {
-		t.Fatalf("render document: %v", err)
-	}
-	if len(spec) == 0 {
-		t.Fatal("generated document is empty")
 	}
 }
 
@@ -257,14 +240,14 @@ func TestThePagesOwnInlineScriptIsAllowedByHashAndNothingWider(t *testing.T) {
 
 	sum := sha256.Sum256([]byte(`document.documentElement.setAttribute("data-look","dark");`))
 	want := "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
-	if !strings.Contains(policy, want) {
+	if !slices.Contains(directive(policy, "script-src"), want) {
 		t.Errorf("the policy does not allow the page's own script: %s", policy)
 	}
 	// The hash and nothing wider: unsafe-inline would allow every inline
 	// script, including one somebody smuggled past the sanitizer, which is
 	// what this policy is a second line against.
-	if strings.Contains(policy, "unsafe-inline") &&
-		!strings.Contains(policy, "style-src 'self' 'unsafe-inline'") {
+	if script := directive(policy, "script-src"); slices.Contains(script, "'unsafe-inline'") ||
+		slices.Contains(script, "'unsafe-eval'") {
 		t.Errorf("the policy allows inline scripts wholesale: %s", policy)
 	}
 	if strings.Count(policy, "'sha256-") != 1 {
@@ -337,5 +320,10 @@ func TestNoTwoOperationsClaimOneMethodAndPath(t *testing.T) {
 		t.Errorf("%d operations are registered in the source and %d reached the document, "+
 			"so %d were claimed by another on the same method and path",
 			registered, described, registered-described)
+	}
+	// The document every registration reached is the one published, so it
+	// has to render.
+	if spec, err := api.OpenAPI().YAML(); err != nil || len(spec) == 0 {
+		t.Errorf("the document does not render: %d bytes, %v", len(spec), err)
 	}
 }

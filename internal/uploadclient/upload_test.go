@@ -5,12 +5,16 @@ package uploadclient
 
 import (
 	"compress/gzip"
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 )
 
 func TestARunIsSentCompressedWithItsFields(t *testing.T) {
@@ -145,5 +149,81 @@ func TestARefusedAddressHidesItsPassword(t *testing.T) {
 		} else if strings.Contains(err.Error(), "hunter2") {
 			t.Errorf("%s: the refusal shows the password: %v", address, err)
 		}
+	}
+}
+
+// waitsOf sets the waits between attempts for the rest of the test.
+func waitsOf(t *testing.T, first, longest time.Duration) {
+	t.Helper()
+	wasFirst, wasLongest := firstPause, longestWait
+	firstPause, longestWait = first, longest
+	t.Cleanup(func() { firstPause, longestWait = wasFirst, wasLongest })
+}
+
+// unreachable is a transport that cannot reach anything, failing with err,
+// and counts what it was asked.
+type unreachable struct {
+	err   error
+	asked int
+}
+
+func (u *unreachable) RoundTrip(*http.Request) (*http.Response, error) {
+	u.asked++
+	return nil, u.err
+}
+
+func TestAnUnreachableDeploymentIsAskedFiveTimes(t *testing.T) {
+	waitsOf(t, time.Millisecond, time.Minute)
+	refused := errors.New("connection refused")
+	transport := &unreachable{err: refused}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	_, err := Send(ctx, &http.Client{Transport: transport},
+		Target{URL: "https://deployment.example", Key: "k", Product: "p", BranchOrTag: "s", Variant: "v"},
+		[]byte("{}"), Fields{})
+	if !errors.Is(err, refused) || transport.asked != attempts {
+		t.Errorf("answered %v after %d attempts, want the transport's failure after %d", err, transport.asked, attempts)
+	}
+}
+
+func TestACancelledUploadIsNotAskedAgain(t *testing.T) {
+	waitsOf(t, time.Millisecond, time.Minute)
+	transport := &unreachable{err: context.Canceled}
+	_, err := Send(t.Context(), &http.Client{Transport: transport},
+		Target{URL: "https://deployment.example", Key: "k", Product: "p", BranchOrTag: "s", Variant: "v"},
+		[]byte("{}"), Fields{})
+	if !errors.Is(err, context.Canceled) || transport.asked != 1 {
+		t.Errorf("answered %v after %d attempts, want the cancellation after one", err, transport.asked)
+	}
+}
+
+func TestAWaitTheDeploymentAsksForIsBounded(t *testing.T) {
+	// A deployment asking for a day is asked again after the longest wait.
+	waitsOf(t, time.Millisecond, time.Millisecond)
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.Header().Set("Retry-After", "86400")
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	answer, err := Send(ctx, srv.Client(), Target{URL: srv.URL, Key: "k", Product: "p", BranchOrTag: "s", Variant: "v"}, []byte("{}"), Fields{})
+	if err != nil || answer.Status != http.StatusServiceUnavailable || calls != attempts {
+		t.Errorf("answer %d after %d calls, %v; want the 503 after %d", answer.Status, calls, err, attempts)
+	}
+}
+
+func TestASnippetIsCutAtACharacterBoundary(t *testing.T) {
+	// A cut inside a character is invalid text, which the encoder replaces.
+	at := strings.Repeat("a", longestSnippet)
+	if got := bounded([]string{at}); got != at {
+		t.Errorf("a snippet at the bound was cut to %d bytes", len(got))
+	}
+	got := bounded([]string{strings.Repeat("a", longestSnippet-1) + "€"})
+	if len(got) != longestSnippet-1 || !utf8.ValidString(got) {
+		t.Errorf("a snippet past the bound was cut to %d bytes, valid %v; want the %d before the character",
+			len(got), utf8.ValidString(got), longestSnippet-1)
 	}
 }

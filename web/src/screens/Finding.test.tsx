@@ -1,7 +1,7 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { belongTo } from "../app/drafts";
 import { Finding } from "./Finding";
 import { mounted, screen, serve, settle } from "../test/mount";
@@ -12,8 +12,6 @@ beforeEach(() => {
   window.localStorage.clear();
   belongTo("oidc:ana");
 });
-
-afterEach(() => vi.restoreAllMocks());
 
 const ADDRESS =
   "/products/sonic/branches-and-tags/master/variants/broadcom/findings/CVE-2026-1/components/libnl";

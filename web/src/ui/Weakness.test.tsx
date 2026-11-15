@@ -1,15 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Weaknesses as Named } from "./Weakness";
 import { Weaknesses as Picker } from "./Weaknesses";
 import { mounted, screen, serve, settle } from "../test/mount";
+import { change } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const LONG =
   "Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution')";
@@ -59,11 +57,7 @@ describe("the picker on the record-a-flaw form", () => {
     await settle();
 
     const input = mount.host().querySelector("input")!;
-    act(() => {
-      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
-      set.call(input, "double");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    change(input, "double");
     await settle();
 
     expect(searched).toContain("double");

@@ -25,6 +25,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/ingest"
+	"github.com/nexthop-ai/openpsirt/internal/sbom/sbomtest"
 )
 
 // repositories is how many source repositories are hung into the image, each
@@ -34,7 +35,7 @@ import (
 const repositories = 30
 
 func TestMeasureTheBurndownAndTheRepositoryList(t *testing.T) {
-	doc := fullSizeImage(t)
+	doc := sbomtest.FullSizeImage(t)
 	catalogSeed.Each(t, func(t *testing.T, db *database.DB, c seededCatalog) {
 		f := &fixture{
 			db: db, store: finding.NewStore(db.DB), graph: graph.NewStore(db.DB),

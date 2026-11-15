@@ -453,19 +453,21 @@ func TestADecisionInAProductYouCannotSeeAnswersLikeOneThatIsNotThere(t *testing.
 		}
 
 		// A decision that exists and one that does not, asked by somebody who may
-		// see neither. The two answers have to be the same answer.
-		invisible := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			fmt.Sprintf("/v1/decisions/%d/reaffirmation", theirDecision.DecisionID),
-			`{"reasoning":"Still true."}`)
-		absent := httpapitest.AsPerson(t, r, "triager", http.MethodPost,
-			"/v1/decisions/999999/reaffirmation", `{"reasoning":"Still true."}`)
-		if invisible.Code != absent.Code {
-			t.Errorf("a decision elsewhere answered %d and a missing one %d",
-				invisible.Code, absent.Code)
-		}
-		if invisible.Body.String() != absent.Body.String() {
-			t.Errorf("a decision elsewhere answered %q and a missing one %q",
-				invisible.Body.String(), absent.Body.String())
+		// see neither. The two answers have to be the same answer: re-affirmed
+		// by a triager of this product, and sent back by an approver of it.
+		for _, act := range []struct{ who, at, body string }{
+			{"triager", "reaffirmation", `{"reasoning":"Still true."}`},
+			{"reviewer", "send-back", `{"because":"Say which build this was read against."}`},
+		} {
+			invisible := httpapitest.AsPerson(t, r, act.who, http.MethodPost,
+				fmt.Sprintf("/v1/decisions/%d/%s", theirDecision.DecisionID, act.at), act.body)
+			absent := httpapitest.AsPerson(t, r, act.who, http.MethodPost,
+				"/v1/decisions/999999/"+act.at, act.body)
+			if invisible.Code != http.StatusNotFound || invisible.Code != absent.Code ||
+				invisible.Body.String() != absent.Body.String() {
+				t.Errorf("%s: a decision elsewhere answered %d %q and a missing one %d %q",
+					act.at, invisible.Code, invisible.Body.String(), absent.Code, absent.Body.String())
+			}
 		}
 	})
 }

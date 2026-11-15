@@ -6,12 +6,15 @@ package supplier_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/outward"
+	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/supplier"
 )
 
@@ -399,4 +402,77 @@ func TestARefusalFromTheStoreIsAboutTheDocument(t *testing.T) {
 			t.Errorf("the refusal %v reads as a failure of this deployment", err)
 		}
 	})
+}
+
+// A document larger than what is read is refused the same way on every pass,
+// so it is stepped over and the document after it is read.
+func TestADocumentLargerThanTheBoundIsSteppedOver(t *testing.T) {
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		p := serving(t)
+		body := advisory("EL-2026-0060", "libnl-3-200", "3.7.1", "CVE-2026-5260")
+		most := int64(len(body)) + 64
+		p.publishes("/2026/EL-59.json", "2026-09-20T00:00:00Z", strings.Repeat(" ", int(most)+1))
+		p.publishes("/2026/EL-60.json", "2026-09-21T00:00:00Z", body)
+
+		fetch := supplier.NewFetcher(f.db.DB, sbom.Limits{MaxBytes: most}, outward.Excluded{})
+		fetch.Client = p.reaching()
+		fetch.Pause = 0
+		took, err := fetch.From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatalf("a document past the bound stopped the supplier: %v", err)
+		}
+		if took.Refused != 1 || took.Documents != 1 {
+			t.Errorf("read %+v, want the large document stepped over and the next one read", took)
+		}
+	})
+}
+
+// A listing that is not the shape its kind is written in is malformed the same
+// way on every pass, so it is stepped over and the listing beside it is read.
+// The publisher names a directory and two feeds, and one of the first two is
+// malformed while the other lists nothing.
+func TestAMalformedListingDoesNotStopTheOthers(t *testing.T) {
+	for _, c := range []struct{ what, path, body string }{
+		{"a feed that is not JSON", "/empty.json", "not json"},
+		{"a list of changes with a quote left open", "/csaf/changes.csv", "\"2026/EL-61.json,2026-09-20T00:00:00Z\n"},
+	} {
+		t.Run(c.what, func(t *testing.T) {
+			shipping(t, func(t *testing.T, f *ships) {
+				ctx := t.Context()
+				p := serving(t)
+				document := "/2026/EL-62.json"
+				listings := map[string]string{
+					"/csaf/changes.csv": "",
+					"/empty.json":       `{"feed":{"id":"e","title":"t","entry":[]}}`,
+				}
+				listings[c.path] = c.body
+				p.override = func(w http.ResponseWriter, r *http.Request) {
+					switch r.URL.Path {
+					case "/.well-known/csaf/provider-metadata.json":
+						_, _ = fmt.Fprintf(w, `{"distributions":[{"directory_url":%q},{"rolie":{"feeds":[
+							{"tlp_label":"WHITE","url":%q},{"tlp_label":"WHITE","url":%q}]}}]}`,
+							p.server.URL+"/csaf/", p.server.URL+"/empty.json", p.server.URL+"/feed.json")
+					case "/feed.json":
+						_, _ = fmt.Fprintf(w, `{"feed":{"id":"f","title":"t","entry":[
+							{"link":[{"rel":"self","href":%q}],"updated":"2026-09-20T00:00:00Z",
+							 "content":{"type":"application/json","src":%q}}]}}`,
+							p.server.URL+document, p.server.URL+document)
+					case document:
+						_, _ = fmt.Fprint(w, advisory("EL-2026-0062", "libnl-3-200", "3.7.1", "CVE-2026-5262"))
+					default:
+						_, _ = fmt.Fprint(w, listings[r.URL.Path])
+					}
+				}
+
+				took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+				if err != nil {
+					t.Fatalf("%s stopped the supplier: %v", c.what, err)
+				}
+				if took.Documents != 1 {
+					t.Errorf("read %+v, want the document the other listing names", took)
+				}
+			})
+		})
+	}
 }

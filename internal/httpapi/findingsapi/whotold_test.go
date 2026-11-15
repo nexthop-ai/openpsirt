@@ -4,7 +4,6 @@
 package findingsapi_test
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -24,23 +23,14 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 		// Received a fortnight before it was typed in, which is the case the
 		// clock rule exists for.
 		arrived := time.Now().UTC().AddDate(0, 0, -14).Format(time.DateOnly)
-		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+		identifier := r.RecordedFlaw(t,
 			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200",`+
 				`"reported_by":"A. Researcher","contact":"a@example.org",`+
 				`"credit":"anonymous","received":"`+arrived+`"}`)
-		if got.Code != http.StatusCreated {
-			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
-		}
-		var recorded struct {
-			Identifier string `json:"identifier"`
-		}
-		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
-			t.Fatal(err)
-		}
 
-		at := "/v1/products/mine/issues/" + recorded.Identifier + "/report"
+		at := "/v1/products/mine/issues/" + identifier + "/report"
 		var told struct {
 			ReportedBy      string `json:"reported_by"`
 			Contact         string `json:"contact"`
@@ -77,7 +67,7 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 			DiscloseAt string `json:"disclose_at"`
 		}
 		httpapitest.Read(t, r, "private-triage", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/findings/"+recorded.Identifier+"/components/libnl-3-200", &detail)
+			"/findings/"+identifier+"/components/libnl-3-200", &detail)
 		want := time.Now().UTC().AddDate(0, 0, -14).AddDate(0, 0, 90).Format(time.DateOnly)
 		if detail.DiscloseAt != want {
 			t.Errorf("the embargo ends %q, want %q — it should run from receipt",
@@ -178,22 +168,13 @@ func TestWhoToldUsNeedsTheRightItSaysItNeeds(t *testing.T) {
 	// what the generated reference tells an operator the rule is.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+		identifier := r.RecordedFlaw(t,
 			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone has authenticated.",`+
 				`"severity":"high","component":"libnl-3-200",`+
 				`"reported_by":"A. Researcher","contact":"a@example.org"}`)
-		if got.Code != http.StatusCreated {
-			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
-		}
-		var recorded struct {
-			Identifier string `json:"identifier"`
-		}
-		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
-			t.Fatal(err)
-		}
 
-		at := "/v1/products/mine/issues/" + recorded.Identifier + "/report"
+		at := "/v1/products/mine/issues/" + identifier + "/report"
 		// Who reported it is read with the right that reads the report itself:
 		// undisclosed work in the product, whether or not the reader may act.
 		for _, who := range []string{"private", "private-triage"} {

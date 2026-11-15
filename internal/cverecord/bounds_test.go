@@ -577,3 +577,108 @@ func TestAnArchiveWhoseRecordsInflatePastTheBoundIsRefusedBeforeAnyIsRead(t *tes
 		return err
 	}, cverecord.IsTooLarge)
 }
+
+// shortened writes an archive of four empty members, each carrying a zip64
+// field of one value, with its directory end stating a directory that begins
+// one entry later than the first. When deferred is set, the first entry defers
+// both its sizes to its zip64 field, which then holds too few values for it to
+// be an entry a reader accepts, and the directory end states one entry fewer.
+// It names the archive.
+func shortened(t *testing.T, deferred bool) string {
+	t.Helper()
+	field := make([]byte, 12)
+	binary.LittleEndian.PutUint16(field, 0x0001)
+	binary.LittleEndian.PutUint16(field[2:], 8)
+	path := filepath.Join(t.TempDir(), "shortened.zip")
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	for i := range 4 {
+		if _, err := w.CreateHeader(&zip.FileHeader{Name: fmt.Sprint(i), Method: zip.Store, Extra: field}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	raw := buf.Bytes()
+	end := raw[bytes.LastIndex(raw, []byte("PK\x05\x06")):]
+	first := raw[binary.LittleEndian.Uint32(end[16:]):]
+	entry := 46 + int(binary.LittleEndian.Uint16(first[28:])) +
+		int(binary.LittleEndian.Uint16(first[30:])) + int(binary.LittleEndian.Uint16(first[32:]))
+	binary.LittleEndian.PutUint32(end[12:], binary.LittleEndian.Uint32(end[12:])-uint32(entry)) //nolint:gosec // G115: a small test archive
+	if deferred {
+		binary.LittleEndian.PutUint32(first[20:], 0xffffffff)
+		binary.LittleEndian.PutUint32(first[24:], 0xffffffff)
+		binary.LittleEndian.PutUint16(end[8:], 3)
+		binary.LittleEndian.PutUint16(end[10:], 3)
+	}
+	if err := os.WriteFile(path, raw, 0o600); err != nil { //nolint:gosec // G703: a path under the test's own directory
+		t.Fatal(err)
+	}
+	return path
+}
+
+// membersOpened is how many members a reader of the format finds in an
+// archive, failing the test where it cannot open it.
+func membersOpened(t *testing.T, path string) int {
+	t.Helper()
+	opened, err := zip.OpenReader(path)
+	if err != nil {
+		t.Fatalf("a reader does not open the archive, so it tests nothing: %v", err)
+	}
+	defer func() { _ = opened.Close() }()
+	return len(opened.File)
+}
+
+func TestADirectoryEndUnderstatingItsDirectoryIsCountedFromTheEntryItNames(t *testing.T) {
+	// A directory end stating a directory smaller than the one at its offset
+	// reads as data before the archive, unless a whole entry sits at that
+	// offset unmoved, where a reader walks from it. Counted from where the
+	// size alone puts it, the walk misses the entries before that point. The
+	// bound is the directory size the end states, which three entries fill
+	// and the four a reader walks pass; the count the end states is four
+	// either way, so a bound on members would refuse it from that alone.
+	path := shortened(t, false)
+	if got := membersOpened(t, path); got != 4 {
+		t.Fatalf("a reader found %d members, want the four from the stated offset", got)
+	}
+	cverecord.LowerBounds(t, cverecord.Bounds{Directory: int64(directorySize(t, path))})
+	if err := cverecord.CountMembers(path); !cverecord.IsTooLarge(err) {
+		t.Errorf("the archive answered %v, want a refusal for its four members", err)
+	}
+}
+
+func TestAnEntryAReaderRefusesAtTheStatedOffsetLeavesTheDirectoryMoved(t *testing.T) {
+	// An entry deferring two sizes to a zip64 field holding one is no entry
+	// to a reader, so the reader keeps the data before the archive and walks
+	// from where the size puts the directory. The count walks the same
+	// entries, and finds the three a reader finds.
+	path := shortened(t, true)
+	if got := membersOpened(t, path); got != 3 {
+		t.Fatalf("a reader found %d members, want the three after the stated offset", got)
+	}
+	cverecord.LowerBounds(t, cverecord.Bounds{Members: 3})
+	if err := cverecord.CountMembers(path); err != nil {
+		t.Errorf("the archive answered %v, want the three members a reader walks counted", err)
+	}
+}
+
+func TestMembersPastTheBoundAreRefusedByTheRecordsRead(t *testing.T) {
+	// The count before an archive is opened walks what the reader walks, and
+	// the read of its records bounds the members it is handed as well.
+	cverecord.LowerBounds(t, cverecord.Bounds{Members: 3})
+	members := func(n int) []*zip.File {
+		out := make([]*zip.File, n)
+		for i := range out {
+			out[i] = &zip.File{FileHeader: zip.FileHeader{Name: fmt.Sprint(i)}}
+		}
+		return out
+	}
+	// Members that are no records are refused at the bound for holding none.
+	if _, _, _, err := cverecord.Records(members(3)); err == nil || cverecord.IsTooLarge(err) {
+		t.Errorf("members at the bound answered %v, want them read and found to hold no record", err)
+	}
+	if _, _, _, err := cverecord.Records(members(4)); !cverecord.IsTooLarge(err) {
+		t.Errorf("members past the bound answered %v, want a refusal", err)
+	}
+}

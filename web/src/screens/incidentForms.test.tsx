@@ -8,6 +8,7 @@ import { Incident } from "./FindingIncident";
 import { Incidents, placesTyped } from "./Incidents";
 import { accept, mounted, screen, serve, settle } from "../test/mount";
 import { readingDependencies } from "../test/reach";
+import { change } from "../test/controls";
 
 // A reader of sonic's dependency findings, whose shelf the forms are on.
 const READER = { admin: false, reach: [readingDependencies("sonic")] };
@@ -23,17 +24,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.unstubAllEnvs();
-  vi.restoreAllMocks();
 });
-
-function type(field: HTMLInputElement | HTMLTextAreaElement | null, value: string) {
-  if (!field) throw new Error("no such field");
-  const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
-  act(() => {
-    Object.getOwnPropertyDescriptor(proto.prototype, "value")?.set?.call(field, value);
-    field.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-}
 
 function press(label: string) {
   const button = Array.from(mount.host().querySelectorAll("button")).find((each) =>
@@ -62,8 +53,8 @@ describe("moments typed on the incident forms", () => {
     const sent = accept(() => ({ data: {}, status: 201 }));
     mount.render(screen(<Incident product="sonic" vulnerability="CVE-2026-1" mayTriage />));
     await press("Record an incident");
-    type(mount.host().querySelector<HTMLInputElement>("#knownat"), "2026-09-20T14:00");
-    type(mount.host().querySelector<HTMLTextAreaElement>("#grounds"), "A customer saw it.");
+    change(mount.host().querySelector<HTMLInputElement>("#knownat"), "2026-09-20T14:00");
+    change(mount.host().querySelector<HTMLTextAreaElement>("#grounds"), "A customer saw it.");
     await press("Record");
     const body = (sent()[0]?.[1] as { body: { known_at: string } }).body;
     expect(body.known_at).toBe("2026-09-20T14:00:00.000Z");
@@ -98,10 +89,10 @@ describe("moments typed on the incident forms", () => {
     mount.render(screen(<Incidents />));
     await settle();
     await press("Record who was told");
-    type(mount.host().querySelector<HTMLInputElement>("#recipient-7"), "A regulator");
-    type(mount.host().querySelector<HTMLInputElement>("#toldat-7"), "2026-09-20T14:00");
-    type(mount.host().querySelector<HTMLTextAreaElement>("#said-7"), "Told.");
-    type(mount.host().querySelector<HTMLTextAreaElement>("#places-7"), "Korea, Republic of\n");
+    change(mount.host().querySelector<HTMLInputElement>("#recipient-7"), "A regulator");
+    change(mount.host().querySelector<HTMLInputElement>("#toldat-7"), "2026-09-20T14:00");
+    change(mount.host().querySelector<HTMLTextAreaElement>("#said-7"), "Told.");
+    change(mount.host().querySelector<HTMLTextAreaElement>("#places-7"), "Korea, Republic of\n");
     await press("Record");
     const body = (sent()[0]?.[1] as { body: { told_at: string; places: string[] } }).body;
     expect(body.told_at).toBe("2026-09-20T14:00:00.000Z");

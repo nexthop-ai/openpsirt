@@ -83,6 +83,11 @@ func TestTheEcosystemFilterCountsOnlyWhatTheReaderMaySee(t *testing.T) {
 			{"reader", "component=linux-image&ecosystem=deb", http.StatusOK, 1, false},
 			{"embargo-reader", "ecosystem=deb", http.StatusOK, 1, false},
 			{"triager", "ecosystem=deb", http.StatusOK, 1, false},
+			// Across products, for readers who see some of it and all of it.
+			{"private", "ecosystem=deb", http.StatusOK, 2, true},
+			{"reader", "ecosystem=deb", http.StatusOK, 1, true},
+			{"embargo-reader", "ecosystem=deb", http.StatusOK, 1, true},
+			{"triager", "ecosystem=deb", http.StatusOK, 1, true},
 			// Reading another product is no reading of this one.
 			{"outsider", "ecosystem=deb", http.StatusOK, 0, true},
 			{"outsider", "ecosystem=deb", http.StatusNotFound, -1, false},

@@ -1,15 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Compare } from "./Compare";
 import { press, tick } from "../test/controls";
 import { mounted, screen, serve, settle } from "../test/mount";
-import { readingDependencies } from "../test/reach";
+import { readerOf } from "../test/reach";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const PATTERN = "/products/:product/compare";
 const PAIR = "from=202411&from_variant=broadcom&to=master&to_variant=broadcom";
@@ -26,13 +24,7 @@ const comparison = {
   ],
 };
 
-const READER = {
-  identity: "ana",
-  name: "Ana",
-  admin: false,
-  kind: "person",
-  reach: [readingDependencies("sonic")],
-};
+const READER = readerOf("sonic");
 
 // The reads the screen makes, answered, and every one it asked for.
 function serving() {

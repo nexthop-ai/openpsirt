@@ -3,14 +3,12 @@
 
 import { act } from "react";
 import type { Who } from "../app/session";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Decision } from "./Decision";
 import { accept, client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
-import { only } from "../test/controls";
+import { change, only } from "../test/controls";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const ANA: Who = {
   identity: "ana",
@@ -51,13 +49,7 @@ describe("re-affirming a lapsed decision from its own page", () => {
         'textarea[placeholder="The reason it still holds, having checked again"]',
       );
     if (!box) throw new Error("no re-affirm form");
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set?.call(
-        box,
-        "Checked again.",
-      );
-      box.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    change(box, "Checked again.");
     const button = Array.from(mount.host().querySelectorAll("button")).find((each) =>
       each.textContent?.startsWith("Re-affirm all"),
     );

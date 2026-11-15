@@ -376,6 +376,64 @@ func TestARedactionWhoseDeleteFailedIsFinishedByAskingAgain(t *testing.T) {
 	})
 }
 
+// A redaction that finds the file already redacted, and cannot remove its
+// bytes, says the removal failed rather than that the file is gone.
+func TestARedactionAskedAgainWhoseDeleteFailsSaysSo(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		stored := f.upload(t, who, "oops.txt", []byte("AKIAIOSFODNN7EXAMPLE"))
+		if err := attach.NewStore(f.db.DB, undeletable{f.files}).
+			Redact(ctx, f.admin(t), stored.Token, "a credential"); err == nil {
+			t.Fatal("a redaction whose delete failed reported success")
+		}
+		err := attach.NewStore(f.db.DB, undeletable{f.files}).
+			Redact(ctx, f.admin(t), stored.Token, "a credential")
+		if errors.Is(err, attach.ErrGone) || err == nil || !strings.Contains(err.Error(), "remove a redacted file") {
+			t.Fatalf("asking again with a store that deletes nothing answered %v, want the removal's failure", err)
+		}
+	})
+}
+
+// A redaction overtaken by another administrator's, landing between its read
+// and its own mark, leaves the other's record, removes the bytes, and answers
+// that the file is gone.
+func TestARedactionOvertakenByAnotherRemovesTheBytesAndAnswersGone(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.who(t, access.PublicTriage)
+		stored := f.upload(t, who, "oops.txt", []byte("AKIAIOSFODNN7EXAMPLE"))
+		admin := f.admin(t)
+		other := func() {
+			if _, err := f.db.DB.NewUpdate().Table("attachment").
+				Set(`"redacted_at" = ?`, time.Now().UTC().Truncate(time.Microsecond)).
+				Set(`"redacted_by" = ?`, admin.ID).
+				Set(`"redacted_reason" = ?`, "the other administrator").
+				Where(`"token" = ?`, stored.Token).Exec(ctx); err != nil {
+				t.Error(err)
+			}
+		}
+		hook := &stopping{verb: "SELECT", table: "attachment", after: true, stop: other}
+		store := attach.NewStore(dbtest.Hooked(f.db, hook).DB, f.files)
+		if err := store.Redact(ctx, admin, stored.Token, "a credential"); !errors.Is(err, attach.ErrGone) {
+			t.Fatalf("an overtaken redaction answered %v, want that the file is gone", err)
+		}
+		if !hook.fired {
+			t.Fatal("the other redaction never landed")
+		}
+		row, err := f.store.Find(ctx, who, stored.Token)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if row.RedactedReason == nil || *row.RedactedReason != "the other administrator" {
+			t.Errorf("the record holds %v, want the other administrator's reason", row.RedactedReason)
+		}
+		if _, err := f.files.Open(ctx, row.ObjectKey); err == nil {
+			t.Error("the bytes of an overtaken redaction are still in the store")
+		}
+	})
+}
+
 // failingOnce is a store whose first delete fails.
 type failingOnce struct {
 	attach.Storage

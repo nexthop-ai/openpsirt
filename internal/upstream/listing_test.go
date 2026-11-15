@@ -5,9 +5,11 @@ package upstream_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -449,6 +451,82 @@ func TestAReadIsRecordedOnlyWhileTheLeaseIsHeld(t *testing.T) {
 			t.Fatal(err)
 		} else if after.FetchedAt == nil || after.Failed != failed.Error() {
 			t.Error("a read was not recorded by the replica holding the lease")
+		}
+	})
+}
+
+// directoryOnly has the upstream's provider description name its directory
+// and no feed, so a reader lists its documents from the directory's list of
+// changes.
+func (w *world) directoryOnly() {
+	w.t.Helper()
+	w.server.change(publish.MetadataPath, func(body []byte) []byte {
+		var meta map[string]any
+		if err := json.Unmarshal(body, &meta); err != nil {
+			w.t.Errorf("the provider description does not read: %v", err)
+			return body
+		}
+		dists, _ := meta["distributions"].([]any)
+		for _, one := range dists {
+			dist, _ := one.(map[string]any)
+			if dist["directory_url"] == nil {
+				w.t.Error("the provider description names no directory")
+			}
+			delete(dist, "rolie")
+		}
+		out, err := json.Marshal(meta)
+		if err != nil {
+			w.t.Errorf("the provider description does not write: %v", err)
+			return body
+		}
+		return out
+	})
+}
+
+// An upstream naming a directory and no feed is read from the directory's
+// list of changes, each entry resolved against the list.
+func TestAnUpstreamWithNoFeedIsReadFromItsListOfChanges(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.directoryOnly()
+		w.trust()
+		listed := len(w.server.documents(t))
+		if took := w.read(); took.Documents != listed || took.Refused != 0 {
+			t.Fatalf("the read took %+v, want all %d documents from the list of changes", took, listed)
+		}
+		w.server.mu.Lock()
+		asked := slices.Clone(w.server.asked)
+		w.server.mu.Unlock()
+		if !slices.Contains(asked, publish.ChangesPath) || slices.Contains(asked, publish.FeedPath) {
+			t.Errorf("the reader asked for %q; want the list of changes and never the feed", asked)
+		}
+		w.rescan()
+		said := w.statement(portable, finding.PlacedAnybody)
+		if said == nil {
+			t.Fatal("the statement holding for anybody was not recorded from the list of changes")
+		}
+		if got := w.state(w.forkBuild, portable, openssl); got.open || got.statedBy == nil || *got.statedBy != said.ID {
+			t.Errorf("the fork's openssl stands %+v, want closed by statement %d", got, said.ID)
+		}
+	})
+}
+
+// A row of the list of changes naming no document is an entry the read could
+// not take: the read goes on to every other document and records it.
+func TestARowOfTheListOfChangesNamingNoDocumentIsRecorded(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.directoryOnly()
+		w.server.change(publish.ChangesPath, func(body []byte) []byte {
+			return append(body, []byte("only-one-field\n")...)
+		})
+		w.trust()
+		listed := len(w.server.documents(t))
+		if took := w.read(); took.Documents != listed {
+			t.Errorf("a read with a short row took %+v, want all %d documents", took, listed)
+		}
+		if failed := w.failed(); !strings.Contains(failed, "1 entries of what the upstream lists name no document this can read") {
+			t.Errorf("the read records %q, want the row it could not read", failed)
 		}
 	})
 }

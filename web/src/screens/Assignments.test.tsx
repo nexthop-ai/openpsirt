@@ -1,15 +1,13 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { Assignments } from "./Assignments";
 import { screen, serve, settle, mounted } from "../test/mount";
 import { remember } from "../app/scope";
 import { reaching, readingDependencies } from "../test/reach";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const me = { identity: "ana", name: "Ana", admin: false, kind: "person", reach: [] };
 

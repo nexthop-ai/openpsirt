@@ -26,6 +26,7 @@ type rulingRead struct {
 	State       string   `json:"state"`
 	Yours       bool     `json:"yours"`
 	ApprovedBy  string   `json:"approved_by"`
+	ProposedAt  string   `json:"proposed_at"`
 }
 
 // rulingOf reads a report's disposition fields, which ReportRead leaves out.
@@ -239,15 +240,21 @@ func TestRulingsAcrossProductsAreThoseInProductsTheReaderWorksReportsIn(t *testi
 			}
 		}
 
-		// The period is the day it was proposed, the end exclusive.
-		today := time.Now().UTC().Format(time.DateOnly)
-		tomorrow := time.Now().UTC().AddDate(0, 0, 1).Format(time.DateOnly)
+		// The period is the day it was proposed, the end exclusive. The day
+		// is the one the server stamped, which a run crossing midnight
+		// would not find on the test's own clock.
+		proposed, err := time.Parse(time.RFC3339, seen.Items[0].ProposedAt)
+		if err != nil {
+			t.Fatalf("proposed at %q: %v", seen.Items[0].ProposedAt, err)
+		}
+		day := proposed.UTC().Format(time.DateOnly)
+		next := proposed.UTC().AddDate(0, 0, 1).Format(time.DateOnly)
 		var within, before across
-		httpapitest.Read(t, r, "private-triage", "/v1/report-rulings?from="+today+"&to="+tomorrow, &within)
-		httpapitest.Read(t, r, "private-triage", "/v1/report-rulings?to="+today, &before)
+		httpapitest.Read(t, r, "private-triage", "/v1/report-rulings?from="+day+"&to="+next, &within)
+		httpapitest.Read(t, r, "private-triage", "/v1/report-rulings?to="+day, &before)
 		if within.Total != 1 || before.Total != 0 {
-			t.Errorf("proposed today, it is %d in today and %d before it",
-				within.Total, before.Total)
+			t.Errorf("proposed on %s, it is %d in that day and %d before it",
+				day, within.Total, before.Total)
 		}
 
 		// Approved, it is no longer waiting.

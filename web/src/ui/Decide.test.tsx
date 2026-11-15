@@ -2,31 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Decide, type At } from "./Decide";
-import { accept, client, mounted, screen, serve, settle, watchInvalidations } from "../test/mount";
-import { PUBLISHED } from "../test/outcomes";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Decide } from "./Decide";
+import { change, only, press, tick } from "../test/controls";
+import { DECIDING_AT as at, serveDecider } from "../test/deciding";
+import { accept, client, mounted, screen, settle, watchInvalidations } from "../test/mount";
 
 const mount = mounted();
 
 beforeEach(() => window.sessionStorage.clear());
-afterEach(() => vi.restoreAllMocks());
-
-const at: At = {
-  product: "sonic",
-  branch_or_tag: "master",
-  variant: "broadcom",
-  vulnerability: "CVE-2026-1",
-  component: "openssl",
-  version: "3.0.2",
-};
-
-// A controlled field changed the way a person changes it.
-function type(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement : HTMLInputElement;
-  Object.getOwnPropertyDescriptor(proto.prototype, "value")?.set?.call(field, value);
-  field.dispatchEvent(new Event("input", { bubbles: true }));
-}
 
 // A day this many whole days from today, as the date field writes one.
 function daysOut(days: number): string {
@@ -46,22 +30,7 @@ describe("proposing a deferral past the threshold", () => {
   // threshold" and the test fails on it. And by sending the landing date in
   // place of the deferral date: the body check fails.
   it("says a second person must agree, and sends the date and the reasoning", async () => {
-    serve((path) => {
-      if (path === "/v1/session/me") {
-        return {
-          data: {
-            identity: "ana",
-            name: "Ana",
-            admin: false,
-            kind: "person",
-            deferral_days: 30,
-            outcomes: PUBLISHED,
-          },
-        };
-      }
-      if (path.endsWith("/reach")) return { data: { automatic: [], differing: [] } };
-      return { data: { items: [], total: 0 } };
-    });
+    serveDecider();
     const sent = accept(() => ({
       data: { decision_id: 9, recorded: 1, covered: 1, left: 0, needs_approval: true },
     }));
@@ -85,13 +54,9 @@ describe("proposing a deferral past the threshold", () => {
     const until = daysOut(25);
     const date = host.querySelector<HTMLInputElement>('input[type="date"]');
     expect(date, "no date field").not.toBeNull();
-    act(() => {
-      if (date) type(date, until);
-    });
+    change(date, until);
     const reasoning = host.querySelector<HTMLTextAreaElement>("textarea");
-    act(() => {
-      if (reasoning) type(reasoning, "Waiting on the vendor's next image.");
-    });
+    change(reasoning, "Waiting on the vendor's next image.");
 
     // Said beside the date and in the aside, before anything is sent.
     const said = "with what was put off before reaches the 30-day threshold, so a second person";
@@ -125,22 +90,7 @@ describe("proposing a deferral past the threshold", () => {
 
 describe("the decision form's Ctrl+Enter", () => {
   async function ready(queries = client()) {
-    serve((path) => {
-      if (path === "/v1/session/me") {
-        return {
-          data: {
-            identity: "ana",
-            name: "Ana",
-            admin: false,
-            kind: "person",
-            deferral_days: 30,
-            outcomes: PUBLISHED,
-          },
-        };
-      }
-      if (path.endsWith("/reach")) return { data: { automatic: [], differing: [] } };
-      return { data: { items: [], total: 0 } };
-    });
+    serveDecider();
     const sent = accept(() => ({
       data: { decision_id: 9, recorded: 1, covered: 1, left: 0, needs_approval: false },
     }));
@@ -166,13 +116,9 @@ describe("the decision form's Ctrl+Enter", () => {
     );
     act(() => deferred?.click());
     const date = host.querySelector<HTMLInputElement>('input[type="date"]');
-    act(() => {
-      if (date) type(date, daysOut(10));
-    });
+    change(date, daysOut(10));
     const reasoning = host.querySelector<HTMLTextAreaElement>(".writing textarea");
-    act(() => {
-      if (reasoning) type(reasoning, "Waiting on the vendor's next image.");
-    });
+    change(reasoning, "Waiting on the vendor's next image.");
     return { sent, host, reasoning };
   }
 
@@ -215,5 +161,76 @@ describe("the decision form's Ctrl+Enter", () => {
         "findings",
       ]),
     );
+  });
+});
+
+describe("what a decision covers", () => {
+  // Three occurrences under two consumers, none decided.
+  const OCCURRENCES = [
+    {
+      occurrence: "kernel/netfilter",
+      component: "openssl",
+      chain: [{ component: "image" }, { component: "kernel" }, { component: "netfilter" }],
+    },
+    {
+      occurrence: "kernel/crypto",
+      component: "openssl",
+      chain: [{ component: "image" }, { component: "kernel" }, { component: "crypto" }],
+    },
+    {
+      occurrence: "sshd/sshd",
+      component: "openssl",
+      chain: [{ component: "image" }, { component: "sshd" }, { component: "sshd" }],
+    },
+  ];
+
+  async function affected() {
+    const sent = accept(() => ({
+      data: { decision_id: 9, recorded: 2, covered: 2, left: 1, needs_approval: false },
+    }));
+    mount.render(screen(<Decide at={at} occurrences={OCCURRENCES} onDone={() => undefined} />));
+    await settle();
+    await press(mount.host(), "Affected");
+    change(mount.host().querySelector("textarea"), "Reachable from the management port.");
+    return sent;
+  }
+
+  it("sends the occurrences left in when some were excluded", async () => {
+    serveDecider();
+    const sent = await affected();
+    await press(mount.host(), "Exclude occurrences…");
+    tick(mount.host(), "sshd");
+    await press(mount.host(), "Submit decision");
+    await settle();
+    const body = only(sent)[1].body as { occurrences?: string[] };
+    expect(body.occurrences).toEqual(["kernel/netfilter", "kernel/crypto"]);
+  });
+
+  it("sends no occurrence list where none was excluded, so it covers every open one", async () => {
+    serveDecider();
+    const sent = await affected();
+    await press(mount.host(), "Submit decision");
+    await settle();
+    expect(only(sent)[1].body).toEqual({
+      outcome: "affected",
+      reasoning: "Reachable from the management port.",
+    });
+  });
+
+  it("sends each other build ticked in review with the version the reach named", async () => {
+    serveDecider({
+      automatic: [],
+      differing: [{ branch_or_tag: "202411", variant: "x", version: "3.0.1", occurrences: 2 }],
+    });
+    const sent = await affected();
+    await press(mount.host(), "Submit decision");
+    const sheet = mount.host().querySelector<HTMLElement>('[role="dialog"]');
+    if (!sheet) throw new Error("no review sheet");
+    tick(sheet, "3.0.1");
+    await press(sheet, "Review and submit → ↵");
+    await press(sheet, "Confirm and submit ↵");
+    await settle();
+    const body = only(sent)[1].body as { also?: unknown };
+    expect(body.also).toEqual([{ branch_or_tag: "202411", variant: "x", version: "3.0.1" }]);
   });
 });

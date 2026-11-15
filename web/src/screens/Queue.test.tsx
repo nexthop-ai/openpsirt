@@ -2,19 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Queue } from "./Queue";
 import { stillPicked } from "./useSelection";
 import { Product } from "./Product";
-import { accept, answer, screen, serve, settle, mounted } from "../test/mount";
-import { readingDependencies } from "../test/reach";
-import { change, press } from "../test/controls";
+import {
+  accept,
+  answer,
+  client,
+  screen,
+  serve,
+  settle,
+  mounted,
+  watchInvalidations,
+} from "../test/mount";
+import { button, change, only, press } from "../test/controls";
+import { EVERY_DECISION_KEY } from "../test/decisionKeys";
+import { readerOf } from "../test/reach";
 import { belongTo } from "../app/drafts";
 import { FLOORS } from "../ui/severities";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const exports = () =>
   Array.from(mount.host().querySelectorAll<HTMLAnchorElement>("a")).filter((each) =>
@@ -114,14 +122,7 @@ describe("approving a selection", () => {
     expect(all, "no select-all control").not.toBeNull();
     act(() => all?.click());
     const batch = host.querySelector<HTMLInputElement>('input[aria-label="Batch name"]');
-    act(() => {
-      if (!batch) return;
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(
-        batch,
-        "tuesday",
-      );
-      batch.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    change(batch, "tuesday");
     const approve = Array.from(host.querySelectorAll<HTMLButtonElement>("button")).find(
       (each) => each.textContent === "Approve 2 selected",
     );
@@ -144,6 +145,47 @@ describe("approving a selection", () => {
     );
     expect(host.textContent).toContain("1 selected");
     expect(host.textContent).toContain("Agreed to under “tuesday”");
+  });
+});
+
+describe("taking back an approval batch", () => {
+  // Verified by sending the batch under another path parameter, by dropping
+  // the refresh after the undo lands, and by leaving the batch named after it:
+  // each fails one assertion below.
+  it("deletes the batch just agreed to, refreshes the decisions, and offers the undo no longer", async () => {
+    serve((path) => {
+      if (path === "/v1/review-queue")
+        return { data: { items: [waiting(1), waiting(2)], total: 2 } };
+      if (path === "/v1/session/me") {
+        return { data: { identity: "ana", name: "Ana", admin: false, kind: "person", reach: [] } };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    accept(() => ({ data: {} }));
+    const deleted = answer("DELETE", () => ({ status: 204 }));
+    const queries = client();
+    mount.render(screen(<Queue />, "/review-queue", "*", queries));
+    await settle();
+    const host = mount.host();
+    act(() =>
+      host
+        .querySelector<HTMLInputElement>('input[aria-label="Select every decision shown"]')
+        ?.click(),
+    );
+    change(host.querySelector<HTMLInputElement>('input[aria-label="Batch name"]'), "b1");
+    await press(host, "Approve 2 selected");
+    await settle();
+    expect(host.textContent).toContain("Agreed to under “b1”");
+
+    const invalidated = watchInvalidations(queries);
+    await press(host, "Undo the batch");
+    await settle();
+    const [path, init] = only(deleted);
+    expect(path).toBe("/v1/approval-batches/{batch}");
+    expect(init.params?.path).toEqual({ batch: "b1" });
+    expect(invalidated()).toEqual(expect.arrayContaining(EVERY_DECISION_KEY));
+    expect(host.textContent).not.toContain("Agreed to under");
+    expect(() => button(host, "Undo the batch")).toThrow();
   });
 });
 
@@ -266,13 +308,7 @@ describe("a product's page", () => {
         return { data: { name: "sonic", waiting: 3 } };
       if (path === "/v1/session/me") {
         return {
-          data: {
-            identity: "ana",
-            name: "Ana",
-            admin: false,
-            kind: "person",
-            reach: [readingDependencies("sonic")],
-          },
+          data: readerOf("sonic"),
         };
       }
       return { data: { items: [], total: 0 } };

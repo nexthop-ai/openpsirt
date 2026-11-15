@@ -14,7 +14,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
-	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // reaffirmedMany is the answer to one act over many decisions.
@@ -518,21 +517,7 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 
 		// The component moves, which lapses the deferral, and the release it
 		// sits in is a tag.
-		if _, err := r.DB.DB.NewUpdate().Table("component").
-			Set(`"version" = ?`, "3.8.0-1").Set(`"upstream_version" = ?`, "3.8.0").
-			Where(`"name" = ?`, "libnl-3-200").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		var buildIDs []int64
-		if err := r.DB.DB.NewSelect().TableExpr(`"build" AS "t"`).
-			ColumnExpr(`"t"."id"`).Scan(ctx, &buildIDs); err != nil {
-			t.Fatal(err)
-		}
-		for _, build := range buildIDs {
-			if _, err := triage.NewStore(r.DB.DB).Lapse(ctx, build); err != nil {
-				t.Fatal(err)
-			}
-		}
+		r.MovedTo(t, "libnl-3-200", "3.8.0")
 		if _, err := r.DB.DB.NewUpdate().Table("branch_or_tag").
 			Set(`"kind" = ?`, catalog.Tag).Where(`"name" = ?`, "master").Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -545,6 +530,44 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 		if got.Code != http.StatusUnprocessableEntity {
 			t.Errorf("re-affirming a deferral in a tag build answered %d: %s",
 				got.Code, got.Body.String())
+		}
+	})
+}
+
+func TestWhatIsYoursToReaffirmNarrowedToAProductIsThatProducts(t *testing.T) {
+	// The triager's lapsed decision is in mine, and they triage theirs too,
+	// so theirs narrows to nothing rather than being refused.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		ctx := t.Context()
+		r.ScannedSiblings(t)
+		lapsed := r.AgreedThenLapsed(t)
+		person, err := r.Rights.ByIdentity(ctx, "triager")
+		if err != nil {
+			t.Fatal(err)
+		}
+		theirs, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "theirs")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := r.Rights.GrantRole(ctx, person.ID, theirs.ID, access.PublicTriage); err != nil {
+			t.Fatal(err)
+		}
+
+		for product, want := range map[string]int{"": 1, "mine": 1, "theirs": 0} {
+			var page struct {
+				Items []struct {
+					Decision struct {
+						ID int64 `json:"id"`
+					} `json:"decision"`
+				} `json:"items"`
+				Total int `json:"total"`
+			}
+			httpapitest.Read(t, r, "triager", "/v1/to-reaffirm?product="+product, &page)
+			if len(page.Items) != want || page.Total != want ||
+				(want == 1 && page.Items[0].Decision.ID != lapsed) {
+				t.Errorf("narrowed to %q, %d of %d listed (%+v), want %d: decision %d",
+					product, len(page.Items), page.Total, page.Items, want, lapsed)
+			}
 		}
 	})
 }

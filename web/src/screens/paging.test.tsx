@@ -2,26 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { act } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DisclosureDeadlines } from "./DisclosureDeadlines";
 import { Assignments } from "./Assignments";
 import { location, screen, serve, settle, mounted } from "../test/mount";
-import { readingDependencies } from "../test/reach";
+import { change, press } from "../test/controls";
+import { readerOf } from "../test/reach";
 
 // A list narrowed or switched starts at its own beginning, and a page past the
 // end of a list says how to get back rather than that the list is empty.
 const mount = mounted();
 
-afterEach(() => vi.restoreAllMocks());
-
-// A reader of dependency findings, who sees who else holds them.
-const me = {
-  identity: "ana",
-  name: "Ana",
-  admin: false,
-  kind: "person",
-  reach: [readingDependencies("sonic")],
-};
+const me = readerOf("sonic");
 
 describe("the assignments screen", () => {
   it("offers the way back from a page past the end of what somebody holds", async () => {
@@ -61,6 +53,7 @@ describe("the disclosure deadlines screen", () => {
   it("starts a narrowed list at its beginning", async () => {
     const asked: unknown[] = [];
     serve((path, init) => {
+      if (path === "/v1/session/me") return { data: me };
       if (path === "/v1/disclosure-deadlines") {
         asked.push((init as { params: { query: { offset: number } } }).params.query.offset);
         return { data: { items: [], total: 250 } };
@@ -69,15 +62,10 @@ describe("the disclosure deadlines screen", () => {
     });
     mount.render(screen(<DisclosureDeadlines />, "/disclosure-deadlines"));
     await settle();
-    const next = Array.from(mount.host().querySelectorAll<HTMLButtonElement>("button.chip")).at(-1);
-    act(() => next?.click());
+    await press(mount.host(), "Next");
     await settle();
-    const within = mount.host().querySelector<HTMLSelectElement>("select");
-    act(() => {
-      if (!within) return;
-      within.value = "7";
-      within.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    expect(asked).toEqual([0, 100]);
+    change(mount.host().querySelector("select"), "7");
     await settle();
     expect(asked.at(-1)).toBe(0);
   });

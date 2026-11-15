@@ -28,7 +28,7 @@ func TestASaveTakenAgainReadsTheLimitAgain(t *testing.T) {
 		t.Fatal(err)
 	}
 	limitedTo(t, db, "2")
-	lower = func() { limitedTo(t, db, "1") }
+	lower = func() { limitedTo(t, race.Other(), "1") }
 
 	race.Arm(1)
 	_, err = store.SaveFilterPreparing(t.Context(), person.ID,
@@ -59,7 +59,7 @@ func TestASaveTakenAgainCarriesNoIdentifierFromTheAttemptBefore(t *testing.T) {
 	store := saved.NewStore(db.DB)
 	// Another person's save lands where the rolled-back row was.
 	between = func() {
-		if _, err := db.DB.NewInsert().Model(&saved.Filter{PersonID: other.ID, Name: "theirs",
+		if _, err := race.Other().NewInsert().Model(&saved.Filter{PersonID: other.ID, Name: "theirs",
 			DisplayName: "Theirs", Query: "component=openssl", CreatedAt: time.Now().UTC()}).
 			Exec(t.Context()); err != nil {
 			t.Error(err)

@@ -14,6 +14,14 @@ var visibilityColumns = map[string]bool{
 	`"q"."visibility"`:  true,
 }
 
+// visibilityColumn is column, refusing one outside visibilityColumns.
+func visibilityColumn(caller, column string) string {
+	if !visibilityColumns[column] {
+		panic("access." + caller + ": " + column + " is not a visibility column")
+	}
+	return column
+}
+
 // PrivateCount is an aggregate counting the rows of a group whose visibility
 // is undisclosed, with the argument it binds.
 //
@@ -22,10 +30,7 @@ var visibilityColumns = map[string]bool{
 // undisclosed" only while the words sort that way. A count, so a group with
 // no undisclosed rows is zero on every engine rather than a null.
 func PrivateCount(column string) (string, any) {
-	if !visibilityColumns[column] {
-		panic("access.PrivateCount: " + column + " is not a visibility column")
-	}
-	return "COUNT(CASE WHEN " + column + " = ? THEN 1 END)", string(Private)
+	return "COUNT(CASE WHEN " + visibilityColumn("PrivateCount", column) + " = ? THEN 1 END)", string(Private)
 }
 
 // AnyPrivate is a condition over a group that holds where any of its rows is
@@ -43,10 +48,7 @@ func AnyPrivate(column string) (string, any) {
 // alone, and PrivateCount is the question it asks; what a message leaving
 // the deployment may say about a row is asked of this one.
 func WithheldCount(column string) (string, any) {
-	if !visibilityColumns[column] {
-		panic("access.WithheldCount: " + column + " is not a visibility column")
-	}
-	return "COUNT(CASE WHEN " + column + " <> ? THEN 1 END)", string(Public)
+	return "COUNT(CASE WHEN " + visibilityColumn("WithheldCount", column) + " <> ? THEN 1 END)", string(Public)
 }
 
 // AnyWithheld is a condition over a group that holds where the detail of any
@@ -85,10 +87,8 @@ func WithheldCountAs(column, name string) (string, any) {
 // of undisclosed work reads none of them, so an audience is asked about them
 // apart.
 func SecurityTestingCountAs(column, name string) (string, any) {
-	if !visibilityColumns[column] {
-		panic("access.SecurityTestingCountAs: " + column + " is not a visibility column")
-	}
-	return "COUNT(CASE WHEN " + column + " = ? THEN 1 END)" + as("SecurityTestingCountAs", name), string(SecurityTesting)
+	return "COUNT(CASE WHEN " + visibilityColumn("SecurityTestingCountAs", column) + " = ? THEN 1 END)" +
+		as("SecurityTestingCountAs", name), string(SecurityTesting)
 }
 
 // AnyPrivateAs is AnyPrivate selected under a name, for a column list.

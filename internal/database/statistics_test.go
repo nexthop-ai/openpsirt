@@ -189,8 +189,10 @@ func TestRefreshingStatisticsKeepsAnInMemoryDatabase(t *testing.T) {
 	}
 }
 
-func TestRefreshingStatisticsSucceedsOnEveryEngine(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+// The servers keep their own statistics, so a refresh asks nothing of them:
+// MySQL and MariaDB refuse a bare ANALYZE.
+func TestRefreshingStatisticsAsksNothingOfAServer(t *testing.T) {
+	dbtest.Servers(t, func(t *testing.T, db *database.DB) {
 		if err := database.RefreshStatistics(t.Context(), db); err != nil {
 			t.Error(err)
 		}
