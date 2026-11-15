@@ -443,7 +443,7 @@ type waiting struct {
 	logger *slog.Logger
 	since  time.Time
 	said   time.Time
-	// change is a wait for the schema change lock, not the migration lock.
+	// change marks a wait for the schema change lock.
 	change bool
 }
 

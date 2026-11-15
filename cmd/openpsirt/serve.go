@@ -208,7 +208,7 @@ func (p passes) loops() []loop {
 // Once the router answers, another instance changing the schema pauses it:
 // every request is answered as the start answers while it migrates, and every
 // request the router was answering has its context ended, so its transaction
-// rolls back rather than committing against a schema being changed.
+// rolls back.
 type listening struct {
 	srv   *http.Server
 	phase atomic.Pointer[phase]
@@ -478,10 +478,11 @@ func watchSchema(logger *slog.Logger, look func(context.Context) (schema.Standin
 // While it serves, watch reports the schema's standing. Where another
 // instance changes the schema, it pauses: requests are answered as upgrading,
 // the ones being answered end, and the passes stop. It serves again when the
-// schema is this build's, starting the passes again once the ones stopped have
-// ended. Where a later release has upgraded the schema, or it has fallen
-// behind this build with nothing changing it, it stops, and says so in its
-// error. A nil watch reports nothing.
+// schema is this build's, starting the passes again once the ones stopped
+// have ended, and stops where they have not ended within the shutdown grace.
+// Where a later release has upgraded the schema, or it has fallen behind this
+// build with nothing changing it, it stops, and says so in its error. A nil
+// watch reports nothing.
 func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger, server *listening,
 	start func(context.Context) *sync.WaitGroup, watch func(context.Context) <-chan sighting) error {
 	ctx, stop := context.WithCancel(parent)
@@ -498,20 +499,20 @@ func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger,
 	workers := start(running)
 	srv := server.srv
 	errs := server.failed
-	// paused is whether the router is set aside; drained closes once the
-	// passes a pause stopped have ended, and is nil while none are ending.
-	// Two copies of one pass never run at once.
-	paused, wanted := false, false
+	// paused is whether the router is set aside, and halted whether the
+	// passes are stopped. drained closes once the passes a pause stopped have
+	// ended, and is nil while none are ending; the passes start again only
+	// after, so two copies of one pass never run at once. stalled fires where
+	// they have not ended a grace after the router resumed.
+	paused, halted := false, false
 	var drained <-chan struct{}
+	var stalled <-chan time.Time
 	var stopping error
-	resume := func(version int64) {
+	restart := func() {
 		running, stopRunning = context.WithCancel(ctx) //nolint:gosec // G118: the deferred call above cancels whichever context is current
 		workers = start(running)
-		server.resume()
-		paused, wanted = false, false
-		logger.Info("the schema is this build's again: serving", "version", version)
+		halted, stalled = false, nil
 	}
-	var version int64
 
 serving:
 	for {
@@ -530,19 +531,27 @@ serving:
 			break serving
 		case <-drained:
 			drained = nil
-			if wanted {
-				resume(version)
+			if halted && !paused {
+				restart()
 			}
+		case <-stalled:
+			stopping = fmt.Errorf("background work stopped for a schema change did not end within %s "+
+				"of serving again", cfg.ShutdownGrace)
+			logger.Error("background work did not stop for a schema change: stopping", "grace", cfg.ShutdownGrace)
+			break serving
 		case seen := <-standings:
 			switch seen.standing {
 			case schema.Changes:
-				wanted = false
+				stalled = nil
+				if !halted {
+					stopRunning()
+					drained = ended(workers)
+					halted = true
+				}
 				if paused {
 					continue
 				}
 				server.pause()
-				stopRunning()
-				drained = ended(workers)
 				paused = true
 				logger.Warn("another instance is changing the schema: not serving until it is this build's",
 					"applied", seen.applied, "carried", seen.carried)
@@ -550,12 +559,14 @@ serving:
 				if !paused {
 					continue
 				}
-				version = seen.applied
-				if drained != nil {
-					wanted = true
-					continue
+				server.resume()
+				paused = false
+				logger.Info("the schema is this build's again: serving", "version", seen.applied)
+				if drained == nil {
+					restart()
+				} else {
+					stalled = time.After(cfg.ShutdownGrace)
 				}
-				resume(version)
 			case schema.Superseded, schema.Behind:
 				server.pause()
 				stopRunning()

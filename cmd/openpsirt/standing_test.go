@@ -38,12 +38,16 @@ type switched struct {
 	// starts counts the times the passes were started, and stopped the times
 	// a start's context ended.
 	starts, stopped atomic.Int32
+	// stuck keeps a pass from ending once stopped until release closes.
+	stuck   atomic.Bool
+	release chan struct{}
 }
 
 func serveSwitched(t *testing.T, db *database.DB) *switched {
 	t.Helper()
 	s := &switched{standings: make(chan sighting), done: make(chan error, 1), inside: make(chan struct{}),
-		silent: make(chan struct{}), finished: make(chan struct{})}
+		silent: make(chan struct{}), finished: make(chan struct{}), release: make(chan struct{})}
+	t.Cleanup(func() { close(s.release) })
 	router := http.NewServeMux()
 	router.HandleFunc("/held", func(w http.ResponseWriter, r *http.Request) {
 		err := database.InTransaction(r.Context(), db.DB, func(ctx context.Context, tx bun.Tx) error {
@@ -94,6 +98,9 @@ func serveSwitched(t *testing.T, db *database.DB) *switched {
 				defer workers.Done()
 				<-ctx.Done()
 				s.stopped.Add(1)
+				if s.stuck.Load() {
+					<-s.release
+				}
 			}()
 			return &workers
 		}, func(context.Context) <-chan sighting { return s.standings })
@@ -355,4 +362,34 @@ func TestAStartServesOnlyASchemaItsLookFindsItsOwn(t *testing.T) {
 			t.Errorf("standing %v, look failing %v: refused %v, want serving %v", c.standing, c.err, err, c.serves)
 		}
 	}
+}
+
+// A pass that does not end when a pause stops it holds back the passes and
+// not the router: the instance serves again once the schema is its own, and
+// stops once the pass has not ended within the shutdown grace.
+func TestAStuckPassHoldsBackOnlyThePasses(t *testing.T) {
+	dbtest.Two(t, func(t *testing.T, db *database.DB) {
+		s := serveSwitched(t, db)
+		eventually(t, "the passes started", func() bool { return s.starts.Load() == 1 })
+		s.stuck.Store(true)
+		s.see(t, schema.Changes)
+		eventually(t, "the passes were stopped", func() bool { return s.stopped.Load() == 1 })
+		s.see(t, schema.Serves)
+		eventually(t, "the router answered again", func() bool {
+			code, _, body := s.ask(t, "/")
+			return code == http.StatusOK && body == "router"
+		})
+		if s.starts.Load() != 1 {
+			t.Error("the passes started again while a stopped one was still running")
+		}
+		select {
+		case err := <-s.done:
+			s.done <- err
+			if err == nil || !strings.Contains(err.Error(), "did not end within") {
+				t.Errorf("an instance whose stopped pass never ended answered %v", err)
+			}
+		case <-time.After(30 * time.Second):
+			t.Fatal("an instance whose stopped pass never ended had not stopped within 30s")
+		}
+	})
 }

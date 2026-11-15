@@ -60,11 +60,12 @@ const (
 )
 
 // Notice is how long an upgrade waits, holding the schema change lock, before
-// its first statement: an interval and the longest look for every serving
-// instance to ask, the thirty seconds the longest write a stopped request or
-// pass goes on with is bounded by (recording a patch branch visit, cleaning up
-// an attachment), and a second more.
-const Notice = WatchEvery + AcquireWithin + LookWithin + 30*time.Second + time.Second
+// its first statement: for every serving instance to see the lock, the rest
+// of a look that asked just before the lock was taken, an interval and one
+// whole look; then the thirty seconds the longest write a stopped request or
+// pass goes on with is bounded by (recording a patch branch visit, cleaning
+// up an attachment), and a second more.
+const Notice = LookWithin + WatchEvery + AcquireWithin + LookWithin + 30*time.Second + time.Second
 
 // Standing is what an instance serving a database makes of its schema.
 type Standing int

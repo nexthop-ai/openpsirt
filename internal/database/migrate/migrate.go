@@ -21,6 +21,7 @@ import (
 
 	"github.com/pressly/goose/v3"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
@@ -224,9 +225,7 @@ func recordChange(ctx context.Context, db *database.DB, target int64) error {
 		host = "an unnamed host"
 	}
 	by := fmt.Sprintf("process %d on %s", os.Getpid(), host)
-	if len(by) > database.NameWidth {
-		by = by[:database.NameWidth]
-	}
+	by = bound.HeadRunes(by, database.NameWidth)
 	if _, err := db.ExecContext(ctx, `INSERT INTO "`+ChangeTable+`" ("started_at", "started_by", "target_version")
 		VALUES (?, ?, ?)`, time.Now().UTC(), by, target); err != nil {
 		return fmt.Errorf("record the schema change: %w", err)

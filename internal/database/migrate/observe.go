@@ -68,7 +68,7 @@ func NewObserver(ctx context.Context, db *database.DB) (*Observer, error) {
 //
 // The version is read first and answered even where asking about a change
 // then fails, since a version ahead settles what a serving instance does
-// whatever else is true.
+// whatever else is true. It is read again after, and the later answer kept.
 func (o *Observer) Look(ctx context.Context, acquireWithin, lookWithin time.Duration) (bool, int64, error) {
 	acquiring, cancel := context.WithTimeout(ctx, acquireWithin)
 	conn, err := o.db.Conn(acquiring)
@@ -84,7 +84,14 @@ func (o *Observer) Look(ctx context.Context, acquireWithin, lookWithin time.Dura
 		return false, 0, err
 	}
 	changing, err := o.changing(asking, conn, applied)
-	return changing, applied, err
+	if err != nil {
+		return false, applied, err
+	}
+	// Read again, since an upgrade may have finished and let go of the lock
+	// between the two reads: an absent lock with the first version would
+	// read as this build's schema when it is already the next one's.
+	later, err := o.applied(asking, conn)
+	return changing, max(applied, later), err
 }
 
 // changing reports whether an instance holds the schema change lock, which it
