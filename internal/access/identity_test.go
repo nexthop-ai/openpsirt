@@ -30,7 +30,9 @@ func authorized(t *testing.T, f *fixture, handle, username string) *access.Accou
 func TestAnAuthorizationIsRedeemedByNameAndThenPinnedToTheIdentifier(t *testing.T) {
 	// An administrator can only type the name. The provider's own identifier
 	// is not knowable until the person actually arrives, so authorizing in
-	// advance is expressed in the moving name and pinned at first use.
+	// advance is expressed in the moving name and pinned at first use. Inside
+	// the claim window an ordinary first sign-in redeems it: bounding the
+	// window must not make one fail.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		person := authorized(t, f, "alice", "alice")
@@ -183,7 +185,10 @@ func TestOneUsernameIsOnePersonWhicheverWayTheyArrive(t *testing.T) {
 			}
 			// The recovery path has to work on the day it is needed, and by
 			// then the provider has usually bound its identifier already. A
-			// proxy arrival is not measured against it.
+			// proxy arrival is not measured against it: the mismatch refusal
+			// protects a name that moved between people at the provider, and
+			// a deployment trusting the header has already granted whatever
+			// sets it the power to claim to be anybody.
 			matched, err := f.store.MatchProxy(ctx, "bhouse@example.com")
 			if err != nil {
 				t.Fatalf("a bound identifier locked out the proxy: %v", err)
@@ -316,50 +321,6 @@ func TestAnAuthorizationNobodyRedeemedStopsBeingRedeemable(t *testing.T) {
 
 		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err == nil {
 			t.Error("an authorization nobody redeemed inside its window was still redeemed")
-		}
-	})
-}
-
-func TestAnAuthorizationIsRedeemableInsideItsWindow(t *testing.T) {
-	// The other half, and the one that matters more: bounding the window must
-	// not make an ordinary first sign-in fail. Somebody authorized ahead of a
-	// start date arrives days later and is still who was authorized.
-	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		person := authorized(t, f, "alice", "alice")
-
-		matched, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice")
-		if err != nil {
-			t.Fatalf("an authorization inside its window was refused: %v", err)
-		}
-		if matched.ID != person.ID {
-			t.Errorf("the authorization was redeemed by person %d, want %d", matched.ID, person.ID)
-		}
-	})
-}
-
-func TestAProxyLetsSomebodyInWhileTheProviderIsUnreachable(t *testing.T) {
-	// The way back in when the provider is down. A reverse proxy asserts the
-	// name and the deployment runs with no provider configured at all, which
-	// is the arrangement the trusted header exists for.
-	//
-	// A pinned identifier does not refuse it, and must not: the mismatch
-	// refusal protects a name that moved between people at the provider, and
-	// a deployment trusting the header has already granted whatever sets it
-	// the power to claim to be anybody.
-	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		person := authorized(t, f, "alice", "alice")
-		if _, err := f.store.MatchProvider(ctx, "okta", "00u1a2b3", "alice"); err != nil {
-			t.Fatalf("the first sign-in did not pin: %v", err)
-		}
-
-		got, err := f.store.MatchProxy(ctx, "alice")
-		if err != nil {
-			t.Fatalf("somebody bound to a provider cannot come in by proxy: %v", err)
-		}
-		if got.ID != person.ID {
-			t.Errorf("the proxy resolved to person %d, want %d", got.ID, person.ID)
 		}
 	})
 }

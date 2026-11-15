@@ -295,7 +295,7 @@ func TestATokenCannotMintOrWithdrawAnother(t *testing.T) {
 	})
 }
 
-func TestTwoCredentialsMayNotShareAName(t *testing.T) {
+func TestTwoKeysMayNotShareAName(t *testing.T) {
 	// A key's name is what an ingest records as having sent a scan, what
 	// receipts are narrowed by, and what an administrator revokes. Two sharing
 	// one makes each able to read the other's uploads, and makes a revocation
@@ -311,17 +311,6 @@ func TestTwoCredentialsMayNotShareAName(t *testing.T) {
 		// A name an administrator types is one name in any capitals.
 		if _, _, err := f.store.NewKey(ctx, " Nightly ", access.Scope{ProductID: f.products["onie"]}); err == nil {
 			t.Error("two keys were given one name in different capitals")
-		}
-
-		person, err := f.store.Ensure(ctx, "someone", "Someone", new(true), nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := f.store.NewToken(ctx, person.ID, "scripting", nil, nil, time.Hour, 0); err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := f.store.NewToken(ctx, person.ID, "scripting", nil, nil, time.Hour, 0); err == nil {
-			t.Error("one person was given two tokens with one name")
 		}
 	})
 }

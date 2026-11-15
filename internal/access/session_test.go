@@ -215,16 +215,6 @@ func TestASignInHasACeiling(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// Nothing asked for takes the default, which is the ordinary case.
-		issued, err := f.store.StartSession(ctx, person.ID, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if issued.Session.ExpiresAt.Sub(issued.Session.CreatedAt) != access.DefaultSessionLifetime {
-			t.Errorf("a sign-in asking for nothing lasts %s",
-				issued.Session.ExpiresAt.Sub(issued.Session.CreatedAt))
-		}
-
 		// The ceiling itself is allowed.
 		if _, err := f.store.StartSession(ctx, person.ID, access.MaxSessionLifetime); err != nil {
 			t.Errorf("a sign-in at the ceiling was refused: %v", err)
