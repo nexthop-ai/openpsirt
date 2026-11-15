@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -60,7 +61,7 @@ func TestAFileCarriesTheLabelBesideTheName(t *testing.T) {
 		}{
 			{"triager", "/v1/running-out.csv?days=365", map[string]string{
 				"product": "mine", "product name": httpapitest.ShownAs("mine"),
-				"branch_or_tag": "master", "branch or tag name": "Master",
+				core.BranchOrTagColumn: "master", "branch or tag name": "Master",
 				"variant": "broadcom", "variant name": "Broadcom",
 			}},
 			{"triager", "/v1/audit.csv", map[string]string{

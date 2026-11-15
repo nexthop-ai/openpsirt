@@ -394,7 +394,7 @@ func coverageBody(got []analysis.Analyzed, since, until time.Time) AnalysisCover
 // order coverageRows fills them. Across products, a last column names the
 // product.
 func coverageColumns() []string {
-	return []string{"branch or tag", "variant", "series", "method", "quiet", "past end of life",
+	return []string{core.BranchOrTagColumn, "variant", "series", "method", "quiet", "past end of life",
 		"last arrived", "last applied", "not comparable", "units expected", "units analyzed",
 		"last comparable", "applied runs", "not comparable runs", "failed runs", "expected days",
 		"allowed days", "silent days"}

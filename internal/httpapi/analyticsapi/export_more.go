@@ -84,7 +84,7 @@ func registerDueExport(api huma.API, in core.Deps) {
 			About: []core.Stated{{Label: "looking ahead days", Value: strconv.Itoa(input.Days)}},
 			Header: []string{
 				"issue", "severity", "exploited", "component", "version",
-				"product", "product name", "branch_or_tag", "branch or tag name", "variant", "variant name",
+				"product", "product name", core.BranchOrTagColumn, "branch or tag name", "variant", "variant name",
 				"occurrences", "held by", "held by name", "due", "days left",
 			},
 			Rows: func(ctx context.Context, db bun.IDB, moment time.Time, limit, offset int) ([][]string, error) {

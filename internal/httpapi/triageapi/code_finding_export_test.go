@@ -103,7 +103,7 @@ func TestAFindingsFileReadsOneSeededCodeFinding(t *testing.T) {
 					}
 					l := codeFindings[0]
 					if l["issue"] != "clang-tidy/leak" || l["path"] != "src/a.c" || l["line"] != "12" ||
-						l["message"] != message || l["branch_or_tag"] != "master" ||
+						l["message"] != message || l[core.BranchOrTagColumn] != "master" ||
 						l["variant"] != "broadcom" || l["severity"] != "" || l["component"] != "" {
 						t.Errorf("%s: %s's file holds the code finding as %v", path, who, l)
 					}
