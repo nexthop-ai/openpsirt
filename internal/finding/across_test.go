@@ -32,17 +32,7 @@ func TestOneIssueInTwoBuildsIsOneRowAcrossThemAndSaysHowMany(t *testing.T) {
 	// seen.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		f.shipped(t, through(libnl))
-		f.foundOnLibnl(t)
-		// The same code, the same version, the same way down, in a second
-		// variant of the same product.
-		other := f.anotherVariant(t, "mellanox")
-		f.shippedTo(t, other, through(libnl))
-		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.libnlFoundInTwoVariants(t)
 		who := f.holding(t, access.PublicRead)
 
 		one, total, err := f.store.Groups(ctx, who, f.scope, 50, 0, finding.Filter{})
@@ -134,15 +124,7 @@ func TestASubtreeIsRefusedWhereTheSelectionHoldsMoreThanOneBuild(t *testing.T) {
 	// open in it.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
-		f.shipped(t, through(libnl))
-		f.foundOnLibnl(t)
-		other := f.anotherVariant(t, "mellanox")
-		f.shippedTo(t, other, through(libnl))
-		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), []finding.Reported{
-			found("CVE-2026-1", libnl),
-		}); err != nil {
-			t.Fatal(err)
-		}
+		f.libnlFoundInTwoVariants(t)
 		who := f.holding(t, access.PublicRead)
 		under := f.componentID(t, swss.Name)
 
@@ -230,4 +212,20 @@ func TestAScopeOnAnEdgeToItselfDeclaresNothing(t *testing.T) {
 			t.Errorf("kept to the test scope, the list holds %d here and %d across, want none", here, across)
 		}
 	})
+}
+
+// libnlFoundInTwoVariants ships libnl the same way down in the fixture's
+// variant and a second one of the same product, and reports CVE-2026-1 at it
+// in both.
+func (f *fixture) libnlFoundInTwoVariants(t *testing.T) {
+	t.Helper()
+	f.shipped(t, through(libnl))
+	f.foundOnLibnl(t)
+	other := f.anotherVariant(t, "mellanox")
+	f.shippedTo(t, other, through(libnl))
+	if _, err := f.store.Apply(t.Context(), other, f.runOn(t, other), []finding.Reported{
+		found("CVE-2026-1", libnl),
+	}); err != nil {
+		t.Fatal(err)
+	}
 }
