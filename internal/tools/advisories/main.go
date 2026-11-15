@@ -438,7 +438,9 @@ const packagesArg = "{packages}"
 
 // withPackages is the command with packagesArg replaced by every package of
 // the module in dir, leaving out what lies under node_modules, which is the
-// interface's installed dependencies and not this module's code.
+// interface's installed dependencies and not this module's code. The rule is
+// the makefile's PACKAGES, read here because the base's checkout lists its
+// own.
 func withPackages(dir string, command []string) ([]string, error) {
 	at := slices.Index(command, packagesArg)
 	if at < 0 {
@@ -569,6 +571,10 @@ func goReachedAt(root string, command []string, commit string) (map[string]bool,
 	}
 	defer func() { _ = os.RemoveAll(parent) }()
 	dir := filepath.Join(parent, "base")
+	// A run stopped before its deferred removal leaves its checkout
+	// registered; pruning first forgets any whose directory is gone.
+	//nolint:gosec // G204: a fixed git command over the repository given
+	_ = exec.Command("git", "-C", root, "worktree", "prune").Run()
 	//nolint:gosec // G204: a commit git merge-base named, checked out under a directory this made
 	if out, err := exec.Command("git", "-C", root, "worktree", "add", "--quiet", "--detach", dir, commit).
 		CombinedOutput(); err != nil {

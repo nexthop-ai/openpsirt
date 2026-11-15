@@ -57,9 +57,9 @@ var pypiPreRanks = map[string]int{
 }
 
 // pypiPreSpellings is the pattern's alternation of pre-release letters, read
-// from pypiPreRanks so a spelling is matched exactly when it is ranked.
-// Longest first, because an alternation takes its first match and "pre" would
-// otherwise end "preview" early.
+// from pypiPreRanks so a spelling is matched exactly when it is ranked. Sorted,
+// longest first, so the pattern is the same on every run whatever order the
+// map is read in.
 func pypiPreSpellings() string {
 	spellings := slices.Collect(maps.Keys(pypiPreRanks))
 	slices.SortFunc(spellings, func(a, b string) int {
