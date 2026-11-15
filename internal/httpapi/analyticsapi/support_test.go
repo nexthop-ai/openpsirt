@@ -136,12 +136,13 @@ func TestOutOfSupportSaysWhenTheFileWasTaken(t *testing.T) {
 //
 // The day a release goes out of support the deadline comes off every open
 // finding on it, so a pile of work leaves every overdue count at once with
-// nobody having decided anything. The report was past-only, so the first sight
-// of it was the figures moving.
+// nobody having decided anything. A report of the past alone shows that only
+// as the figures moving.
 func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedTwoIssues(t)
-		soon := time.Now().UTC().AddDate(0, 0, 20).Format(time.DateOnly)
+		started := time.Now().UTC()
+		soon := started.AddDate(0, 0, 20).Format(time.DateOnly)
 		ending := httpapitest.AsPerson(t, r, "admin", http.MethodPut,
 			"/v1/products/mine/branches-and-tags/master/end-of-life",
 			fmt.Sprintf(`{"on":%q}`, soon))
@@ -197,11 +198,12 @@ func TestNothingWarnedBeforeAReleaseCrossed(t *testing.T) {
 		}
 		// Negative, which is the same figure read the other way: how long is
 		// left rather than how long ago — and it is the whole number of days
-		// somebody plans in. Counted from the instant rather than from today,
-		// a release ending tomorrow read as zero days left.
-		if ahead.Ending[0].EndedDays != -20 {
-			t.Errorf("a date twenty days ahead reads as %d days",
-				ahead.Ending[0].EndedDays)
+		// somebody plans in. Days count from today rather than from the
+		// instant, or a release ending tomorrow reads as zero days left. A run
+		// crossing midnight since the date was set reads one day fewer.
+		crossed := time.Now().UTC().Format(time.DateOnly) != started.Format(time.DateOnly)
+		if days := ahead.Ending[0].EndedDays; days != -20 && (!crossed || days != -19) {
+			t.Errorf("a date twenty days ahead reads as %d days", days)
 		}
 		// And what leaves every overdue count on the day it crosses, which is
 		// the number the warning is for.

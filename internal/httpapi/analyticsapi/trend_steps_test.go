@@ -39,7 +39,11 @@ func TestStepsEndAtTheComingMidnightUTC(t *testing.T) {
 
 func TestATrendInDaysHasADailyStepEndingToday(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		// The server dates its steps by its own clock, so today is whichever
+		// day the request ran on, read on both sides of it.
+		asked := time.Now().UTC()
 		got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/trend?days=30", "")
+		answered := time.Now().UTC()
 		if got.Code != http.StatusOK {
 			t.Fatalf("a daily trend answered %d: %s", got.Code, got.Body.String())
 		}
@@ -54,10 +58,13 @@ func TestATrendInDaysHasADailyStepEndingToday(t *testing.T) {
 		if len(body.Items) != 30 {
 			t.Fatalf("%d steps, want 30", len(body.Items))
 		}
-		today := time.Now().UTC().Format(time.DateOnly)
-		yesterday := time.Now().UTC().AddDate(0, 0, -1).Format(time.DateOnly)
-		if last, before := body.Items[29].At, body.Items[28].At; last != today || before != yesterday {
-			t.Errorf("the last two steps are dated %s and %s, want %s and %s", before, last, yesterday, today)
+		endingOn := func(day time.Time) bool {
+			return body.Items[29].At == day.Format(time.DateOnly) &&
+				body.Items[28].At == day.AddDate(0, 0, -1).Format(time.DateOnly)
+		}
+		if !endingOn(asked) && !endingOn(answered) {
+			t.Errorf("the last two steps are dated %s and %s, want the day before the request and its day, %s",
+				body.Items[28].At, body.Items[29].At, answered.Format(time.DateOnly))
 		}
 		file := httpapitest.AsPerson(t, r, "triager", http.MethodGet, "/v1/trend.csv?days=30", "")
 		if file.Code != http.StatusOK || !strings.Contains(file.Body.String(), "day,new,corrected,returned") {

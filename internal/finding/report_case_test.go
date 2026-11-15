@@ -187,14 +187,17 @@ func TestAMessageIsRecordedOnAReportFromOutsideAndNoOther(t *testing.T) {
 				t.Errorf("%+v was answered %v, want %v", c.in, err, c.want)
 			}
 		}
+		// The store dates the message by its own clock, so today is the day
+		// on either side of the call.
+		before := time.Now().UTC().Format(time.DateOnly)
 		message, _, err := f.store.LogMessage(ctx, who, f.productID, row.Reference,
 			finding.Logged{Direction: finding.Received, Body: "Any news?"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		today := time.Now().UTC().Format(time.DateOnly)
-		if message.Dated.Format(time.DateOnly) != today {
-			t.Errorf("a message given no day is dated %s, want today", message.Dated)
+		after := time.Now().UTC().Format(time.DateOnly)
+		if got := message.Dated.Format(time.DateOnly); got != before && got != after {
+			t.Errorf("a message given no day is dated %s, want today, %s", message.Dated, after)
 		}
 		read, err := f.store.Messages(ctx, who, f.productID, row.Reference)
 		if err != nil || len(read) != 1 || read[0].Body != "Any news?" {
