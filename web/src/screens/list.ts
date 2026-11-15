@@ -25,7 +25,7 @@ export const PAGE = PAGES[0];
 // The most the server returns in one request. Named because walking off the
 // end of a page asks for a row either side of it, and at the largest page
 // there is no room to ask.
-const MOST = 200;
+export const LIST_MOST = 200;
 
 // The word the server takes for one order, read out of the generated client.
 //
@@ -628,9 +628,9 @@ export function findingsPageKey(
 // own window; the finding screen locates itself in the window by identity, so
 // it found nothing and the walk vanished at the largest page size.
 export function windowFor(offset: number, limit: number): { offset: number; limit: number } {
-  if (limit >= MOST) return { offset, limit: MOST };
+  if (limit >= LIST_MOST) return { offset, limit: LIST_MOST };
   const start = Math.max(0, offset - 1);
-  return { offset: start, limit: Math.min(MOST, limit + (offset - start) + 1) };
+  return { offset: start, limit: Math.min(LIST_MOST, limit + (offset - start) + 1) };
 }
 
 // The list's address as the neighbor should carry it: the same filters, at

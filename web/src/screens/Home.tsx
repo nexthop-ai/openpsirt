@@ -37,7 +37,7 @@ import {
 // a decision is derived from its rows rather than stored on them, so there is no
 // count to ask for — a page is read and what is on it counted, and the tile
 // says so where the page was cut.
-const BACK_LIMIT = 200;
+export const BACK_LIMIT = 200;
 
 // One home page, assembled from what this person holds. The work comes first
 // and holds both families: what is theirs, what came back, what waits on them,

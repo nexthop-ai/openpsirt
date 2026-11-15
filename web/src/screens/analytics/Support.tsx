@@ -229,7 +229,7 @@ const AHEAD = [0, 30, 90] as const;
 // The longest warning the sheet will ask for. The value goes to the server,
 // which refuses one it cannot answer for, and an edited address is the
 // ordinary way a wrong one arrives.
-const FURTHEST = 3650;
+export const FURTHEST = 3650;
 
 // The address the file comes from. A link somebody follows rather than a
 // request this page makes, so the browser fetches it with the session it

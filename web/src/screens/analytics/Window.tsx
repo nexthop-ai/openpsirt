@@ -17,7 +17,7 @@ import { DAY_MS } from "../../ui/when";
 // The longest window any sheet offers. Ten years reads as "everything" and is
 // also the bound on what the address may ask for: a date arithmetic that runs
 // on a number from a query string is one edited address away from a throw.
-const LONGEST = 3650;
+export const LONGEST = 3650;
 
 // boundedAsked is a whole number the address asks for, checked rather than
 // trusted.
