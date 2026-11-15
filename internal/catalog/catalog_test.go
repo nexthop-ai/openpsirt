@@ -116,8 +116,13 @@ func TestResolveNamesTheMissingPart(t *testing.T) {
 	// something somewhere was wrong.
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()
-		p, _ := s.DeclareProduct(ctx, "sonic", "SONiC")
-		_, _ = s.DeclareBranchOrTag(ctx, p.ID, "release-2.4", catalog.Branch, nil)
+		p, err := s.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.DeclareBranchOrTag(ctx, p.ID, "release-2.4", catalog.Branch, nil); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := s.DeclareVariant(ctx, p.ID, "broadcom", true); err != nil {
 			t.Fatal(err)
 		}
@@ -223,8 +228,8 @@ func TestBadNamesAreRejected(t *testing.T) {
 			// early, and neither is anything somebody meant to type.
 			"ends\r\nX-Injected: yes", "quoted\"name", "with\ttab", "nul\x00byte",
 		} {
-			if _, err := s.DeclareProduct(ctx, name, ""); err == nil {
-				t.Errorf("product name %q was accepted", name)
+			if _, err := s.DeclareProduct(ctx, name, ""); !refusal.In(err) {
+				t.Errorf("product name %q answered %v, want a refusal", name, err)
 			}
 		}
 
@@ -240,8 +245,8 @@ func TestBadNamesAreRejected(t *testing.T) {
 		if _, err := s.DeclareProduct(ctx, strings.Repeat("é", 191), ""); err != nil {
 			t.Errorf("a multi-byte name of exactly the column's width was refused: %v", err)
 		}
-		if _, err := s.DeclareProduct(ctx, strings.Repeat("ü", 192), ""); err == nil {
-			t.Error("a multi-byte name one character past the column's width was accepted")
+		if _, err := s.DeclareProduct(ctx, strings.Repeat("ü", 192), ""); !refusal.In(err) {
+			t.Errorf("a multi-byte name one character past the column's width answered %v, want a refusal", err)
 		}
 	})
 }
@@ -281,9 +286,12 @@ func second[T any](_ T, err error) error { return err }
 func TestBranchOrTagKindIsChecked(t *testing.T) {
 	each(t, func(t *testing.T, _ *database.DB, s *catalog.Store) {
 		ctx := t.Context()
-		p, _ := s.DeclareProduct(ctx, "sonic", "SONiC")
-		if _, err := s.DeclareBranchOrTag(ctx, p.ID, "x", catalog.Kind("release"), nil); err == nil {
-			t.Error("an unrecognized branch or tag kind was accepted")
+		p, err := s.DeclareProduct(ctx, "sonic", "SONiC")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.DeclareBranchOrTag(ctx, p.ID, "x", catalog.Kind("release"), nil); !refusal.In(err) {
+			t.Errorf("an unrecognized branch or tag kind answered %v, want a refusal", err)
 		}
 	})
 }
@@ -458,14 +466,14 @@ func TestAReleaseIsCutOnlyFromABranchOfItsOwnProduct(t *testing.T) {
 			{"a branch cut from a branch", "next", catalog.Branch, branch.ID},
 			{"a tag cut from another product's branch", "v1.2", catalog.Tag, foreign.ID},
 		} {
-			if _, err := store.DeclareBranchOrTag(ctx, product.ID, c.name, c.kind, &c.parent); err == nil {
-				t.Errorf("%s was recorded", c.what)
+			if _, err := store.DeclareBranchOrTag(ctx, product.ID, c.name, c.kind, &c.parent); !refusal.In(err) {
+				t.Errorf("%s answered %v, want a refusal", c.what, err)
 			}
-			if _, _, err := store.EnsureBranchOrTag(ctx, product.ID, c.name, c.kind, &c.parent); err == nil {
-				t.Errorf("%s was recorded through ensuring", c.what)
+			if _, _, err := store.EnsureBranchOrTag(ctx, product.ID, c.name, c.kind, &c.parent); !refusal.In(err) {
+				t.Errorf("%s through ensuring answered %v, want a refusal", c.what, err)
 			}
-			if _, err := store.BranchOrTagByName(ctx, product.ID, c.name); err == nil {
-				t.Errorf("%s left a row behind", c.what)
+			if _, err := store.BranchOrTagByName(ctx, product.ID, c.name); !errors.Is(err, catalog.ErrNotFound) {
+				t.Errorf("%s left a row behind: %v", c.what, err)
 			}
 		}
 
@@ -474,11 +482,11 @@ func TestAReleaseIsCutOnlyFromABranchOfItsOwnProduct(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := store.EnsureBranchOrTag(ctx, product.ID, "v2.0", catalog.Tag, &tag.ID); err == nil {
-			t.Error("a tag was filled in as cut from a tag")
+		if _, _, err := store.EnsureBranchOrTag(ctx, product.ID, "v2.0", catalog.Tag, &tag.ID); !refusal.In(err) {
+			t.Errorf("a tag filled in as cut from a tag answered %v, want a refusal", err)
 		}
-		if _, err := store.FillInParent(ctx, bare.ID, foreign.ID); err == nil {
-			t.Error("a tag was filled in as cut from another product's branch")
+		if _, err := store.FillInParent(ctx, bare.ID, foreign.ID); !refusal.In(err) {
+			t.Errorf("a tag filled in as cut from another product's branch answered %v, want a refusal", err)
 		}
 	})
 }
