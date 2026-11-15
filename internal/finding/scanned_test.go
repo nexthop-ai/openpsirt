@@ -170,6 +170,107 @@ func TestAComponentGoneAltogetherClosesAsRemoved(t *testing.T) {
 	})
 }
 
+// replacedBy ships twoConsumers with libnl replaced by another component of
+// its name under both consumers.
+func (f *fixture) replacedBy(t *testing.T, replacement graph.Described) {
+	t.Helper()
+	f.shipped(t, graph.Snapshot{
+		Root: root, Components: []graph.Described{swss, teamd, replacement},
+		Dependencies: []graph.Dependency{
+			{Parent: root, Child: swss}, {Parent: root, Child: teamd},
+			{Parent: swss, Child: replacement}, {Parent: teamd, Child: replacement},
+		},
+	})
+}
+
+// closedRows is every closed finding.
+func (f *fixture) closedRows(t *testing.T) []finding.Finding {
+	t.Helper()
+	var closed []finding.Finding
+	if err := f.db.DB.NewSelect().Model(&closed).
+		Where(`"closed_at" IS NOT NULL`).Scan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	return closed
+}
+
+func TestADownstreamRevisionClosesAsRevisedToItsVersion(t *testing.T) {
+	// The version that ships moved and the version vulnerabilities are
+	// matched against did not: a distribution's own revision landed.
+	each(t, func(t *testing.T, f *fixture) {
+		first := at("libnl-3-200", "3.7.0-1")
+		first.UpstreamName, first.UpstreamVersion = "libnl3", "3.7.0"
+		revised := at("libnl-3-200", "3.7.0-2")
+		revised.UpstreamName, revised.UpstreamVersion = "libnl3", "3.7.0"
+		snap := twoConsumers()
+		snap.Components = []graph.Described{swss, teamd, first}
+		snap.Dependencies = []graph.Dependency{
+			{Parent: root, Child: swss}, {Parent: root, Child: teamd},
+			{Parent: swss, Child: first}, {Parent: teamd, Child: first},
+		}
+		f.shipped(t, snap)
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", first)}); err != nil {
+			t.Fatal(err)
+		}
+
+		f.replacedBy(t, revised)
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if applied.Unexplained != 0 {
+			t.Errorf("%d closures went unexplained", applied.Unexplained)
+		}
+		closed := f.closedRows(t)
+		if len(closed) != 2 {
+			t.Fatalf("closed %d findings, want 2", len(closed))
+		}
+		for _, row := range closed {
+			if row.ClosedBecause != finding.Revised || row.MovedTo != "3.7.0-2" {
+				t.Errorf("closed because %q moving to %q, want %q to 3.7.0-2",
+					row.ClosedBecause, row.MovedTo, finding.Revised)
+			}
+		}
+	})
+}
+
+func TestAComponentReplacedByItsUnchangedNamesakeClosesUnexplained(t *testing.T) {
+	// Another component of the same name at the same versions took its
+	// place, and the scanner stopped reporting the issue. Nothing about the
+	// component explains that, so the closure is unexplained, never removed.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t),
+			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
+			t.Fatal(err)
+		}
+
+		// Another distribution's package: a different identity, the same name
+		// and versions.
+		namesake := libnl
+		namesake.Purl = "pkg:deb/ubuntu/libnl-3-200@3.7.0"
+		f.replacedBy(t, namesake)
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if applied.Unexplained != 2 {
+			t.Errorf("%d closures were flagged as unexplained, want 2", applied.Unexplained)
+		}
+		closed := f.closedRows(t)
+		if len(closed) != 2 {
+			t.Fatalf("closed %d findings, want 2", len(closed))
+		}
+		for _, row := range closed {
+			if row.ClosedBecause != finding.Unexplained || row.MovedTo != "" {
+				t.Errorf("closed because %q moving to %q, want %q to nothing",
+					row.ClosedBecause, row.MovedTo, finding.Unexplained)
+			}
+		}
+	})
+}
+
 func TestADisappearanceNothingExplainsIsFlagged(t *testing.T) {
 	// The component is present, unchanged, and the scanner stopped reporting
 	// it. There is no volume at which "we cannot account for this" stops
