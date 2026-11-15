@@ -306,15 +306,20 @@ outage for as long as its migrations take.
 | Rule | Reason |
 |---|---|
 | An upgrade takes the schema change lock after reading the version, where a migration is outstanding, and lets it go after the last migration and the statistics refresh, on every path | A start with nothing to apply takes the migration lock alone, so a replica starting beside others pauses none of them |
-| Beside the lock, the upgrade writes a row to the schema change record, where the database has that table, and removes it once the upgrade succeeds | The lock goes with its session; the row outlives an upgrade that fails part way |
-| On MySQL and MariaDB an upgrade ending any other way than success leaves its row | Each data-definition statement commits alone, so the schema is part changed, and nothing serves it until an upgrade succeeds or the backup is restored |
+| Beside the lock, the upgrade writes a row to the schema change record, where the database has that table, naming the last version it applies, and removes it once the upgrade succeeds | The lock goes with its session; the row outlives an upgrade that fails part way |
+| A row counts while the version applied is behind the one it names | A row left by a process ended after its last migration, or by a removal that failed, pauses nobody |
+| A start with nothing to apply removes every row the version applied has reached | The record holds only upgrades still outstanding |
+| On MySQL and MariaDB an upgrade ending any other way than success leaves its row | Each data-definition statement commits alone, so the schema is part changed, and nothing serves it until an upgrade reaches the version the row names or the backup is restored |
 | On PostgreSQL and SQLite a failed upgrade removes its row | Its transaction rolled back, leaving the schema of the version recorded |
-| On a database holding a schema, the upgrade waits 32 seconds holding the change lock before its first statement | One interval for every serving instance to look, 30 seconds for the longest write a stopped request or pass goes on with (recording a patch branch visit, cleaning up an attachment), and a second more. A test helper migrating a database it alone holds waits none |
+| On a database holding a schema, the upgrade waits 44 seconds holding the change lock before its first statement | One interval and the longest look (12 seconds) for every serving instance to look, 30 seconds for the longest write a stopped request or pass goes on with (recording a patch branch visit, cleaning up an attachment), and a second more. A test helper migrating a database it alone holds waits none |
 | A statement already running when an instance pauses holds its tables, and the upgrade waits for it | § Statement lock waits |
 | `openpsirt migrate up` takes the change lock and waits the same way | It is the same upgrade under other credentials |
 | A serving instance looks every second: is the change lock held or a record standing, and which version is applied | One look costs under a millisecond on every engine: 0.79 ms on PostgreSQL, the slowest (`design-docs/database-measurements.md` § Schema watch looks) |
 | A look takes nothing an upgrade waits for | PostgreSQL reads the lock table; MySQL and MariaDB ask who holds the named lock; SQLite takes a shared lock on the file for the moment of looking, never through a link and never waiting on a file that is not a regular one, and the upgrade tries again past it |
-| A look that fails or passes two seconds reads as Changes, logged once until a look succeeds | An instance that cannot tell whether the schema is changing does not serve it; the bound is under the notice |
+| A look takes a connection of its own from the pool, waiting up to ten seconds, then asks within two | A pool busy with requests delays a look without failing it |
+| A look that cannot take a connection, fails, or overruns either bound reads as Changes, logged once until a look succeeds | An instance that cannot tell whether the schema is changing does not serve it |
+| A look reads the version first, and a version ahead is Superseded even where asking about a change then fails | A later release may have reshaped what that asks |
+| A start looks once more just before its router opens, and refuses to start unless the look finds Serves | Preparing to serve takes up to the startup deadline, longer than the notice |
 | SQLite's change lock file is created readable by every user | Migrations may run as another user than the server, whose looks would otherwise fail |
 | On SQLite a change lock held past one attempt at the migration lock is logged about once a minute | A serving instance's look holds it for a moment; anything longer is a holder outside the application |
 | On the server engines the change lock held by a session outside the application refuses the upgrade, naming the holder | Only the migration lock's holder takes it |
@@ -332,7 +337,7 @@ outage for as long as its migrations take.
 |---|---|
 | Answers every request as it answers while it migrates at start (`design-docs/packaging.md` § Starting and stopping) | Readiness fails, and every other path is 503 with `Retry-After` |
 | Ends every request the router was answering | Its transaction rolls back rather than committing against a changing schema |
-| Answers a request it ended as upgrading where the handler's answer is a failure or nothing | The failure is the ending of its context |
+| Answers a request it ended as upgrading where the handler's answer is a server failure or nothing | The failure is the ending of its context |
 | Keeps the answer of a request whose handler answered a success | What it did took effect, and a retry would repeat it |
 | Stops every pass and the queue's workers | No pass writes while another instance migrates |
 | Starts the passes again on resuming, once the stopped ones have ended, and goes on reading standings while they end | Two copies of one pass never run at once |

@@ -49,12 +49,22 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 // another instance is changing its schema.
 const WatchEvery = time.Second
 
+// AcquireWithin bounds how long one look waits for a connection, and
+// LookWithin how long its questions take once it has one. A look that fails
+// either bound reads as a change. A pool busy with requests delays a look
+// without failing it, and only a pool held for the whole of AcquireWithin
+// pauses the instance.
+const (
+	AcquireWithin = 10 * time.Second
+	LookWithin    = 2 * time.Second
+)
+
 // Notice is how long an upgrade waits, holding the schema change lock, before
-// its first statement: an interval for every serving instance to ask, the
-// thirty seconds the longest write a stopped request or pass goes on with is
-// bounded by (recording a patch branch visit, cleaning up an attachment), and
-// a second more.
-const Notice = WatchEvery + 30*time.Second + time.Second
+// its first statement: an interval and the longest look for every serving
+// instance to ask, the thirty seconds the longest write a stopped request or
+// pass goes on with is bounded by (recording a patch branch visit, cleaning up
+// an attachment), and a second more.
+const Notice = WatchEvery + AcquireWithin + LookWithin + 30*time.Second + time.Second
 
 // Standing is what an instance serving a database makes of its schema.
 type Standing int
@@ -94,17 +104,24 @@ func NewWatcher(ctx context.Context, db *database.DB) (*Watcher, error) {
 }
 
 // Look reports the schema's standing, with the version applied and the one
-// this build carries.
+// this build carries, bounded by AcquireWithin and LookWithin. A version
+// ahead is Superseded even where asking about a change failed: a later
+// release may have reshaped what that asks.
 func (w *Watcher) Look(ctx context.Context) (Standing, int64, int64, error) {
-	changing, err := w.observer.Changing(ctx)
-	if err != nil {
-		return Serves, 0, w.expected, err
+	changing, applied, err := w.observer.Look(ctx, AcquireWithin, LookWithin)
+	standing, err := looked(changing, applied, w.expected, err)
+	return standing, applied, w.expected, err
+}
+
+// looked is the standing a look answered, given what asking failed with.
+func looked(changing bool, applied, expected int64, failed error) (Standing, error) {
+	if applied > expected {
+		return Superseded, nil
 	}
-	applied, err := w.observer.Applied(ctx)
-	if err != nil {
-		return Serves, 0, w.expected, err
+	if failed != nil {
+		return Serves, failed
 	}
-	return stands(changing, applied, w.expected), applied, w.expected, nil
+	return stands(changing, applied, expected), nil
 }
 
 // stands is the standing of a schema at applied, for a build carrying

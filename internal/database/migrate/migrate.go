@@ -132,37 +132,40 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger, notice time.D
 // and up to target is outstanding, records the change where the database
 // keeps that record, waits notice on a database holding a schema, and answers
 // what ends the change given how the upgrade ended. Where nothing is
-// outstanding it takes nothing.
+// outstanding it takes nothing, and removes any record the version applied
+// has reached.
 //
 // The record is removed when the upgrade succeeds, and on an engine whose
 // schema changes roll back with their transaction. On MySQL and MariaDB an
 // upgrade ending any other way leaves the schema part changed, so the record
-// stays, and every serving instance stays paused, until an upgrade succeeds
-// or the backup is restored.
+// stays, and every serving instance stays paused, until an upgrade reaches
+// the version it names or the backup is restored.
 //
 // A release of the lock that fails is logged: the migration lock's release
 // follows on the same session, and reports a session lost part way.
 func changeSchema(ctx context.Context, db *database.DB, lock *held, logger *slog.Logger, before, target int64,
 	notice time.Duration) (func(error), error) {
 	nothing := func(error) {}
-	if target <= before {
-		return nothing, nil
-	}
-	// The library answers an error, not an empty list, where none is
-	// outstanding.
-	outstanding, err := goose.CollectMigrations(".", before, target)
-	if err != nil && !errors.Is(err, goose.ErrNoMigrationFiles) {
-		return nil, fmt.Errorf("list the outstanding migrations: %w", err)
+	var outstanding goose.Migrations
+	if target > before {
+		// The library answers an error, not an empty list, where none is
+		// outstanding.
+		var err error
+		outstanding, err = goose.CollectMigrations(".", before, target)
+		if err != nil && !errors.Is(err, goose.ErrNoMigrationFiles) {
+			return nil, fmt.Errorf("list the outstanding migrations: %w", err)
+		}
 	}
 	if len(outstanding) == 0 {
+		clearReached(ctx, db, before, logger)
 		return nothing, nil
 	}
-	return beginChange(ctx, db, lock, logger, before, notice)
+	return beginChange(ctx, db, lock, logger, before, outstanding[len(outstanding)-1].Version, notice)
 }
 
 // beginChange takes the schema change lock, records the change, and waits
 // notice on a database holding a schema, as changeSchema says.
-func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.Logger, before int64,
+func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.Logger, before, target int64,
 	notice time.Duration) (func(error), error) {
 	release, err := lock.change(ctx)
 	if err != nil {
@@ -173,7 +176,7 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 			logger.Warn("could not release the schema change lock", "error", err)
 		}
 	}
-	if err := recordChange(ctx, db); err != nil {
+	if err := recordChange(ctx, db, target); err != nil {
 		let()
 		return nil, err
 	}
@@ -182,8 +185,8 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 		if partChanged {
 			logger.Warn("the schema is left part changed, so every serving instance stays paused " +
 				"until an upgrade succeeds or the backup taken before it is restored")
-		} else if err := clearChange(ctx, db); err != nil {
-			logger.Warn("could not clear the record of the schema change", "error", err)
+		} else {
+			clearReached(ctx, db, target, logger)
 		}
 		let()
 	}
@@ -204,10 +207,14 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 // which a release's migration makes and this reads and writes.
 const ChangeTable = "schema_change"
 
-// recordChange writes the record of an upgrade changing the schema, where the
-// database has the table for it: a database the release that made the table
-// has not yet upgraded has none.
-func recordChange(ctx context.Context, db *database.DB) error {
+// recordChange writes the record of an upgrade changing the schema to target,
+// where the database has the table for it: a database the release that made
+// the table has not yet upgraded has none.
+//
+// A record names the version its upgrade was reaching, so one left by a
+// process ended after its last migration, or by a removal that failed, stops
+// counting once the version applied reaches it.
+func recordChange(ctx context.Context, db *database.DB, target int64) error {
 	there, err := tableExists(ctx, db, ChangeTable)
 	if err != nil || !there {
 		return err
@@ -220,26 +227,27 @@ func recordChange(ctx context.Context, db *database.DB) error {
 	if len(by) > database.NameWidth {
 		by = by[:database.NameWidth]
 	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO "`+ChangeTable+`" ("started_at", "started_by") VALUES (?, ?)`,
-		time.Now().UTC(), by); err != nil {
+	if _, err := db.ExecContext(ctx, `INSERT INTO "`+ChangeTable+`" ("started_at", "started_by", "target_version")
+		VALUES (?, ?, ?)`, time.Now().UTC(), by, target); err != nil {
 		return fmt.Errorf("record the schema change: %w", err)
 	}
 	return nil
 }
 
-// clearChange removes every record of an upgrade changing the schema, once
-// the schema is whole. Bounded as a release is, whatever happened to ctx.
-func clearChange(ctx context.Context, db *database.DB) error {
+// clearReached removes every record of an upgrade changing the schema to a
+// version no later than reached, which nothing reads as changing any more.
+// Bounded as a release is, whatever happened to ctx; a failure is logged,
+// since a record the version applied has reached pauses nobody.
+func clearReached(ctx context.Context, db *database.DB, reached int64, logger *slog.Logger) {
 	clearing, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
 	defer cancel()
 	there, err := tableExists(clearing, db, ChangeTable)
-	if err != nil || !there {
-		return err
+	if err == nil && there {
+		_, err = db.ExecContext(clearing, `DELETE FROM "`+ChangeTable+`" WHERE "target_version" <= ?`, reached)
 	}
-	if _, err := db.ExecContext(clearing, `DELETE FROM "`+ChangeTable+`"`); err != nil {
-		return fmt.Errorf("clear the record of the schema change: %w", err)
+	if err != nil {
+		logger.Warn("could not clear the record of the schema change", "error", err)
 	}
-	return nil
 }
 
 // refreshStatistics analyzes every table once migrations have changed the

@@ -335,3 +335,24 @@ func TestARunningServerStopsWhenALaterReleaseUpgradesItsSchema(t *testing.T) {
 		t.Fatal("a server whose schema a later release upgraded was still serving after 30s")
 	}
 }
+
+// A start opens its router only on a schema at its build's version that
+// nothing is changing, as a look just before opening finds it.
+func TestAStartServesOnlyASchemaItsLookFindsItsOwn(t *testing.T) {
+	for _, c := range []struct {
+		standing schema.Standing
+		err      error
+		serves   bool
+	}{
+		{schema.Serves, nil, true},
+		{schema.Changes, nil, false},
+		{schema.Superseded, nil, false},
+		{schema.Behind, nil, false},
+		{schema.Serves, errors.New("the look failed"), false},
+	} {
+		look := func(context.Context) (schema.Standing, int64, int64, error) { return c.standing, 47, 47, c.err }
+		if err := lookBeforeServing(t.Context(), look); (err == nil) != c.serves {
+			t.Errorf("standing %v, look failing %v: refused %v, want serving %v", c.standing, c.err, err, c.serves)
+		}
+	}
+}

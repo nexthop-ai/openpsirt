@@ -48,12 +48,13 @@ func TestAnUpgradeHoldsTheChangeLockFromBeforeItsFirstStatement(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		look := func() (bool, int64, error) { return observer.Look(ctx, time.Minute, time.Minute) }
 		const notice = time.Second
 		done := make(chan error, 1)
 		go func() { done <- migrate.Up(context.WithoutCancel(ctx), db, quiet(), notice) }()
 		deadline := time.Now().Add(30 * time.Second)
 		for {
-			changing, err := observer.Changing(ctx)
+			changing, _, err := look()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -70,16 +71,16 @@ func TestAnUpgradeHoldsTheChangeLockFromBeforeItsFirstStatement(t *testing.T) {
 			}
 			time.Sleep(20 * time.Millisecond)
 		}
-		if applied, err := observer.Applied(ctx); err != nil || applied != v0120 {
+		if _, applied, err := look(); err != nil || applied != v0120 {
 			t.Errorf("as the change lock was taken the schema was at %d (%v), not %d", applied, err, v0120)
 		}
 		if err := <-done; err != nil {
 			t.Fatalf("the upgrade: %v", err)
 		}
-		if changing, err := observer.Changing(ctx); err != nil || changing {
+		if changing, _, err := look(); err != nil || changing {
 			t.Errorf("after the upgrade a serving instance saw the schema changing %v (%v)", changing, err)
 		}
-		if applied, err := observer.Applied(ctx); err != nil || applied != expected {
+		if _, applied, err := look(); err != nil || applied != expected {
 			t.Errorf("after the upgrade the schema was at %d (%v), not %d", applied, err, expected)
 		}
 
@@ -87,7 +88,7 @@ func TestAnUpgradeHoldsTheChangeLockFromBeforeItsFirstStatement(t *testing.T) {
 		done = make(chan error, 1)
 		go func() { done <- migrate.Up(context.WithoutCancel(ctx), db, quiet(), notice) }()
 		for {
-			changing, err := observer.Changing(ctx)
+			changing, _, err := look()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -103,6 +104,70 @@ func TestAnUpgradeHoldsTheChangeLockFromBeforeItsFirstStatement(t *testing.T) {
 			default:
 			}
 			time.Sleep(20 * time.Millisecond)
+		}
+	})
+}
+
+// A record of an upgrade whose version the schema has reached pauses nobody,
+// as a process ended after its last migration or a removal that failed leaves
+// one, and a start with nothing to apply removes it. A record of an upgrade to
+// a later version still pauses, and stays.
+func TestARecordTheVersionHasReachedPausesNobody(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		if err := migrate.Up(ctx, db, quiet(), 0); err != nil {
+			t.Fatal(err)
+		}
+		expected, err := migrations.Expected()
+		if err != nil {
+			t.Fatal(err)
+		}
+		observer, err := migrate.NewObserver(ctx, servingBeside(t, db))
+		if err != nil {
+			t.Fatal(err)
+		}
+		record := func(target int64) {
+			t.Helper()
+			if _, err := db.ExecContext(ctx, `INSERT INTO "schema_change" ("started_at", "started_by", "target_version")
+				VALUES (?, ?, ?)`, time.Now().UTC(), "a process", target); err != nil {
+				t.Fatal(err)
+			}
+		}
+		changing := func() bool {
+			t.Helper()
+			changing, _, err := observer.Look(ctx, time.Minute, time.Minute)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return changing
+		}
+		count := func(where string) int {
+			t.Helper()
+			var n int
+			if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "schema_change" WHERE "target_version" `+where,
+				expected).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
+
+		record(expected)
+		if changing() {
+			t.Error("a record of an upgrade to the version applied paused a serving instance")
+		}
+		record(expected + 1)
+		if !changing() {
+			t.Error("a record of an upgrade to a later version paused nobody")
+		}
+		if err := migrate.Up(ctx, db, quiet(), 0); err != nil {
+			t.Fatal(err)
+		}
+		if n := count("<= ?"); n != 0 {
+			t.Errorf("a start with nothing to apply left %d records the version had reached", n)
+		}
+		if n := count("> ?"); n != 1 {
+			t.Errorf("a start with nothing to apply left %d records of a later version, want 1", n)
 		}
 	})
 }

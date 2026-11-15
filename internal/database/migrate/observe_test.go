@@ -32,7 +32,7 @@ func changingWithin(t *testing.T, o *Observer, want bool, doing string) {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for {
-		got, err := o.Changing(t.Context())
+		got, err := o.changing(t.Context(), o.db, 0)
 		if err != nil {
 			t.Fatalf("%s: asking whether the schema is changing: %v", doing, err)
 		}
@@ -147,7 +147,7 @@ func recordTable(t *testing.T, db *database.DB) {
 	drop := func() { _, _ = db.ExecContext(context.Background(), `DROP TABLE IF EXISTS "`+ChangeTable+`"`) }
 	drop()
 	if _, err := db.ExecContext(t.Context(), `CREATE TABLE "`+ChangeTable+`" ("id" `+id+`,
-		"started_at" TIMESTAMP NULL, "started_by" VARCHAR(255) NOT NULL)`); err != nil {
+		"started_at" TIMESTAMP NULL, "started_by" VARCHAR(255) NOT NULL, "target_version" BIGINT NOT NULL)`); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(drop)
@@ -171,7 +171,7 @@ func TestAFailedUpgradeKeepsServingInstancesPausedWhereItLeftThePartChanged(t *t
 			if err != nil {
 				t.Fatal(err)
 			}
-			end, err := beginChange(ctx, migrating, lock, slog.New(slog.DiscardHandler), 0, 0)
+			end, err := beginChange(ctx, migrating, lock, slog.New(slog.DiscardHandler), 0, 1, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -191,4 +191,35 @@ func TestAFailedUpgradeKeepsServingInstancesPausedWhereItLeftThePartChanged(t *t
 		end(nil)
 		changingWithin(t, observer, false, "after an upgrade succeeded")
 	})
+}
+
+// A look waits for a connection a busy pool frees rather than reading the
+// wait as a change, and fails only once its bound on taking one passes.
+func TestALookWaitsForABusyPool(t *testing.T) {
+	engines.SkipUnless(t, database.SQLite)
+	ctx := t.Context()
+	db := open(t, "sqlite://"+filepath.Join(t.TempDir(), "busy.db"))
+	if _, err := db.ExecContext(ctx, `CREATE TABLE "`+VersionTable+`" ("version_id" BIGINT, "is_applied" BOOLEAN)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO "`+VersionTable+`" VALUES (7, TRUE)`); err != nil {
+		t.Fatal(err)
+	}
+	observer, err := NewObserver(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.SetMaxOpenConns(1)
+	busy, err := db.DB.DB.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := observer.Look(ctx, 100*time.Millisecond, time.Minute); err == nil {
+		t.Fatal("a look answered with every connection held past its bound on taking one")
+	}
+	time.AfterFunc(300*time.Millisecond, func() { _ = busy.Close() })
+	changing, applied, err := observer.Look(ctx, time.Minute, 100*time.Millisecond)
+	if err != nil || changing || applied != 7 {
+		t.Fatalf("a look past a pool busy for longer than its questions take: %v at %d, %v", changing, applied, err)
+	}
 }

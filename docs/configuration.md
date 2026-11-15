@@ -167,7 +167,7 @@ it to let the start go on.
 No process serves while another applies the schema, because an answer read
 from a schema part way through a change cannot be trusted. A process that is
 already serving looks every second for another one changing the schema, and
-the one changing it waits 32 seconds before its first change:
+the one changing it waits 44 seconds before its first change:
 
 | The serving process sees | It |
 |---|---|
@@ -175,10 +175,12 @@ the one changing it waits 32 seconds before its first change:
 | | Ends every request it was answering, rolling back its writes; one whose work had already succeeded keeps its answer |
 | | Stops its background work |
 | | Serves again once the change ends and the schema is the one it was built for |
-| A look at the database that fails or takes over two seconds | Does the same as for a change, and logs it once |
-| An upgrade on MySQL or MariaDB that failed part way | Stays paused until an upgrade succeeds or the backup is restored, because those engines commit each schema change alone |
+| A look at the database that cannot take a connection within ten seconds, fails, or takes over two seconds | Does the same as for a change, and logs it once |
+| An upgrade on MySQL or MariaDB that failed part way | Stays paused until an upgrade completes or the backup is restored, because those engines commit each schema change alone |
 | A schema a later release applied | Stops, exiting 1 and naming both schema versions, so the platform replaces it |
 | A schema behind its own, such as a restored backup | Stops the same way; its next start migrates the database or refuses it |
+
+A process starting while another begins changing the schema refuses to start, and the platform starts it again.
 
 An upgrade that changes the schema is therefore an outage for as long as its
 migrations take, whatever the deployment's update strategy. One that changes
@@ -1727,7 +1729,7 @@ v0.10.2 named `reaffirm-claim`.
 | An issue rated by the word `low` with no score ranks at 2.0, the middle of the low band. v0.12.0 ranked it at 3.0, above scanned lows scored 2.0 to 2.9 | Nothing. An open finding of such an issue keeps the old rank until it is next ranked, which a rescan of its build does, as does any change to the issue's rating, signals or incident records |
 | The findings list, the list spanning products and the by-component view sorted by severity order by the band of the rating in force, the product's own where it states one, then by score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score, and the planned upgrades sorted by severity, an approver's outliers and a release note's fixes rank it the same way. A planned upgrade whose worst issue is unrated reads `unrated`, which v0.12.0 drew as `medium`, and the list and its file carry that issue's score in a new `score` field and column. v0.12.0 ordered by the published score alone, so an issue with a word and no score sorted last and a product's own rating moved nothing | A script reading the planned-upgrade file by column position reads it by name |
 | `POST /v1/keys` refuses with 422 a request carrying `secret`, `withdrawn`, `created_at`, `last_used_at` or `product_name`, the fields only its answer holds. v0.12.0 accepted them and ignored them | Send `name`, `product`, `branch_or_tag` and `variant` alone |
-| A serving process stops serving while another process changes the schema, answering as it does while it migrates at start, and exits 1 once a later release has changed it ([Health checks](#health-checks)). An upgrade that changes the schema waits 32 seconds before its first change. v0.12.0 kept serving through another process's upgrade | Stop every v0.12.0 process before this upgrade, which the chart's default `Recreate` does. On ECS, set `minimumHealthyPercent` to 0 for this and every later upgrade |
+| A serving process stops serving while another process changes the schema, answering as it does while it migrates at start, and exits 1 once a later release has changed it ([Health checks](#health-checks)). An upgrade that changes the schema waits 44 seconds before its first change. v0.12.0 kept serving through another process's upgrade | Stop every v0.12.0 process before this upgrade, which the chart's default `Recreate` does. On ECS, set `minimumHealthyPercent` to 0 for this and every later upgrade |
 
 #### VEX statements from v0.12.0
 

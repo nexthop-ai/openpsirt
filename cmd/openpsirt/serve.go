@@ -401,9 +401,24 @@ type sighting struct {
 	applied, carried int64
 }
 
-// lookWithin bounds one look at the schema. A look that fails or overruns is
-// read as a change, so it is shorter than the notice an upgrade gives.
-const lookWithin = 2 * time.Second
+// lookBeforeServing looks at the schema once more just before the router
+// opens, and refuses the start unless it is this build's with nothing
+// changing it. What the start checked was read before preparing, which can
+// take the whole startup deadline, and an upgrade's notice may have run out
+// since. The first look of the watch follows within an interval, inside the
+// notice.
+func lookBeforeServing(ctx context.Context, look func(context.Context) (schema.Standing, int64, int64, error)) error {
+	standing, applied, carried, err := look(ctx)
+	switch {
+	case err != nil:
+		return fmt.Errorf("could not ask whether the schema is changing before serving: %w", err)
+	case standing == schema.Changes:
+		return fmt.Errorf("another instance began changing the schema, at version %d, while this one started", applied)
+	case standing != schema.Serves:
+		return fmt.Errorf("the database is at schema version %d, and this build carries %d", applied, carried)
+	}
+	return nil
+}
 
 // watchSchema answers what looks at the schema every interval until its
 // context ends, sending each standing that differs from the one before. The
@@ -426,9 +441,7 @@ func watchSchema(logger *slog.Logger, look func(context.Context) (schema.Standin
 					return
 				case <-tick.C:
 				}
-				asking, cancel := context.WithTimeout(ctx, lookWithin)
-				standing, applied, carried, err := look(asking)
-				cancel()
+				standing, applied, carried, err := look(ctx)
 				if ctx.Err() != nil {
 					return
 				}

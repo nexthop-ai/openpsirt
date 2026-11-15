@@ -241,6 +241,9 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 		if err != nil {
 			return err
 		}
+		if err := lookBeforeServing(startup, watcher.Look); err != nil {
+			return server.abandon(cfg, logger, startupFailed(err, "checking the schema before serving", cfg))
+		}
 		server.answer(handler)
 		serving = true
 		return serveBeside(stopping, cfg, logger, server, beside.background,
@@ -287,6 +290,9 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	watcher, err := schema.NewWatcher(startup, db)
 	if err != nil {
 		return server.abandon(cfg, logger, startupFailed(err, "preparing to watch the schema", cfg))
+	}
+	if err := lookBeforeServing(startup, watcher.Look); err != nil {
+		return server.abandon(cfg, logger, startupFailed(err, "checking the schema before serving", cfg))
 	}
 	server.answer(handler)
 	logger.Info("serving")

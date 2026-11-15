@@ -247,7 +247,7 @@ a stopped upgrade run again finds done.
 
 | Table | Created |
 |---|---|
-| `schema_change` | The record of an upgrade under way: when it started and which process started it, empty (`design-docs/database-migrations.md` § Instances during an upgrade). The upgrade to v0.13.0 writes no row, since it began before the table existed, so one failing part way pauses nothing that looks |
+| `schema_change` | The record of an upgrade under way: when it started, which process started it and the last version it applies, empty (`design-docs/database-migrations.md` § Instances during an upgrade). The upgrade to v0.13.0 writes no row, since it began before the table existed, so one failing part way pauses nothing that looks |
 
 | Table | Loses |
 |---|---|

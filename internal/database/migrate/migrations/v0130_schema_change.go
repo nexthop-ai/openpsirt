@@ -19,11 +19,14 @@ func schemaChangeV0130(t *columnTypes) []string {
 		// lock goes with its session; this outlives an upgrade that fails
 		// part way on an engine whose schema changes each commit alone, so
 		// nothing serves the part-changed schema until an upgrade succeeds or
-		// the backup is restored.
+		// the backup is restored. A row names the version its upgrade was
+		// reaching, and stops counting once the version applied reaches it,
+		// so one a process left after its last migration pauses nobody.
 		`CREATE TABLE "schema_change" (
-			"id"         ` + t.id + `,
-			"started_at" ` + t.timestamp + ` NOT NULL,
-			"started_by" ` + t.name + ` NOT NULL
+			"id"             ` + t.id + `,
+			"started_at"     ` + t.timestamp + ` NOT NULL,
+			"started_by"     ` + t.name + ` NOT NULL,
+			"target_version" BIGINT NOT NULL
 		)` + t.suffix,
 	}
 }

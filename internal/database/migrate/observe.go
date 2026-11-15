@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
@@ -61,27 +62,54 @@ func NewObserver(ctx context.Context, db *database.DB) (*Observer, error) {
 	return o, nil
 }
 
-// Changing reports whether an instance holds the schema change lock, which it
+// Look reports whether another instance is changing the schema, and the
+// highest schema version applied, on one connection of its own. Taking the
+// connection is bounded by acquireWithin and the questions by lookWithin.
+//
+// The version is read first and answered even where asking about a change
+// then fails, since a version ahead settles what a serving instance does
+// whatever else is true.
+func (o *Observer) Look(ctx context.Context, acquireWithin, lookWithin time.Duration) (bool, int64, error) {
+	acquiring, cancel := context.WithTimeout(ctx, acquireWithin)
+	conn, err := o.db.Conn(acquiring)
+	cancel()
+	if err != nil {
+		return false, 0, fmt.Errorf("take a connection to ask about the schema: %w", err)
+	}
+	defer func() { _ = conn.Close() }()
+	asking, cancel := context.WithTimeout(ctx, lookWithin)
+	defer cancel()
+	applied, err := o.applied(asking, conn)
+	if err != nil {
+		return false, 0, err
+	}
+	changing, err := o.changing(asking, conn, applied)
+	return changing, applied, err
+}
+
+// changing reports whether an instance holds the schema change lock, which it
 // holds from before its first migration's statements to after its last, or a
-// record of an upgrade that left the schema part changed stands.
-func (o *Observer) Changing(ctx context.Context) (bool, error) {
-	held, err := o.locked(ctx)
+// record stands of an upgrade reaching a version later than applied, which an
+// upgrade that left the schema part changed leaves.
+func (o *Observer) changing(ctx context.Context, q rowQuerier, applied int64) (bool, error) {
+	held, err := o.locked(ctx, q)
 	if err != nil || held || !o.recorded {
 		return held, err
 	}
 	var records int
-	if err := o.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+ChangeTable+`"`).Scan(&records); err != nil {
+	if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+ChangeTable+`" WHERE "target_version" > ?`,
+		applied).Scan(&records); err != nil {
 		return false, fmt.Errorf("read the record of schema changes: %w", err)
 	}
 	return records > 0, nil
 }
 
 // locked reports whether an instance holds the schema change lock.
-func (o *Observer) locked(ctx context.Context) (bool, error) {
+func (o *Observer) locked(ctx context.Context, q rowQuerier) (bool, error) {
 	switch o.db.Server.Engine {
 	case database.Postgres:
 		var held int
-		if err := o.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "pg_catalog"."pg_locks"
+		if err := q.QueryRowContext(ctx, `SELECT COUNT(*) FROM "pg_catalog"."pg_locks"
 			WHERE "locktype" = 'advisory' AND "granted"
 			AND "database" = (SELECT "oid" FROM "pg_catalog"."pg_database" WHERE "datname" = current_database())
 			AND "classid"::bigint = ? AND "objid"::bigint = ? AND "objsubid" = 1`,
@@ -91,7 +119,7 @@ func (o *Observer) locked(ctx context.Context) (bool, error) {
 		return held > 0, nil
 	case database.MySQL, database.MariaDB:
 		var holder sql.NullInt64
-		if err := o.db.QueryRowContext(ctx, "SELECT IS_USED_LOCK(?)", o.name).Scan(&holder); err != nil {
+		if err := q.QueryRowContext(ctx, "SELECT IS_USED_LOCK(?)", o.name).Scan(&holder); err != nil {
 			return false, fmt.Errorf("ask whether the schema is changing: %w", err)
 		}
 		return holder.Valid, nil
@@ -104,11 +132,11 @@ func (o *Observer) locked(ctx context.Context) (bool, error) {
 	return false, fmt.Errorf("no schema change lock for %s", o.db.Server.Engine)
 }
 
-// Applied reports the highest schema version applied, in one query on the
+// applied reports the highest schema version applied, in one query on the
 // migration library's bookkeeping table.
-func (o *Observer) Applied(ctx context.Context) (int64, error) {
+func (o *Observer) applied(ctx context.Context, q rowQuerier) (int64, error) {
 	var applied sql.NullInt64
-	if err := o.db.QueryRowContext(ctx,
+	if err := q.QueryRowContext(ctx,
 		`SELECT MAX("version_id") FROM "`+VersionTable+`" WHERE "is_applied"`).Scan(&applied); err != nil {
 		return 0, fmt.Errorf("read the schema version: %w", err)
 	}
