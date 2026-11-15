@@ -340,7 +340,10 @@ func TestAScanThatCannotBeReadSaysSoOnTheScan(t *testing.T) {
 		}
 		// Nothing partial: a half-applied graph is indistinguishable from
 		// components having been removed.
-		nodes, _ := nodesNow(t.Context(), f.db.DB, f.branch)
+		nodes, err := nodesNow(t.Context(), f.db.DB, f.branch)
+		if err != nil {
+			t.Fatal(err)
+		}
 		if len(nodes) != 0 {
 			t.Errorf("%d nodes were stored from a scan that failed", len(nodes))
 		}
