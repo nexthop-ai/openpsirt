@@ -112,13 +112,13 @@ func TestBringingSomebodyOntoACodeFindingTwiceLeavesOneGrant(t *testing.T) {
 			t.Fatalf("the code finding carries %+v, want one grant to them by the granter", rows)
 		}
 
-		if err := f.store.RemoveFromCodeFinding(ctx, product, occurrence, person.ID, granter.ID); err != nil {
+		if err := f.store.RemoveFromCodeFinding(ctx, product, occurrence, person.ID, granter.ID, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 		if rows, err := f.store.CodeFindingRows(ctx, product, occurrence); err != nil || len(rows) != 0 {
 			t.Errorf("taken off, the code finding carries %+v (%v)", rows, err)
 		}
-		if err := f.store.RemoveFromCodeFinding(ctx, product, occurrence, person.ID, granter.ID); !errors.Is(err, access.ErrNothingMatched) {
+		if err := f.store.RemoveFromCodeFinding(ctx, product, occurrence, person.ID, granter.ID, time.Now()); !errors.Is(err, access.ErrNothingMatched) {
 			t.Errorf("taking them off again answered %v, want nothing matched", err)
 		}
 	})

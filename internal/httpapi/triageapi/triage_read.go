@@ -252,7 +252,7 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		}
 		described, err := core.DescribeDecisionOccurrences(ctx, in.DB.DB, store, []triage.DecisionOccurrence{whole.DecisionOccurrence},
 			map[int64]string{whole.DecisionOccurrence.ID: whole.Reasoning})
-		if err != nil || len(described) == 0 {
+		if err != nil {
 			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
 		}
 		about := described[0]

@@ -132,7 +132,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			// The name the issue is filed under, read before the new one is
 			// added.
 			//
@@ -202,7 +202,7 @@ func registerWhoTold(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		out := &struct{ Body AliasRemovedBody }{}
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			named, err := finding.NewVulnerabilities(tx).NamesByID(ctx, []int64{issue})
 			if err != nil {
 				return core.WentWrong(in.Logger, "that issue could not be looked up", err)

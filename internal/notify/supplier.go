@@ -50,7 +50,7 @@ func (w *Watch) suppliersSilent(ctx context.Context) ([]Holds, error) {
 	}
 	err = w.db.NewSelect().
 		Model((*supplier.Feed)(nil)).
-		ColumnExpr("sp.*").
+		ColumnExpr(`"sp".*`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "sp"."product_id"`).
 		Where(`"sp"."retired_at" IS NULL`).

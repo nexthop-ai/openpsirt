@@ -151,7 +151,7 @@ func Reranked(ctx context.Context, tx bun.IDB, issues []int64, learnedAt time.Ti
 				rests = append(rests, one.issue, int64(one.rest))
 			}
 			q := reranking(tx, productID,
-				"CASE vulnerability_id"+strings.Repeat(" WHEN ? THEN ?", len(batch))+" END", rests...).
+				`CASE "vulnerability_id"`+strings.Repeat(" WHEN ? THEN ?", len(batch))+" END", rests...).
 				Where(`"vulnerability_id" IN (?)`, bun.List(ids)).
 				Where(kinds, kindArgs...)
 			if scanned != 0 {

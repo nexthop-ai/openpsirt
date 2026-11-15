@@ -32,12 +32,6 @@ type Said = {
   edited_at?: string;
 };
 
-// said is how a moment on a thread is written: to the minute, in UTC and
-// saying so, as every moment quoted across time zones is.
-export function said(moment?: string): string {
-  return at(moment);
-}
-
 export function Thread({
   items,
   mine,
@@ -103,7 +97,7 @@ export function Thread({
               <div>
                 <div className="meta">
                   <b>{each.written_by_name || each.written_by}</b>
-                  <span className="when">{said(each.written_at)}</span>
+                  <span className="when">{at(each.written_at)}</span>
                   {each.edited_at && (
                     <button
                       type="button"
@@ -221,7 +215,7 @@ function Earlier({
       {rows.map((row) => (
         <div key={row.version}>
           <span className="hint">
-            Version {row.version}, replaced {said(row.replaced_at)}
+            Version {row.version}, replaced {at(row.replaced_at)}
           </span>
           <Markdown source={row.body ?? ""} />
         </div>

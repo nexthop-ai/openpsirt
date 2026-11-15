@@ -76,6 +76,7 @@ kind reaches mail in the digest alone (`design-docs/notifications-work.md`
 |---|---|
 | The unsent notifications of those kinds are the work list, sent and marked | Mail configured a week late finds the week waiting |
 | Every other kind stays unsent, and the digest reads it from the area | A notice is mailed once, by one path |
+| Immediate mail and the digests run in passes of their own, each under its own lease | A day's digests take up to the batch times one message's bound, and an assignment waiting behind them waits that long on one replica |
 | A condition the application withdrew is not carried | Nothing reconciles it |
 | A server and a sender are configured together or not at all, refused at startup, logging which arrived | Half reads as no mail configured |
 | Tried five times, then left unsent and readable | |

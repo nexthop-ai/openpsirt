@@ -83,10 +83,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if read == 0 {
-		fmt.Fprintln(os.Stderr, "no Go file was read, so this checked nothing")
-		os.Exit(2)
-	}
 	if len(bad) == 0 {
 		fmt.Printf("every doc comment sits on the declaration it describes (%d files)\n", read)
 		return

@@ -412,7 +412,7 @@ func (s *Store) MarkFailed(ctx context.Context, id int64, cause error) error {
 	_, err := s.db.NewUpdate().Model((*Scan)(nil)).
 		Set(`"status" = ?`, Failed).
 		// A refusal may quote the document it refuses, NUL included.
-		Set(`"failure" = ?`, truncate(bound.Text(reason), 2000)).
+		Set(`"failure" = ?`, bound.Head(bound.Text(reason), bound.MostReason)).
 		Where(`"id" = ?`, id).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("record that scan %d failed: %w", id, err)
@@ -510,12 +510,6 @@ func (s *Store) named(ctx context.Context, scanID int64) (bool, error) {
 	return len(found) > 0, nil
 }
 
-// truncate bounds what is stored from a message that quotes a scan file.
-//
-// A message quoting a producer's own text can carry multi-byte characters,
-// which is why the cut goes through the shared helper rather than a slice.
-func truncate(s string, most int) string { return bound.Head(s, most) }
-
 // Made records what an inventory turned out to be made of.
 //
 // Written after it has been read rather than when it arrives, because until
@@ -580,38 +574,20 @@ func (s *Store) Refused(ctx context.Context, subject access.Subject, r Refusal) 
 	}
 	// A refusal may quote the document it refuses, NUL and bytes that are
 	// not text included.
-	r.Reason = truncate(bound.Text(r.Reason), 2000)
+	r.Reason = bound.Head(bound.Text(r.Reason), bound.MostReason)
 
-	// An update and then an insert, rather than an upsert: there is no
-	// portable spelling of one, two of the four engines want ON CONFLICT and
-	// the other two ON DUPLICATE KEY UPDATE, and engine-specific SQL is
-	// confined to migration data-definition and the queue's locking. The
-	// update first because a build being refused once is a build being
-	// refused repeatedly, so the row is nearly always already there.
-	res, err := s.db.NewUpdate().Model((*Refusal)(nil)).
-		Set(`"at" = ?`, r.At).
-		Set(`"reason" = ?`, r.Reason).
-		Set(`"credential" = ?`, r.Credential).
-		Set(`"built_at" = ?`, r.BuiltAt).
-		Set(`"content_hash" = ?`, r.ContentHash).
-		Where(`"build_id" = ?`, r.BuildID).Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("record that an upload was refused: %w", err)
-	}
-	changed, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("record that an upload was refused: %w", err)
-	}
-	if changed > 0 {
-		return nil
-	}
-	// Two refusals for one build arriving together resolve on the unique
-	// constraint: one inserts and the loser is the one this arm refuses, which
-	// is a refusal recorded by the other request rather than one lost.
-	if _, err := s.db.NewInsert().Model(&r).Exec(ctx); err != nil {
-		if database.IsDuplicate(err) {
-			return nil
-		}
+	// One row per build, the last refusal replacing the one before.
+	if err := database.UpdateElseInsert(ctx, s.db,
+		func(db bun.IDB) *bun.UpdateQuery {
+			return db.NewUpdate().Model((*Refusal)(nil)).
+				Set(`"at" = ?`, r.At).
+				Set(`"reason" = ?`, r.Reason).
+				Set(`"credential" = ?`, r.Credential).
+				Set(`"built_at" = ?`, r.BuiltAt).
+				Set(`"content_hash" = ?`, r.ContentHash).
+				Where(`"build_id" = ?`, r.BuildID)
+		},
+		func(db bun.IDB) *bun.InsertQuery { return db.NewInsert().Model(&r) }); err != nil {
 		return fmt.Errorf("record that an upload was refused: %w", err)
 	}
 	return nil

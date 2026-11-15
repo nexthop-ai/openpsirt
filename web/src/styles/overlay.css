@@ -202,8 +202,3 @@
   border-top: 1px solid var(--line);
   background: var(--raised);
 }
-@media (prefers-reduced-motion: reduce) {
-  .drawer {
-    transition: none;
-  }
-}

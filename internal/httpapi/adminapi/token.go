@@ -146,7 +146,7 @@ func registerTokens(api huma.API, in core.Deps) {
 
 		var token *access.Token
 		var secret string
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			// The product is resolved again where the token is minted, and
 			// that one decides: a name another act took since the early
 			// refusal answers as it does now, and a retry reads it afresh.
@@ -217,7 +217,7 @@ func registerTokens(api huma.API, in core.Deps) {
 			return nil, huma.Error403Forbidden(
 				"a token cannot withdraw another; sign in to withdraw one")
 		}
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			rights := access.NewStore(tx)
 			token, err := rights.TokenByName(ctx, subject.ID, input.Name)
 			if err != nil {

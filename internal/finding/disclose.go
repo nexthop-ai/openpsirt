@@ -887,7 +887,7 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 			readable = append(readable, id)
 		}
 	}
-	if subject.Kind != access.Person || (!all && len(readable) == 0) {
+	if !all && len(readable) == 0 {
 		return nil, 0, nil
 	}
 
@@ -899,7 +899,7 @@ func (s *Store) PendingPage(ctx context.Context, subject access.Subject,
 	kinds, kindArgs := kind.Triage.Where(`"fu"."kind"`)
 	query := s.db.NewSelect().
 		Model((*Movement)(nil)).
-		ColumnExpr("dx.*").
+		ColumnExpr(`"dx".*`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "dx"."product_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "dx"."vulnerability_id"`).
 		ColumnExpr(`"p"."name" AS "product"`).

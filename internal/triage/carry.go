@@ -237,7 +237,7 @@ func (s *Store) occurrenceOnLine(ctx context.Context, toBuild, occurrenceID int6
 // what is offered for carrying and what a carry writes and authorizes are
 // both read through it.
 func landingOnLine(toBuild int64, as string) func(*bun.SelectQuery) *bun.SelectQuery {
-	undisclosed, private := access.AnyPrivate(`"f"."visibility"`)
+	undisclosed, private := access.AnyPrivate(access.FindingVisibility())
 	kinds, kindArgs := kindsOf(kind.VersionCarry, "f")
 	return func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.ColumnExpr(`COALESCE((SELECT CASE WHEN COUNT(*) = 0 THEN NULL

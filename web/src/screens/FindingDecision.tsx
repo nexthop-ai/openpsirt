@@ -16,7 +16,6 @@ import {
   useDecisionRevisions,
 } from "../api/decisions";
 import { happenedOf, stripeOf } from "../ui/stripe";
-import { FLOORS } from "../ui/severities";
 import { useState, type ReactNode } from "react";
 import { at, on } from "../ui/when";
 import { initials } from "../ui/initials";
@@ -477,7 +476,7 @@ export function Revisions({ decisionId }: { decisionId: number }) {
                     <span className="state waiting">Never approved</span>
                   )}
                 </div>
-                <div className="words">
+                <div className="revtext">
                   <Markdown source={r.body ?? ""} />
                 </div>
               </div>
@@ -756,5 +755,3 @@ function Prior({
     </article>
   );
 }
-
-export const RATINGS = FLOORS;

@@ -4,8 +4,11 @@
 package finding_test
 
 import (
+	"context"
 	"slices"
 	"testing"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -82,4 +85,69 @@ func githubVersions(rows []finding.Group) []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// Every read over a Filter resolves its package identifier before narrowing
+// by it: the identifier chooses rows where it names a package the build holds
+// and none where it names nothing. A read that narrowed an unprepared filter
+// would fail here rather than answer an empty list.
+func TestEveryReadOverAFilterResolvesItsPackageIdentifier(t *testing.T) {
+	swss := graph.Described{Purl: "pkg:github/sonic-net/sonic-swss@aaa111", Name: "sonic-swss", Version: "aaa111"}
+	other := graph.Described{Purl: "pkg:deb/debian/curl@7.0", Name: "curl", Version: "7.0"}
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, graph.Snapshot{
+			Root:         root,
+			Components:   []graph.Described{swss, other},
+			Dependencies: []graph.Dependency{{Parent: root, Child: swss}, {Parent: root, Child: other}},
+		})
+		f.applied(t, found("CVE-2026-1", swss), found("CVE-2026-2", other))
+		who := f.planner(t, access.PublicTriage, access.Assigner)
+		colleague, err := access.NewStore(f.db.DB).Ensure(ctx, "colleague@example.com", "Colleague", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		admits := func(context.Context, bun.IDB, []access.Visibility) error { return nil }
+
+		reads := map[string]func(finding.Filter) (int, error){
+			"component groups": func(filter finding.Filter) (int, error) {
+				_, total, err := f.store.ComponentGroups(ctx, who, f.scope, 50, 0, filter)
+				return total, err
+			},
+			"component group count": func(filter finding.Filter) (int, error) {
+				return f.store.CountComponentGroups(ctx, who, f.scope, filter)
+			},
+			"planned upgrades": func(filter finding.Filter) (int, error) {
+				_, total, err := f.store.PlannedUpgrades(ctx, who, f.scope, 50, 0, filter)
+				return total, err
+			},
+			"planned upgrade count": func(filter finding.Filter) (int, error) {
+				return f.store.CountPlannedUpgrades(ctx, who, f.scope, filter)
+			},
+			"hidden below a line": func(filter finding.Filter) (int, error) {
+				filter.MinimumSeverity = finding.MinimumSeverity{Word: "critical"}
+				return f.store.Hidden(ctx, who, f.scope, filter)
+			},
+			"assigning what matches": func(filter finding.Filter) (int, error) {
+				handed, err := f.store.AssignMatching(ctx, who, f.scope, filter, nil, &colleague.ID, admits)
+				return handed.Pieces, err
+			},
+		}
+		for name, read := range reads {
+			chosen, err := read(finding.Filter{Purl: graph.ParsePurlPrefix("pkg:github/sonic-net/sonic-swss")})
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			if chosen != 1 {
+				t.Errorf("%s: the package the build holds counts %d, want 1", name, chosen)
+			}
+			none, err := read(finding.Filter{Purl: graph.ParsePurlPrefix("pkg:github/sonic-net/sonic-sw")})
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			if none != 0 {
+				t.Errorf("%s: a package the build does not hold counts %d, want 0", name, none)
+			}
+		}
+	})
 }

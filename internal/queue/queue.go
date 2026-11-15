@@ -95,7 +95,8 @@ type Options struct {
 	// prevent, because the second claim is legitimate.
 	//
 	// Well under the claim timeout, so a renewal can fail several times over
-	// before the claim is actually at risk. Zero renews nothing.
+	// before the claim is actually at risk. Positive, as the claim timeout and
+	// the ceiling are.
 	Heartbeat time.Duration
 	// MaxHold is how long one claim may be renewed for in total, after which
 	// the renewals stop and the work is cancelled.
@@ -108,9 +109,7 @@ type Options struct {
 	// it bounds a worker going silent, and a wedged worker is not silent.
 	//
 	// A small multiple of the claim timeout, because it has to exceed the
-	// longest legitimate single unit of work. Zero is no ceiling, which is
-	// what a caller running work with no upper bound of its own asks for
-	// explicitly rather than by omission.
+	// longest legitimate single unit of work.
 	MaxHold time.Duration
 	// Backoff is how long to wait before retrying, multiplied by the attempt.
 	Backoff time.Duration
@@ -143,14 +142,31 @@ func DefaultOptions() Options {
 // against each other. Refused as the process starts rather than discovered
 // later: what a wrong pair produces is work handed to a second worker while
 // the first is still doing it, which looks like a fault in the work.
+//
+// Every bound is positive: renewal ticks on the heartbeat and a hold ends at
+// the ceiling, so zero in either has no meaning to give. The process runs
+// this before it builds a queue, and New reads a zero heartbeat or ceiling as
+// unset.
 func (o Options) Check() error {
-	if o.Heartbeat > 0 && o.ClaimTimeout > 0 && o.Heartbeat >= o.ClaimTimeout {
+	for _, bound := range []struct {
+		name  string
+		value time.Duration
+	}{
+		{"OPENPSIRT_QUEUE_CLAIM_TIMEOUT", o.ClaimTimeout},
+		{"OPENPSIRT_QUEUE_HEARTBEAT", o.Heartbeat},
+		{"OPENPSIRT_QUEUE_MAX_HOLD", o.MaxHold},
+	} {
+		if bound.value <= 0 {
+			return fmt.Errorf("%s is %s: every queue bound is a positive duration", bound.name, bound.value)
+		}
+	}
+	if o.Heartbeat >= o.ClaimTimeout {
 		return fmt.Errorf(
 			"OPENPSIRT_QUEUE_HEARTBEAT is %s and OPENPSIRT_QUEUE_CLAIM_TIMEOUT is %s: "+
 				"a claim renewed no more often than it goes stale is handed to a second "+
 				"worker while the first is still holding it", o.Heartbeat, o.ClaimTimeout)
 	}
-	if o.MaxHold > 0 && o.ClaimTimeout > 0 && o.MaxHold <= o.ClaimTimeout {
+	if o.MaxHold <= o.ClaimTimeout {
 		return fmt.Errorf(
 			"OPENPSIRT_QUEUE_MAX_HOLD is %s and OPENPSIRT_QUEUE_CLAIM_TIMEOUT is %s: "+
 				"a ceiling on one hold that is not above the claim timeout cancels work "+
@@ -171,8 +187,33 @@ type Queue struct {
 	locking bool
 }
 
-// New returns a queue over db.
+// New returns a queue over db. A set of bounds Check refuses panics: the
+// process checks the configured set as it starts, so a refused set here is a
+// programming error.
 func New(db *database.DB, opts Options) *Queue {
+	// Zero reads as unset, as it does for every setting: renewal ticks on the
+	// heartbeat and a hold ends at the ceiling, so neither has a zero to mean.
+	// An unset heartbeat or ceiling keeps the defaults' proportion to the
+	// claim timeout. The process always passes all three, so only a set built
+	// in code leaves one unset.
+	defaults := DefaultOptions()
+	if opts.ClaimTimeout <= 0 {
+		opts.ClaimTimeout = defaults.ClaimTimeout
+	}
+	// In floating point: the product of two durations in nanoseconds
+	// overflows, and a quotient of two truncates the proportion.
+	proportion := func(of time.Duration) time.Duration {
+		return time.Duration(float64(opts.ClaimTimeout) * float64(of) / float64(defaults.ClaimTimeout))
+	}
+	if opts.Heartbeat <= 0 {
+		opts.Heartbeat = proportion(defaults.Heartbeat)
+	}
+	if opts.MaxHold <= 0 {
+		opts.MaxHold = proportion(defaults.MaxHold)
+	}
+	if err := opts.Check(); err != nil {
+		panic("queue: " + err.Error())
+	}
 	return &Queue{
 		db:      db,
 		opts:    opts,
@@ -562,9 +603,6 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 	logger *slog.Logger) (context.Context, func() error) {
 
 	working, give := context.WithCancelCause(ctx)
-	if q.opts.Heartbeat <= 0 {
-		return working, func() error { give(nil); return nil }
-	}
 
 	var lost error
 	started := q.now()
@@ -587,7 +625,7 @@ func (q *Queue) Holding(ctx context.Context, id int64, worker string,
 			// Logged at Error: a hold that reached its ceiling is a worker
 			// that is not coming back, which is the one event here an
 			// operator has to see.
-			if held := q.now().Sub(started); q.opts.MaxHold > 0 && held >= q.opts.MaxHold {
+			if held := q.now().Sub(started); held >= q.opts.MaxHold {
 				logger.Error("work has been held past the ceiling on one claim, "+
 					"so the claim is being given up and the work cancelled",
 					"job", id, "worker", worker, "held", held, "ceiling", q.opts.MaxHold)

@@ -175,8 +175,8 @@ const DOCUMENT_STATES = {
 
 type DocumentUpload = Body<"DocumentUploadBody">;
 
-// Who sent a document: the person or key that uploaded it, or the feed that
-// fetched it.
+// Who sent a document: the person who uploaded it, or the feed that fetched
+// it.
 function sender(doc: DocumentUpload) {
   if (doc.fetched_by) return `${doc.fetched_by} feed`;
   return doc.uploaded_by_name || doc.uploaded_by || "—";

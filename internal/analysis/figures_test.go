@@ -330,6 +330,37 @@ func TestEverySecurityTestingFigureAcrossProductsRefusesAProductNotReadAtSecurit
 	}
 }
 
+// A figure of one product refuses a scope across products even to a reader of
+// every product: read as one product, the scope names product zero, and the
+// figure would count it.
+func TestAFigureOfOneProductRefusesAScopeAcrossProductsToAReaderOfEveryProduct(t *testing.T) {
+	reader := access.Everything("count every product")
+	scope := Scope{Across: []int64{7, 8}}
+	now := time.Now()
+	for name, figure := range map[string]func() error{
+		"TimeToFix": func() error {
+			_, err := TimeToFix(t.Context(), nil, reader, scope, now, now)
+			return err
+		},
+		"PrecisionOf": func() error {
+			_, err := PrecisionOf(t.Context(), nil, reader, scope)
+			return err
+		},
+		"ByRelease": func() error {
+			_, err := ByRelease(t.Context(), nil, reader, scope, 1)
+			return err
+		},
+		"CountsOfComponent": func() error {
+			_, err := CountsOfComponent(t.Context(), nil, reader, scope)
+			return err
+		},
+	} {
+		if err := refusedOrReached(figure); !errors.Is(err, access.ErrDenied) {
+			t.Errorf("%s across products answered %v to a reader of every product; want a refusal", name, err)
+		}
+	}
+}
+
 // The code finding queue across products keeps the products where the reader
 // reads security testing work, whatever the caller names, and refuses
 // anybody but a person before the database is asked anything.

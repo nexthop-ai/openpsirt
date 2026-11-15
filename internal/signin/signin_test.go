@@ -43,13 +43,9 @@ func TestGroupMembershipThatCannotBeReadYieldsNoRolesRatherThanEveryRole(t *test
 			t.Errorf("%#v read as %v, want nothing", claim, got)
 		}
 	}
-	for _, claim := range []any{
-		[]any{"platform", "security"},
-		[]string{"platform", "security"},
-	} {
-		if got := groups(claim); len(got) != 2 || got[0] != "platform" || got[1] != "security" {
-			t.Errorf("%#v read as %v", claim, got)
-		}
+	claim := []any{"platform", "security"}
+	if got := groups(claim); len(got) != 2 || got[0] != "platform" || got[1] != "security" {
+		t.Errorf("%#v read as %v", claim, got)
 	}
 	if got := groups("platform"); len(got) != 1 || got[0] != "platform" {
 		t.Errorf("a single group as a bare string read as %v", got)

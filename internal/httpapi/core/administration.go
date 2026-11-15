@@ -27,14 +27,12 @@ type Administering struct {
 	Access  func(bun.IDB) *access.Store
 	Catalog func(bun.IDB) *catalog.Store
 	Logger  *slog.Logger
-	// Findings says whether work is handed back to the unassigned list when
-	// somebody can no longer reach it, rather than staying where nobody can.
-	// Nil where the routes built over it release nothing.
+	// Findings is the store a deactivation hands work back over, on the
+	// pooled handle, once the deactivation has committed. Nil on the routes
+	// that deactivate nobody.
 	//
-	// A withdrawn role or a change to a team's membership hands back inside
-	// its own transaction, over a store built on it, and reads this only as
-	// whether to. A deactivation hands back over this store, on the pooled
-	// handle, once the deactivation has committed.
+	// A withdrawn role and a change to a team's membership hand back inside
+	// their own transaction, over a store built on it, and do not read this.
 	Findings func() *finding.Store
 	// Settings is where the window an unredeemed authorization stays
 	// redeemable for is read.

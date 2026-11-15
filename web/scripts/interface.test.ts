@@ -12,6 +12,10 @@ import { sweep as addresses } from "./addresses.mjs";
 import { sweep as queryKeys } from "./query-keys.mjs";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
 import { sweep as prose, sweepNames as names } from "./screen-copy.mjs";
+// @ts-expect-error - a gate script, which is plain ESM with no types of its own
+import { sweep as printedHeads } from "./printed-heads.mjs";
+// @ts-expect-error - a gate script, which is plain ESM with no types of its own
+import { sweep as stateColors } from "./state-colors.mjs";
 
 // The whole tree is parsed once, which takes 1.3 s on two cores under the full
 // suite with coverage on and several seconds on a 2-vCPU CI runner. The
@@ -55,6 +59,23 @@ describe("the interface", { timeout: WHOLE_TREE_MS }, () => {
       examined,
       "no control, heading or label was found, so this checked nothing",
     ).toBeGreaterThan(0);
+    expect(found).toEqual([]);
+  });
+
+  it("prints every head's breadcrumb and counts, and none of its actions", () => {
+    const { examined, found, hidden } = printedHeads();
+    expect(
+      examined,
+      "no span under a screen head was found, so this checked nothing",
+    ).toBeGreaterThan(0);
+    expect(found).toEqual([]);
+    expect(hidden).toEqual([]);
+  });
+
+  it("draws no failure as done, and looked", () => {
+    const { files, done, found } = stateColors();
+    expect(files, "no screens were found, so this checked nothing").toBeGreaterThan(0);
+    expect(done, "no state class is drawn as done, so this checked nothing").not.toEqual([]);
     expect(found).toEqual([]);
   });
 });

@@ -219,7 +219,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 		}
 		var rule *finding.AssignmentRule
 		var team *access.Team
-		if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			product, err := ruleProduct(ctx, in, tx, subject, input.Product)
 			if err != nil {
 				return err
@@ -275,7 +275,7 @@ func registerAssignmentRules(api huma.API, in core.Deps) {
 			if err != nil {
 				return nil, err
 			}
-			if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+			if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 				product, err := ruleProduct(ctx, in, tx, subject, input.Product)
 				if err != nil {
 					return err

@@ -110,24 +110,34 @@ func NewPost(db *bun.DB, channel Channel, baseURL string, logger *slog.Logger,
 	}
 }
 
-// Run sweeps until the context ends.
+// Run carries the messages mailed as they happen until the context ends.
+//
+// Digests run in a loop of their own, RunDigests: a day's digests take up to
+// the batch times the channel's timeout, and an assignment waiting behind
+// them would wait that long.
 func (p *Post) Run(ctx context.Context, interval time.Duration) {
-	// Both leases are handed back once the last cycle has ended, so the next
-	// replica carries on without waiting them out.
-	defer p.leases.Handback(ctx, DigestLease, p.replica, p.logger)
+	// The lease is handed back once the last cycle has ended, so the next
+	// replica carries on without waiting it out.
 	defer p.leases.Handback(ctx, PostLease, p.replica, p.logger)
 	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
-		if sent, err := p.Digests(ctx); err != nil {
-			p.logger.Error("sending digests", "error", err)
-		} else if sent > 0 {
-			p.logger.Info("digests sent", "channel", p.channel.Name(), "sent", sent)
-		}
 		if sent, failed, err := p.Once(ctx); err != nil {
 			// Logged and carried on, like every other background pass here.
 			p.logger.Error("carrying notifications out of the application", "error", err)
 		} else if sent > 0 || failed > 0 {
 			p.logger.Info("notifications sent",
 				"channel", p.channel.Name(), "sent", sent, "failed", failed)
+		}
+	})
+}
+
+// RunDigests sends the daily digests until the context ends.
+func (p *Post) RunDigests(ctx context.Context, interval time.Duration) {
+	defer p.leases.Handback(ctx, DigestLease, p.replica, p.logger)
+	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
+		if sent, err := p.Digests(ctx); err != nil {
+			p.logger.Error("sending digests", "error", err)
+		} else if sent > 0 {
+			p.logger.Info("digests sent", "channel", p.channel.Name(), "sent", sent)
 		}
 	})
 }
@@ -156,7 +166,7 @@ func (p *Post) Once(ctx context.Context) (sent, failed int, err error) {
 	var rows []waiting
 	err = p.db.NewSelect().
 		Model((*Notification)(nil)).
-		ColumnExpr("nt.*").
+		ColumnExpr(`"nt".*`).
 		ColumnExpr(`"pe"."email" AS "email"`).
 		Join(`JOIN "person" AS "pe" ON "pe"."id" = "nt"."person_id"`).
 		Where(`"nt"."sent_at" IS NULL`).
@@ -259,8 +269,8 @@ func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 		// digest is assembled as its reader, which refuses them anyway, and
 		// reselecting them would spend the batch on people it cannot serve.
 		Where(`"deactivated_at" IS NULL`).
-		// One a day. The sweep runs far more often than that, because it
-		// carries the immediate messages too.
+		// One a day. The sweep runs far more often than that, so somebody who
+		// turns digests on is sent one within a minute.
 		Where(`"digest_sent_at" IS NULL OR "digest_sent_at" < ?`, p.now().Add(-aDay)).
 		// Bounded like every other read here. A deployment with more people
 		// than this sends the rest on the next cycle rather than holding the
@@ -332,6 +342,6 @@ func (p *Post) Digests(ctx context.Context) (sent int, err error) {
 const aDay = 24 * time.Hour
 
 // DigestLease names the work of assembling and sending digests. Separate from
-// the immediate messages so that a long digest cycle does not stop the
-// messages a person must act on.
+// the immediate messages, as its loop is, so that a long digest cycle does not
+// stop the messages a person must act on.
 const DigestLease = "notification.digest"

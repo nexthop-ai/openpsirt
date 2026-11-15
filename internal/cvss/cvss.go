@@ -41,6 +41,8 @@ type Scored struct {
 	ScoreCenti int
 	// Severity is the word the score falls in, by the published bands.
 	Severity string
+	// metrics is each metric the vector states, as Score read it.
+	metrics map[string]string
 }
 
 // Scheme is the version of the scheme the vector is on, spelled the way a
@@ -61,18 +63,14 @@ func (s *Scored) Scheme() string {
 // is not published as part of one: a consumer validating a vector against the
 // specification's grammar refuses a metric name or value it does not define.
 func (s *Scored) BaseVector() string {
-	parts := strings.Split(s.Vector, "/")
-	given, err := stated(parts[1:])
-	if err != nil {
-		return s.Vector
-	}
+	scheme, _, _ := strings.Cut(s.Vector, "/")
 	base := baseThree
-	if parts[0] == "CVSS:4.0" {
+	if scheme == "CVSS:4.0" {
 		base = baseFour
 	}
-	written := []string{parts[0]}
+	written := []string{scheme}
 	for _, metric := range base {
-		written = append(written, metric+":"+given[metric])
+		written = append(written, metric+":"+s.metrics[metric])
 	}
 	return strings.Join(written, "/")
 }
@@ -215,6 +213,7 @@ func scoreThree(vector string, given map[string]string) (*Scored, error) {
 	}
 	return &Scored{
 		Vector: vector, ScoreCenti: int(math.Round(score * 100)), Severity: BandOf(score),
+		metrics: given,
 	}, nil
 }
 

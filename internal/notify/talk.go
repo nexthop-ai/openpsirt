@@ -176,7 +176,7 @@ func (t *Talk) channels(ctx context.Context, chat Chat, offered []string) (sent,
 		for _, to := range named[at] {
 			var rows []noting
 			q := unsettled(t.db.NewSelect().Model(&rows), to).
-				ColumnExpr("nt.*").
+				ColumnExpr(`"nt".*`).
 				ColumnExpr(`COALESCE(` + catalog.ShownExpr("p") + `, '') AS "product"`).
 				Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "nt"."product_id"`)
 			q = forChannel(q, to, offered, t.now().Add(-chatHorizon)).
@@ -291,7 +291,7 @@ func (t *Talk) directs(ctx context.Context, chat Chat, offered []string) (sent, 
 	for _, person := range people {
 		var rows []noting
 		if err := direct(t.db.NewSelect().Model(&rows), chat.Platform(), offered, since).
-			ColumnExpr("nt.*").
+			ColumnExpr(`"nt".*`).
 			ColumnExpr(`COALESCE(`+catalog.ShownExpr("p")+`, '') AS "product"`).
 			Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "nt"."product_id"`).
 			Where(`"nt"."person_id" = ?`, person.PersonID).

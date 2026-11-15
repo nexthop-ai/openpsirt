@@ -319,7 +319,8 @@ func DecisionArgument(c triage.Decision, reasoning string) DecisionOccurrenceBod
 // happens fifty times.
 //
 // Every name is read through db, which a file being written reads its pages
-// through, so a page and its names come from one view.
+// through, so a page and its names come from one view. The answer holds one
+// detail per occurrence, in the order given.
 func DescribeDecisionOccurrences(ctx context.Context, db bun.IDB, store *triage.Store,
 	occurrences []triage.DecisionOccurrence, reasoning map[int64]string) ([]DecisionOccurrenceDetail, error) {
 

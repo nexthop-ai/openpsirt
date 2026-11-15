@@ -53,7 +53,7 @@ export function FlowMark({
   said: string;
 }) {
   return (
-    <g className="mark">
+    <g className="stepmark">
       <line x1={x} x2={x} y1={top} y2={top + height} />
       <path d={`M${x - 4},${top} h8 l-4,6 z`} />
       <title>{said}</title>

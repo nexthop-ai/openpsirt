@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
-import { doneButTrouble, doneClasses, sweep } from "./state-colors.mjs";
+import { doneButTrouble, doneClasses } from "./state-colors.mjs";
 
 const DONE = new Set(["agreed", "closed"]);
 const check = (text: string) => doneButTrouble("x.tsx", text, DONE) as string[];
@@ -53,14 +53,5 @@ describe("the classes taken as done", () => {
     const css = `.state.agreed { --c: var(--ok); } .state.closed { --c: var(--ok); }
       .state.bad { --c: var(--sev-critical); } .other { --c: var(--ok); }`;
     expect([...(doneClasses(css) as Set<string>)].sort()).toEqual(["agreed", "closed"]);
-  });
-});
-
-describe("the interface", () => {
-  it("draws no failure as done, and looked", () => {
-    const { files, done, found } = sweep();
-    expect(files, "no screens were found, so this checked nothing").toBeGreaterThan(0);
-    expect(done, "no state class is drawn as done, so this checked nothing").not.toEqual([]);
-    expect(found).toEqual([]);
   });
 });

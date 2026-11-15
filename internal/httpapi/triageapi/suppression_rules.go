@@ -141,7 +141,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		var rule *analysis.SuppressionRule
-		if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			product, err := ruleProduct(ctx, in, tx, subject, input.Product)
 			if err != nil {
 				return err
@@ -180,7 +180,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 			return nil, err
 		}
 		var rule *analysis.SuppressionRule
-		if err := core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			product, err := ruleProduct(ctx, in, tx, subject, input.Product)
 			if err != nil {
 				return err
@@ -217,7 +217,7 @@ func registerSuppressionRules(api huma.API, in core.Deps) {
 		if err != nil {
 			return nil, err
 		}
-		return &struct{}{}, core.Changing(ctx, in.DB, in.Logger, func(ctx context.Context, tx bun.Tx) error {
+		return &struct{}{}, core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			product, err := ruleProduct(ctx, in, tx, subject, input.Product)
 			if err != nil {
 				return err

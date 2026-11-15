@@ -81,14 +81,8 @@ type Judging struct {
 func TimeToJudge(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	since, until, now time.Time) (*Judging, error) {
 
-	if err := scope.mayCount(subject, "time the judging of code findings"); err != nil {
-		return nil, err
-	}
-	visible, err := scope.visible(subject)
+	scope, visible, err := scope.authorized(ctx, db, subject, "time the judging of code findings")
 	if err != nil {
-		return nil, err
-	}
-	if scope, err = scope.resolved(ctx, db); err != nil {
 		return nil, err
 	}
 
@@ -221,14 +215,8 @@ type Fixing struct {
 func TimeToFix(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	since, until time.Time) (*Fixing, error) {
 
-	if err := MayCount(subject, scope.ProductID, "time the fixing of code findings"); err != nil {
-		return nil, err
-	}
-	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
+	scope, visible, err := scope.oneProduct(ctx, db, subject, "time the fixing of code findings")
 	if err != nil {
-		return nil, err
-	}
-	if scope, err = scope.resolved(ctx, db); err != nil {
 		return nil, err
 	}
 	product := inProduct(scope.ProductID)

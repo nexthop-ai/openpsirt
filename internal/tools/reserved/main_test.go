@@ -73,7 +73,7 @@ func TestAConcatenatedClauseIsOneString(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", c.what, err)
 		}
-		got, _, ok := literal(fset, node)
+		got, ok := literal(fset, node)
 		if ok != c.read {
 			t.Errorf("%s: read=%v, want %v", c.what, ok, c.read)
 			continue
@@ -438,6 +438,37 @@ func TestAnInventedNameALikeAndAListAreReadForTheQualifiedForm(t *testing.T) {
 	}
 	if qualified == 0 {
 		t.Error("the qualified pass counted nothing it read")
+	}
+}
+
+// Every column of a row selected through a qualifier names no column, so
+// the qualifier is the one identifier there to quote, alone, in a clause and
+// in a statement.
+func TestABareQualifierBeforeEveryColumnIsReported(t *testing.T) {
+	const source = "package x\n\nfunc q() {\n" +
+		"\tdb.ColumnExpr(\"nt.*\")\n" +
+		"\tdb.ColumnExpr(\"rr.*, \\\"p\\\".\\\"name\\\"\")\n" +
+		"\tdb.NewRaw(`SELECT de.* FROM \"decision\" AS \"de\"`)\n" +
+		"\tdb.ColumnExpr(`\"nt\".*`)\n" +
+		"\tdb.ColumnExpr(\"?TableAlias.*\")\n" +
+		"\tdb.ColumnExpr(\"count(*)\")\n" +
+		"}\n"
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "internal/x/x.go", source, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad, _, _ := checkFile(fset, "internal/x/x.go", file, map[string]bool{"decision": true},
+		map[string]bool{"name": true}, nil, nil)
+	var got []string
+	for _, one := range ordered(bad) {
+		if one.everyColumn {
+			got = append(got, one.column)
+		}
+	}
+	want := `"nt".* "rr".* "de".*`
+	if strings.Join(got, " ") != want {
+		t.Errorf("reported %v, want %s", got, want)
 	}
 }
 

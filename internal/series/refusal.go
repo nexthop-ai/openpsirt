@@ -19,9 +19,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/typedname"
 )
 
-// mostReason bounds what a refusal records of what the sender was told.
-const mostReason = 2000
-
 // Refusal is the last upload of a series to a build that was turned away
 // once its sender was admitted to the build.
 type Refusal struct {
@@ -54,37 +51,24 @@ func (s *Store) Refused(ctx context.Context, r Refusal) error {
 	if r.At.IsZero() {
 		r.At = time.Now().UTC()
 	}
-	// Cut where a character starts, since an engine checking the encoding
-	// refuses a split one.
-	r.Reason = bound.Head(r.Reason, mostReason)
-	// An update and then an insert, for the reason a scan refusal is written
-	// so: no portable upsert, and a series refused once is usually refused
-	// again.
-	res, err := s.db.NewUpdate().Model((*Refusal)(nil)).
-		Set(`"series" = ?`, r.Series).
-		Set(`"at" = ?`, r.At).
-		Set(`"reason" = ?`, r.Reason).
-		Set(`"credential" = ?`, r.Credential).
-		Where(`"build_id" = ?`, r.BuildID).
-		Where(`"kind" = ?`, r.Kind).
-		Where(`"series_folded" = ?`, r.SeriesFolded).
-		Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("record that an upload was refused: %w", err)
-	}
-	changed, err := database.Affected(res)
-	if err != nil {
-		return fmt.Errorf("record that an upload was refused: %w", err)
-	}
-	if changed > 0 {
-		return nil
-	}
-	if _, err := s.db.NewInsert().Model(&r).Exec(ctx); err != nil {
-		// Two refusals arriving together: one inserted, and this one is
-		// the same note.
-		if database.IsDuplicate(err) {
-			return nil
-		}
+	// A refusal may quote what it refused, NUL and bytes that are not UTF-8
+	// included, and is cut where a character starts, since an engine checking
+	// the encoding refuses a split one.
+	r.Reason = bound.Head(bound.Text(r.Reason), bound.MostReason)
+	// One row per series of a kind on a build, the last refusal replacing
+	// the one before.
+	if err := database.UpdateElseInsert(ctx, s.db,
+		func(db bun.IDB) *bun.UpdateQuery {
+			return db.NewUpdate().Model((*Refusal)(nil)).
+				Set(`"series" = ?`, r.Series).
+				Set(`"at" = ?`, r.At).
+				Set(`"reason" = ?`, r.Reason).
+				Set(`"credential" = ?`, r.Credential).
+				Where(`"build_id" = ?`, r.BuildID).
+				Where(`"kind" = ?`, r.Kind).
+				Where(`"series_folded" = ?`, r.SeriesFolded)
+		},
+		func(db bun.IDB) *bun.InsertQuery { return db.NewInsert().Model(&r) }); err != nil {
 		return fmt.Errorf("record that an upload was refused: %w", err)
 	}
 	return nil

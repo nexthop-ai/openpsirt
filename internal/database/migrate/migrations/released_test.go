@@ -5,6 +5,7 @@ package migrations
 
 import (
 	"testing"
+	"testing/fstest"
 
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 )
@@ -56,5 +57,33 @@ func TestTheExpectedVersionCountsNoTestFile(t *testing.T) {
 	}
 	if got != 47 {
 		t.Errorf("a build carrying %v expects version %d, want 47", names, got)
+	}
+}
+
+// A test file builds no schema, so editing one leaves the fingerprint where it
+// was, and editing a migration source moves it.
+func TestTheFingerprintIgnoresTestFiles(t *testing.T) {
+	base := fstest.MapFS{
+		"00047_v0130.go":     {Data: []byte("package migrations // 47")},
+		"upgrade.go":         {Data: []byte("package migrations // upgrade")},
+		"v0130_node_test.go": {Data: []byte("package migrations // test")},
+	}
+	edited := func(name, content string) fstest.MapFS {
+		out := fstest.MapFS{}
+		for k, v := range base {
+			out[k] = v
+		}
+		out[name] = &fstest.MapFile{Data: []byte(content)}
+		return out
+	}
+	want, err := fingerprintOf(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := fingerprintOf(edited("v0130_node_test.go", "package migrations // edited")); err != nil || got != want {
+		t.Errorf("editing a test file moved the fingerprint from %s to %s (%v)", want, got, err)
+	}
+	if got, err := fingerprintOf(edited("upgrade.go", "package migrations // edited")); err != nil || got == want {
+		t.Errorf("editing a migration source left the fingerprint at %s (%v)", want, err)
 	}
 }

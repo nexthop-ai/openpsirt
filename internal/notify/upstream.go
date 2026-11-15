@@ -36,7 +36,7 @@ func (w *Watch) upstreamsFailing(ctx context.Context) ([]Holds, map[string]Holds
 	}
 	err = w.db.NewSelect().
 		Model((*upstream.Upstream)(nil)).
-		ColumnExpr("up.*").
+		ColumnExpr(`"up".*`).
 		ColumnExpr(catalog.ShownExpr("p")+` AS "product"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "up"."product_id"`).
 		Where(`"p"."retired_at" IS NULL`).

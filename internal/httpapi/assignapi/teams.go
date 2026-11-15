@@ -6,7 +6,6 @@ package assignapi
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -33,7 +32,16 @@ type TeamBody struct {
 type TeamRecordBody struct {
 	Name        string   `json:"name" minLength:"1" maxLength:"191" doc:"The team's name"`
 	DisplayName string   `json:"display_name,omitempty" maxLength:"191" doc:"The display spelling. Defaults to the name"`
-	Members     []string `json:"members,omitempty" maxItems:"500" doc:"The members, by sign-in identity. Everybody named must already have been recorded"`
+	Members     []string `json:"members,omitempty" doc:"The members, by sign-in identity. Everybody named must already have been recorded"`
+}
+
+// TransformSchema bounds the members from the one ceiling, which a struct tag
+// would have to copy, so the published document and the refusal before the
+// handler both read it.
+func (TeamRecordBody) TransformSchema(_ huma.Registry, s *huma.Schema) *huma.Schema {
+	most := access.MostTeamMembers
+	s.Properties["members"].MaxItems = &most
+	return s
 }
 
 func registerTeams(api huma.API, a core.Administering) {
@@ -112,7 +120,7 @@ func registerTeams(api huma.API, a core.Administering) {
 		var team *access.Team
 		var body TeamBody
 		var declared bool
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err
@@ -129,10 +137,6 @@ func registerTeams(api huma.API, a core.Administering) {
 					nil, trail.Said("declared", true)); err != nil {
 					return core.NotRecorded(a.Logger, err)
 				}
-			}
-			if len(in.Body.Members) > access.MostTeamMembers {
-				return huma.Error422UnprocessableEntity(fmt.Sprintf(
-					"a team is declared with at most %d members at once", access.MostTeamMembers))
 			}
 			for _, identity := range in.Body.Members {
 				person, err := core.PersonNamed(ctx, a.Logger, store, identity)
@@ -178,7 +182,7 @@ func registerTeams(api huma.API, a core.Administering) {
 		Team string `path:"team"`
 	}) (*struct{}, error) {
 		a := a.In(ctx)
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err
@@ -224,7 +228,7 @@ func registerTeams(api huma.API, a core.Administering) {
 		if err != nil {
 			return nil, err
 		}
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err
@@ -271,7 +275,7 @@ func registerTeams(api huma.API, a core.Administering) {
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
 		a := a.In(ctx)
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err
@@ -331,9 +335,6 @@ func teamBody(ctx context.Context, store *access.Store, team access.Team) (TeamB
 // handBackFrom hands back, inside the act that changed a team's membership,
 // the work in its queue no remaining member reads.
 func handBackFrom(ctx context.Context, a core.Administering, tx bun.Tx, teamID int64) error {
-	if a.Findings == nil {
-		return nil
-	}
 	if _, err := finding.NewStore(tx).HandBackUnread(ctx,
 		access.Narrowed{Teams: []int64{teamID}}); err != nil {
 		return core.WentWrong(a.Logger, "cannot hand back what the team held", err)

@@ -26,9 +26,6 @@ const (
 	UploadTurnedAway = "refused"
 )
 
-// mostUploadReason bounds what a refusal records of what the sender was told.
-const mostUploadReason = 2000
-
 // Arrival is how a document came to be recorded: uploaded by the subject
 // recording it, or fetched by a supplier advisory feed.
 type Arrival struct {
@@ -123,7 +120,9 @@ func (s *Store) TurnedAway(ctx context.Context, by access.Subject, productID int
 	from.Publisher = bound.HeadRunes(from.Publisher, database.NameWidth)
 	from.Identifier = bound.HeadRunes(from.Identifier, database.NameWidth)
 	row := uploadOf(by, productID, from, s.now())
-	said := bound.Head(reason, mostUploadReason)
+	// A refusal may quote the document it refuses, NUL and bytes that are
+	// not text included.
+	said := bound.Head(bound.Text(reason), bound.MostReason)
 	row.Status, row.Reason = UploadTurnedAway, &said
 	if _, err := s.db.NewInsert().Model(&row).Exec(ctx); err != nil {
 		return fmt.Errorf("record a refused upload: %w", err)

@@ -169,7 +169,9 @@ func (p passes) loops() []loop {
 	// documents go unsigned or the key never expires. These guards are the
 	// ones that say something.
 	if p.post != nil {
-		all = append(all, loop{"send mail", p.post.Run, 0})
+		all = append(all,
+			loop{"send mail", p.post.Run, 0},
+			loop{"send digests", p.post.RunDigests, 0})
 	}
 	if p.talk != nil {
 		all = append(all, loop{"send what is owed to chat", p.talk.Run, 0})

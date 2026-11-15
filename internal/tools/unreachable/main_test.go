@@ -41,6 +41,7 @@ func TestTheNamesTheRuntimeCallsAreNotOrphans(t *testing.T) {
 		{"Swap", true},
 		{"BeforeQuery", true},
 		{"AfterQuery", true},
+		{"TransformSchema", true},
 
 		// And the other direction, which is the half that matters: an
 		// exemption that grew to cover ordinary names would make the gate

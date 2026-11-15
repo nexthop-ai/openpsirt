@@ -706,7 +706,7 @@ func (s *Store) Destinations(ctx context.Context, subject access.Subject) ([]Con
 		Team     string `bun:"team"`
 	}
 	if err := s.db.NewSelect().Model(&rows).
-		ColumnExpr("ob.*").
+		ColumnExpr(`"ob".*`).
 		ColumnExpr(`COALESCE("p"."name", '') AS "product"`).
 		ColumnExpr(`COALESCE("tm"."name", '') AS "team"`).
 		Join(`LEFT JOIN "product" AS "p" ON "p"."id" = "ob"."product_id"`).

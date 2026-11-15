@@ -249,7 +249,7 @@ func registerDeactivation(api huma.API, a core.Administering) {
 		}{}
 		var subject access.Subject
 		var person *access.Account
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			rights, asking, who, err := aboutPerson(ctx, a, tx, input.Identity)
 			if err != nil {
 				return err
@@ -308,21 +308,18 @@ func registerDeactivation(api huma.API, a core.Administering) {
 		// On a repeat as well. The hand-back runs after the deactivation has
 		// committed, so a failure here leaves work held by somebody who has
 		// left, and asking again is how it is finished.
-		if a.Findings != nil {
-			if findings := a.Findings(); findings != nil {
-				released, err := findings.Release(ctx, subject, person.PartyID)
-				if err != nil {
-					return nil, core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
-				}
-				// And each team they were on gives up what no member still
-				// here reads.
-				queued, err := findings.HandBackUnread(ctx, access.Narrowed{People: []int64{person.ID}})
-				if err != nil {
-					return nil, core.WentWrong(a.Logger, "cannot hand back what their teams held", err)
-				}
-				out.Body.Released = released + queued
-			}
+		findings := a.Findings()
+		released, err := findings.Release(ctx, subject, person.PartyID)
+		if err != nil {
+			return nil, core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)
 		}
+		// And each team they were on gives up what no member still
+		// here reads.
+		queued, err := findings.HandBackUnread(ctx, access.Narrowed{People: []int64{person.ID}})
+		if err != nil {
+			return nil, core.WentWrong(a.Logger, "cannot hand back what their teams held", err)
+		}
+		out.Body.Released = released + queued
 		return out, nil
 	})
 
@@ -340,7 +337,7 @@ func registerDeactivation(api huma.API, a core.Administering) {
 		Identity string `path:"identity" maxLength:"191"`
 	}) (*struct{}, error) {
 		a := a.In(ctx)
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			rights, _, person, err := aboutPerson(ctx, a, tx, input.Identity)
 			if err != nil {
 				return err

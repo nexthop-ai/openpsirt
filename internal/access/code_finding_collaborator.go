@@ -63,13 +63,14 @@ func (s *Store) AddToCodeFinding(ctx context.Context, productID int64, occurrenc
 		})
 }
 
-// RemoveFromCodeFinding withdraws a code finding grant, keeping the row.
+// RemoveFromCodeFinding withdraws a code finding grant at the time given,
+// keeping the row. The time is the caller's, so an act withdrawing grants
+// among other writes records one moment.
 func (s *Store) RemoveFromCodeFinding(ctx context.Context, productID int64, occurrenceIdentity string,
-	personID, by int64) error {
+	personID, by int64, at time.Time) error {
 
-	now := s.now().Truncate(time.Microsecond)
 	result, err := s.db.NewUpdate().Model((*CodeFindingCollaborator)(nil)).
-		Set(`"removed_at" = ?`, now).
+		Set(`"removed_at" = ?`, at.Truncate(time.Microsecond)).
 		Set(`"removed_by" = ?`, by).
 		Set(`"live_person_id" = ?`, nil).
 		Where(`"product_id" = ?`, productID).

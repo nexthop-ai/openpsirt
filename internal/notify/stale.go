@@ -300,8 +300,8 @@ func decisionRollup(db bun.IDB, counted string) *bun.SelectQuery {
 		// links by the product's name.
 		ColumnExpr(`MIN(`+catalog.ShownExpr("p")+`) AS "product"`).
 		ColumnExpr(`COUNT(*) AS ?`, bun.Ident(counted)).
-		ColumnExpr(access.WithheldCountAs(`"de"."visibility"`, "private_rows")).
-		ColumnExpr(access.SecurityTestingCountAs(`"de"."visibility"`, "security_testing_rows")).
+		ColumnExpr(access.WithheldCountAs(access.DecisionOccurrenceVisibility(), "private_rows")).
+		ColumnExpr(access.SecurityTestingCountAs(access.DecisionOccurrenceVisibility(), "security_testing_rows")).
 		GroupExpr(`"de"."decision_id", "de"."product_id", "de"."proposed_by"`)
 }
 
@@ -436,7 +436,7 @@ func (w *sweep) queuesUntaken(ctx context.Context) (map[int64][]Holds, error) {
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(access.WithheldCountAs(`"f"."visibility"`, "private_rows")).
+		ColumnExpr(access.WithheldCountAs(access.FindingVisibility(), "private_rows")).
 		Where(kinds, kindArgs...).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."assigned_at" IS NOT NULL`).

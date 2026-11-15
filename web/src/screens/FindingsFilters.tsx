@@ -237,7 +237,7 @@ function said(pairs: Pairs, value: string): string {
 // removing one leaves the rest — which is the whole point of asking for two.
 // The pairs say what to remove: a key with an empty word is the whole filter,
 // a key with a word is that one value of it.
-type Active = {
+export type Active = {
   key: string;
   label: string;
   value: string;

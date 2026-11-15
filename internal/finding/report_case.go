@@ -94,6 +94,11 @@ func reportedProblem(typed string) (string, error) {
 func reportIn(ctx context.Context, db bun.IDB, productID int64, reference string) (*FlawReport, error) {
 	row := new(FlawReport)
 	err := db.NewSelect().Model(row).
+		// Against the stored form, which is the minted one: a reference is
+		// uppercase by construction, so the value typed is folded to match
+		// rather than the column being compared loosely. The engines default
+		// differently on that, and a folded value compares the same under
+		// any of them.
 		Where(`"fr"."reference" = ?`, foldReference(reference)).
 		Where(`"fr"."product_id" = ?`, productID).
 		Scan(ctx)

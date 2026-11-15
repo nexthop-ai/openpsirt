@@ -13,7 +13,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
-	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
@@ -56,16 +55,10 @@ type Release struct {
 func ByRelease(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope,
 	limit int) ([]Release, error) {
 
-	if err := MayCount(subject, scope.ProductID, "count the code findings of each release"); err != nil {
-		return nil, err
-	}
-	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
-	if err != nil {
-		return nil, err
-	}
 	// A release line is the tags; a branch named would narrow it to nothing.
 	scope.BranchOrTagID = nil
-	if scope, err = scope.resolved(ctx, db); err != nil {
+	scope, visible, err := scope.oneProduct(ctx, db, subject, "count the code findings of each release")
+	if err != nil {
 		return nil, err
 	}
 

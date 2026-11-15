@@ -251,7 +251,7 @@ func (f *Fetcher) From(ctx context.Context, by access.Subject, feed Feed) (Taken
 	}
 
 	at2, mark := feed.From(f.History)
-	due, filled, err := f.due(ctx, client, listed, at2, mark, &took)
+	due, filled, err := f.due(ctx, client, listed, at2, mark)
 	if err != nil {
 		return took, err
 	}
@@ -439,7 +439,7 @@ func (f *Fetcher) kept(ctx context.Context) (bool, error) {
 // strength of the others it passes everything the unreached one listed before
 // it, and those entries are never read.
 func (f *Fetcher) due(ctx context.Context, client *http.Client, listed []listing,
-	from time.Time, mark string, took *Taken) ([]entry, bool, error) {
+	from time.Time, mark string) ([]entry, bool, error) {
 
 	var due []entry
 	var refused error
@@ -754,7 +754,7 @@ func (f *Fetcher) record(ctx context.Context, by access.Subject, feed Feed, one 
 		// pass takes minutes, and a supplier withdrawn during one goes on
 		// fetching and recording — which is the request leaving this
 		// deployment that withdrawing it was meant to stop.
-		standing, err := NewStore(tx).Standing(ctx, tx, feed.ID)
+		standing, err := NewStore(tx).Standing(ctx, feed.ID)
 		if err != nil {
 			return err
 		}

@@ -7,14 +7,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Failed } from "../ui/Failed";
-import { RECORDABLE } from "../ui/severities";
-import { RATINGS } from "./FindingDecision";
+import { FLOORS, RECORDABLE } from "../ui/severities";
 
 // The rating the form opens on: the standing one, then the published one, and
 // only where the form offers it. A published "negligible" or "none" is a word
 // the select cannot show and the route refuses, so it opens on medium instead.
 export function startingRating(assessed?: string, published?: string): string {
-  const offered = RATINGS as readonly string[];
+  const offered = FLOORS as readonly string[];
   return [assessed, published].find((word) => offered.includes(word ?? "")) ?? "medium";
 }
 
@@ -66,7 +65,7 @@ export function Assess({
       unwrap(
         await api.POST("/v1/products/{product}/issues/{issue}/assessment", {
           params: { path: { product, issue: vulnerability } },
-          body: { severity: severity as (typeof RATINGS)[number], reasoning },
+          body: { severity: severity as (typeof FLOORS)[number], reasoning },
         }),
       ),
     onSuccess: (rated) => {
@@ -94,7 +93,7 @@ export function Assess({
             style={{ width: "auto" }}
             onChange={(event) => setSeverity(event.target.value)}
           >
-            {RATINGS.map((each) => (
+            {FLOORS.map((each) => (
               <option key={each} value={each}>
                 {each}
               </option>

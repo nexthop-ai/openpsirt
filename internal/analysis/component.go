@@ -54,14 +54,8 @@ func MayCount(subject access.Subject, productID int64, what string) error {
 // holds is placed there. Counted only where the name names a build's root,
 // over every component that was ever that build's root, named as values.
 func CountsOfComponent(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope) (*ComponentCounts, error) {
-	if err := MayCount(subject, scope.ProductID, "count the code findings of a component"); err != nil {
-		return nil, err
-	}
-	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
+	scope, visible, err := scope.oneProduct(ctx, db, subject, "count the code findings of a component")
 	if err != nil {
-		return nil, err
-	}
-	if scope, err = scope.resolved(ctx, db); err != nil {
 		return nil, err
 	}
 	series, err := countBySeries(ctx, db, subject, scope, visible)

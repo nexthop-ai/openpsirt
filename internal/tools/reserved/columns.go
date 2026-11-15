@@ -221,15 +221,21 @@ func importedNames(file *ast.File) map[string]bool {
 var qualifiedBare = regexp.MustCompile(
 	"(?:^|[^A-Za-z0-9_.\"'`/?\\[-])((?:\"[a-z_][a-z0-9_]*\"|\\?[A-Za-z]+|[a-z_][a-z0-9_]*)\\.([a-z_][a-z0-9_]*))(?:[^A-Za-z0-9_.(\"'`/-]|$)")
 
+// everyColumnBare matches every column of a row selected through a bare
+// qualifier, `nt.*`. The builder's placeholder is filled quoted, and a quoted
+// qualifier does not match.
+var everyColumnBare = regexp.MustCompile("(?:^|[^A-Za-z0-9_.\"'`/?\\[-])([a-z_][a-z0-9_]*)\\.\\*")
+
 // qualifiedAlone matches a literal that is one qualified column and nothing
 // else, which is a name handed to code rather than a clause.
 var qualifiedAlone = regexp.MustCompile(`\A\s*(?:"[a-z_][a-z0-9_]*"|\??[A-Za-z_][A-Za-z0-9_]*)\.[a-z_][a-z0-9_]*\s*\z`)
 
 // sqlShaped recognizes a literal holding a clause: a comparison written with
 // the spaces every query here gives one, a parenthesis, a list of qualified
-// names, or a keyword written in capitals as every keyword here is. A sentence naming a setting's key and
+// names, every column through a qualifier, or a keyword written in capitals
+// as every keyword here is. A sentence naming a setting's key and
 // an option assigning one have none of them.
-var sqlShaped = regexp.MustCompile(`\s(?:=|<>|!=|<=|>=|<|>)\s|\(|[a-z_]\.[a-z_]+"?\s*,\s*"?[a-z_]+"?\.|\b(?:LIKE|BETWEEN)\b|\b(?:AND|OR|IS|NOT|NULL|IN|ON|AS|ASC|DESC|CASE|WHEN|THEN|ELSE|END|SELECT|WHERE|FROM|JOIN|EXISTS|BY)\b`)
+var sqlShaped = regexp.MustCompile(`\s(?:=|<>|!=|<=|>=|<|>)\s|\(|[a-z_]\.[a-z_]+"?\s*,\s*"?[a-z_]+"?\.|[a-z_"]\.\*|\b(?:LIKE|BETWEEN)\b|\b(?:AND|OR|IS|NOT|NULL|IN|ON|AS|ASC|DESC|CASE|WHEN|THEN|ELSE|END|SELECT|WHERE|FROM|JOIN|EXISTS|BY)\b`)
 
 // qualifiedColumns reports every declared column a clause writes bare after a
 // qualifier, in a literal that carries no statement marker.
@@ -263,6 +269,13 @@ func qualifiedIn(text string, columns map[string]bool, path string, line int) []
 		}
 		one := bareColumn{word: word, qualifier: text[match[2] : match[4]-1]}
 		bad = append(bad, found{word: word, file: path, line: line, bare: true, column: one.quoted()})
+	}
+	for _, match := range everyColumnBare.FindAllStringSubmatchIndex(text, -1) {
+		qualifier := text[match[2]:match[3]]
+		bad = append(bad, found{
+			word: qualifier, file: path, line: line, bare: true,
+			everyColumn: true, column: strconv.Quote(qualifier) + ".*",
+		})
 	}
 	return bad
 }

@@ -241,19 +241,31 @@ type HeldBody struct {
 	Source core.GrantSource `json:"source,omitempty" doc:"Whether an administrator assigned this or a group derived it"`
 }
 
-// KeyBody is a pipeline credential, without its secret.
-type KeyBody struct {
+// KeyRequest is a credential being created: its purpose and its reach.
+//
+// Separate from KeyBody for the reason RecordBody is separate from PersonBody:
+// the secret, the dates and the withdrawal are the answer's, and a request
+// carrying them reads as though a caller chose them.
+type KeyRequest struct {
 	Name    string `json:"name" minLength:"1" maxLength:"191" doc:"The credential's purpose, stored in lower case and matched without regard to capitals"`
 	Product string `json:"product" minLength:"1" doc:"The product it may send scans for, by the name that addresses it. Always required"`
+	// Branch or tag and Variant narrow it further. Either, both or neither may
+	// be given: a key covering a whole product cannot imply which release an
+	// upload is for, which is why an upload always states its own build.
+	BranchOrTag string `json:"branch_or_tag,omitempty" doc:"Optionally, the one release it may send for"`
+	Variant     string `json:"variant,omitempty" doc:"Optionally, the one variant it may send for"`
+}
+
+// KeyBody is a pipeline credential, without its secret.
+//
+// It carries create-key's fields under create-key's bounds, so a listing names
+// a credential in the words that made it.
+type KeyBody struct {
+	KeyRequest
 	// ProductDisplayName is the human spelling, beside the address rather than
 	// in place of it: this field is what create-key resolves, and a display
 	// name resolves to nothing.
 	ProductDisplayName string `json:"product_name,omitempty" doc:"The product's display name, where it differs from its name"`
-	// Branch or tag and Variant narrow it further. Either, both or neither may be
-	// given: a key covering a whole product cannot imply which release an
-	// upload is for, which is why an upload always states its own build.
-	BranchOrTag string `json:"branch_or_tag,omitempty" doc:"Optionally, the one release it may send for"`
-	Variant     string `json:"variant,omitempty" doc:"Optionally, the one variant it may send for"`
 	// Secret is returned when the credential is created, and never again.
 	Secret string `json:"secret,omitempty" doc:"Shown once, at creation. It is stored hashed and cannot be shown again"`
 	// CreatedAt is when it was issued. A credential's age is half of what
@@ -573,7 +585,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 			return nil, err
 		}
 		var released int64
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			released = 0
 			store, names, err := core.Administerable(ctx, a, tx)
 			if err != nil {
@@ -640,7 +652,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
 		a := a.In(ctx)
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			// A credential-shaped act: whoever next arrives under the username
 			// is taken to be its holder, so a token may not do it.
 			store, _, err := mintable(ctx, a, tx)
@@ -698,7 +710,7 @@ func registerAdministration(api huma.API, a core.Administering) {
 			return nil, err
 		}
 		var released int64
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			released = 0
 			store, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
@@ -753,10 +765,6 @@ type ReleasedOutput struct {
 // longer open it, and asking again answers that there is no such grant before
 // it reaches the hand-back.
 func handBack(ctx context.Context, a core.Administering, tx bun.IDB, personID int64) (int64, error) {
-	if a.Findings == nil {
-		// This deployment hands back nobody's work.
-		return 0, nil
-	}
 	released, err := finding.NewStore(tx).HandBackUnread(ctx, access.Narrowed{People: []int64{personID}})
 	if err != nil {
 		return 0, core.WentWrong(a.Logger, "cannot hand back what they were dealing with", err)

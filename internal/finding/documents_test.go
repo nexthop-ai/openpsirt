@@ -5,7 +5,9 @@ package finding_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
@@ -144,6 +146,32 @@ func TestEveryUploadOfADocumentIsListedAndTheNewestTakenStands(t *testing.T) {
 			if !u.Current() {
 				t.Errorf("%s reads as replaced; want it standing beside the other and the refusal", u.Identifier)
 			}
+		}
+	})
+}
+
+// A refused upload may quote the document it refused, NUL and bytes that are
+// not text included, and the refusal is recorded all the same.
+func TestARefusedUploadQuotingABinaryDocumentIsRecorded(t *testing.T) {
+	catalogSeed.Each(t, func(t *testing.T, db *database.DB, c seededCatalog) {
+		ctx := t.Context()
+		store := finding.NewStore(db.DB)
+		person, err := access.NewStore(db.DB).Ensure(ctx, "admin@example.com", "Admin", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		by := access.NewPerson(person.ID, "admin@example.com", true, nil, 0)
+		if err := store.TurnedAway(ctx, by, c.product, finding.Supplied{
+			Source: finding.FromVex, Document: "broken.json", Arrived: &finding.Arrival{},
+		}, "unreadable near \x00 and \xff"); err != nil {
+			t.Fatalf("a refusal quoting a binary document was not recorded: %v", err)
+		}
+		uploads, _, err := store.Uploads(ctx, by, c.product, finding.FromVex, 50, 0)
+		if err != nil || len(uploads) != 1 || uploads[0].Reason == nil {
+			t.Fatalf("the uploads read %+v: %v", uploads, err)
+		}
+		if said := *uploads[0].Reason; !utf8.ValidString(said) || strings.ContainsRune(said, 0) {
+			t.Errorf("recorded %q, want the reason with its NUL dropped and its invalid byte replaced", said)
 		}
 	})
 }

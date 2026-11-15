@@ -155,7 +155,7 @@ select.minimumseverity {
 .prior .why,
 .qcard .why,
 .said2 .bubble,
-.version .words {
+.version .revtext {
   background: var(--raised);
   border-radius: var(--radius);
   padding: 9px 11px;

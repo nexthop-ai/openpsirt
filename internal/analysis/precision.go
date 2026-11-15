@@ -11,7 +11,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
 // Answered is what people said of the code findings of one series, or of one
@@ -71,14 +70,8 @@ type Precision struct {
 // Refused to anybody who does not read security testing material in the
 // product, before any name in the scope is resolved.
 func PrecisionOf(ctx context.Context, db bun.IDB, subject access.Subject, scope Scope) (*Precision, error) {
-	if err := MayCount(subject, scope.ProductID, "measure the precision of the analyzers"); err != nil {
-		return nil, err
-	}
-	visible, err := finding.CodeFindingVisible(subject, scope.ProductID)
+	scope, visible, err := scope.oneProduct(ctx, db, subject, "measure the precision of the analyzers")
 	if err != nil {
-		return nil, err
-	}
-	if scope, err = scope.resolved(ctx, db); err != nil {
 		return nil, err
 	}
 	product := inProduct(scope.ProductID)

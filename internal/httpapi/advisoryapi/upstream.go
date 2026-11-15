@@ -168,7 +168,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 		}
 		address, _ := upstream.Address(input.Body.URL)
 		var out *upstream.Upstream
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			by, product, err := core.AdministeredProduct(ctx, in, tx, input.Product)
 			if err != nil {
 				return err
@@ -227,7 +227,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 		if err := finding.EnsureStatementsLock(ctx, in.DB); err != nil {
 			return nil, core.NotRecorded(in.Log(), err)
 		}
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			// First, as every transaction setting statements aside takes it.
 			if err := finding.TakeStatements(ctx, tx); err != nil {
 				return core.NotRecorded(in.Logger, err)
@@ -376,7 +376,7 @@ func declineHandler(in core.Deps, decline bool) func(context.Context, *struct {
 		Statement int64 `path:"statement"`
 	}) (*struct{}, error) {
 		in := core.Of(ctx, in)
-		if err := core.Changing(ctx, in.DB, in.Log(), func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, in.DB, func(ctx context.Context, tx bun.Tx) error {
 			subject, err := core.Requester(ctx)
 			if err != nil {
 				return err

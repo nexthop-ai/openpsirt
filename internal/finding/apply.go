@@ -6,8 +6,6 @@ package finding
 import (
 	"context"
 	"fmt"
-	"maps"
-	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -17,7 +15,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
-	"github.com/nexthop-ai/openpsirt/internal/rating"
 )
 
 // occurrence is one finding's position: the component, and what pulled it in.
@@ -978,76 +975,6 @@ func closeIDs(ctx context.Context, tx bun.IDB, ids []int64, startedAt time.Time,
 	return matched, err
 }
 
-// latestClosed reads the most recent closed row of these issues, at each
-// component and consumer and at each occurrence identity.
-func latestClosed(ctx context.Context, db bun.IDB, buildID int64,
-	vulnerabilities []int64) (map[key]Finding, map[at]Finding, error) {
-
-	byKey, byAt := map[key]Finding{}, map[at]Finding{}
-	if len(vulnerabilities) == 0 {
-		return byKey, byAt, nil
-	}
-	issues := distinct(vulnerabilities)
-	err := database.IDsInBatches(ctx, issues, func(ctx context.Context, batch []int64) error {
-		// The latest row of each grouping, by identifier, rather than every
-		// closed row ever recorded: an occurrence whose version moves gathers a
-		// closed row at every move.
-		latest := func(grouping string) *bun.SelectQuery {
-			kinds, kindArgs := kind.Closure.Where(`"lf"."kind"`)
-			return db.NewSelect().
-				TableExpr(`"finding" AS "lf"`).
-				ColumnExpr(`MAX("lf"."id")`).
-				Where(`"lf"."build_id" = ?`, buildID).
-				Where(kinds, kindArgs...).
-				Where(`"lf"."closed_at" IS NOT NULL`).
-				Where(`"lf"."vulnerability_id" IN (?)`, bun.List(batch)).
-				GroupExpr(grouping)
-		}
-		// A replaced inventory's check writes its rows after the
-		// replacement's, so by identifier its match at an occurrence hides the
-		// replacement's row there. The latest a scan wrote is read beside it,
-		// for the order below to rank.
-		scanned := func(grouping string) *bun.SelectQuery {
-			return latest(grouping).Where(`NOT (` + checkRecorded("lf") + `)`)
-		}
-		var rows []Finding
-		kinds, kindArgs := kind.Closure.Where(`"kind"`)
-		err := db.NewSelect().Model(&rows).
-			Column("id", "vulnerability_id", "component_id", "consumer_id",
-				"occurrence_identity", "closed_because", "suppressed_by", "unaffected_by", "stated_by").
-			// The range again outside the arms: a membership test under OR
-			// is never a semi-join on PostgreSQL or MySQL, so without it the
-			// read walks every finding in the deployment.
-			Where(`"build_id" = ?`, buildID).
-			Where(kinds, kindArgs...).
-			Where(`"closed_at" IS NOT NULL`).
-			Where(`"vulnerability_id" IN (?)`, bun.List(batch)).
-			WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
-				return q.
-					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."component_id", "lf"."consumer_id"`)).
-					WhereOr(`"id" IN (?)`, scanned(`"lf"."vulnerability_id", "lf"."component_id", "lf"."consumer_id"`)).
-					WhereOr(`"id" IN (?)`, latest(`"lf"."vulnerability_id", "lf"."occurrence_identity"`))
-			}).
-			// Ascending, so the last row read at an occurrence is its latest,
-			// in the order Later gives: a replaced inventory's check writes
-			// its rows after the replacement's, about a stretch before them.
-			OrderExpr(`"closed_at" ASC, "id" ASC`).
-			Scan(ctx)
-		if err != nil {
-			return err
-		}
-		for _, row := range rows {
-			byKey[key{row.VulnerabilityID, occurrence{row.ComponentID, value(row.ConsumerID)}}] = row
-			byAt[at{row.VulnerabilityID, row.OccurrenceIdentity}] = row
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("read what these occurrences last closed as: %w", err)
-	}
-	return byKey, byAt, nil
-}
-
 // same reports whether what a scan found about a finding matches what is
 // already recorded. Only what the fix half of the update writes is compared;
 // how urgent it is has its own comparison, because the two write different
@@ -1072,130 +999,6 @@ func same(held heldFinding, found Finding) bool {
 		equalRef(held.SuppressedBy, found.SuppressedBy) &&
 		equalRef(held.StatedBy, found.StatedBy) &&
 		equalRef(held.ClaimedBy, found.ClaimedBy)
-}
-
-// learnedExploitation is the moment to record beside a clock that just moved,
-// or nothing where the row is no longer exploited.
-//
-// The day the known-exploited catalog listed the issue, or the run's start
-// where that is earlier or no day is known. The run's start rather than the
-// wall clock, because that is what the deadline beside it was counted from and
-// the two have to agree. A finding first seen after the listing still counts
-// from when it was seen, which Deadline answers by counting from the later of
-// this and the opening.
-func learnedExploitation(f Finding, listedOn *time.Time, startedAt time.Time) *time.Time {
-	if !f.RankExploited {
-		return nil
-	}
-	return exploitationKnown(listedOn, startedAt)
-}
-
-// exploitationKnown is when exploitation counts from: the day the catalog
-// listed the issue, or the moment it was learned here where that is earlier or
-// no day is known.
-func exploitationKnown(listedOn *time.Time, learnedAt time.Time) *time.Time {
-	if listedOn != nil && listedOn.Before(learnedAt) {
-		at := listedOn.UTC()
-		return &at
-	}
-	return &learnedAt
-}
-
-// ranking reports whether an open finding's place in the order has moved, and
-// whether exploitation is what moved it.
-//
-// The two are separate, and deliberately: every ranking signal moves the
-// order, and exploitation is the only one that starts a clock over. A score
-// somebody revised upward is worth reordering the list for and is not worth
-// resetting a deadline over — likelihood and score are not in the deadline at
-// all, and a deadline recounted whenever a number was revised would never
-// arrive, which is the same failure as recounting it nightly.
-//
-// It does not answer whether the deadline moved. That is asked of the deadline
-// itself, because a fix appearing upstream moves it and touches no ranking
-// signal at all.
-func ranking(held heldFinding, found Finding) (moved, exploitationMoved bool) {
-	moved = held.Urgency != found.Urgency ||
-		held.RankExploited != found.RankExploited ||
-		held.RankShipped != found.RankShipped
-	exploitationMoved = held.RankExploited != found.RankExploited
-	return moved, exploitationMoved
-}
-
-// ratingRow is one issue as ratingsInForce reads it.
-type ratingRow struct {
-	ID            int64      `bun:"id"`
-	Published     string     `bun:"published"`
-	Assessed      string     `bun:"assessed"`
-	Exploited     bool       `bun:"exploited"`
-	Incident      int        `bun:"incident"`
-	ScoreCenti    int        `bun:"score_centi"`
-	LikelihoodPPM int        `bun:"likelihood_ppm"`
-	ExploitedOn   *time.Time `bun:"exploited_on"`
-}
-
-// ratingsInForce reads what is on record about each interned issue.
-//
-// Read back from the issue rather than taken from the report that is being
-// applied, and that is the point of it. A report is one source's account of
-// one moment: it may omit that something is being exploited, or carry a score
-// lower than a report last week gave. What is stored is the worst anybody has
-// claimed, moving only toward worse, plus this product's rating where somebody
-// here has made one — so the issue is the one place that knows everything
-// known about it, and ranking from anywhere else makes the order depend on
-// which scan ran last.
-//
-// The rating is this build's product's. Another product's rating of the same
-// issue reaches nothing here, which is what makes two products able to hold
-// different ones.
-//
-// Interning has already folded this report into the row, so what comes back
-// includes whatever this report knew that the row did not.
-func ratingsInForce(ctx context.Context, tx bun.IDB, productID int64,
-	interned map[string]int64) (map[int64]Rating, error) {
-
-	ids := distinct(slices.Collect(maps.Values(interned)))
-	ratings := map[int64]Rating{}
-	if len(ids) == 0 {
-		return ratings, nil
-	}
-	var rows []ratingRow
-	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
-		var found []ratingRow
-		err := tx.NewSelect().
-			TableExpr(`"vulnerability" AS "v"`).
-			Join(rating.Here, productID).
-			// Whether this product has been recorded as attacked through the
-			// issue. A left join on the standing record rather than a column
-			// on the issue, because the record belongs to one product and the
-			// issue is shared by all of them.
-			Join(standingExploitationHere, productID).
-			ColumnExpr(`"v"."id" AS "id"`).
-			ColumnExpr(`COALESCE("v"."severity", ?) AS "published"`, "").
-			ColumnExpr(`COALESCE("ir"."severity", ?) AS "assessed"`, "").
-			ColumnExpr(`"v"."exploited" AS "exploited"`).
-			ColumnExpr(`CASE WHEN "eh"."id" IS NULL THEN 0 ELSE 1 END AS "incident"`).
-			ColumnExpr(`COALESCE("v"."score_centi", 0) AS "score_centi"`).
-			ColumnExpr(`COALESCE("v"."likelihood_ppm", 0) AS "likelihood_ppm"`).
-			ColumnExpr(`"v"."exploited_on" AS "exploited_on"`).
-			Where(`"v"."id" IN (?)`, bun.List(batch)).
-			Scan(ctx, &found)
-		rows = append(rows, found...)
-		return err
-	})
-	if err != nil {
-		return nil, fmt.Errorf("read what is on record about these issues: %w", err)
-	}
-	for _, row := range rows {
-		ratings[row.ID] = Rating{
-			Published: row.Published, Assessed: row.Assessed,
-			Exploited: row.Exploited, Incident: row.Incident == 1,
-			ScoreCenti:    row.ScoreCenti,
-			LikelihoodPPM: row.LikelihoodPPM,
-			ExploitedOn:   row.ExploitedOn,
-		}
-	}
-	return ratings, nil
 }
 
 // equalRef compares two references that may be absent.

@@ -172,11 +172,6 @@ func (c change) addsOnly() bool {
 type added struct {
 	column string
 	fill   string
-	// serverFill replaces fill on the engines that alter a table in place,
-	// where a column is filled before its constraints exist. A table rebuilt
-	// on SQLite is created with them, so a fill that has to be unique before
-	// the value it stands in for is written differs between the two.
-	serverFill string
 }
 
 // change alters one table into the shape the release declares.
@@ -204,9 +199,6 @@ func (u *upgrader) change(statements []string, c change) error {
 			return err
 		}
 		fill := a.fill
-		if a.serverFill != "" {
-			fill = a.serverFill
-		}
 		if fill == "" {
 			stmts = append(stmts, `ALTER TABLE "`+c.table+`" ADD COLUMN `+def)
 			continue

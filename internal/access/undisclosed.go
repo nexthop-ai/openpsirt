@@ -5,21 +5,32 @@ package access
 
 import "regexp"
 
-// visibilityColumns are the qualified columns a statement may count
-// undisclosed rows of. A column is placed in the statement as written, so it
-// comes from this set rather than from a caller.
-var visibilityColumns = map[string]bool{
-	`"f"."visibility"`:  true,
-	`"de"."visibility"`: true,
-	`"q"."visibility"`:  true,
+// VisibilityColumn is a column holding a visibility, as a statement names it.
+//
+// A column is spliced into the statement, so the set is
+// closed and named here: its one field is unexported, so no other package
+// builds one from a string it was handed or from a literal. The empty value
+// names no column, and an aggregate asked of it panics.
+type VisibilityColumn struct{ name string }
+
+// spliced is the column as the statement names it.
+func (c VisibilityColumn) spliced() string {
+	if c.name == "" {
+		panic("access: a visibility column names no column")
+	}
+	return c.name
 }
 
-// visibilityColumn is column, refusing one outside visibilityColumns.
-func visibilityColumn(caller, column string) string {
-	if !visibilityColumns[column] {
-		panic("access." + caller + ": " + column + " is not a visibility column")
-	}
-	return column
+// The columns a statement counts undisclosed rows of, each by the alias its
+// table takes in the statements that ask. Functions rather than variables, so
+// no other package can reassign one.
+
+// FindingVisibility is a finding's visibility.
+func FindingVisibility() VisibilityColumn { return VisibilityColumn{`"f"."visibility"`} }
+
+// DecisionOccurrenceVisibility is a decision occurrence's visibility.
+func DecisionOccurrenceVisibility() VisibilityColumn {
+	return VisibilityColumn{`"de"."visibility"`}
 }
 
 // PrivateCount is an aggregate counting the rows of a group whose visibility
@@ -29,13 +40,13 @@ func visibilityColumn(caller, column string) string {
 // equality and never ordered, because an ordering answers "is any of this
 // undisclosed" only while the words sort that way. A count, so a group with
 // no undisclosed rows is zero on every engine rather than a null.
-func PrivateCount(column string) (string, any) {
-	return "COUNT(CASE WHEN " + visibilityColumn("PrivateCount", column) + " = ? THEN 1 END)", string(Private)
+func PrivateCount(column VisibilityColumn) (string, any) {
+	return "COUNT(CASE WHEN " + column.spliced() + " = ? THEN 1 END)", string(Private)
 }
 
 // AnyPrivate is a condition over a group that holds where any of its rows is
 // undisclosed, with the argument it binds.
-func AnyPrivate(column string) (string, any) {
+func AnyPrivate(column VisibilityColumn) (string, any) {
 	count, arg := PrivateCount(column)
 	return "(" + count + " > 0)", arg
 }
@@ -47,13 +58,13 @@ func AnyPrivate(column string) (string, any) {
 // Undisclosed and security testing rows both. Disclosure applies to private work
 // alone, and PrivateCount is the question it asks; what a message leaving
 // the deployment may say about a row is asked of this one.
-func WithheldCount(column string) (string, any) {
-	return "COUNT(CASE WHEN " + visibilityColumn("WithheldCount", column) + " <> ? THEN 1 END)", string(Public)
+func WithheldCount(column VisibilityColumn) (string, any) {
+	return "COUNT(CASE WHEN " + column.spliced() + " <> ? THEN 1 END)", string(Public)
 }
 
 // AnyWithheld is a condition over a group that holds where the detail of any
 // of its rows stays inside the deployment, with the argument it binds.
-func AnyWithheld(column string) (string, any) {
+func AnyWithheld(column VisibilityColumn) (string, any) {
 	count, arg := WithheldCount(column)
 	return "(" + count + " > 0)", arg
 }
@@ -71,13 +82,13 @@ func as(caller, name string) string {
 }
 
 // PrivateCountAs is PrivateCount selected under a name, for a column list.
-func PrivateCountAs(column, name string) (string, any) {
+func PrivateCountAs(column VisibilityColumn, name string) (string, any) {
 	count, arg := PrivateCount(column)
 	return count + as("PrivateCountAs", name), arg
 }
 
 // WithheldCountAs is WithheldCount selected under a name, for a column list.
-func WithheldCountAs(column, name string) (string, any) {
+func WithheldCountAs(column VisibilityColumn, name string) (string, any) {
 	count, arg := WithheldCount(column)
 	return count + as("WithheldCountAs", name), arg
 }
@@ -86,13 +97,12 @@ func WithheldCountAs(column, name string) (string, any) {
 // security testing work, selected under a name, with the argument it binds. A reader
 // of undisclosed work reads none of them, so an audience is asked about them
 // apart.
-func SecurityTestingCountAs(column, name string) (string, any) {
-	return "COUNT(CASE WHEN " + visibilityColumn("SecurityTestingCountAs", column) + " = ? THEN 1 END)" +
-		as("SecurityTestingCountAs", name), string(SecurityTesting)
+func SecurityTestingCountAs(column VisibilityColumn, name string) (string, any) {
+	return "COUNT(CASE WHEN " + column.spliced() + " = ? THEN 1 END)" + as("SecurityTestingCountAs", name), string(SecurityTesting)
 }
 
 // AnyPrivateAs is AnyPrivate selected under a name, for a column list.
-func AnyPrivateAs(column, name string) (string, any) {
+func AnyPrivateAs(column VisibilityColumn, name string) (string, any) {
 	cond, arg := AnyPrivate(column)
 	return cond + as("AnyPrivateAs", name), arg
 }

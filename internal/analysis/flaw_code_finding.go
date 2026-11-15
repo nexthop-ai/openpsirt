@@ -188,7 +188,7 @@ func UndoRecordAsFlaw(ctx context.Context, db bun.IDB, subject access.Subject, p
 // code finding its flaw is not disclosed for, and a code finding no longer recorded as a flaw has no
 // case to be brought into.
 func endCodeFindingGrants(ctx context.Context, tx bun.IDB, subject access.Subject, productID int64,
-	occurrenceIdentity, name string, now time.Time) error {
+	occurrenceIdentity, name string, at time.Time) error {
 
 	rights := access.NewStore(tx)
 	rows, err := rights.CodeFindingRows(ctx, productID, occurrenceIdentity)
@@ -208,7 +208,7 @@ func endCodeFindingGrants(ctx context.Context, tx bun.IDB, subject access.Subjec
 	}
 	records := trail.NewStore(tx)
 	for _, row := range rows {
-		if err := rights.RemoveFromCodeFinding(ctx, productID, occurrenceIdentity, row.PersonID, subject.ID); err != nil {
+		if err := rights.RemoveFromCodeFinding(ctx, productID, occurrenceIdentity, row.PersonID, subject.ID, at); err != nil {
 			return err
 		}
 		if err := records.Record(ctx, subject, trail.Case, name+" · "+identity[row.PersonID],

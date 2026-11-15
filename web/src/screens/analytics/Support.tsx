@@ -238,21 +238,23 @@ function fileAt(format: "csv" | "json", asked: string): string {
   return linkedFile("/v1/releases/out-of-support.{format}", format, { query: asked });
 }
 
-// The findings open on one release, as the findings list shows them.
-//
-// The two filters the list applies to itself are stated rather than left to
-// default: it keeps to branches in support unless told otherwise, and every
-// release here is out of support, so the default answers nothing. The kind is
-// the release's own, because a branch can be past end-of-life too. The findings
-// open on a release that has not gone yet. The same list, without the
-// past-end-of-life filter: this one is still in support, which is what makes it
-// something somebody can still act on.
+// The findings open on a release that has not gone yet, as the findings list
+// shows them. The same list as openAt's without the past-end-of-life filter:
+// this one is still in support, which is what makes it something somebody can
+// still act on.
 function endingAt(product: string, branchOrTag: string, kind: string): string {
   const asked = new URLSearchParams({ branch_or_tag: branchOrTag });
   asked.set("on", kind === "tag" ? "tag" : "branch");
   return findingsPath({ product }, false, asked);
 }
 
+// The findings open on one release past end-of-life, as the findings list shows
+// them.
+//
+// The two filters the list applies to itself are stated rather than left to
+// default: it keeps to branches in support unless told otherwise, and every
+// release here is out of support, so the default answers nothing. The kind is
+// the release's own, because a branch can be past end-of-life too.
 function openAt(product: string, branchOrTag: string, kind: string): string {
   const asked = new URLSearchParams({ branch_or_tag: branchOrTag });
   asked.set("on", kind === "tag" ? "tag" : "branch");

@@ -69,7 +69,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 			" one build's edges, and this list spans products")
 	}
 	limit = database.AList.Of(limit)
-	if err := s.decidedIssuesFor(ctx, &filter, products, all); err != nil {
+	if err := s.prepare(ctx, &filter, products, all); err != nil {
 		return nil, 0, err
 	}
 	filter.Across = true

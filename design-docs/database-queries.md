@@ -46,6 +46,7 @@ refused by MySQL alone.
 | What is a column | A declared name in lower case, since keywords are in capitals. A word before a parenthesis is a function. Arguments after a builder method's SQL are values |
 | Which literals are statements | Any literal containing `FROM "` or `JOIN "`, wherever it is held. Every table is quoted, so prose never carries the marker |
 | A qualified column outside a statement | An alias, a dot and a declared column, all lower case, in any literal of running code |
+| Every column through a qualifier | A bare alias before `.*`, in a statement or a clause of running code. The builder fills its own alias quoted |
 | A name invented with `AS` | Read as a declared column wherever a reference qualifies it, in any file, and where it stands alone in running code's statement or builder method's SQL argument, as an ordering by an alias writes it |
 | What is not a name | A word a placeholder mark or a formatting verb opens, such as `%s` or `%[2]s` |
 | A table a query names | Read in every literal outside the migrations, against the tables the migrations made. A literal that is only a table name is read where a method naming a table is called |
@@ -56,7 +57,7 @@ refused by MySQL alone.
 
 | Literal | Read as |
 |---|---|
-| A clause: a comparison with spaces, a parenthesis, a list of qualified names, `LIKE`, `BETWEEN`, or another capitalized keyword | Every qualified column in it |
+| A clause: a comparison with spaces, a parenthesis, a list of qualified names, an alias before `.*`, `LIKE`, `BETWEEN`, or another capitalized keyword | Every qualified column in it, and every bare alias before `.*` |
 | One qualified name alone, handed to a call, returned, a field's value, or a constant of a named type | That name |
 | An argument of a builder method or function that quotes its argument | Nothing: the callee quotes it |
 | An argument of a standard library call, a map's key, a constant of plain string type | Nothing: a setting's key is written the same way |
@@ -104,6 +105,7 @@ update touched: zero means somebody got there first.
 |---|---|
 | Every connection reports rows matched, not changed | MySQL and MariaDB report rows changed by default, so a write whose values were already correct reports a false conflict |
 | The count is read through one helper | An unreadable count is a fault, never zero, which callers read as a lost race |
+| A note kept as one row per key is written through one helper: an update, and an insert where it matched nothing, a duplicate on the insert being success | No upsert is portable, and two writers meeting on the unique key wrote the same note; it runs outside a transaction, which a refused insert ends on PostgreSQL |
 
 A test asserts the count on all four engines, and removing the setting fails
 exactly the two.

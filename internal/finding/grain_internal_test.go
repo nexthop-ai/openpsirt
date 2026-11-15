@@ -89,6 +89,7 @@ func TestEveryConditionOverAGroupIsKnownAsOne(t *testing.T) {
 			*v = []access.Visibility{access.Public}
 		case *graph.PurlPrefix:
 			*v = graph.ParsePurlPrefix("pkg:deb/debian/curl")
+			f.purlComponents = []int64{1}
 		default:
 			// A field of a named type this does not know how to set. The
 			// ones named here write no condition over a group; any other is

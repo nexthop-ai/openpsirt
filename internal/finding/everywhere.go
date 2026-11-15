@@ -136,7 +136,7 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 		ColumnExpr(graph.NodeName("sn", "c")+` AS "component"`).
 		ColumnExpr(graph.NodeVersion("sn", "c")+` AS "version"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(access.PrivateCountAs(`"f"."visibility"`, "private")).
+		ColumnExpr(access.PrivateCountAs(access.FindingVisibility(), "private")).
 		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
 		// The version a fix arrived in, where any occurrence knows one. Folded

@@ -205,7 +205,7 @@ func registerRevocation(api huma.API, a core.Administering) {
 		Name     string `path:"name"`
 	}) (*struct{}, error) {
 		a := a.In(ctx)
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			rights, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err
@@ -249,7 +249,7 @@ func registerRevocation(api huma.API, a core.Administering) {
 		Identity string `path:"identity"`
 	}) (*struct{}, error) {
 		a := a.In(ctx)
-		if err := core.Changing(ctx, a.DB, a.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, a.DB, func(ctx context.Context, tx bun.Tx) error {
 			rights, _, err := core.Administerable(ctx, a, tx)
 			if err != nil {
 				return err

@@ -4,6 +4,7 @@
 package finding
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
-	"github.com/nexthop-ai/openpsirt/internal/typedname"
 	"github.com/nexthop-ai/openpsirt/internal/weakness"
 )
 
@@ -136,12 +136,13 @@ type Filter struct {
 	Ecosystems []string
 	// Purl keeps what is open against components whose package identifier
 	// the prefix chooses, at any version, as the burndown chooses them. The
-	// store resolves it to purlComponents before the list is read.
+	// store's prepare resolves it to purlComponents before the list is read.
 	Purl graph.PurlPrefix
 	// purlComponents is the components Purl chooses, set by the store: the
 	// type narrows the statement reading them and the package is tested on
 	// each identifier read, since no stored column holds it reduced. Read only
-	// where Purl is set; unset or empty, the list keeps nothing.
+	// where Purl is set; empty, the list keeps nothing, and nil is a filter
+	// never prepared.
 	purlComponents []int64
 	// Under keeps what sits inside one container, by its name. UnderTheBuild
 	// asks for the other case: what the build holds directly, which has no
@@ -602,6 +603,22 @@ func (f Filter) ofPage(q *bun.SelectQuery) *bun.SelectQuery {
 	return f.narrowRows(q)
 }
 
+// errUnprepared is a filter naming a package identifier narrowed before the
+// store resolved the components it chooses. Unresolved, the set reads as
+// empty and the list would answer nothing with nothing saying why.
+//
+// It is carried on the narrowed statement, and on the statement over groups,
+// so running either answers it and the request fails as an internal error the
+// log records. A statement embedding one as an argument has the error written
+// into its text, which no engine parses, so it fails as well.
+var errUnprepared = errors.New("finding: a filter naming a package identifier was narrowed before the store prepared it")
+
+// unprepared reports a filter naming a package identifier whose components
+// the store never resolved.
+func (f Filter) unprepared() bool {
+	return !f.Purl.Empty() && f.purlComponents == nil
+}
+
 // narrowRows applies the half of the filter that is asked of each occurrence:
 // the WHERE clauses, and the joins they read.
 func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
@@ -674,6 +691,9 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 		}
 	}
 	if !f.Purl.Empty() {
+		if f.unprepared() {
+			return q.Err(errUnprepared)
+		}
 		if len(f.purlComponents) == 0 {
 			// An empty list is a syntax error on two of the engines, and an
 			// empty set holds nothing.
@@ -864,6 +884,9 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 // The conditions are the same at either grain; only the aggregates that reach
 // them differ.
 func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
+	if f.unprepared() {
+		return q.Err(errUnprepared)
+	}
 	if f.Exploited {
 		// The flag, not the urgency. Two bands of the urgency answer "some
 		// exploitation" — the world's word and this product's own record of
@@ -939,94 +962,6 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	return f.statesHaving(q, g)
 }
 
-// VariantSpread is how a group is spread over the variants of a branch.
-type VariantSpread string
-
-const (
-	// AnyVariants is no narrowing by spread.
-	AnyVariants VariantSpread = ""
-	// OnlyThisVariant keeps rows no other variant of the same branch holds
-	// open — what is specific to the variant the selection names.
-	OnlyThisVariant VariantSpread = "only"
-	// EveryVariant keeps rows every build of the same branch holds open —
-	// what is common to the product rather than to how it was built.
-	EveryVariant VariantSpread = "every"
-)
-
-// VariantSpreads is every narrowing by spread a request can ask for. No
-// narrowing is the absence of one, so it is not among them.
-func VariantSpreads() []VariantSpread { return []VariantSpread{OnlyThisVariant, EveryVariant} }
-
-// onThisRowsBranch is the branch the row's own build sits on.
-//
-// Spelled as a scalar subquery, which is how the other five lookups of this
-// shape here are written, rather than as a join correlated outward from
-// inside a subquery.
-const onThisRowsBranch = `(SELECT "tg0"."branch_or_tag_id" FROM "build" AS "tg0"` +
-	` WHERE "tg0"."id" = "f"."build_id")`
-
-// acrossVariants keeps rows by how the variants of a branch share them.
-//
-// The comparison is against the other builds on the row's own branch, whatever
-// the selection holds. Taken over the selection's branches together, a
-// selection naming a variant and leaving the branch at all compares each row
-// against every other variant on either branch: an issue open on one branch's
-// variant and on a different variant of another branch is dropped from "only",
-// though on its own branch nothing else has it.
-//
-// A row is held elsewhere where the same issue is open at the same fold, which
-// is the grain the list groups by. The fold is looked up from the row's
-// component rather than read off the outer query, because not every query this
-// narrows has the component joined under a known name.
-//
-// Both conditions are placed on the rows rather than as a HAVING, because the
-// question is about an occurrence: a group open on two branches keeps the
-// occurrences where its variant is alone with it and drops the occurrences
-// where it is not.
-func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
-	if f.AcrossVariants == AnyVariants || len(f.BuildIDs) == 0 {
-		return q
-	}
-	// The same issue at the same fold, open and seen by this reader; which
-	// build is added by the caller.
-	heldElsewhere := func() *bun.SelectQuery {
-		kinds, args := kind.Triage.Where(`"f2"."kind"`)
-		held, heldArgs := openOn("f2", f.OpenOn)
-		return q.NewSelect().TableExpr(`"finding" AS "f2"`).
-			Join(`JOIN "component" AS "c2" ON "c2"."id" = "f2"."component_id"`).
-			ColumnExpr("1").
-			Where(`"f2"."vulnerability_id" = "f"."vulnerability_id"`).
-			Where(`"c2"."fold_key" = (SELECT "c1"."fold_key" FROM "component" AS "c1"`+
-				` WHERE "c1"."id" = "f"."component_id")`).
-			Where(held, heldArgs...).
-			Where(`"f2"."visibility" IN (?)`, bun.List(f.Visible)).
-			Where(kinds, args...)
-	}
-	switch f.AcrossVariants {
-	case OnlyThisVariant:
-		// A variant has to be named for "only this one" to mean anything;
-		// the caller refuses the request before it reaches here, and this
-		// is the same answer for a caller that did not.
-		if f.VariantID == nil {
-			return q.Where("1 = 0")
-		}
-		others := q.NewSelect().TableExpr(`"build" AS "b2"`).
-			ColumnExpr(`"b2"."id"`).
-			Where(`"b2"."branch_or_tag_id" = `+onThisRowsBranch).
-			Where(`"b2"."variant_id" <> ?`, *f.VariantID)
-		return q.Where("NOT EXISTS (?)", heldElsewhere().
-			Where(`"f2"."build_id" IN (?)`, others))
-	case EveryVariant:
-		// No build on the row's own branch lacks it.
-		lacking := q.NewSelect().TableExpr(`"build" AS "b2"`).
-			ColumnExpr(`"b2"."id"`).
-			Where(`"b2"."branch_or_tag_id" = `+onThisRowsBranch).
-			Where("NOT EXISTS (?)", heldElsewhere().Where(`"f2"."build_id" = "b2"."id"`))
-		return q.Where("NOT EXISTS (?)", lacking)
-	}
-	return q
-}
-
 // whatUpstreamDid keeps only the groups upstream has done one of these about.
 //
 // A condition on the group rather than on a row, for the reason the fix flag
@@ -1059,155 +994,6 @@ func (f Filter) whatUpstreamDid(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		args = append(args, state, state)
 	}
 	q = having(q, "("+strings.Join(says, " OR ")+")", args...)
-	return q
-}
-
-// Who is dealing with a group, as a findings list asks it.
-const (
-	// HeldByMe is mine or a team I am on, at every occurrence.
-	HeldByMe = "me"
-	// HeldBySomebody is held at every occurrence, by anybody.
-	HeldBySomebody = "somebody"
-	// HeldByNobody is held at no occurrence.
-	HeldByNobody = "nobody"
-)
-
-// Assignees is every word a findings list asks who is dealing with a group in.
-func Assignees() []string { return []string{HeldByMe, HeldBySomebody, HeldByNobody} }
-
-// heldBy keeps only the groups whose occurrences are held by who was asked
-// about.
-//
-// One condition holding an OR rather than several applied in turn: "mine or
-// whatever nobody has picked up" is one question, and applied one at a time
-// these would AND and answer with nothing.
-//
-// A condition on the group, so "mine" means every occurrence held and every one
-// of them by one of my names. A group split between me and somebody else is not
-// mine, and saying it is would hand somebody work that is half theirs.
-func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
-	asked := trimmed(f.Assigned)
-	if len(asked) == 0 {
-		return q
-	}
-	says := make([]string, 0, len(asked))
-	args := make([]any, 0, 2)
-	for _, who := range asked {
-		switch who {
-		case HeldByNobody:
-			says = append(says, g.held()+" < 1")
-		case HeldBySomebody:
-			says = append(says, g.held()+" >= "+g.occurrences())
-		case HeldByMe:
-			// Mine or my team's, everywhere the phrase appears. A subject
-			// holding no party names nobody, so the phrase contributes
-			// nothing — which the guard below turns into an answer of nothing
-			// where it is the only thing asked for.
-			if len(f.HeldBy) == 0 {
-				continue
-			}
-			says = append(says, "("+g.held()+" >= "+g.occurrences()+
-				" AND "+g.heldLeast()+" IN (?) AND "+g.heldMost()+" IN (?))")
-			args = append(args, bun.List(f.HeldBy), bun.List(f.HeldBy))
-		}
-	}
-	if len(says) == 0 {
-		// Something was asked for and none of it could be turned into a
-		// condition: a word this does not know, or "mine" from a subject that
-		// holds no party. That is a narrowing that cannot be applied rather
-		// than no narrowing, and dropping it would answer with every finding
-		// there is while the screen shows the filter as on.
-		return having(q, "1 = 0")
-	}
-	return having(q, "("+strings.Join(says, " OR ")+")", args...)
-}
-
-// sayingIt keeps only what a VEX publisher has a standing statement about,
-// and only where that statement says what was asked.
-//
-// Apart from narrow, so that the rest of it reads as independent narrowings.
-// The statements are resolved into the (component, issue) pairs they name,
-// once, and the list is joined to that.
-//
-// A statement naming the product a component ships inside, where this product
-// ships that product, is about the component where it sits inside it, which a
-// pair cannot say. It reaches the list through the finding the run answered
-// with it, and through nothing else (REQ-31). A product this product does not
-// ship, such as the platform a distribution composes its packages into, places
-// nothing, and its statement is matched by package. Asked once per statement
-// rather than per finding.
-func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
-	publishers, saidIt := trimmed(f.Publishers), trimmed(f.VexStatus)
-	if len(publishers) > 0 || len(saidIt) > 0 {
-		// The statements being asked about, written once and used for
-		// both arms of the union below.
-		asked := []string{`"ss"."superseded_at" IS NULL`}
-		var about []any
-		if len(publishers) > 0 {
-			lowered := make([]string, 0, len(publishers))
-			for _, name := range publishers {
-				lowered = append(lowered, typedname.Matching(name))
-			}
-			asked = append(asked, `"ss"."publisher" IN (?)`)
-			about = append(about, bun.List(lowered))
-		}
-		if len(saidIt) > 0 {
-			asked = append(asked, `"ss"."status" IN (?)`)
-			about = append(about, bun.List(saidIt))
-		}
-		narrowing := strings.Join(asked, " AND ")
-		alone := narrowing + ` AND ("ss"."within" IS NULL OR NOT EXISTS (SELECT 1
-			FROM "component" AS "pc"
-			JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"
-			JOIN "build" AS "pt" ON "pt"."id" = "pn"."build_id"
-			JOIN "branch_or_tag" AS "ps" ON "ps"."id" = "pt"."branch_or_tag_id"
-			WHERE "ps"."product_id" = "ss"."product_id" AND "pn"."closed_scan_id" IS NULL
-			  AND "pc"."name_folded" = "ss"."within"))`
-
-		// The issue under its own name, and under every other name it
-		// goes by: which identifier a publisher chose says nothing
-		// about which issue they meant. Two arms rather than an OR
-		// across two left joins, because one statement can match one
-		// issue by name and another by alias, and folding those
-		// together would drop one of them.
-		//
-		// Both sides of every comparison are folded on the way in, so
-		// these are equalities the indexes can be used for rather than
-		// functions of a column. That is not a tidiness point: with
-		// LOWERon the issue's side the plan scanned the whole
-		// vulnerability table, and the whole alias table, once per
-		// statement.
-		pairs := `(SELECT "ss"."product_id" AS "product_id", "vc"."id" AS "component_id",
-			"vv"."issue_id" AS "vulnerability_id"
-			FROM "received_vex_statement" AS "ss"
-			JOIN "component" AS "vc" ON "vc"."name_folded" = "ss"."component"
-			JOIN "vulnerability" AS "vv" ON "vv"."identifier_folded" = "ss"."vulnerability"
-			WHERE ` + alone + `
-			UNION
-			SELECT "ss"."product_id", "vc"."id", "vl"."vulnerability_id"
-			FROM "received_vex_statement" AS "ss"
-			JOIN "component" AS "vc" ON "vc"."name_folded" = "ss"."component"
-			JOIN "vulnerability_alias" AS "vl" ON "vl"."identifier_folded" = "ss"."vulnerability"
-			WHERE ` + alone + `)`
-
-		where, args := f.product()
-		joined := make([]any, 0, 2*len(about)+len(args))
-		joined = append(joined, about...)
-		joined = append(joined, about...)
-		joined = append(joined, args...)
-		q = q.Join("LEFT JOIN "+pairs+` AS "vx" ON "vx"."component_id" = "f"."component_id"`+
-			` AND "vx"."vulnerability_id" = "f"."vulnerability_id"`+
-			// Correlated on the row's own product where the list spans them,
-			// so a statement in one product cannot answer for a finding in
-			// another.
-			` AND "vx"."product_id" = `+where, joined...).
-			// The union is distinct on the pair, so the join adds at most one
-			// row to a finding. A statement the run answered a finding with
-			// is in the finding's own product, because the run reads that
-			// product's statements and no other's.
-			Where(`("vx"."component_id" IS NOT NULL OR "f"."stated_by" IN
-				(SELECT "ss"."id" FROM "received_vex_statement" AS "ss" WHERE `+narrowing+`))`, about...)
-	}
 	return q
 }
 
@@ -1245,58 +1031,6 @@ func namedOrStated(q *bun.SelectQuery, stated []int64, condition string, args ..
 		args = append(append([]any{}, args...), bun.List(stated))
 	}
 	return componentsWhere(q, condition, args...)
-}
-
-// foldedNames is typed component names as the fold stored beside each name.
-func foldedNames(names []string) []string {
-	out := make([]string, 0, len(names))
-	for _, name := range names {
-		out = append(out, graph.Folded(name))
-	}
-	return out
-}
-
-// containsTerm prepares a term to be searched for literally.
-//
-// A search box is not a pattern language. Typing `50%` means a component whose
-// name contains "50%", not every component containing "50" — and `a_b` means
-// what it says rather than "a, anything, b". So the wildcards are escaped and
-// the escape character is stated: every engine here takes `ESCAPE`, and SQLite
-// has no default escape character at all, so leaving it out makes a backslash
-// mean one thing on three engines and another on the fourth.
-//
-// The escape character is `#`, and a backslash is what it must not be.
-// MySQL and MariaDB treat a backslash as an escape inside a string literal, so
-// `ESCAPE '\'` is an unterminated string: a syntax error there, and parsed
-// happily by the other two, which only the four-engine run catches.
-//
-// Case is folded here and again by the engine, which is a compromise worth
-// naming. Folding the term in Go is Unicode-aware; `LOWER()` on the column is
-// ASCII-only on SQLite — so a name carrying a non-ASCII capital is found on
-// three engines and missed on the fourth, wherever the comparison is against a
-// column with no folded copy.
-//
-// The component half has one — `component.name_folded`, which the search
-// clause above compares against — so this applies to the issue half, where
-// `vulnerability.identifier_folded` exists and `LOWER(v.identifier)` is what
-// is still asked. Issue identifiers are ASCII in every scheme anybody
-// publishes, which is why this is written down rather than fixed.
-func containsTerm(term string) string {
-	return database.LikeEscaped(strings.ToLower(term))
-}
-
-// foldedLabels is a set of labels as they are stored, without the ones that fold
-// to nothing. Folded rather than trimmed, because a label is matched on the
-// folded form everywhere else and a filter that skipped the folding would
-// answer nothing for a word somebody typed with a capital.
-func foldedLabels(words []string) []string {
-	kept := make([]string, 0, len(words))
-	for _, word := range words {
-		if label := LabelAs(word); label != "" {
-			kept = append(kept, label)
-		}
-	}
-	return kept
 }
 
 // having applies a condition assembled from however many answers were asked

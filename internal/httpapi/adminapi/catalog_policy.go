@@ -53,7 +53,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		if in.Body.Approvers > 0 {
 			approvers = &in.Body.Approvers
 		}
-		return &struct{}{}, core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		return &struct{}{}, core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
@@ -94,7 +94,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		if err := core.Administrating(ctx); err != nil {
 			return nil, err
 		}
-		return &struct{}{}, core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		return &struct{}{}, core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
@@ -161,7 +161,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 					"or nothing at all to follow the deployment",
 					in.Body.MinimumSeverity, strings.Join(minimumSeverities, ", ")))
 		}
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
@@ -221,7 +221,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
@@ -288,7 +288,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		// be recorded leaves the parent filled in permanently — and the parent
 		// is what a comparison walks, so the caller's refusal describes a
 		// state the database no longer has.
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag)
 			if err != nil {
 				return err
@@ -354,7 +354,7 @@ func registerCatalogPolicy(api huma.API, d core.Declaring) {
 		if err != nil {
 			return nil, err
 		}
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, branchOrTag, err := core.BranchOrTagIn(ctx, d, tx, in.Product, in.BranchOrTag)
 			if err != nil {
 				return err

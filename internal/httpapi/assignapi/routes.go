@@ -8,7 +8,6 @@ package assignapi
 import (
 	"github.com/danielgtaylor/huma/v2"
 
-	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
 )
 
@@ -29,9 +28,6 @@ func Register(api huma.API, in core.Deps) {
 	// reads.
 	registerTeams(api, core.Administering{
 		DB: in.DB, Access: in.Rights, Catalog: in.Catalog, Logger: in.Logger,
-		Findings: func() *finding.Store {
-			return finding.NewStore(in.DB.DB)
-		},
 	})
 	// The words people put on findings.
 	registerLabels(api, in)

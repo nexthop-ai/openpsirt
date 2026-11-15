@@ -42,7 +42,7 @@ func registerDeclaring(api huma.API, d core.Declaring) {
 			return nil, err
 		}
 		var out *core.DeclaredOutput[core.ProductBody]
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store := d.Store(tx)
 			product, did, err := store.EnsureProduct(ctx, in.Body.Name, in.Body.DisplayName)
 			if err != nil {
@@ -77,7 +77,7 @@ func registerDeclaring(api huma.API, d core.Declaring) {
 			return nil, err
 		}
 		var out *core.DeclaredOutput[core.BranchOrTagBody]
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err
@@ -142,7 +142,7 @@ func registerDeclaring(api huma.API, d core.Declaring) {
 			facing = *in.Body.CustomerFacing
 		}
 		var out *core.DeclaredOutput[core.VariantBody]
-		if err := core.Changing(ctx, d.DB, d.Logger, func(ctx context.Context, tx bun.Tx) error {
+		if err := core.Changing(ctx, d.DB, func(ctx context.Context, tx bun.Tx) error {
 			store, product, err := core.ProductIn(ctx, d, tx, in.Product)
 			if err != nil {
 				return err

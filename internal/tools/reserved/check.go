@@ -256,7 +256,7 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 				return true
 			}
 			for _, arg := range call.Args {
-				if _, _, readable := literal(fset, arg); readable {
+				if _, readable := literal(fset, arg); readable {
 					continue // read at the call, above
 				}
 				text, ok := pieces[assembledFrom(arg)]
@@ -272,7 +272,7 @@ func checkFile(fset *token.FileSet, path string, file *ast.File,
 				}
 			}
 			if arg := queryArgument(call, method.Sel.Name, packages); arg != nil {
-				if _, _, readable := literal(fset, arg); !readable {
+				if _, readable := literal(fset, arg); !readable {
 					if text, ok := quoted[assembledFrom(arg)]; ok {
 						examined++
 						bad = append(bad, unquotedColumns(withoutSQLComments(text), columns, path,

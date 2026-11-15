@@ -66,12 +66,12 @@
   stroke: var(--ok);
   stroke-width: 2;
 }
-.chart .mark line {
+.chart .stepmark line {
   stroke: var(--faint);
   stroke-width: 1;
   stroke-dasharray: 3 3;
 }
-.chart .mark path {
+.chart .stepmark path {
   fill: var(--faint);
 }
 .chart .zero {

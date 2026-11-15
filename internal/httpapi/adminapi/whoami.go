@@ -160,44 +160,39 @@ func registerWhoAmI(api huma.API, in core.Deps) {
 		}
 		// A whole number of days, as the threshold is read.
 		body.DeferralDays = int(threshold.Hours() / 24)
-		if in.DB != nil {
-			cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.BulkDecisionCap,
-				triage.DefaultBulkDecisionCap)
-			if err != nil {
-				return nil, core.WentWrong(in.Logger, "your limits could not be read", err)
-			}
-			body.BulkCap = cap
-			embargo, err := setting.NewStore(in.DB.DB).Duration(ctx, setting.DiscloseAfter,
-				setting.DefaultDiscloseAfter)
-			if err != nil {
-				return nil, core.WentWrong(in.Logger, "your limits could not be read", err)
-			}
-			body.DiscloseAfter = embargo.String()
+		cap, err := setting.NewStore(in.DB.DB).Count(ctx, setting.BulkDecisionCap,
+			triage.DefaultBulkDecisionCap)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "your limits could not be read", err)
 		}
-		// The digest they asked for, where this process has somewhere to read
-		// it from. A person with no account row of their own, which is
-		// somebody a trusted proxy asserted, asks for nothing and is sent
-		// nothing.
-		if in.DB != nil {
-			me, err := access.NewStore(in.DB.DB).ByIdentity(ctx, subject.Identity)
-			switch {
-			case err == nil:
-				body.Digest = me.Digest
-				body.DigestUnassigned = me.DigestUnassigned
-				body.Reachable = strings.TrimSpace(me.Email) != ""
-			case !errors.Is(err, access.ErrNoSuchPerson):
-				return nil, core.WentWrong(in.Logger, "who you are could not be read", err)
+		body.BulkCap = cap
+		embargo, err := setting.NewStore(in.DB.DB).Duration(ctx, setting.DiscloseAfter,
+			setting.DefaultDiscloseAfter)
+		if err != nil {
+			return nil, core.WentWrong(in.Logger, "your limits could not be read", err)
+		}
+		body.DiscloseAfter = embargo.String()
+		// The digest they asked for. A person with no account row of their
+		// own, which is somebody a trusted proxy asserted, asks for nothing
+		// and is sent nothing.
+		me, err := access.NewStore(in.DB.DB).ByIdentity(ctx, subject.Identity)
+		switch {
+		case err == nil:
+			body.Digest = me.Digest
+			body.DigestUnassigned = me.DigestUnassigned
+			body.Reachable = strings.TrimSpace(me.Email) != ""
+		case !errors.Is(err, access.ErrNoSuchPerson):
+			return nil, core.WentWrong(in.Logger, "who you are could not be read", err)
+		}
+		// A read that fails fails the answer. Left out, the chat field tells
+		// an administrator no platform is configured, which sends them to fix
+		// the wrong thing.
+		if len(in.Chats) > 0 {
+			chose, err := notify.NewStore(in.DB.DB).ChatChoicesOf(ctx, subject)
+			if err != nil {
+				return nil, core.WentWrong(in.Logger, "what you chose about chat could not be read", err)
 			}
-			// A read that fails fails the answer. Left out, the chat field
-			// tells an administrator no platform is configured, which sends
-			// them to fix the wrong thing.
-			if len(in.Chats) > 0 {
-				chose, err := notify.NewStore(in.DB.DB).ChatChoicesOf(ctx, subject)
-				if err != nil {
-					return nil, core.WentWrong(in.Logger, "what you chose about chat could not be read", err)
-				}
-				body.Chat = &ChatBody{Platforms: in.Chats, Direct: chose.Direct, Shared: chose.Shared}
-			}
+			body.Chat = &ChatBody{Platforms: in.Chats, Direct: chose.Direct, Shared: chose.Shared}
 		}
 
 		// Asked as the list of their own cases is, so a screen asks for the

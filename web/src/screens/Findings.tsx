@@ -3,24 +3,13 @@
 
 import { overCapNotice, useBulkCap } from "../ui/bulk";
 import { questionIn, untaken, useSelection } from "./useSelection";
+import { FindingsBar } from "./FindingsBar";
 import { DecidedNotice, FindingsTable, type Decided } from "./FindingsTable";
 import { notACredential } from "../ui/noautofill";
 import { ByBump, ByComponent, Pager } from "./FindingsViews";
 import { NAMED_AT_ONCE, useHandOver, useRereadList } from "./findingsHandover";
 import { useFindingsViews } from "./findingsQueries";
-import {
-  ASSIGNED,
-  DEADLINES,
-  Filters,
-  Narrowed,
-  STATES,
-  activeFilters,
-  unbumped,
-  without,
-  withoutAny,
-} from "./FindingsFilters";
-import { FilterMenu, type MenuOption } from "../ui/FilterMenu";
-import { FLOORS } from "../ui/severities";
+import { Filters, Narrowed, activeFilters, unbumped, without, withoutAny } from "./FindingsFilters";
 import { findingsPath } from "../app/scope";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loading } from "../ui/Loading";
@@ -30,9 +19,8 @@ import { api } from "../api/client";
 import { unwrap } from "../api/queries";
 import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
-import { Icon } from "../ui/Icons";
 import { Holder } from "../ui/Holder";
-import { Saved, here, ruleIn, useKept } from "../ui/Saved";
+import { here, ruleIn, useKept } from "../ui/Saved";
 import { said } from "../ui/Decide";
 import { useKeepPlace } from "../app/keepPlace";
 import { activates, meansFor, moved, typingIn } from "./keys";
@@ -49,7 +37,6 @@ import {
   acrossProducts,
   asAsked,
   BY_DEFAULT,
-  daysBack,
   hidden,
   identityOf,
   LEAST_FIRST,
@@ -72,23 +59,6 @@ import {
 import { allFindingsAt, findingAt } from "../app/routes";
 import { useReseed } from "../ui/reseed";
 import { exportQuery, fileAt } from "../api/links";
-
-// The filters the bar sets itself, so the count on More filters leaves them out.
-const ON_THE_BAR = new Set(["q", "floor", "state", "assigned", "running"]);
-
-// The severity scale as the bar offers it: a floor, read as "and up". The
-// lowest step is no floor at all, and the highest has nothing above it.
-const FLOOR_MENU: readonly MenuOption[] = FLOORS.map((band, i) => {
-  const name = `${band[0]?.toUpperCase() ?? ""}${band.slice(1)}`;
-  if (i === 0) return ["", "Any"] as const;
-  return [band, i === FLOORS.length - 1 ? name : `${name} and up`] as const;
-});
-
-// The deadlines, worded to read after "Due".
-const DUE_MENU: readonly MenuOption[] = DEADLINES.map(([word, label]) => [
-  word,
-  word === "" ? "Any time" : label.replace(/^Due within/, "Within"),
-]);
 
 // One row per issue in a component, not per occurrence. Every filter is in the URL,
 // so a link carries what somebody is looking at; every filter is the server's,
@@ -158,13 +128,6 @@ export function Findings() {
     [asked, product, branchOrTag, variant],
   );
   const advanced = chips.length;
-  // What narrows the list from behind More filters, which is every chip but
-  // the ones the bar sets itself — so the count on that button is about what
-  // it opens.
-  const elsewhere = chips.filter(
-    (each) =>
-      !ON_THE_BAR.has(each.key) && !(each.key === "opened_after" && each.value === daysBack(1)),
-  ).length;
   // Closed until somebody opens it. The panel is most of a screen, and what is
   // narrowed is already stated above the list as a chip per filter that removes
   // itself when clicked — so opening it because a filter is set covers the rows
@@ -574,102 +537,23 @@ export function Findings() {
           ))}
         </div>
       )}
-      <div className="filters filterbar">
-        <form
-          className="searchbox"
-          onSubmit={(event) => {
-            event.preventDefault();
-            set("q", typed.trim());
-          }}
-        >
-          <Icon name="search" />
-          <input
-            {...notACredential}
-            type="text"
-            value={typed}
-            onChange={(event) => setTyped(event.target.value)}
-            placeholder="Find a component — openssl, linux, python…"
-            aria-label="Find a component"
-          />
-        </form>
-        {searching && (
-          <button
-            type="button"
-            className="linkish"
-            onClick={() => {
-              setTyped("");
-              set("q", "");
-            }}
-          >
-            Clear “{searching}”
-          </button>
-        )}
-        {/* One button per question asked every day, each naming itself and
-            what it is set to. Whatever else narrows the list is behind More
-            filters, and every filter in force is a chip under the bar. */}
-        <FilterMenu
-          label="Decision"
-          multi
-          options={STATES}
-          chosen={asked.getAll("state").filter(Boolean)}
-          onChange={(chosen) => setMany("state", chosen)}
-        />
-        <FilterMenu
-          label="Severity"
-          options={FLOOR_MENU}
-          chosen={floor === "low" ? [] : [floor]}
-          onChange={(chosen) => set("floor", chosen[0] ?? "")}
-        />
-        <FilterMenu
-          label="Assigned"
-          multi
-          anything="Anyone"
-          options={ASSIGNED}
-          chosen={asked.getAll("assigned").filter(Boolean)}
-          onChange={(chosen) => setMany("assigned", chosen)}
-        />
-        <FilterMenu
-          label="Due"
-          anything="Any time"
-          options={DUE_MENU}
-          chosen={asked.get("running") ? [asked.get("running") ?? ""] : []}
-          onChange={(chosen) => set("running", chosen[0] ?? "")}
-        />
-        {/* The date rather than the word, so a list somebody sends means the
-            same thing when it is opened. */}
-        <button
-          type="button"
-          className="chip"
-          aria-pressed={asked.get("opened_after") === daysBack(1)}
-          title="Findings first seen in the last day"
-          onClick={() =>
-            set("opened_after", asked.get("opened_after") === daysBack(1) ? "" : daysBack(1))
-          }
-        >
-          New today
-        </button>
-        <span className="spacer" />
-        <button
-          type="button"
-          className="chip"
-          aria-pressed={elsewhere > 0 || more}
-          aria-expanded={more}
-          onClick={() => setMore(!more)}
-        >
-          More filters{elsewhere > 0 ? ` · ${elsewhere}` : ""}
-        </button>
-        {/* Picking a saved filter replaces what is on screen, so it replaces
-          the population a selection was made out of. Keeping the selection
-          across that would carry rows chosen under one question into an act
-          taken under another. */}
-        <Saved
-          onBuild={Boolean(branchOrTag || variant)}
-          onPicked={(next) => {
-            ask(next, true);
-            setDeclined(null);
-          }}
-        />
-      </div>
+      <FindingsBar
+        asked={asked}
+        chips={chips}
+        searching={searching}
+        typed={typed}
+        setTyped={setTyped}
+        floor={floor}
+        set={set}
+        setMany={setMany}
+        more={more}
+        setMore={setMore}
+        onBuild={Boolean(branchOrTag || variant)}
+        onPicked={(next) => {
+          ask(next, true);
+          setDeclined(null);
+        }}
+      />
 
       {/* What is narrowing the list, whether or not the panel is open, and
           removable one at a time. The count on the Filters control said how

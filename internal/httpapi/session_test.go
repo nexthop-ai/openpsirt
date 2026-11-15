@@ -357,11 +357,6 @@ func TestATokenCannotMintItselfAWiderOne(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		mine, err := r.Rights.ByIdentity(ctx, "reader")
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = mine
 
 		_, narrow, err := r.Rights.NewToken(ctx, person.ID, "narrow", nil, nil, time.Hour, 0)
 		if err != nil {

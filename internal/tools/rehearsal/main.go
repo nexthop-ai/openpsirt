@@ -92,11 +92,12 @@ type run struct {
 	attached     string   // the engine's container, joined to the rehearsal's network
 	env          []string // what the release's demo started its server with, beyond its image
 	base         string   // where the proxy answers, as the administrator
+	client       *http.Client
 	log          *os.File
 }
 
 func main() {
-	var r run
+	r := run{client: proxyClient()}
 	var dir string
 	var keep bool
 	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.9.0")
@@ -497,7 +498,7 @@ func (r *run) answer(ctx context.Context, builds Totals) error {
 	answered := 0
 	for _, product := range slices.Sorted(maps.Keys(products)) {
 		at := "/v1/products/" + url.PathEscape(product) + "/reports"
-		status, body, err := r.get(ctx, at+"?limit=200")
+		status, body, err := r.do(ctx, http.MethodGet, at+"?limit=200")
 		if err != nil {
 			return err
 		}
@@ -517,7 +518,7 @@ func (r *run) answer(ctx context.Context, builds Totals) error {
 			if report.Acknowledged != "" {
 				continue
 			}
-			status, body, err := r.post(ctx, at+"/"+url.PathEscape(report.Reference)+"/acknowledgement")
+			status, body, err := r.do(ctx, http.MethodPost, at+"/"+url.PathEscape(report.Reference)+"/acknowledgement")
 			if err != nil {
 				return err
 			}
@@ -643,7 +644,7 @@ func (r *run) serve(ctx context.Context) error {
 	}
 	deadline := time.Now().Add(3 * time.Minute)
 	for time.Now().Before(deadline) {
-		if status, _, err := r.get(ctx, "/readyz"); err == nil && status == http.StatusOK {
+		if status, _, err := r.do(ctx, http.MethodGet, "/readyz"); err == nil && status == http.StatusOK {
 			return nil
 		}
 		if err := pause(ctx, 2*time.Second); err != nil {
@@ -660,7 +661,7 @@ func (r *run) open(ctx context.Context, builds Totals) (Totals, error) {
 	for build := range builds {
 		parts := strings.SplitN(build, "/", 3)
 		q := url.Values{"branch_or_tag": {parts[1]}, "variant": {parts[2]}, "limit": {"1"}}
-		status, body, err := r.get(ctx, "/v1/products/"+url.PathEscape(parts[0])+"/findings?"+q.Encode())
+		status, body, err := r.do(ctx, http.MethodGet, "/v1/products/"+url.PathEscape(parts[0])+"/findings?"+q.Encode())
 		if err != nil {
 			return nil, err
 		}
@@ -683,7 +684,7 @@ func (r *run) open(ctx context.Context, builds Totals) (Totals, error) {
 // seed made standing in for its path parameters, and reports any 5xx. An
 // operation whose parameter the seed has no name for is skipped.
 func (r *run) sweep(ctx context.Context, builds Totals) ([]string, error) {
-	status, body, err := r.get(ctx, "/openapi.json")
+	status, body, err := r.do(ctx, http.MethodGet, "/openapi.json")
 	if err != nil || status != http.StatusOK {
 		return nil, fmt.Errorf("the API document: %d %v", status, err)
 	}
@@ -714,7 +715,7 @@ func (r *run) sweep(ctx context.Context, builds Totals) ([]string, error) {
 			skipped++
 			continue
 		}
-		status, body, err := r.get(ctx, filled)
+		status, body, err := r.do(ctx, http.MethodGet, filled)
 		results = append(results, getResult{path: filled, status: status, body: body, err: err})
 	}
 	faults, answered, err := classifyGets(results, r.log)
@@ -754,33 +755,27 @@ func classifyGets(results []getResult, log io.Writer) (faults []string, answered
 	return faults, answered, nil
 }
 
-func (r *run) get(ctx context.Context, path string) (int, []byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.base+path, nil)
-	if err != nil {
-		return 0, nil, err
-	}
-	res, err := (&http.Client{Transport: &http.Transport{Proxy: nil}}).Do(req)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer func() { _ = res.Body.Close() }()
-	body, err := io.ReadAll(res.Body)
-	return res.StatusCode, body, err
+// proxyClient is the one client every request to the proxy goes through, so a
+// connection is kept alive between requests rather than left idle in a
+// transport of its own. No proxy: one set in the environment would divert
+// requests meant for this machine.
+func proxyClient() *http.Client {
+	return &http.Client{Transport: &http.Transport{Proxy: nil, IdleConnTimeout: 30 * time.Second}}
 }
 
-// post sends a request with no body, from the origin the proxy answers on,
-// which a state-changing request has to name.
-func (r *run) post(ctx context.Context, path string) (int, []byte, error) {
+// do sends a request with no body. One that changes state names the origin the
+// proxy answers on, which such a request has to.
+func (r *run) do(ctx context.Context, method, path string) (int, []byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.base+path, nil)
+	req, err := http.NewRequestWithContext(ctx, method, r.base+path, nil)
 	if err != nil {
 		return 0, nil, err
 	}
-	req.Header.Set("Origin", r.base)
-	res, err := (&http.Client{Transport: &http.Transport{Proxy: nil}}).Do(req)
+	if method != http.MethodGet {
+		req.Header.Set("Origin", r.base)
+	}
+	res, err := r.client.Do(req)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -792,6 +787,9 @@ func (r *run) post(ctx context.Context, path string) (int, []byte, error) {
 // clean removes the containers, the network and the database. The worktree
 // of the release and the scanner's database are kept for the next run.
 func (r *run) clean(ctx context.Context) {
+	if r.client != nil {
+		r.client.CloseIdleConnections()
+	}
 	_ = exec.CommandContext(ctx, "docker", "rm", "-f", app, proxy).Run()
 	// The engine leaves the network rather than going with it: a network with
 	// a container on it is not removed.

@@ -24,7 +24,7 @@
 // | Invented names | `AS <word>` in a statement or a builder argument | an alias or an output name written bare |
 // | Tables | a table after FROM, JOIN, INTO or UPDATE, or opening a table expression | a table the migrations declare, written bare |
 // | Declared columns | a statement, the SQL argument of a builder method, and a clause built in a variable and handed to one | a column the migrations declare, written bare, alone or after a qualifier |
-// | Qualified columns | every literal outside the tests and the migrations: a clause, or one qualified name handed to code that places it | a column the migrations declare, or a name the file's queries invent with AS, written bare after a qualifier |
+// | Qualified columns | every literal outside the tests and the migrations: a clause, or one qualified name handed to code that places it | a column the migrations declare, or a name the file's queries invent with AS, written bare after a qualifier, and a bare qualifier before `.*` |
 // | Definitions | the migrations' data-definition literals | a declared name that collides with a word an engine reserves |
 // | Model aliases | a struct tag's alias | an alias that collides with a word an engine reserves |
 //
@@ -177,6 +177,9 @@ type found struct {
 	// column is a declared column written bare, as it reads quoted, and
 	// empty for every other finding.
 	column string
+	// everyColumn says the name is the qualifier of `word.*`, which names no
+	// column, so column holds the qualifier quoted before the star.
+	everyColumn bool
 }
 
 // source is one Go file of the tree.
@@ -291,6 +294,11 @@ func main() {
 		return
 	}
 	for _, one := range ordered(bad) {
+		if one.everyColumn {
+			fmt.Fprintf(os.Stderr, "%s:%d: the qualifier %q is written bare before .*. "+
+				"Quote it: %s\n", one.file, one.line, one.word, one.column)
+			continue
+		}
 		if one.column != "" {
 			fmt.Fprintf(os.Stderr, "%s:%d: the column %q is written bare. "+
 				"Quote it: %s\n", one.file, one.line, one.word, one.column)
@@ -464,10 +472,10 @@ func withoutSQLComments(text string) string {
 // literal reads a string argument, following the concatenations these queries
 // are written as: a clause built from three pieces on three lines is one
 // string to the engine and has to be one string here.
-func literal(fset *token.FileSet, node ast.Expr) (string, int, bool) {
+func literal(fset *token.FileSet, node ast.Expr) (string, bool) {
 	parts := piecesOf(fset, node)
 	if len(parts) == 0 {
-		return "", 0, false
+		return "", false
 	}
-	return joined(parts), parts[0].line, true
+	return joined(parts), true
 }

@@ -80,7 +80,8 @@
 .col li .why {
   color: var(--muted);
 }
-.col li .why .mark {
+.col li .why .because {
+  white-space: nowrap;
   font-size: 10.5px;
   border-radius: 3px;
   padding: 0 4px;
@@ -89,7 +90,7 @@
   border: 1px solid var(--line);
   color: var(--muted);
 }
-.col li .why .mark.patched {
+.col li .why .because.patched {
   background: var(--accent-soft);
   color: var(--accent);
   border-color: transparent;

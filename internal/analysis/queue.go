@@ -160,6 +160,37 @@ func (scope Scope) mayCount(subject access.Subject, what string) error {
 	return nil
 }
 
+// authorized is the prologue of every figure: the subject refused unless they
+// read security testing material in the scope's product, or in each of its
+// products across, then the visibilities they read code findings at, then
+// the scope's names resolved. In that order, so a name is resolved only for a
+// reader the scope admits (REQ-42).
+func (scope Scope) authorized(ctx context.Context, db bun.IDB, subject access.Subject,
+	what string) (Scope, []access.Visibility, error) {
+
+	if err := scope.mayCount(subject, what); err != nil {
+		return scope, nil, err
+	}
+	visible, err := scope.visible(subject)
+	if err != nil {
+		return scope, nil, err
+	}
+	resolved, err := scope.resolved(ctx, db)
+	return resolved, visible, err
+}
+
+// oneProduct is authorized for a figure that answers one product alone, which
+// refuses a scope across products to every reader, one reading every product
+// included: read as one product, it names product zero.
+func (scope Scope) oneProduct(ctx context.Context, db bun.IDB, subject access.Subject,
+	what string) (Scope, []access.Visibility, error) {
+
+	if scope.across() {
+		return scope, nil, access.Denied(what + " across products")
+	}
+	return scope.authorized(ctx, db, subject, what)
+}
+
 // readAcross keeps, of the products a scope across products names, those the
 // subject reads security testing work in, and refuses anybody but a person: a
 // flaw's reader reads one code finding, never a product's queue, and a key
