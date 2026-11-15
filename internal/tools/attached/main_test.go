@@ -111,9 +111,9 @@ func TestWidenLeavesTheOriginalAlone() {}
 		},
 		{
 			// The testing package runs a function in a test file. A constant
-			// named like one in an ordinary file is a declaration like any
+			// named like one, even in a test file, is a declaration like any
 			// other, and its comment is held to the convention.
-			"a constant whose name opens with a test prefix",
+			"a constant in a test file whose name opens with a test prefix",
 			`package p
 
 // Shown is what a reader sees.
@@ -123,7 +123,22 @@ const Shown = 1
 `,
 			inPackage("TestHeader", "Shown"),
 			1,
-			"",
+			"thing_test.go",
+		},
+		{
+			// A prefix with nothing after it is a name the testing package
+			// runs, so its comment may open with the symbol it exercises.
+			"a test named for its prefix alone",
+			`package p
+
+// Shown is what a reader sees.
+func Test() {}
+
+const Shown = 1
+`,
+			inPackage("Test", "Shown"),
+			0,
+			"thing_test.go",
 		},
 		{
 			// Test followed by a lower-case letter is not a test to the
