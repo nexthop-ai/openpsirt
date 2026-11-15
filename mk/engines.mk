@@ -56,9 +56,8 @@ ENGINE_FLOOR_DATA    ?= 256m
 # behind them. This is the command to run before committing.
 #
 # The names it greps for come from the application's own enumeration rather
-# than from a list here. They were written out by hand three times, so a fifth
-# engine would not have been looked for by any of them — and a grep for
-# nothing reports the same "OK" as a grep that found nothing wrong. The empty
+# than from a list here, so an engine added to it is looked for here too: a
+# grep for nothing reports the same "OK" as a grep that found nothing wrong. The empty
 # check below is for the same reason: an enumeration that came back empty would
 # make every loop vacuous.
 #

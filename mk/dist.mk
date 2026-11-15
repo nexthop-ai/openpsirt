@@ -176,8 +176,7 @@ dist-inventories: dist-version
 	@echo "  building $(DIST_IMAGE):$(DIST_VERSION) for $(DIST_IMAGE_ARCH)"
 	@# Not quiet. This builds the binary's inventory inside the image, and a
 	@# release that cannot say why it failed is one somebody re-runs to find
-	@# out — which is what happened: the step exited 1 and the only thing
-	@# recorded was that it had.
+	@# out.
 	$(DOCKER) build -t $(DIST_IMAGE):$(DIST_VERSION) \
 	  --build-arg VERSION=$(DIST_VERSION) --build-arg COMMIT=$(COMMIT) \
 	  --build-arg DATE=$(DATE) .

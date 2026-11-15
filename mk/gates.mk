@@ -66,10 +66,9 @@ licenses: web-deps
 # The reader over a real inventory, which the fixtures cannot stand in for.
 #
 # It reports every path the reader takes that no document exercised, and the
-# shapes that appear once are the ones a small document does not have. It had
-# never run: the test asks for a document through an environment variable that
-# nothing in the makefile, the workflows or the documentation ever set, while a
-# full-size one sat in the same directory compressed.
+# shapes that appear once are the ones a small document does not have. The
+# test asks for a document through an environment variable, and this target is
+# what sets it, to the full-size one kept compressed beside the fixtures.
 #
 # Decompressed into a scratch directory rather than committed uncompressed:
 # the file is the size the measurement is about.
@@ -141,9 +140,9 @@ web-audit:
 	$(GO) run ./internal/tools/advisories npm -- $(NPM) audit --json
 
 # Exported code nothing reaches. The analysis gate only reports unexported
-# symbols, which left ten real defects invisible in one review — a store method
-# with no route to it, a renderer nothing rendered with, a rule enforced in a
-# second place nothing called. Every one looked like working code.
+# symbols, and an exported one nothing reaches — a store method with no route
+# to it, a renderer nothing renders with, a rule enforced in a second place
+# nothing calls — looks like working code.
 unreachable:
 	$(GO) run ./internal/tools/unreachable
 
@@ -155,10 +154,10 @@ readable:
 	$(GO) run ./internal/tools/readable
 
 # A 404 whose body is an error's own text. It asserts that a name reaches
-# nothing and publishes whatever the error carried: thirty handlers wrote one,
-# the catalog readers under them returned the driver's message unwrapped, and a
-# connection failure reached whoever asked as "that product does not exist"
-# with the database host and port in the detail.
+# nothing and publishes whatever the error carried: with a catalog reader
+# returning the driver's message unwrapped, a connection failure reaches
+# whoever asked as "that product does not exist" with the database host and
+# port in the detail.
 negatives:
 	$(GO) run ./internal/tools/negatives
 
@@ -329,9 +328,8 @@ node-version:
 # release itself.
 #
 # The tidy run rewrites the tree, so what it found there is put back on every
-# exit path — including an interrupt, which used to leave the tree as tidy had
-# made it and the copies behind under a name every checkout on the machine
-# shared.
+# exit path, an interrupt included, or the tree is left as tidy made it and
+# the copies behind under a name every checkout on the machine shares.
 .PHONY: pins-check
 pins-check:
 	@fail=0; \

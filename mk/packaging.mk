@@ -37,7 +37,7 @@ else
 	  || { echo "image carries no working scanner, so it could ingest and never scan"; exit 1; }
 	@# That the image serves the interface, not merely that it starts. The Go
 	@# build embeds a git-ignored directory, so an image built from a clean
-	@# checkout carried no interface at all and every other check here passed.
+	@# checkout can carry no interface at all and pass every other check here.
 	@set -e; \
 	  id=$$($(DOCKER) run -d --rm -p 127.0.0.1:0:8080 \
 	         --tmpfs /tmp \
