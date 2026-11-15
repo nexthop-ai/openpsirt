@@ -547,75 +547,6 @@ func TestAVectorThisCannotScoreIsTheCallersToFix(t *testing.T) {
 	})
 }
 
-func TestAFlawAssessedUnderVersionFourIsRecordedWithTheSchemeItWasAssessedUnder(t *testing.T) {
-	// The population a deployment writes advisories about is the one it
-	// assesses itself, so this is the scheme that matters most. A number
-	// recorded without it cannot be placed: 7.5 under version 3 and 7.5 under
-	// version 4 are two different judgments.
-	//
-	// On every engine, because it is the only test that reaches the aggregate
-	// carrying the scheme, and an aggregate is SQL. Both lists: the one inside
-	// a product and the one spanning them, which are separate statements and
-	// the second is where two schemes share a column.
-	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		r.ScannedWithEvidence(t)
-		const at = "/v1/products/mine/findings"
-		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, at,
-			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
-				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
-		if made.Code != http.StatusCreated {
-			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
-		}
-		var recorded struct {
-			Identifier string `json:"identifier"`
-		}
-		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
-			t.Fatal(err)
-		}
-		for _, at := range []struct{ what, path string }{
-			{"inside the product", "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom"},
-			{"across every product", "/v1/findings"},
-		} {
-			t.Run(at.what, func(t *testing.T) {
-				// Read fresh. A field left out of a payload is left alone by
-				// the decoder rather than cleared, so a struct reused across
-				// two reads reports the first read's answer for anything the
-				// second omits — and an omitted scheme is the thing under
-				// test.
-				var listed struct {
-					Items []struct {
-						Vulnerability string  `json:"vulnerability"`
-						Severity      string  `json:"severity"`
-						Score         float64 `json:"score"`
-						ScoreVersion  string  `json:"score_version"`
-					} `json:"items"`
-				}
-				httpapitest.Read(t, r, "private-triage", at.path, &listed)
-				for _, item := range listed.Items {
-					if item.Vulnerability != recorded.Identifier {
-						continue
-					}
-					if item.ScoreVersion != "4.0" {
-						t.Errorf("the list says the score is on %q, want the 4.0 it was "+
-							"assessed under", item.ScoreVersion)
-					}
-					// 10.0 by the published tables, which is "critical".
-					if item.Severity != "critical" {
-						t.Errorf("the vector said critical and the finding reads %q",
-							item.Severity)
-					}
-					if item.Score != 10 {
-						t.Errorf("the score is %v, want the 10.0 the vector works out to",
-							item.Score)
-					}
-					return
-				}
-				t.Error("what was recorded is not in the list")
-			})
-		}
-	})
-}
-
 func TestAFlawMayBeRecordedBeforeAnybodyHasRatedIt(t *testing.T) {
 	// Early triage. Making somebody pick a severity to get the record written
 	// is how a guess ends up stored as a judgment.
@@ -910,10 +841,16 @@ func quotedJSON(s string) string {
 }
 
 func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
-	// A number alone is not readable across schemes, and a rule enforced at
-	// one of six places holds until somebody does their job. Two of these
-	// leave the deployment as files a script reads, where a bare column of
-	// numbers from two schemes is a ranking that is not one.
+	// A number alone is not readable across schemes: 7.5 under version 3 and
+	// 7.5 under version 4 are two different judgments. A rule enforced at one
+	// of six places holds until somebody does their job. Two of these leave
+	// the deployment as files a script reads, where a bare column of numbers
+	// from two schemes is a ranking that is not one.
+	//
+	// On every engine, because the two lists reach the aggregate carrying the
+	// scheme, and an aggregate is SQL. The list inside a product and the one
+	// spanning them are separate statements, and the second is where two
+	// schemes share a column.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
@@ -929,18 +866,24 @@ func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
 		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
 			t.Fatal(err)
 		}
-		for _, at := range []struct{ what, path string }{
-			{"the findings list", "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom"},
-			{"the list across products", "/v1/findings"},
-			{"the issue", "/v1/issues/" + recorded.Identifier},
-			{"the forwarded document", "/v1/issues/" + recorded.Identifier + "/document"},
-			{"the export of one product", "/v1/products/mine/findings.csv"},
-			{"the export of every product", "/v1/findings.csv"},
+		for _, at := range []struct {
+			what, path string
+			list       bool
+		}{
+			{"the findings list", "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom", true},
+			{"the list across products", "/v1/findings", true},
+			{"the issue", "/v1/issues/" + recorded.Identifier, false},
+			{"the forwarded document", "/v1/issues/" + recorded.Identifier + "/document", false},
+			{"the export of one product", "/v1/products/mine/findings.csv", false},
+			{"the export of every product", "/v1/findings.csv", false},
 		} {
 			t.Run(at.what, func(t *testing.T) {
 				got := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, at.path, "")
 				if got.Code != http.StatusOK {
 					t.Fatalf("GET %s answered %d: %s", at.path, got.Code, got.Body.String())
+				}
+				if at.list {
+					listedAsAssessed(t, got.Body.Bytes(), recorded.Identifier)
 				}
 				body := got.Body.String()
 				if !strings.Contains(body, recorded.Identifier) {
@@ -963,6 +906,45 @@ func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
 			})
 		}
 	})
+}
+
+// listedAsAssessed checks that a list carries the flaw named identifier with
+// the scheme, score and severity its CVSS 4.0 vector of every impact high
+// works out to.
+//
+// Decoded fresh for each list. A field left out of a payload is left alone by
+// the decoder rather than cleared, so a struct reused across two reads reports
+// the first read's answer for anything the second omits, and an omitted
+// scheme is the thing under test.
+func listedAsAssessed(t *testing.T, body []byte, identifier string) {
+	t.Helper()
+	var listed struct {
+		Items []struct {
+			Vulnerability string  `json:"vulnerability"`
+			Severity      string  `json:"severity"`
+			Score         float64 `json:"score"`
+			ScoreVersion  string  `json:"score_version"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(body, &listed); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range listed.Items {
+		if item.Vulnerability != identifier {
+			continue
+		}
+		if item.ScoreVersion != "4.0" {
+			t.Errorf("the list says the score is on %q, want the 4.0 it was assessed under",
+				item.ScoreVersion)
+		}
+		// 10.0 by the published tables, which is "critical".
+		if item.Severity != "critical" || item.Score != 10 {
+			t.Errorf("the vector works out to critical at 10.0 and the list reads %q at %v",
+				item.Severity, item.Score)
+		}
+		return
+	}
+	t.Error("what was recorded is not in the list")
 }
 
 func TestScoringAnEmptyVectorIsRefusedRatherThanAnswered(t *testing.T) {
