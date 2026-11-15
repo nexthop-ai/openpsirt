@@ -1853,11 +1853,11 @@ export interface paths {
          * List findings for one issue across every product
          * @description Every build that carries this issue, across every product you may see, with how far it has been decided in each.
          *
-         *     One row per build and component, not per occurrence: the same component in two builds is two things somebody ships, and sixty occurrences of it in one build is one piece of work with a count.
+         *     One row per build and component, with a count of its occurrences.
          *
-         *     Narrowed the way every other read is, per product and per visibility. A page that spans products is exactly where filtering afterwards gets forgotten, and the count is the leak even when no row is shown.
+         *     The rows, `total` and the count of products cover only products you may read.
          *
-         *     Nothing affected is an answer, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
+         *     An issue that affects nothing you may read answers `total` zero with empty `items`, whether nobody here has seen it or it sits only in products you cannot read.
          *
          *     Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
          *
@@ -5149,7 +5149,17 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List the builds an issue is open at
+         * @description Every build of this product where the issue stands open, one row per build, in the shape setting the affected builds takes.
+         *
+         *     Answers at most as many builds as one write names, with `more` set where it is open at more. One read answers the whole set, so the set sent back to set the affected builds closes only the builds taken out of it.
+         *
+         *     Only builds whose findings you may read are listed.
+         *
+         *     Requires: public-read or public-triage or private-read or private-triage or security-testing-read or security-testing-triage on the product. Answers only what you may see.
+         */
+        get: operations["list-affected-builds"];
         /**
          * Set which builds a recorded flaw affects
          * @description Makes the builds this flaw is filed against exactly the ones named.
@@ -8029,6 +8039,18 @@ export interface components {
             superseded: number;
             /** @description What the publisher called it */
             title?: string;
+        };
+        AffectedBuildsBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/AffectedBuildsBody.json
+             */
+            readonly $schema?: string;
+            /** @description The builds it is open at, ordered by branch or tag and variant, at most as many as one write names */
+            items: components["schemas"]["BuildNamed"][] | null;
+            /** @description Whether it is open at more builds than one write names, so items is not every build */
+            more: boolean;
         };
         AffectsBody: {
             /**
@@ -16734,6 +16756,11 @@ export interface components {
              * @enum {string}
              */
             kind: "person";
+            /**
+             * Format: int64
+             * @description The number of weaknesses one recorded flaw states at most. A screen picking them stops at it
+             */
+            most_weaknesses?: number;
             /** @description The display name, where one is recorded */
             name: string;
             /** @description Every triage outcome, in the order the vocabulary lists them, with what each claims */
@@ -25326,6 +25353,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AttachmentBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "list-affected-builds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+                /** @description The issue, by any name it is known under */
+                issue: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AffectedBuildsBody"];
                 };
             };
             /** @description Error */

@@ -39,6 +39,11 @@ export function Paged({
     );
   }
   if (offset === 0 && total <= shown) return null;
+  // An offset at or past the end, from a kept address or a list that shrank
+  // under it: the page holds nothing, and the way back is the last page that
+  // holds anything rather than one page back, which can still be past the end.
+  const past = offset > 0 && offset >= total;
+  const last = Math.max(0, Math.floor((total - 1) / limit) * limit);
   const from = Math.min(offset + 1, total);
   const upto = Math.min(offset + shown, total);
   return (
@@ -47,7 +52,9 @@ export function Paged({
       style={{ margin: "8px 0 0", display: "flex", alignItems: "center", gap: 6 }}
     >
       <span>
-        Showing {from.toLocaleString()}–{upto.toLocaleString()} of {total.toLocaleString()}
+        {past
+          ? `Nothing on this page of ${total.toLocaleString()}`
+          : `Showing ${from.toLocaleString()}–${upto.toLocaleString()} of ${total.toLocaleString()}`}
       </span>
       {onGo && (
         <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
@@ -55,7 +62,7 @@ export function Paged({
             type="button"
             className="chip"
             disabled={offset === 0}
-            onClick={() => onGo(Math.max(0, offset - limit))}
+            onClick={() => onGo(past ? last : Math.max(0, offset - limit))}
           >
             Previous
           </button>

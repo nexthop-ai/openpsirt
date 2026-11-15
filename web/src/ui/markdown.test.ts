@@ -205,9 +205,9 @@ describe("files attached here", () => {
   const token = "0f9a1b2c3d4e5f60718293a4b5c6d7e8";
 
   it("renders an image of one from this origin", () => {
-    // The content security policy permits images from this origin and no
-    // other, so the reference becomes a path here rather than an address at
-    // whoever's store the operator runs.
+    // The reference becomes a path on this origin rather than an address at
+    // whoever's store the operator runs. The rewrite is what keeps an image
+    // here: the content security policy also permits data: images.
     const html = render(`![a screenshot](attachment:${token})`);
     expect(html).toContain(`src="/v1/attachments/${token}"`);
     expect(html).toContain('referrerpolicy="no-referrer"');

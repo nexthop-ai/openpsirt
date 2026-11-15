@@ -185,25 +185,10 @@ export function DependencyFigures({
   const overdueCut = cut && soon.length === 0;
   const overdueCutEverywhere = cutEverywhere && allSoon === 0;
 
-  // The same figure without the scope. Nothing where no scope is
-  // selected, because the two would be one number said twice.
-  function everywhere(n: number | undefined): React.ReactNode {
-    if (!widely || n === undefined) return null;
-    return <span className="d">{n.toLocaleString()} all products</span>;
-  }
-
-  // The same, for a figure read out of a list the server caps. Printed exact, a
-  // capped list says there are fewer than there are — and a filtered part of it
-  // can read zero while the unfiltered whole is at the cap.
-  function everywhereAtLeast(n: number, capped: boolean): React.ReactNode {
-    if (!widely) return null;
-    return (
-      <span className="d">
-        {n.toLocaleString()}
-        {capped ? "+" : ""} all products
-      </span>
-    );
-  }
+  const everywhere = (n: number | undefined) => <AllProducts n={n} scoped={widely} />;
+  const everywhereAtLeast = (n: number, capped: boolean) => (
+    <AllProducts n={n} capped={capped} scoped={widely} />
+  );
 
   if (!figures) return <HeldLine at={dependencies} />;
 
@@ -553,4 +538,27 @@ function reading(now: number, shipped: number, release: string): string {
     return `${now} critical now against ${shipped} in ${release} — ${now - shipped} more than last shipped.`;
   }
   return `${now} critical now against ${shipped} in ${release} — ${shipped - now} fewer than last shipped.`;
+}
+
+// A tile's figure without the scope. Nothing where no scope is selected,
+// because the two would be one number said twice. Capped is a figure read out
+// of a list the server caps: printed exact, a capped list says there are fewer
+// than there are, and a filtered part of it can read zero while the unfiltered
+// whole is at the cap.
+export function AllProducts({
+  n,
+  capped = false,
+  scoped,
+}: {
+  n: number | undefined;
+  capped?: boolean;
+  scoped: boolean;
+}) {
+  if (!scoped || n === undefined) return null;
+  return (
+    <span className="d">
+      {n.toLocaleString()}
+      {capped ? "+" : ""} all products
+    </span>
+  );
 }

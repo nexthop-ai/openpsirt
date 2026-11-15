@@ -5,10 +5,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CodeFinding } from "./CodeFinding";
 import { accept, answer, mounted, screen, serve, settle } from "../test/mount";
 import { change, pick, press, tick } from "../test/controls";
+import { belongTo } from "../app/drafts";
 
 const mount = mounted();
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  belongTo(undefined);
+  window.localStorage.clear();
+});
 
 const AT = "/products/sonic/branches-and-tags/master/variants/broadcom/code-findings/abc";
 const PATTERN =
@@ -119,6 +124,23 @@ describe("recording as a flaw a code finding", () => {
       component: "zlib",
     });
     expect(text()).toContain("SONIC-2026-000001");
+  });
+
+  it("forgets the summary once the flaw is recorded, so the next form opens empty", async () => {
+    belongTo("ana");
+    await drawn(CONFIRMED);
+    accept(() => ({
+      status: 201,
+      data: { identifier: "SONIC-2026-000001", component: "zlib", builds: 1, occurrences: 1 },
+    }));
+    pick(mount.host(), "zlib");
+    change(mount.host().querySelector<HTMLTextAreaElement>("textarea"), "p leaks");
+    const drafts = () =>
+      Object.keys(window.localStorage).filter((key) => key.includes("code-finding-flaw:"));
+    expect(drafts()).not.toEqual([]);
+    await press(mount.host(), "Record as a flaw");
+    await settle();
+    expect(drafts()).toEqual([]);
   });
 
   it("says a flaw in third-party code is reported upstream, and still records it", async () => {

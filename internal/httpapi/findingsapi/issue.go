@@ -73,17 +73,11 @@ func registerIssue(api huma.API, in core.Deps) {
 		Summary: "List findings for one issue across every product",
 		Description: "Every build that carries this issue, across every product you may see, " +
 			"with how far it has been decided in each.\n\n" +
-			"One row per build and component, not per occurrence: the same component in two " +
-			"builds is two things somebody ships, and sixty occurrences of it in one build is one " +
-			"piece of work with a count.\n\n" +
-			"Narrowed the way every other read is, per product and per visibility. A page " +
-			"that spans products is exactly where filtering afterwards gets forgotten, and " +
-			"the count is the leak even when no row is shown.\n\n" +
-			"Nothing affected is an answer, not a 404: `total` is zero and `items` is " +
-			"empty, which is what a customer inquiry is asking for. An identifier nobody " +
-			"here has seen answers the same way as one that sits only in products you " +
-			"cannot read — told apart, the pair would say which issues this deployment " +
-			"holds, one guess at a time.\n\n" +
+			"One row per build and component, with a count of its occurrences.\n\n" +
+			"The rows, `total` and the count of products cover only products you may read.\n\n" +
+			"An issue that affects nothing you may read answers `total` zero with empty " +
+			"`items`, whether nobody here has seen it or it sits only in products you cannot " +
+			"read.\n\n" +
 			"Answers by any name the issue goes by, with when it was published and last " +
 			"modified as OSV states them.",
 		Tags: []string{"Findings"},

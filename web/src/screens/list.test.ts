@@ -372,6 +372,12 @@ describe("widening out of a scope", () => {
     expect(out.get("beneath_version")).toBeNull();
     expect(out.get("state")).toBe("undecided");
   });
+
+  it("drops a subtree started at a package identifier with the build", () => {
+    const asked = new URLSearchParams("beneath_purl=pkg:github/sonic-net/sonic-swss");
+    const out = query(widened("/products/sonic/findings?branch_or_tag=master", asked));
+    expect(out.get("beneath_purl")).toBeNull();
+  });
 });
 
 describe("a subtree's root", () => {
@@ -384,6 +390,21 @@ describe("a subtree's root", () => {
     expect(out.get("beneath_version")).toBeNull();
     expect(out.get("beneath_ecosystem")).toBeNull();
     expect(out.get("beneath_namespace")).toBeNull();
+  });
+
+  it("named by a component replaces one named by a package identifier", () => {
+    const asked = new URLSearchParams("beneath_purl=pkg:github/sonic-net/sonic-swss");
+    const out = withEach(asked, { beneath: "zlib" });
+    expect(out.get("beneath")).toBe("zlib");
+    expect(out.get("beneath_purl")).toBeNull();
+  });
+
+  it("named by a package identifier replaces one named by a component", () => {
+    const asked = new URLSearchParams("beneath=openssl&beneath_version=3.0.2");
+    const out = withEach(asked, { beneath_purl: "pkg:github/sonic-net/sonic-swss" });
+    expect(out.get("beneath_purl")).toBe("pkg:github/sonic-net/sonic-swss");
+    expect(out.get("beneath")).toBeNull();
+    expect(out.get("beneath_version")).toBeNull();
   });
 
   it("keeps a qualifier the same change names", () => {

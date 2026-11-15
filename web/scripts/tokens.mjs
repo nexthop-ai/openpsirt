@@ -19,8 +19,7 @@
 // reaches.
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
-import { sourceFiles, WEB } from "./parsed.mjs";
+import { isMain, sourceFiles, WEB } from "./parsed.mjs";
 
 // A comment is prose, not a reference.
 //
@@ -130,7 +129,7 @@ export function tokenFindings(files) {
 // is dead whether it is in tokens.css or beside a rule that no longer reads
 // it. The bundle is self-contained and embedded in the binary, so there is no
 // consumer outside this directory for one to be defined for.
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+if (isMain(import.meta)) {
   const paths = sourceFiles({ ext: [".css", ".tsx", ".ts"], tests: true });
   const files = Object.fromEntries(
     paths.map((file) => [path.relative(WEB, file), readFileSync(file, "utf8")]),

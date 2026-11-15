@@ -119,34 +119,42 @@ export function useQueueCount(product?: string, options: { enabled?: boolean } =
 // approvals beside the editor showing the old approval as standing — the one
 // state the second-person control exists to make visible, reported wrong at
 // the moment it changes.
+const afterDecision = [
+  "queue",
+  "decision-occurrence",
+  "decided",
+  "finding",
+  "home",
+  // The proposer's own list, which is where a decision they split appears as
+  // two.
+  "my-decisions",
+  // The decision's own blocks: what it has said, and who agreed to it. Both
+  // change under a revision and neither list held them.
+  "decision",
+  "comments",
+  // A decision about a code finding moves where the code finding stands, and
+  // the queue it is listed in.
+  "code-findings",
+  "code-finding",
+  // The list the work came from. A decision answers findings, so agreeing to
+  // one moves what the list says about every occurrence it covers.
+  "findings",
+  // The same list by component and by upgrade, and a build's planned
+  // upgrades: a promise to upgrade is a decision, and its rows join them.
+  "findings-by-component",
+  "planned-upgrades",
+  "build-planned-upgrades",
+  // What an advisory states about a release, which follows the decisions
+  // covering it.
+  "advisory",
+  "advisory-document",
+  "advisory-releases",
+] as const;
+
 export function useAfterDecision() {
   const queries = useQueryClient();
   return () => {
-    void queries.invalidateQueries({ queryKey: ["queue"] });
-    void queries.invalidateQueries({ queryKey: ["decision-occurrence"] });
-    void queries.invalidateQueries({ queryKey: ["decided"] });
-    void queries.invalidateQueries({ queryKey: ["finding"] });
-    void queries.invalidateQueries({ queryKey: ["home"] });
-    // And the proposer's own list, which is where a decision they split
-    // appears as two.
-    void queries.invalidateQueries({ queryKey: ["my-decisions"] });
-    // The decision's own blocks: what it has said, and who agreed to it. Both
-    // change under a revision and neither list held them.
-    void queries.invalidateQueries({ queryKey: ["decision"] });
-    void queries.invalidateQueries({ queryKey: ["comments"] });
-    // A decision about a code finding moves where the code finding stands, and the queue it is
-    // listed in.
-    void queries.invalidateQueries({ queryKey: ["code-findings"] });
-    void queries.invalidateQueries({ queryKey: ["code-finding"] });
-    // And the list the work came from. A decision answers findings, so
-    // agreeing to one moves what the list says about every occurrence it
-    // covers.
-    void queries.invalidateQueries({ queryKey: ["findings"] });
-    // And what an advisory states about a release, which follows the
-    // decisions covering it.
-    void queries.invalidateQueries({ queryKey: ["advisory"] });
-    void queries.invalidateQueries({ queryKey: ["advisory-document"] });
-    void queries.invalidateQueries({ queryKey: ["advisory-releases"] });
+    for (const key of afterDecision) void queries.invalidateQueries({ queryKey: [key] });
   };
 }
 
@@ -220,6 +228,15 @@ export function useDecisionApprovals(id: number) {
     queryKey: ["decision", id, "approvals"],
     queryFn: async () =>
       unwrap(await api.GET("/v1/decisions/{id}/approvals", { params: { path: { id } } })),
+  });
+}
+
+// What has been said on a decision.
+export function useDecisionComments(id: number) {
+  return useQuery({
+    queryKey: ["comments", id],
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/decisions/{id}/comments", { params: { path: { id } } })),
   });
 }
 

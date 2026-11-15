@@ -13,7 +13,16 @@ import { Mix, Pace, PaceLegend, folded } from "../../ui/Charts";
 import { settled } from "../../ui/trend";
 import { Empty } from "../../ui/Empty";
 import { Sheet } from "./Sheet";
-import { Segments, StepSegments, boundedAsked } from "./Window";
+import {
+  FIRST_DAYS,
+  FIRST_WEEKS,
+  MOST_DAYS,
+  MOST_WEEKS,
+  TrendWindow,
+  boundedAsked,
+  weeksWords,
+  wordsFor,
+} from "./Window";
 import { Wide } from "../../ui/Wide";
 import { useWho } from "../../app/session";
 import { counted, heldLine, holding } from "../../app/families";
@@ -34,11 +43,6 @@ import { Downloads } from "../../ui/Downloads";
 // arrives is critical and what leaves is not, which a line of totals draws as
 // flat.
 
-// The windows worth asking this over, by step. Two years is the longest the
-// server answers for in either.
-const WEEKS = [4, 13, 26, 52, 104] as const;
-const DAYS = [14, 30, 90, 365, 730] as const;
-
 export function Backlog() {
   const at = useScope();
   const scope = scopeQuery(at);
@@ -46,8 +50,8 @@ export function Backlog() {
   // Daily unless the address says weekly. A value outside the range falls
   // back to the step's default, and a fraction is cut to a whole number.
   const daily = params.get("step") !== "week";
-  const weeks = boundedAsked(params.get("weeks"), 104, 13);
-  const days = boundedAsked(params.get("days"), 730, 30);
+  const weeks = boundedAsked(params.get("weeks"), MOST_WEEKS, FIRST_WEEKS);
+  const days = boundedAsked(params.get("days"), MOST_DAYS, FIRST_DAYS);
   const window = daily ? { days } : { weeks };
 
   // The backlog is dependency findings, asked and drawn only where the reader
@@ -75,27 +79,10 @@ export function Backlog() {
       settled={!figures || trend.isSuccess}
       name="Backlog over time"
       answers="whether the backlog is growing, and what kind of thing is making it grow."
-      asked={daily ? `${days} days` : `${weeks} weeks`}
+      asked={daily ? wordsFor(days) : weeksWords(weeks)}
     >
       <div className="controls">
-        <StepSegments daily={daily} />
-        {daily ? (
-          <Segments
-            label="Window"
-            param="days"
-            offered={DAYS}
-            chosen={days}
-            words={(n) => (n === 730 ? "two years" : n === 365 ? "a year" : `${n} days`)}
-          />
-        ) : (
-          <Segments
-            label="Window"
-            param="weeks"
-            offered={WEEKS}
-            chosen={weeks}
-            words={(n) => (n === 104 ? "two years" : n === 52 ? "a year" : `${n} weeks`)}
-          />
-        )}
+        <TrendWindow daily={daily} days={days} weeks={weeks} />
         {figures && (
           <span style={{ marginLeft: "auto" }} className="noprint">
             <Downloads href={file} />

@@ -378,6 +378,7 @@ export function Access({ who: me }: { who: Who }) {
                     <td>
                       <Reachable
                         person={person}
+                        editable={me.admin}
                         busy={reach.isPending}
                         onSet={(address) =>
                           reach.mutateAsync({ identity: person.identity ?? "", email: address })
@@ -1043,6 +1044,7 @@ function InlineEdit({
   value,
   type,
   placeholder,
+  editable = true,
   busy,
   onSet,
   children,
@@ -1050,6 +1052,9 @@ function InlineEdit({
   value: string;
   type: "text" | "email";
   placeholder: string;
+  // Whether the reader may change it. Somebody who may not is shown the value
+  // alone, since the write would be refused.
+  editable?: boolean;
   busy: boolean;
   // Settles once the write has; the box stays open on a refusal so what was
   // typed is still there to correct.
@@ -1059,6 +1064,7 @@ function InlineEdit({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
+  if (!editable) return <>{children}</>;
   if (!editing) {
     return (
       <>
@@ -1144,10 +1150,12 @@ function Named({
 // holds and one that drifts back.
 function Reachable({
   person,
+  editable,
   busy,
   onSet,
 }: {
   person: { email?: string; email_source?: string };
+  editable: boolean;
   busy: boolean;
   onSet: (email: string) => Promise<unknown>;
 }) {
@@ -1156,6 +1164,7 @@ function Reachable({
       value={person.email ?? ""}
       type="email"
       placeholder="ashwin@example.com"
+      editable={editable}
       busy={busy}
       onSet={onSet}
     >

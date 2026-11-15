@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { useIssue } from "../api/issue";
+import { BUILDS_MOST, useAffectedBuilds } from "../api/issue";
 import { Failed } from "../ui/Failed";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { Required } from "../ui/Required";
@@ -50,28 +50,20 @@ export function AffectedBuilds({
       unwrap(await api.GET("/v1/products/{product}/releases", { params: { path: { product } } })),
     retry: false,
   });
-  // The builds holding it now. The same request the issue screen makes, under
-  // the same key, so opening this after reading that page asks nothing.
-  const holds = useIssue(vulnerability, open);
+  // The builds of this product holding it now, in one read.
+  const holds = useAffectedBuilds(vulnerability, product, open);
 
-  // A page in hand that is the whole answer.
-  //
   // This editor sends the *complete* list of builds, and the server closes
-  // every build absent from it as never affected. So a set derived from a
-  // capped page is not a partial answer that loses a little — it is a write
-  // that closes the rows past the cap, with whatever reason was typed for a
-  // different build attached to them. There is no safe half: either the whole
-  // set is in hand or nothing is written.
-  const rows = holds.data?.items ?? [];
-  const partial = (holds.data?.total ?? rows.length) > rows.length;
-
-  const now = useMemo(() => {
-    const held = new Set<string>();
-    for (const row of holds.data?.items ?? []) {
-      if (row.product === product) held.add(buildKey(row));
-    }
-    return held;
-  }, [holds.data, product]);
+  // every build absent from it as never affected. So a set past the most one
+  // write names is not a partial answer that loses a little: written back, it
+  // closes the builds past the bound, with whatever reason was typed for a
+  // different build attached to them. Either the whole set is in hand or
+  // nothing is written.
+  const now = useMemo(
+    () => new Set((holds.data?.items ?? []).map((row) => buildKey(row))),
+    [holds.data],
+  );
+  const tooMany = holds.data?.more ?? false;
 
   const set = useMutation({
     mutationFn: async (picked: string[]) =>
@@ -125,13 +117,13 @@ export function AffectedBuilds({
           error={builds.error ?? holds.error}
           what="The builds this is filed against could not be read."
         />
-      ) : partial ? (
+      ) : tooMany ? (
         <div className="alert">
           <strong>This is open at more builds than this screen can set</strong>
           <span>
-            {(holds.data?.total ?? 0).toLocaleString()} builds hold it, and this sends the whole
-            list — so writing from what is shown would close the rest as never affected. Close them
-            one build at a time from each build&rsquo;s own finding instead.
+            More than {BUILDS_MOST.toLocaleString()} builds carry it here, and one change names at
+            most {BUILDS_MOST.toLocaleString()}. Close them one build at a time from each
+            build&rsquo;s own finding instead.
           </span>
         </div>
       ) : (
@@ -185,7 +177,13 @@ export function AffectedBuilds({
           <button
             type="button"
             className="btn"
-            disabled={!changed || picked.length === 0 || wantsReason || set.isPending}
+            disabled={
+              !changed ||
+              picked.length === 0 ||
+              picked.length > BUILDS_MOST ||
+              wantsReason ||
+              set.isPending
+            }
             onClick={() => set.mutate(picked)}
           >
             {set.isPending ? "Setting…" : "Set which builds it affects"}
@@ -193,6 +191,11 @@ export function AffectedBuilds({
           {picked.length === 0 && (
             <span className="hint" style={{ marginLeft: 8 }}>
               Pick at least one build.
+            </span>
+          )}
+          {picked.length > BUILDS_MOST && (
+            <span className="hint" style={{ marginLeft: 8 }}>
+              {BUILDS_MOST.toLocaleString()} builds at most.
             </span>
           )}
         </>

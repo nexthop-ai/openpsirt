@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { Refused, at, notYours, retryable, statusOf, unwrap } from "./queries";
+import { Refused, at, beneathOf, notYours, retryable, statusOf, unwrap } from "./queries";
 
 const answered = (status: number, statusText: string, error?: unknown) => ({
   error,
@@ -141,5 +141,15 @@ describe("whether a failed read is asked again", () => {
       expect(retryable(new Refused(status, "later")), String(status)).toBe(true);
     }
     expect(retryable(new TypeError("Failed to fetch"))).toBe(true);
+  });
+});
+
+describe("where a subtree starts", () => {
+  it("names the component and every part that picks it, leaving out empty ones", () => {
+    expect(beneathOf("openssl", { version: "3.0.2", ecosystem: "", namespace: "debian" })).toEqual({
+      beneath: "openssl",
+      beneath_version: "3.0.2",
+      beneath_namespace: "debian",
+    });
   });
 });

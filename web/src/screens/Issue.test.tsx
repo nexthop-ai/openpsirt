@@ -64,6 +64,8 @@ describe("one issue, everywhere it sits", () => {
     expect(text()).toContain("Also known as GHSA-aaaa-bbbb-cccc");
     expect(text()).toContain("Merged from GHSA-dddd-eeee-ffff");
     expect(text()).toContain("Showing 2 of 3.");
+    // The total counts rows, which are builds and components, never builds.
+    expect(text()).toContain("3 builds and components carry it");
     // What a scan said is shown as written and never rendered.
     expect(text()).toContain("<b>not markup</b>");
     const link = mount.host().querySelector("tbody a.id");

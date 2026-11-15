@@ -4,12 +4,22 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { belongTo } from "../app/drafts";
-import { Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
+import { Assignee, Attachments, Collaborators, Marks, Resolve } from "./FindingPeople";
 import { Disclose } from "./FindingDisclose";
 import { FindingWhich } from "./FindingWhich";
 import { Notes } from "./FindingNotes";
 import { button, change, press } from "../test/controls";
-import { accept, answer, mounted, screen, serve, settle, type Sent } from "../test/mount";
+import {
+  accept,
+  answer,
+  client,
+  mounted,
+  screen,
+  serve,
+  settle,
+  watchInvalidations,
+  type Sent,
+} from "../test/mount";
 
 const mount = mounted();
 
@@ -235,5 +245,35 @@ describe("which component a finding is about", () => {
       "/?from=state%3Dopen&version=3.8",
     ]);
     expect(mount.host().textContent).toContain("deb/debian");
+  });
+});
+
+describe("handing a finding to a holder", () => {
+  it("moves the holdings and every list of who holds what", async () => {
+    serve((path) =>
+      path === "/v1/products/{product}/holders"
+        ? { data: { items: [{ kind: "team", identity: "kernel", name: "Kernel" }] } }
+        : { data: {} },
+    );
+    answer("PUT", () => ({ status: 204 }));
+    const queries = client();
+    const invalidated = watchInvalidations(queries);
+    mount.render(
+      screen(
+        <Assignee at={at} assigned="" undisclosed={false} assignedByRule="" />,
+        "/",
+        "*",
+        queries,
+      ),
+    );
+    await settle();
+    const box = mount.host().querySelector<HTMLInputElement>('input[role="combobox"]');
+    await act(async () => box?.focus());
+    await settle();
+    await press(mount.host(), "Kernel team");
+    await settle();
+    expect(invalidated()).toEqual(
+      expect.arrayContaining(["assigned", "holdings", "team-assigned"]),
+    );
   });
 });

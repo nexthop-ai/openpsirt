@@ -3,6 +3,7 @@
 
 import { matchPath } from "react-router-dom";
 import type { Body } from "../api/client";
+import type { CodeFindingsAsked } from "../api/codeFindings";
 import { filledIn } from "../api/links";
 import table from "./routes.json";
 
@@ -99,33 +100,21 @@ export const vulnerabilityReportAt = (product: string, reference: string) =>
   at("vulnerabilityReport", { product, reference });
 // A product's static analysis code findings: the queue, or one state's code findings, on
 // every build or one.
-export const codeFindingsAt = (
-  product: string,
-  query?: {
-    state?: string;
-    branch_or_tag?: string;
-    variant?: string;
-    series?: string;
-    method?: string;
-    assigned?: "nobody";
-    component?: string;
-    component_version?: string;
-    beneath?: string;
-    beneath_version?: string;
-    beneath_ecosystem?: string;
-    beneath_namespace?: string;
-  },
-) => at("codeFindings", { product }, query);
+export const codeFindingsAt = (product: string, query?: CodeFindingsAsked) =>
+  at("codeFindings", { product }, query);
 // The code findings of every product the reader reads security testing
 // material in, as one queue.
-export const codeFindingsAcrossAt = (query?: {
-  state?: string;
-  series?: string;
-  method?: string;
-  assigned?: "nobody";
-  component?: string;
-  component_version?: string;
-}) => at("codeFindingsAcross", {}, query);
+export const codeFindingsAcrossAt = (
+  query?: Omit<
+    CodeFindingsAsked,
+    | "branch_or_tag"
+    | "variant"
+    | "beneath"
+    | "beneath_version"
+    | "beneath_ecosystem"
+    | "beneath_namespace"
+  >,
+) => at("codeFindingsAcross", {}, query);
 // One code finding's evidence on one build.
 export const codeFindingAt = (build: Build, occurrence: string) =>
   at("codeFinding", { ...build, occurrence });

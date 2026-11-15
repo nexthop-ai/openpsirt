@@ -3,7 +3,7 @@
 
 import { act, useState } from "react";
 import { describe, expect, it } from "vitest";
-import { Covering, type Sitting } from "./Covering";
+import { Covering, namedOccurrences, type Sitting } from "./Covering";
 import { change, press } from "../test/controls";
 import { mounted } from "../test/mount";
 
@@ -68,6 +68,20 @@ describe("the occurrences a decision covers", () => {
     expect(mount.host().textContent).toContain("13 of 14 covered · 1 left open under kernel");
   });
 
+  it("counts only excluded occurrences still listed", () => {
+    mount.render(
+      <Covering
+        occurrences={occurrences}
+        excluded={new Set(["kernel/netfilter", "gone/decided-elsewhere"])}
+        onChange={() => undefined}
+        matching={2}
+        differing={1}
+        reach={answered}
+      />,
+    );
+    expect(mount.host().textContent).toContain("13 of 14 covered · 1 left open under kernel");
+  });
+
   it("covers everything again on Cover all", async () => {
     left.now = new Set();
     mount.render(<Holding />);
@@ -90,5 +104,18 @@ describe("the occurrences a decision covers", () => {
     act(() => occurrence?.querySelector<HTMLInputElement>("input")?.click());
     expect([...left.now]).toEqual(["kernel/module-3"]);
     expect(groupBox("kernel").indeterminate).toBe(true);
+  });
+});
+
+describe("the occurrences a decision names", () => {
+  const listed = [{ occurrence: "a" }, { occurrence: "b" }];
+
+  it("are none where every listed one is covered, an exclusion no longer listed included", () => {
+    expect(namedOccurrences(listed, new Set())).toBeUndefined();
+    expect(namedOccurrences(listed, new Set(["gone"]))).toBeUndefined();
+  });
+
+  it("are the covered ones where a listed one is excluded", () => {
+    expect(namedOccurrences(listed, new Set(["b", "gone"]))).toEqual(["a"]);
   });
 });

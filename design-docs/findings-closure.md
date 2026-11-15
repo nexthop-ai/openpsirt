@@ -117,6 +117,8 @@ out.
 | Widening opens findings; narrowing closes them `invalid`, counted as no fix and in no release note | A corrected filing mistake must not raise the fix rate |
 | A reason is required to take a build out, and no second person | Requiring review keeps wrong records in place |
 | Only a flaw recorded here | A scanner's builds are what the scans found |
+| The set is read in the write's shape: one row per build of the product where the flaw stands open, in one statement, narrowed to what the reader may read, up to the most builds one write names and saying whether more stand open | Read in pages, a change between two reads skips a build, and the write closes it |
+| The editor offers no write where the flaw is open at more builds than one write names | The whole set is sent, so a set missing builds closes every build it misses |
 
 ## Build-declared claims
 

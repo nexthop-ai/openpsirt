@@ -14,7 +14,7 @@ import { useScope } from "../app/scope";
 import { mayOf, useWho } from "../app/session";
 import { ChoiceCards } from "../ui/ChoiceCards";
 import { Dropzone } from "../ui/Dropzone";
-import { Editor, mentioning } from "../ui/Editor";
+import { Editor, forget, mentioning } from "../ui/Editor";
 import { Suggest } from "../ui/Suggest";
 import { Failed } from "../ui/Failed";
 import { Unread } from "../ui/Reading";
@@ -64,6 +64,7 @@ export function RecordFlaw() {
   // The product the link names, where it names one: Vulnerability reports opens this with
   // its own product picked.
   const [product, setProduct] = useState(params.get("product") ?? scope.product ?? "");
+  const draftKey = `record:${product}`;
   const report = useReport(fromReport ? product : "", fromReport);
   const afterReport = useAfterReport();
   // The lines, and the ways they are built. Both are sets: the same code
@@ -237,6 +238,7 @@ export function RecordFlaw() {
       return { made, failed };
     },
     onSuccess: ({ made, failed }) => {
+      forget(draftKey);
       void queries.invalidateQueries({ queryKey: ["findings"] });
       void queries.invalidateQueries({ queryKey: ["disclosure-deadlines"] });
       // The report is judged now, and a page that still offers to judge it
@@ -257,6 +259,16 @@ export function RecordFlaw() {
       navigate(onward);
     },
   });
+  // The component and the version picked for it go together: a version picked
+  // from one refusal names a component in the builds that refusal was about,
+  // and the refusal offering those versions goes with them.
+  function nameComponent(next: string) {
+    setComponent(next);
+    setVersion("");
+    setEcosystem("");
+    setNamespace("");
+    record.reset();
+  }
 
   // Filed for judging: the decision, where it came from, and what arrived with it.
   // The files go against the report, which is what exists once this is done.
@@ -275,6 +287,7 @@ export function RecordFlaw() {
       return { made, failed };
     },
     onSuccess: ({ made, failed }) => {
+      forget(draftKey);
       const onward = vulnerabilityReportAt(product, made.reference);
       setRefused(failed);
       if (failed.length > 0) {
@@ -327,7 +340,7 @@ export function RecordFlaw() {
         {/* What was recorded here before. The screen that files one is where
             somebody asks whether it is already filed. */}
         {scope.product && (
-          <span style={{ marginLeft: "auto" }}>
+          <span className="noprint" style={{ marginLeft: "auto" }}>
             <Link
               className="btn quiet"
               to={productFindingsAt(scope.product, { origin: "manual", below: "yes" })}
@@ -353,7 +366,7 @@ export function RecordFlaw() {
               setProduct(event.target.value);
               setBranchesAndTags([]);
               setVariants([]);
-              setComponent("");
+              nameComponent("");
             }}
           >
             <option value="">Pick one</option>
@@ -377,7 +390,7 @@ export function RecordFlaw() {
           <Editor
             value={summary}
             onChange={setSummary}
-            draftKey={`record:${product}`}
+            draftKey={draftKey}
             rows={6}
             label="Description"
             placeholder="The management socket answers a request before anyone has authenticated."
@@ -526,7 +539,7 @@ export function RecordFlaw() {
                 empty={unpicked(product, lines)}
                 onChange={(next) => {
                   setBranchesAndTags(next);
-                  setComponent("");
+                  nameComponent("");
                 }}
               />
             </div>
@@ -543,7 +556,7 @@ export function RecordFlaw() {
                 empty={unpicked(product, builtAs)}
                 onChange={(next) => {
                   setVariants(next);
-                  setComponent("");
+                  nameComponent("");
                 }}
               />
             </div>
@@ -565,12 +578,7 @@ export function RecordFlaw() {
                 // silent-read: suggestions; a component not offered can still be typed.
                 ...new Set((holding.data?.items ?? []).map((each) => each.component ?? "")),
               ]}
-              onChange={(next) => {
-                setComponent(next);
-                setVersion("");
-                setEcosystem("");
-                setNamespace("");
-              }}
+              onChange={nameComponent}
             />
             <span className="hint">
               As the build calls it. Leave it empty for the build itself.

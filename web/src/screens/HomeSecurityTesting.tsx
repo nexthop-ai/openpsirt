@@ -15,6 +15,7 @@ import {
   type AnalysisCoverage,
   type CodeFindingMarker,
   type CodeFindingMethod,
+  type CodeFindingState,
   type CodeFindingTrend,
 } from "../api/codeFindings";
 import { statusOf } from "../api/queries";
@@ -37,8 +38,9 @@ import { Empty } from "../ui/Empty";
 import { Failed } from "../ui/Failed";
 import { HeldLine } from "../ui/HeldLine";
 import { Loading } from "../ui/Loading";
+import { daysSince } from "../ui/when";
 import { CODE_FINDING_METHODS } from "./codeFindings";
-import { TIERS, codeTrendAt, marksOf } from "./codeTrend";
+import { TIERS, codeTrendAt, marksOf, tiersIn } from "./codeTrend";
 
 // Home's Security testing figures: the code findings to judge and waiting for
 // a judgment, the last step's new and fixed, what is no longer detected, the
@@ -159,6 +161,7 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
     ? [one, at.branch_or_tag, at.variant].filter(Boolean).join(" · ")
     : `${products.length.toLocaleString()} ${products.length === 1 ? "product" : "products"}`;
   const trend = trends.data && named(trends.data, !one);
+  const tiers = tierParts((trend?.points ?? []).map((point) => point.by_tier));
   const series = coverages.flatMap((each) => each.data?.items ?? []);
   const quiet = series.filter((item) => item.quiet);
   const oldest = judging.data?.oldest;
@@ -166,7 +169,7 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
   const open = queue.data?.states?.open ?? 0;
   const absent = queue.data?.states?.["no-longer-detected"] ?? 0;
   const waiting = queue.data?.total ?? 0;
-  const queueAt = (state?: string) =>
+  const queueAt = (state?: CodeFindingState) =>
     one
       ? codeFindingsAt(one, { state, ...asked })
       : codeFindingsAcrossAt(state ? { state } : undefined);
@@ -337,10 +340,10 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
                 <>
                   <Stack
                     rows={trend.points.map((point) => ({ at: point.at, ...point.by_tier }))}
-                    parts={TIER_PARTS}
+                    parts={tiers}
                   />
                   <div className="legend">
-                    {TIER_PARTS.map((part) => (
+                    {tiers.map((part) => (
                       <span key={part.key}>
                         <i style={{ background: part.color }} /> {part.label}
                       </span>
@@ -356,11 +359,14 @@ export function SecurityTestingFigures({ who, code }: { who: Who; code: Holding 
   );
 }
 
-const TIER_PARTS: StackPart[] = Object.entries(TIERS).map(([key, label], i) => ({
-  key,
-  label,
-  color: TIER_COLORS[i] ?? "var(--muted)",
-}));
+// The tiers a chart stacks, each in its color, from the counts it draws.
+function tierParts(counts: Record<string, number>[]): StackPart[] {
+  return tiersIn(counts).map((key, i) => ({
+    key,
+    label: TIERS[key] ?? key,
+    color: TIER_COLORS[i] ?? "var(--muted)",
+  }));
+}
 
 // A chart's body once the trend is read.
 function Drawn({
@@ -392,6 +398,6 @@ function named(trend: CodeFindingTrend, across: boolean): Drawable {
 
 // How long ago a day was, in days.
 function ageOf(day: string): string {
-  const days = Math.max(0, Math.floor((Date.now() - Date.parse(day)) / 86_400_000));
+  const days = Math.max(0, daysSince(day));
   return days === 1 ? "1 day" : `${days.toLocaleString()} days`;
 }

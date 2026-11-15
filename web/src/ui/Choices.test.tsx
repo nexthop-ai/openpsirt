@@ -82,6 +82,15 @@ describe("choices", () => {
     expect(document.activeElement).toBe(boxes()[0]);
   });
 
+  it("closes on Tab, so the list is not left over what focus moves to", () => {
+    mount.render(<Harness start={[]} />);
+    act(() => trigger().focus());
+    press("ArrowDown");
+    expect(list()).not.toBeNull();
+    press("Tab");
+    expect(list()).toBeNull();
+  });
+
   it("closes on Escape and returns to the control", () => {
     mount.render(<Harness start={[]} />);
     act(() => trigger().click());

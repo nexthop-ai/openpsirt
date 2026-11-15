@@ -60,3 +60,20 @@ describe("a disable directive", () => {
     ).toEqual([]);
   });
 });
+
+describe("an outside address", () => {
+  // Linted as a screen would be, under the interface's own configuration.
+  async function restricted(code: string, filePath: string): Promise<string[]> {
+    const { ESLint } = await import("eslint");
+    const [result] = await new ESLint().lintText(code, { filePath });
+    return (result?.messages ?? [])
+      .filter((message) => message.ruleId === "no-restricted-imports")
+      .map((message) => message.message);
+  }
+
+  it("is checked through Outward alone, never by a screen calling the check", async () => {
+    const code = 'import { linkable } from "../ui/addressable";\nexport const x = linkable("a");\n';
+    expect(await restricted(code, "src/screens/Probe.tsx")).toHaveLength(1);
+    expect(await restricted(code.replace("../ui/", "./"), "src/ui/Outward.tsx")).toEqual([]);
+  });
+});

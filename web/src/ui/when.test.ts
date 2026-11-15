@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { at, lasted, on, since, typedMoment, typedNow } from "./when";
+import { at, daysSince, lasted, on, since, typedMoment, typedNow } from "./when";
 
 // Two forms and no others. A stored string shown with its time and offset is
 // the tool displaying its storage rather than answering the question.
@@ -81,10 +81,13 @@ describe("how a moment is written", () => {
     // suite green.
     expect(since("2026-08-24T12:00:00Z", now)).toBe("2 weeks ago");
     expect(since("2026-08-07T12:00:00Z", now)).toBe("1 month ago");
-    // A year is 365.25 days here, so two calendar years back is 1.998 of
-    // them and reads as one. Which is the sort of thing a rung nothing
-    // exercises gets wrong quietly.
     expect(since("2024-06-07T12:00:00Z", now)).toBe("2 years ago");
+  });
+
+  it("names a year on the day it ends, and two on the day the second does", () => {
+    expect(since("2025-09-07T12:00:00Z", now)).toBe("1 year ago");
+    expect(since("2024-09-07T12:00:00Z", now)).toBe("2 years ago");
+    expect(since("2027-09-07T12:00:00Z", now)).toBe("in 1 year");
   });
 
   it("reads the same scale the other way for a moment still ahead", () => {
@@ -148,5 +151,23 @@ describe("how a typed minute is read", () => {
     expect(typedMoment("")).toBe("");
     expect(typedMoment("2026-10-03")).toBe("");
     expect(typedMoment("2026-13-40T99:99")).toBe("");
+  });
+});
+
+describe("days since", () => {
+  const noon = Date.parse("2026-09-07T12:00:00Z");
+
+  it("counts a bare day from its start in UTC", () => {
+    expect(daysSince("2026-09-06", noon)).toBe(1);
+    expect(daysSince("2026-09-07", noon)).toBe(0);
+  });
+
+  it("counts a moment from itself", () => {
+    expect(daysSince("2026-09-06T13:00:00Z", noon)).toBe(0);
+    expect(daysSince("2026-09-05T12:00:00Z", noon)).toBe(2);
+  });
+
+  it("is not a number for what is not a date", () => {
+    expect(daysSince("soon", noon)).toBeNaN();
   });
 });

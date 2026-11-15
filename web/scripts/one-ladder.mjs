@@ -15,8 +15,7 @@
 // takes and the shape that silently loses a rung.
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
-import { sourceFiles, SRC } from "./parsed.mjs";
+import { isMain, sourceFiles, SRC } from "./parsed.mjs";
 
 // Where the ladder is allowed to be written down, relative to src/.
 const HOME = path.join("ui", "severities.ts");
@@ -206,7 +205,7 @@ export function checkedNothing(looked) {
 //
 // Tests are read too: a test holding its own copy of the ladder pins a list
 // that can drift from the one the screens draw.
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+if (isMain(import.meta)) {
   const files = Object.fromEntries(
     sourceFiles({ ext: [".ts", ".tsx"], tests: true }).map((file) => [
       path.relative(SRC, file),

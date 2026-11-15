@@ -10,16 +10,8 @@ import { Loading } from "../../ui/Loading";
 import { Wide } from "../../ui/Wide";
 import { TIERS } from "../codeTrend";
 import { Sheet } from "./Sheet";
-import { Segments, boundedAsked } from "./Window";
-import {
-  Files,
-  Gate,
-  WEEKS,
-  WaitsTable,
-  queryOf,
-  useFigureAsked,
-  weeksWords,
-} from "./securityTesting";
+import { FIRST_WEEKS, MOST_WEEKS, Segments, TREND_WEEKS, boundedAsked, weeksWords } from "./Window";
+import { Files, Gate, WaitsTable, queryOf, useFigureAsked } from "./securityTesting";
 
 // How long a code finding waits for a person: from opening to the first
 // decision proposed about it, whatever it decided, and the queue waiting now
@@ -27,7 +19,7 @@ import {
 // apart.
 export function TimeToJudge() {
   const { product, asked, code, reads, needsBuild, of, params } = useFigureAsked();
-  const weeks = boundedAsked(params.get("weeks"), 104, 13);
+  const weeks = boundedAsked(params.get("weeks"), MOST_WEEKS, FIRST_WEEKS);
   const judged = useCodeFindingJudging(
     product,
     { ...asked, weeks },
@@ -42,7 +34,13 @@ export function TimeToJudge() {
       asked={weeksWords(weeks)}
     >
       <div className="controls">
-        <Segments label="Window" param="weeks" offered={WEEKS} chosen={weeks} words={weeksWords} />
+        <Segments
+          label="Window"
+          param="weeks"
+          offered={TREND_WEEKS}
+          chosen={weeks}
+          words={weeksWords}
+        />
         {product && reads && !needsBuild && (
           <Files
             path="/v1/products/{product}/code-finding-time-to-judge.{format}"
@@ -132,7 +130,7 @@ export function TimeToJudge() {
 // apart, because absence is no proof of a fix.
 export function TimeToFix() {
   const { product, asked, code, reads, needsBuild, of, params } = useFigureAsked();
-  const weeks = boundedAsked(params.get("weeks"), 104, 13);
+  const weeks = boundedAsked(params.get("weeks"), MOST_WEEKS, FIRST_WEEKS);
   const fixing = useCodeFindingFixing(
     product,
     { ...asked, weeks },
@@ -147,7 +145,13 @@ export function TimeToFix() {
       asked={weeksWords(weeks)}
     >
       <div className="controls">
-        <Segments label="Window" param="weeks" offered={WEEKS} chosen={weeks} words={weeksWords} />
+        <Segments
+          label="Window"
+          param="weeks"
+          offered={TREND_WEEKS}
+          chosen={weeks}
+          words={weeksWords}
+        />
         {product && reads && !needsBuild && (
           <Files
             path="/v1/products/{product}/code-finding-time-to-fix.{format}"

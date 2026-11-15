@@ -47,6 +47,9 @@ export function useTrust(product: string) {
   const settled = () => {
     void queries.invalidateQueries({ queryKey: ["upstream", product] });
     void queries.invalidateQueries({ queryKey: ["upstream-offers"] });
+    // What a component screen draws as standing, which stops standing once
+    // the upstream that said it is no longer trusted.
+    void queries.invalidateQueries({ queryKey: ["upstream-said"] });
   };
   const trust = useMutation({
     mutationFn: async (body: { url: string; fingerprint?: string }) =>

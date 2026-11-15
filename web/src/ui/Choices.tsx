@@ -1,9 +1,8 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { useClickAway } from "./away";
-import { moved, summary, toggled } from "./choices";
+import { summary, toggled } from "./choices";
+import { useMenu } from "./menu";
 
 // Several answers to one question, as a list of checkboxes behind a control
 // that says what is ticked.
@@ -20,9 +19,10 @@ import { moved, summary, toggled } from "./choices";
 // as the first and how many more, and the chips above the list name each of
 // them.
 //
-// Operated from the keyboard as the filter bar's menus are: an arrow key on
-// the control opens it, the arrows, Home and End move between the boxes, and
-// Escape closes it and returns to the control.
+// Operated from the keyboard as the filter bar's menus are, through the same
+// hook: an arrow key on the control opens it, the arrows, Home and End move
+// between the boxes, Escape closes it and returns to the control, and Tab
+// closes it as focus moves on.
 
 export type Choice = readonly [string, string];
 
@@ -50,53 +50,15 @@ export function Choices({
   // other controls rather than above them.
   bare?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
-  const box = useRef<HTMLDivElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const boxes = useRef<(HTMLInputElement | null)[]>([]);
-
-  useClickAway(box, open, () => setOpen(false));
-
-  useEffect(() => {
-    if (open) boxes.current[active]?.focus();
-  }, [open, active]);
-
   const offered = options.filter(([word]) => word !== "");
   const ticked = offered.filter(([word]) => chosen.includes(word));
   const says = summary(ticked, anything);
-
-  function show() {
-    // Opened on the first box ticked, so a keyboard lands where the answer is.
-    setActive(
-      Math.max(
-        0,
-        offered.findIndex(([word]) => chosen.includes(word)),
-      ),
-    );
-    setOpen(true);
-  }
-
-  function onTriggerKey(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      show();
-    }
-  }
-
-  function onListKey(event: KeyboardEvent<HTMLDivElement>) {
-    const next = moved(event.key, active, offered.length);
-    if (next !== undefined) {
-      event.preventDefault();
-      setActive(next);
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setOpen(false);
-      trigger.current?.focus();
-    }
-  }
+  // Opened on the first box ticked, so a keyboard lands where the answer is.
+  const menu = useMenu<HTMLInputElement>({
+    count: offered.length,
+    startAt: () => offered.findIndex(([word]) => chosen.includes(word)),
+  });
+  const { open, box, trigger, onTriggerKey, onListKey } = menu;
 
   const control = (
     <div className="choices" ref={box}>
@@ -108,7 +70,7 @@ export function Choices({
         aria-expanded={open}
         aria-haspopup="true"
         data-on={ticked.length > 0 ? "yes" : undefined}
-        onClick={() => (open ? setOpen(false) : show())}
+        onClick={menu.toggle}
         onKeyDown={onTriggerKey}
       >
         <span>{says}</span>
@@ -120,11 +82,11 @@ export function Choices({
             <label key={word} className="check">
               <input
                 ref={(node) => {
-                  boxes.current[i] = node;
+                  menu.items.current[i] = node;
                 }}
                 type="checkbox"
                 checked={chosen.includes(word)}
-                onFocus={() => setActive(i)}
+                onFocus={() => menu.setActive(i)}
                 onChange={(event) => onChange(toggled(offered, chosen, word, event.target.checked))}
               />
               <span>{said}</span>

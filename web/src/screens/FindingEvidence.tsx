@@ -16,7 +16,7 @@ import { own } from "../ui/own";
 import { notYours, statusOf, unwrap } from "../api/queries";
 import { useDuplicates } from "../api/intake";
 import { mayOf, useWho } from "../app/session";
-import { linkable } from "../ui/addressable";
+import { Outward } from "../ui/Outward";
 import { Failed } from "../ui/Failed";
 import { UNPLACED, type Sitting } from "../ui/Covering";
 import { CHAINS, intoTheTree, moreWays, wayDown } from "./waydown";
@@ -37,14 +37,10 @@ import {
 // output. What fails the check is still shown — losing the address would lose
 // the evidence — it is simply not clickable.
 function Away({ url }: { url?: string }) {
-  const href = linkable(url);
-  if (!href) {
-    return <span className="id">{url}</span>;
-  }
   return (
-    <a href={href} target="_blank" rel="noreferrer noopener">
-      {href.replace(/^https?:\/\//, "")}
-    </a>
+    <Outward href={url} className="">
+      {(url ?? "").trim().replace(/^https?:\/\//, "")}
+    </Outward>
   );
 }
 
@@ -164,21 +160,34 @@ export function References({
   }[];
 }) {
   const [whole, setWhole] = useState(false);
-  const all = advisory ? [{ url: advisory, kind: "advisory" }, ...refs] : refs;
-  if (all.length === 0) return null;
   const order: Record<Body<"ReferenceBody">["kind"], number> = {
     patch: 0,
     advisory: 1,
     report: 2,
     documentation: 3,
   };
-  const sorted = [...all].sort((a, b) => (own(order, a.kind) ?? 9) - (own(order, b.kind) ?? 9));
+  const rank = (ref: { kind?: string }) => own(order, ref.kind) ?? 9;
+  // One row per address: a scanner's list often carries the advisory again,
+  // and sometimes one address twice. The row kept is the one whose kind ranks
+  // first, so a patch at the advisory's address keeps its label and place.
+  const listed = [...(advisory ? [{ url: advisory, kind: "advisory" }] : []), ...refs];
+  const all = listed.filter(
+    (ref, i) =>
+      !ref.url ||
+      !listed.some(
+        (other, j) =>
+          other.url === ref.url &&
+          (rank(other) < rank(ref) || (rank(other) === rank(ref) && j < i)),
+      ),
+  );
+  if (all.length === 0) return null;
+  const sorted = [...all].sort((a, b) => rank(a) - rank(b));
   return (
     <div className="evblock">
       <h4>References</h4>
       <ul className="refs">
-        {(whole ? sorted : sorted.slice(0, SHOWN_REFERENCES)).map((ref) => (
-          <li key={ref.url}>
+        {(whole ? sorted : sorted.slice(0, SHOWN_REFERENCES)).map((ref, i) => (
+          <li key={`${ref.kind ?? ""} ${ref.url ?? ""} ${i}`}>
             <span className={ref.kind === "patch" ? "kind patch" : "kind"}>{ref.kind}</span>{" "}
             <span className="ref">
               <Away url={ref.url} />
@@ -321,8 +330,8 @@ export function LookItUp({ links }: { links: { url?: string; name?: string }[] }
     <div className="evblock">
       <h4>Issue records</h4>
       <ul className="refs">
-        {links.map((link) => (
-          <li key={link.url}>
+        {links.map((link, i) => (
+          <li key={`${link.url ?? ""} ${i}`}>
             <span className="kind">{link.name}</span> <Away url={link.url} />
           </li>
         ))}

@@ -18,9 +18,8 @@
 // too: a development dependency imported by the source is in the bundle.
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import ts from "typescript";
-import { parse, sourceFiles, SRC, WEB } from "./parsed.mjs";
+import { isMain, parse, sourceFiles, SRC, WEB } from "./parsed.mjs";
 
 const lockfile = path.join(WEB, "package-lock.json");
 
@@ -246,7 +245,7 @@ export function checkedNothing(checked, imports) {
 // it: the test would read it, and a dependency under the wrong license would
 // call process.exit and take the runner down. What is exported above is the
 // policy; this is the program.
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+if (isMain(import.meta)) {
   if (allowed.size === 0) {
     console.error("no allowlist given. The list lives in the Makefile; run `make licenses`.");
     process.exit(2);

@@ -56,6 +56,10 @@ export function notYours(error: unknown): boolean {
 // A choice the server offered, with whatever else it takes to pick one.
 export type Choice = { version: string; ecosystem?: string; namespace?: string };
 
+// The rows one request of a paged list carries, which is the server's own
+// default, named once so every pager and its request agree where a page ends.
+export const PAGE = 50;
+
 // whichOf is the query that picks one component where its name is not enough:
 // the version, and the ecosystem and namespace where a build holds one name at
 // one version as two components. Empty parts are left out, and the server reads
@@ -69,6 +73,27 @@ export function whichOf(of: { version?: string; ecosystem?: string; namespace?: 
     ...(of.version ? { version: of.version } : {}),
     ...(of.ecosystem ? { ecosystem: of.ecosystem } : {}),
     ...(of.namespace ? { namespace: of.namespace } : {}),
+  };
+}
+
+// beneathOf is the query naming where a subtree starts: one component, with
+// whatever picks it among others of its name. Empty parts are left out, as in
+// whichOf.
+export function beneathOf(
+  name: string,
+  which: { version?: string; ecosystem?: string; namespace?: string },
+): {
+  beneath: string;
+  beneath_version?: string;
+  beneath_ecosystem?: string;
+  beneath_namespace?: string;
+} {
+  const { version, ecosystem, namespace } = whichOf(which);
+  return {
+    beneath: name,
+    ...(version ? { beneath_version: version } : {}),
+    ...(ecosystem ? { beneath_ecosystem: ecosystem } : {}),
+    ...(namespace ? { beneath_namespace: namespace } : {}),
   };
 }
 

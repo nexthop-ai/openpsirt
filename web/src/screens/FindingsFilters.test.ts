@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { activeFilters, kindsOffered, without, withoutAny } from "./FindingsFilters";
+import { activeFilters, kindsOffered, unbumped, without, withoutAny } from "./FindingsFilters";
+import { BUMP_FILTERS, bumpQuery } from "./FindingsViews";
+import { listQuery } from "./list";
 
 // The chips above the findings list: what narrows it, read from the address,
 // and what removing each one leaves.
@@ -179,5 +181,163 @@ describe("the weakness chips", () => {
 
   it("show the number alone before the names are read", () => {
     expect(chips("weakness=CWE-79")).toEqual(["Weakness: CWE-79"]);
+  });
+});
+
+// An address with every filter a chip names in force.
+const EVERY = new URLSearchParams(
+  [
+    "q=ssl",
+    "floor=high",
+    "below=yes",
+    "exploited=1",
+    "fixable=1",
+    "epss_at_least=0.5",
+    "fix_state=fixed",
+    "state=undecided",
+    "outcome=not-affected",
+    "sent_back=1",
+    "planned=planned",
+    "on=branch",
+    "support=past-eol",
+    "assigned=me",
+    "reassessed=1",
+    "origin=manual",
+    "unconfirmed=1",
+    "vex_publisher=acme",
+    "vex_status=fixed",
+    "build_says=affected",
+    "component=curl",
+    "ecosystem=deb",
+    "purl=pkg:deb/debian/curl",
+    "declared_as=library",
+    "under=sonic-swss",
+    "beneath=curl",
+    "under_build=yes",
+    "hide=zlib",
+    "running=overdue",
+    "open_for=30",
+    "open_under=90",
+    "opened_after=2026-01-01",
+    "opened_before=2026-06-01",
+    "open_on=2026-03-01",
+    "opened_by_run=7",
+    "decision=12",
+    "proposed_after=2026-01-01",
+    "closed_after=2026-01-01",
+    "weakness=CWE-79",
+    "label=mine",
+    "differs=1",
+    "variants=only",
+  ].join("&"),
+);
+
+describe("a chip and the list it narrows", () => {
+  it("draws none for a value the list does not send", () => {
+    for (const address of [
+      "open_for=0",
+      "open_under=soon",
+      "epss_at_least=1.5",
+      "epss_at_least=0",
+      "floor=bogus",
+      "opened_after=2026-02-30",
+      "open_on=yesterday",
+      "state=bogus",
+      "outcome=bogus",
+      "fix_state=bogus",
+      "vex_status=bogus",
+      "build_says=bogus",
+      "declared_as=bogus",
+      "assigned=bogus",
+      "origin=bogus",
+      "planned=bogus",
+      "decision=abc",
+      "opened_by_run=-1",
+      "running=never",
+      "hide=%20",
+      "on=branch&on=bogus&on=tag",
+    ]) {
+      expect(activeFilters(new URLSearchParams(address)), address).toEqual([]);
+    }
+  });
+
+  it("narrows the request for every chip it draws", () => {
+    const params = EVERY;
+    const chips = activeFilters(params);
+    expect(chips.length).toBeGreaterThan(0);
+    const sent = JSON.stringify(listQuery(params));
+    for (const chip of chips) {
+      expect(JSON.stringify(listQuery(without(params, chip))), chip.key).not.toBe(sent);
+    }
+  });
+});
+
+describe("a chip and the by-upgrade list", () => {
+  it("narrows the upgrades exactly where the view names the filter as applied", () => {
+    const at = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
+    const sent = (params: URLSearchParams) =>
+      JSON.stringify(bumpQuery(at, listQuery(params), 50, 0));
+    const chips = activeFilters(EVERY);
+    expect(chips.length).toBeGreaterThan(0);
+    for (const chip of chips) {
+      expect(sent(without(EVERY, chip)) !== sent(EVERY), chip.key).toBe(chip.key in BUMP_FILTERS);
+    }
+  });
+});
+
+describe("what the by-upgrade list says it cannot apply", () => {
+  it("names only filters in force over the selection as ones it cannot apply", () => {
+    const params = new URLSearchParams("beneath=openssl&state=undecided");
+    const oneBuild = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
+    const wholeProduct = { product: "sonic", branch_or_tag: "", variant: "" };
+    expect(unbumped(params, oneBuild)).toHaveLength(1);
+    expect(unbumped(params, wholeProduct)).toEqual([]);
+  });
+
+  it("names each value past the first it sends, and no value it never sends", () => {
+    const scope = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
+    const two = unbumped(new URLSearchParams("state=undecided&state=waiting"), scope);
+    expect(two).toEqual(["Decision state: Pending approval"]);
+    expect(unbumped(new URLSearchParams("state=undecided&state=bogus"), scope)).toEqual([]);
+  });
+});
+
+describe("a chip and where the list is asked", () => {
+  it("draws none for a filter the selection leaves off the request", () => {
+    const params = new URLSearchParams("beneath=openssl&differs=1&state=undecided");
+    const keys = (scope: { product: string; branch_or_tag: string; variant: string }) =>
+      activeFilters(params, undefined, scope).map((chip) => chip.key);
+    expect(keys({ product: "", branch_or_tag: "", variant: "" })).toEqual(["state"]);
+    expect(keys({ product: "sonic", branch_or_tag: "", variant: "" })).toEqual([
+      "state",
+      "differs",
+    ]);
+    expect(keys({ product: "sonic", branch_or_tag: "master", variant: "broadcom" })).toEqual([
+      "state",
+      "beneath",
+      "differs",
+    ]);
+  });
+
+  it("draws one subtree root where the address names both", () => {
+    const params = new URLSearchParams("beneath=openssl&beneath_purl=pkg:github/a/b");
+    expect(activeFilters(params).map((chip) => chip.key)).toEqual(["beneath"]);
+    expect(listQuery(params)).not.toHaveProperty("beneath_purl");
+  });
+
+  it("widens to the whole build when that root's chip is removed, or every chip is", () => {
+    const params = new URLSearchParams("beneath=openssl&beneath_purl=pkg:github/a/b");
+    const chip = activeFilters(params).find((each) => each.key === "beneath");
+    expect(chip).toBeDefined();
+    if (!chip) return;
+    expect(without(params, chip).toString()).toBe("");
+    expect(withoutAny(params).toString()).toBe("");
+  });
+});
+
+describe("clearing every chip of an address carrying a value the list does not send", () => {
+  it("takes that value out too", () => {
+    const cleared = withoutAny(new URLSearchParams("state=bogus&open_for=0&sort=age"));
+    expect(cleared.toString()).toBe("sort=age");
   });
 });

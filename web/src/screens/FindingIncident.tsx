@@ -1,8 +1,9 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useAfterIncident } from "../api/incidents";
 import { type ReactNode, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 
 import { api, type Body } from "../api/client";
 import { unwrap } from "../api/queries";
@@ -35,7 +36,6 @@ export function Incident({
   records?: Kept[];
   mayTriage: boolean;
 }) {
-  const queries = useQueryClient();
   const [keeping, setKeeping] = useState(false);
   const [clearing, setClearing] = useState(false);
   // A form opened on one issue is closed on arriving at another: the screen
@@ -44,7 +44,7 @@ export function Incident({
     setKeeping(false);
     setClearing(false);
   });
-  const done = () => void queries.invalidateQueries({ queryKey: ["finding"] });
+  const done = useAfterIncident();
 
   const kept = records ?? [];
   const standing = kept.find((each) => each.standing);

@@ -9,7 +9,7 @@ import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { Wide } from "../../ui/Wide";
-import { TIERS } from "../codeTrend";
+import { TIERS, tiersIn } from "../codeTrend";
 import { Sheet } from "./Sheet";
 import { Files, Gate, queryOf, useFigureAsked } from "./securityTesting";
 
@@ -28,6 +28,7 @@ export function CodeFindingsByRelease() {
   };
   const released = useCodeFindingsByRelease(product, narrowed, !!product && reads);
   const releases = released.data?.releases ?? [];
+  const tiers = tiersIn(releases.map((each) => each.by_tier));
   return (
     <Sheet
       settled={!product || !reads || released.isSuccess}
@@ -82,9 +83,9 @@ export function CodeFindingsByRelease() {
                       <th>Release</th>
                       <th>Went out</th>
                       <th className="num">Not fixed</th>
-                      {Object.entries(TIERS).map(([key, label]) => (
+                      {tiers.map((key) => (
                         <th key={key} className="num">
-                          {label}
+                          {TIERS[key] ?? key}
                         </th>
                       ))}
                       <th className="num" title="Nothing answers them">
@@ -109,7 +110,7 @@ export function CodeFindingsByRelease() {
                           <td>{each.branch_or_tag_name}</td>
                           <td className="hint">{each.cut}</td>
                           <td className="num">{each.not_fixed.toLocaleString()}</td>
-                          {Object.keys(TIERS).map((key) => (
+                          {tiers.map((key) => (
                             <td key={key} className="num hint">
                               {(each.by_tier?.[key] ?? 0).toLocaleString()}
                             </td>

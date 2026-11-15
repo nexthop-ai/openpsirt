@@ -10,6 +10,7 @@ import {
   daysAsked,
   endExclusive,
   periodAsked,
+  weeksWords,
   wordsFor,
 } from "./Window";
 
@@ -61,6 +62,14 @@ describe("what a window is called", () => {
   it("names a year as a year on every sheet", () => {
     expect(wordsFor(365)).toBe("a year");
     expect(coveringWords(365)).toBe("the last year");
+  });
+
+  it("names two years as two years, in days or in weeks", () => {
+    expect(wordsFor(730)).toBe("two years");
+    expect(coveringWords(730)).toBe("the last two years");
+    expect(weeksWords(104)).toBe("two years");
+    expect(weeksWords(52)).toBe("a year");
+    expect(weeksWords(13)).toBe("13 weeks");
   });
 
   it("counts the days otherwise", () => {

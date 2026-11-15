@@ -40,12 +40,35 @@ function box(label: string): HTMLInputElement {
 const click = (label: string) => act(async () => box(label).click());
 
 describe("the grant grid", () => {
-  it("withdraws a role held under the product's display name by its API name", async () => {
-    const acts = await drawn([{ product: "Network OS", role: "approver" }]);
+  it("withdraws a held role by the name that addresses its product", async () => {
+    const acts = await drawn([{ product: "sonic", role: "approver" }]);
     expect(box("Approver on sonic").checked).toBe(true);
     await click("Approver on sonic");
     expect(acts.onWithdraw).toHaveBeenCalledWith("sonic", "approver");
     expect(acts.onGrant).not.toHaveBeenCalled();
+  });
+
+  it("draws a grant on the product it names, never one whose display name matches", async () => {
+    serve((path) =>
+      path === "/v1/products"
+        ? { data: { items: [{ name: "beta" }, { name: "alpha", display_name: "Beta" }] } }
+        : undefined,
+    );
+    mount.render(
+      screen(
+        <GrantGrid
+          holds={[{ product: "beta", role: "approver" }]}
+          busy={false}
+          onGrant={vi.fn()}
+          onWithdraw={vi.fn()}
+          onGrantEverywhere={vi.fn()}
+          onWithdrawEverywhere={vi.fn()}
+        />,
+      ),
+    );
+    await settle();
+    expect(box("Approver on beta").checked).toBe(true);
+    expect(box("Approver on alpha").checked).toBe(false);
   });
 
   it("grants a role not held", async () => {
