@@ -118,8 +118,9 @@ func TestABuildsUploadsSayWhatBecameOfTheNewestOfEachKind(t *testing.T) {
 		}
 
 		_, kinds, _ := uploadKinds(t, r, "security-testing-reader")
-		if sbom := kinds["sbom"]; sbom.Total != 1 || sbom.Latest == nil || sbom.Latest.Status == "refused" {
-			t.Errorf("the SBOMs read %+v; want the one scanned", sbom)
+		if sbom := kinds["sbom"]; sbom.Total != 1 || sbom.Latest == nil ||
+			(sbom.Latest.Status != "in-progress" && sbom.Latest.Status != "completed") {
+			t.Errorf("the SBOMs read %+v; want the one taken, in progress or completed", sbom)
 		}
 		if sarif := kinds["sarif"]; sarif.Total != 1 || sarif.Latest == nil || sarif.Latest.Status != "in-progress" {
 			t.Errorf("the static analysis runs read %+v; want the one queued", sarif)

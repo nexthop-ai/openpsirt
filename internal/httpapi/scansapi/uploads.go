@@ -153,10 +153,7 @@ func sbomUploads(ctx context.Context, in core.Deps, subject access.Subject,
 	if len(receipts) > 0 {
 		r := receipts[0]
 		takenAt = r.Scan.ReceivedAt
-		body.Latest = latestOf(takenAt, map[ingest.Progress]ingest.UploadStatus{
-			ingest.Reading: ingest.UploadInProgress, ingest.Scanning: ingest.UploadInProgress,
-			ingest.Scanned: ingest.UploadCompleted, ingest.Refused: ingest.UploadFailed,
-		}[r.State], r.Failure)
+		body.Latest = latestOf(takenAt, r.State.Upload(), r.Failure)
 	}
 	refused, err := store.LastRefusal(ctx, subject, buildID)
 	if err != nil {
@@ -184,11 +181,7 @@ func sarifUploads(ctx context.Context, in core.Deps, subject access.Subject,
 	if len(sent) > 0 {
 		s := sent[0]
 		takenAt = s.ReceivedAt
-		body.Latest = latestOf(takenAt, map[series.Status]ingest.UploadStatus{
-			series.Queued: ingest.UploadInProgress, series.Waiting: ingest.UploadInProgress,
-			series.Applied: ingest.UploadCompleted, series.Superseded: ingest.UploadCompleted,
-			series.Failed: ingest.UploadFailed,
-		}[series.Status(s.Status)], s.Failure)
+		body.Latest = latestOf(takenAt, ingest.RunUpload(series.Status(s.Status)), s.Failure)
 	}
 	refusals, err := store.RefusalsOf(ctx, subject, productID, buildID, kind.Analysis, analysis.OpensAt)
 	if err != nil {
