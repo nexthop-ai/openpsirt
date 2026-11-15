@@ -4859,7 +4859,7 @@ components:
             - refused
           type: string
         uploaded_by:
-          description: "Who uploaded it: a person by sign-in identity, or an API key by name. Absent where a feed fetched it"
+          description: Who uploaded it, by sign-in identity. Absent where a feed fetched it
           type: string
         uploaded_by_name:
           description: Their display name, where it differs from their identity
@@ -7195,13 +7195,6 @@ components:
     KeyBody:
       additionalProperties: false
       properties:
-        $schema:
-          description: A URL to the JSON Schema for this object.
-          examples:
-            - https://example.com/schemas/KeyBody.json
-          format: uri
-          readOnly: true
-          type: string
         branch_or_tag:
           description: Optionally, the one release it may send for
           type: string
@@ -7232,6 +7225,35 @@ components:
         withdrawn:
           description: Whether it has been withdrawn
           type: boolean
+      required:
+        - name
+        - product
+      type: object
+    KeyRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/KeyRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        branch_or_tag:
+          description: Optionally, the one release it may send for
+          type: string
+        name:
+          description: The credential's purpose, stored in lower case and matched without regard to capitals
+          maxLength: 191
+          minLength: 1
+          type: string
+        product:
+          description: The product it may send scans for, by the name that addresses it. Always required
+          minLength: 1
+          type: string
+        variant:
+          description: Optionally, the one variant it may send for
+          type: string
       required:
         - name
         - product
@@ -21090,6 +21112,8 @@ paths:
       description: |-
         Creates a credential a build may send scans with, and returns its secret. The secret is shown once and stored hashed: a credential store that can hand back what it holds gives up every pipeline's key with a copy of the database.
 
+        Takes a name, a product, and optionally a branch or tag and a variant. A request carrying a field only the answer holds, such as `secret`, `withdrawn`, `created_at`, `last_used_at` or `product_name`, is refused with 422: send it without them.
+
         Requires a session. A credential cannot create another, and a key created by one would outlive it.
 
         Requires: administrator
@@ -21098,7 +21122,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/KeyBody"
+              $ref: "#/components/schemas/KeyRequest"
         required: true
       responses:
         "201":
