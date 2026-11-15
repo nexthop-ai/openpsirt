@@ -13,8 +13,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
-// The former tests a stopped start of the v0.11.0 upgrade is checked by, each
-// a subtest of the one below under its own name.
+// The invariants a stopped start of the v0.11.0 upgrade is checked against,
+// each a subtest of the one below under its own name.
 const (
 	renamesResume     = "AnUpgradeStoppedPartWayThroughItsRenamesResumes"
 	ruleRenamesResume = "AnUpgradeStoppedPartWayThroughTheRuleRenamesResumes"
@@ -75,7 +75,7 @@ var storedWordSteps = []string{
 	"saved_filter", "application_setting",
 }
 
-// ownedStop is a rename stop and the former test it belongs to.
+// ownedStop is a rename stop and the invariant it belongs to.
 type ownedStop struct {
 	test string
 	renameStop
@@ -84,7 +84,7 @@ type ownedStop struct {
 // One v0.10.0 database per engine holds the seeds of every stopped start of
 // the v0.11.0 upgrade checked here, is stopped at every point, and is upgraded
 // once. Building a database to v0.10.0 is most of what such a test costs, and
-// a build per stop held the package past go test's limit on the servers.
+// a build per stop holds the package past go test's limit on the servers.
 //
 // The stops are taken in the order the upgrade reaches them: the renames,
 // then the stored words, then the changes. MySQL and MariaDB commit each
@@ -96,10 +96,10 @@ type ownedStop struct {
 // transactions of their own, and build on one another on every engine.
 //
 // On PostgreSQL and SQLite the renames and stored words are stopped at the
-// first two and the last of each former test's stops (stopsTaken).
+// first two and the last of each invariant's stops (stopsTaken).
 //
-// Each stopped subtest makes one former test's stops, and the resumed subtest
-// of the same name checks what that test pinned.
+// Each stopped subtest makes one invariant's stops, and the resumed subtest
+// of the same name checks what that invariant pins.
 //
 // Two stops have databases of their own. What a stop leaves unmade is dropped
 // from a complete report step, which the shared database resumes over. The
@@ -209,8 +209,8 @@ func TestAV0100DatabaseResumesTheV0110UpgradeFromEveryStop(t *testing.T) {
 		})
 		dbtest.MigrateTo(t, db, v0110)
 
-		// Every former test that compared the schema with v0.11.0's
-		// declaration compared the one this upgrade built. The upgrade starts
+		// Every invariant comparing the schema with v0.11.0's declaration
+		// compares the one this upgrade built. The upgrade starts
 		// over a complete report step: MySQL and MariaDB adopt the holder
 		// index for the holder's foreign key and refuse to drop it, so the
 		// index is made once and never replaced.
@@ -281,7 +281,7 @@ func unmadeByAStop(engine database.Engine) []string {
 	return []string{`DROP INDEX "report_message_log_idx"`}
 }
 
-// stopsTaken is the stops of one former test an engine takes, in order:
+// stopsTaken is the stops of one invariant an engine takes, in order:
 // every one on MySQL and MariaDB, where each stop builds on what the last
 // left, and the first two and the last on PostgreSQL and SQLite, where every
 // stop starts from the database as v0.10.0 left it and runs the same

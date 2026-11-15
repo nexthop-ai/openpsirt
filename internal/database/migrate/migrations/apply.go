@@ -129,7 +129,7 @@ var (
 // alreadyMade reports whether the object a statement creates is already there.
 //
 // Only what this can name for certain. A statement it does not recognize is
-// run, which is what every statement did before this existed.
+// run.
 func alreadyMade(ctx context.Context, tx *sql.Tx, stmt string) (bool, error) {
 	const asking = "this was already created"
 	if m := createsTable.FindStringSubmatch(stmt); m != nil {
@@ -211,18 +211,17 @@ func typesFor(e database.Engine) *columnTypes {
 			name: "VARCHAR(" + strconv.Itoa(database.NameWidth) + ")", date: "DATE", timestamp: "DATETIME(6)",
 			// Sixteen megabytes for text somebody typed. The smaller type
 			// holds 65,535 bytes, and the policy that checks typed text
-			// before it is stored admits 65,536 — so a field that passed
-			// submission failed the write on these two engines and was
-			// recorded on the other two, or truncated silently outside
+			// before it is stored admits 65,536 — so with it, a field that
+			// passed submission would fail the write on these two engines and
+			// be recorded on the other two, or be truncated silently outside
 			// strict mode, leaving an approver agreeing to words that are
 			// not the words that were written.
 			//
 			// The producer-supplied slot is the same type, for a stronger
 			// reason. Typed text is at least bounded at submission; this is
 			// text a producer put in a scan file, of no length anything here
-			// controls, and it was the *smaller* of the two — 64 KB against
-			// 16 MB, on these two engines only, which is the inversion of
-			// what the two slots are declared to mean. No column of this
+			// controls, so it is never the smaller of the two, which would
+			// invert what the two slots are declared to mean. No column of this
 			// class is indexed or unique, so widening it widens no key: the
 			// names that are indexed are the folded ones beside them, which
 			// are short and stay short.

@@ -189,8 +189,8 @@ func issueBaseline(t *columnTypes) []string {
 		// The kind of flaw, by the classification the data carries.
 		//
 		// A row per weakness rather than one comma-joined column, which is the
-		// shape every other multi-valued attribute here has. Packed into one
-		// column it was queried on anyway — the class-of-flaw filter — and the
+		// shape every other multi-valued attribute here has. The class-of-flaw
+		// filter asks it, and packed into one column the
 		// only way to ask "is CWE-79 in this list" without a table is a
 		// substring match, which answers CWE-79 for a search for CWE-7 unless
 		// it is written as four separate patterns to respect the commas. Four
@@ -290,9 +290,9 @@ func issueBaseline(t *columnTypes) []string {
 // product rather than against the deployment. Keyed to a place it would have
 // to be repeated at each one and would lapse on a version change that had
 // nothing to do with it: the rating did not stop being wrong because somebody
-// rebuilt. Keyed to nothing at all it was one statement for everybody, which
-// let a rating made by somebody holding one product move the deadline and the
-// triage line in a product they cannot see, and refused a second team any
+// rebuilt. Keyed to nothing at all it would be one statement for everybody,
+// letting a rating made by somebody holding one product move the deadline and
+// the triage line in a product they cannot see, and refusing a second team any
 // rating of their own — a rating is a judgment about how a component is used,
 // and two products do not use one the same way.
 //
@@ -343,26 +343,26 @@ func issueRatingBaseline(t *columnTypes) []string {
 
 // A note for whoever decides, left without recording a judgment.
 //
-// **There was nowhere to put one.** A comment hangs off a claim, and the
-// finding screen shows the box only where a claim already exists, so the first
-// person to say anything about an issue had to record a judgment in order to
-// say it. Assignment carries no message either: it takes a person or a team
-// and nothing else.
+// A comment hangs off a claim, and the finding screen shows the box only where
+// a claim already exists, so without a note the first person to say anything
+// about an issue would have to record a judgment in order to say it.
+// Assignment carries no message either: it takes a person or a team and
+// nothing else.
 //
-// **Keyed on the issue and the product**, the way a rating is, and for the
+// Keyed on the issue and the product, the way a rating is, and for the
 // same reason. A row in the findings list is one issue at one fold, and one
 // issue is often several rows: measured against the seeded image, 786 of 5,840
 // open issues sit on more than one row, the worst at eleven, across
 // golang.org/x/net and the standard library. A note attached to a row would
 // have been written on one of eleven and hidden from the other ten.
 //
-// **Not merged into a claim's thread.** A claim is keyed on a place and a note
+// Not merged into a claim's thread. A claim is keyed on a place and a note
 // on an issue, so they cannot become one record — two threads rendered near
 // each other, and the claim's record stays exactly what people wrote about the
 // claim. That matters where an approval points at one revision of a
 // justification and editing the text withdraws it.
 //
-// **What it said before is kept**, the way a claim comment's is: a note is
+// What it said before is kept, the way a claim comment's is: a note is
 // part of the record that goes public at disclosure, and a record whose
 // earlier text is unrecoverable is readable rather than checkable.
 func issueNoteBaseline(t *columnTypes) []string {

@@ -191,9 +191,10 @@ func UpTo(ctx context.Context, db *database.DB, logger *slog.Logger, version int
 // need schema-change rights on a fresh database, against no schema rights
 // while running.
 //
-// Zero means nothing is applied and nothing else. A database that could not be
-// read is an error, because the two were the same answer and the reasonable
-// thing to do about "nothing is applied" is to migrate.
+// Zero means nothing is applied and nothing else. A database that cannot be
+// read is an error, because the reasonable thing to do about "nothing is
+// applied" is to migrate, and reading it as zero would migrate a populated
+// database.
 func Version(ctx context.Context, db *database.DB) (int64, error) {
 	running.Lock()
 	defer running.Unlock()

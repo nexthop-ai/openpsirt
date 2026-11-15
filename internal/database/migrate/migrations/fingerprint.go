@@ -81,7 +81,7 @@ var (
 //
 // It exists for this: a deployment that applies migrations separately needs to
 // know whether the database is behind the binary, and "behind" needs a number
-// on both sides. Every other reading of the applied version had only one.
+// on both sides: the applied version is one, and this is the other.
 func Expected() (int64, error) {
 	expectedOnce.Do(func() {
 		names, err := fs.Glob(sources, "*.go")
