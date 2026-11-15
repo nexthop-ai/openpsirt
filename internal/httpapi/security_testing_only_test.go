@@ -25,23 +25,9 @@ func TestTheSecurityTestingRolesReadSecurityTestingWorkAlone(t *testing.T) {
 		r.SecurityTesting(t, securityTesting)
 
 		lists := []string{"/v1/products/mine/findings", "/v1/findings", "/v1/unassigned"}
-		listed := func(t *testing.T, who, path string) map[string]bool {
-			t.Helper()
-			var out struct {
-				Items []struct {
-					Vulnerability string `json:"vulnerability"`
-				} `json:"items"`
-			}
-			httpapitest.Read(t, r, who, path, &out)
-			seen := map[string]bool{}
-			for _, item := range out.Items {
-				seen[item.Vulnerability] = true
-			}
-			return seen
-		}
 		for _, path := range lists {
 			for _, who := range []string{"security-testing-reader", "security-testing-triager"} {
-				seen := listed(t, who, path)
+				seen := httpapitest.Vulnerabilities(t, r, who, path)
 				if !seen[securityTesting] {
 					t.Errorf("%s: %s does not read the security testing finding: %v", path, who, seen)
 				}
@@ -52,7 +38,7 @@ func TestTheSecurityTestingRolesReadSecurityTestingWorkAlone(t *testing.T) {
 			// Reading both other halves is not reading security testing work, and
 			// reads both, so the absence above is the grant rather than the
 			// list being empty.
-			seen := listed(t, "private", path)
+			seen := httpapitest.Vulnerabilities(t, r, "private", path)
 			if seen[securityTesting] {
 				t.Errorf("%s: a reader of disclosed and undisclosed work reads security testing work: %v",
 					path, seen)

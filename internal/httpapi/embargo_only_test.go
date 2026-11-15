@@ -21,23 +21,9 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 		// The product's own list, and the two that span products, which
 		// narrow through a different path.
 		lists := []string{"/v1/products/mine/findings", "/v1/findings", "/v1/unassigned"}
-		listed := func(t *testing.T, who, path string) map[string]bool {
-			t.Helper()
-			var out struct {
-				Items []struct {
-					Vulnerability string `json:"vulnerability"`
-				} `json:"items"`
-			}
-			httpapitest.Read(t, r, who, path, &out)
-			seen := map[string]bool{}
-			for _, item := range out.Items {
-				seen[item.Vulnerability] = true
-			}
-			return seen
-		}
 		for _, path := range lists {
 			for _, who := range []string{"embargo-reader", "embargo-triager"} {
-				seen := listed(t, who, path)
+				seen := httpapitest.Vulnerabilities(t, r, who, path)
 				if !seen[hidden] {
 					t.Errorf("%s: %s does not read the undisclosed finding: %v", path, who, seen)
 				}
@@ -48,7 +34,7 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 			}
 			// The pair the rest of the suite leans on, so the absence above
 			// is the grant rather than the list being empty.
-			if seen := listed(t, "private", path); !seen[hidden] || !seen["CVE-2026-9999"] {
+			if seen := httpapitest.Vulnerabilities(t, r, "private", path); !seen[hidden] || !seen["CVE-2026-9999"] {
 				t.Errorf("%s: a reader of both halves does not read both: %v", path, seen)
 			}
 		}
@@ -88,7 +74,7 @@ func TestTheUndisclosedHalfAloneReadsNothingDisclosed(t *testing.T) {
 			`{"person":"embargo-reader"}`); got.Code != http.StatusNoContent {
 			t.Fatalf("assigning answered %d: %s", got.Code, got.Body.String())
 		}
-		if seen := listed(t, "embargo-reader", "/v1/people/me/assignments"); !seen["CVE-2026-9999"] {
+		if seen := httpapitest.Vulnerabilities(t, r, "embargo-reader", "/v1/people/me/assignments"); !seen["CVE-2026-9999"] {
 			t.Errorf("a disclosed finding handed to a private-only reader is not theirs to see: %v",
 				seen)
 		}

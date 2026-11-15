@@ -20,18 +20,9 @@ import (
 func TestAgreeingToAMovementTheDateHasPassedIsAConflict(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+		identifier := r.RecordedFlaw(t,
 			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"Not announced anywhere.","severity":"high"}`)
-		if got.Code != http.StatusCreated {
-			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
-		}
-		var recorded struct {
-			Identifier string `json:"identifier"`
-		}
-		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
-			t.Fatal(err)
-		}
-		extend := "/v1/products/mine/issues/" + recorded.Identifier + "/disclosure/extension"
+		extend := "/v1/products/mine/issues/" + identifier + "/disclosure/extension"
 		asked := func(until string) int64 {
 			t.Helper()
 			got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, extend,

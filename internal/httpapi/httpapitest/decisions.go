@@ -519,10 +519,16 @@ func (r *Reach) DeclaredAs(t *testing.T, body string) int {
 // Embargoed records a flaw nobody has announced and returns its identifier.
 func (r *Reach) Embargoed(t *testing.T) string {
 	t.Helper()
-	got := AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
-		`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
-			`"summary":"The management socket answers before anyone has authenticated.",`+
-			`"severity":"high","component":"libnl-3-200"}`)
+	return r.RecordedFlaw(t, `{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
+		`"summary":"The management socket answers before anyone has authenticated.",`+
+		`"severity":"high","component":"libnl-3-200"}`)
+}
+
+// RecordedFlaw records the flaw body describes in the product mine, as
+// private-triage, and returns its identifier.
+func (r *Reach) RecordedFlaw(t *testing.T, body string) string {
+	t.Helper()
+	got := AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings", body)
 	if got.Code != http.StatusCreated {
 		t.Fatalf("recording a flaw answered %d: %s", got.Code, got.Body.String())
 	}

@@ -247,6 +247,23 @@ func Read(t *testing.T, r *Reach, who, path string, into any) {
 	}
 }
 
+// Vulnerabilities is the set of issues a list answers who with, read from its
+// items.
+func Vulnerabilities(t *testing.T, r *Reach, who, path string) map[string]bool {
+	t.Helper()
+	var out struct {
+		Items []struct {
+			Vulnerability string `json:"vulnerability"`
+		} `json:"items"`
+	}
+	Read(t, r, who, path, &out)
+	seen := map[string]bool{}
+	for _, item := range out.Items {
+		seen[item.Vulnerability] = true
+	}
+	return seen
+}
+
 // AsPerson makes a request the way a signed-in person does.
 func AsPerson(t *testing.T, r *Reach, who, method, path, body string) *httptest.ResponseRecorder {
 	t.Helper()

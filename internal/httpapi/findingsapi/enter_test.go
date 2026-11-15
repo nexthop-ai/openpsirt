@@ -853,27 +853,17 @@ func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
 	// schemes share a column.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		made := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
-			"/v1/products/mine/findings",
+		identifier := r.RecordedFlaw(t,
 			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],"summary":"The management socket answers before anyone authenticated.",`+
 				`"vector":"CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H"}`)
-		if made.Code != http.StatusCreated {
-			t.Fatalf("recording answered %d: %s", made.Code, made.Body.String())
-		}
-		var recorded struct {
-			Identifier string `json:"identifier"`
-		}
-		if err := json.Unmarshal(made.Body.Bytes(), &recorded); err != nil {
-			t.Fatal(err)
-		}
 		for _, at := range []struct {
 			what, path string
 			list       bool
 		}{
 			{"the findings list", "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom", true},
 			{"the list across products", "/v1/findings", true},
-			{"the issue", "/v1/issues/" + recorded.Identifier, false},
-			{"the forwarded document", "/v1/issues/" + recorded.Identifier + "/document", false},
+			{"the issue", "/v1/issues/" + identifier, false},
+			{"the forwarded document", "/v1/issues/" + identifier + "/document", false},
 			{"the export of one product", "/v1/products/mine/findings.csv", false},
 			{"the export of every product", "/v1/findings.csv", false},
 		} {
@@ -883,10 +873,10 @@ func TestEverySurfaceThatCarriesAScoreCarriesTheSchemeWithIt(t *testing.T) {
 					t.Fatalf("GET %s answered %d: %s", at.path, got.Code, got.Body.String())
 				}
 				if at.list {
-					listedAsAssessed(t, got.Body.Bytes(), recorded.Identifier)
+					listedAsAssessed(t, got.Body.Bytes(), identifier)
 				}
 				body := got.Body.String()
-				if !strings.Contains(body, recorded.Identifier) {
+				if !strings.Contains(body, identifier) {
 					t.Fatalf("what was recorded is not in %s", at.what)
 				}
 				if !strings.Contains(body, "10") {
@@ -962,24 +952,15 @@ func TestScoringAnEmptyVectorIsRefusedRatherThanAnswered(t *testing.T) {
 func TestAnUndeclaredBuildInABodyIsNamedByEveryRouteTakingBuilds(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
-		got := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
+		identifier := r.RecordedFlaw(t,
 			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
 				`"summary":"The management socket answers before anyone authenticated.","severity":"critical"}`)
-		if got.Code != http.StatusCreated {
-			t.Fatalf("recording answered %d: %s", got.Code, got.Body.String())
-		}
-		var recorded struct {
-			Identifier string `json:"identifier"`
-		}
-		if err := json.Unmarshal(got.Body.Bytes(), &recorded); err != nil {
-			t.Fatal(err)
-		}
 
 		const typo = `[{"branch_or_tag":"master","variant":"broadcm"}]`
 		entering := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost, "/v1/products/mine/findings",
 			`{"builds":`+typo+`,"summary":"Another.","severity":"critical"}`)
 		affecting := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut,
-			"/v1/products/mine/issues/"+recorded.Identifier+"/builds", `{"builds":`+typo+`}`)
+			"/v1/products/mine/issues/"+identifier+"/builds", `{"builds":`+typo+`}`)
 		planning := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
 			"/v1/products/mine/components/libcurl4t64/upgrade",
 			`{"to":"8.5.0-1","by":"`+httpapitest.AheadOfUs+`","reasoning":"Taking the bump.","builds":`+typo+`}`)
