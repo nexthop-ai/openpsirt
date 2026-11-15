@@ -603,13 +603,14 @@ func (c *reader) spdx3License(e spdx3Element) {
 	said := e.expression
 	switch e.kind {
 	case spdx3Listed:
-		// A listed license is named by its address in the license list, and
-		// an element at any other address names none of them.
-		listed, ok := strings.CutPrefix(e.id, spdx3ListedPrefix)
-		if !ok {
-			return
+		// A listed license is named by its address in the license list. An
+		// element at any other address is named by its name, as a custom
+		// license is, because the address is no license's name.
+		if listed, ok := strings.CutPrefix(e.id, spdx3ListedPrefix); ok {
+			said = listed
+		} else {
+			said = e.name
 		}
-		said = listed
 	case spdx3Custom:
 		said = e.name
 	}
