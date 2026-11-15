@@ -17,6 +17,8 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/core"
+	"github.com/nexthop-ai/openpsirt/internal/signing"
+	"github.com/nexthop-ai/openpsirt/internal/signing/signingtest"
 )
 
 // UpstreamAt serves an upstream over TLS: a CSAF provider description naming
@@ -24,22 +26,50 @@ import (
 // the description and the authorities the server is trusted by.
 func UpstreamAt(t *testing.T) (string, *x509.CertPool) {
 	t.Helper()
+	return upstreamServing(t, "", "")
+}
+
+// SignedUpstreamAt serves an upstream as UpstreamAt does, with its description
+// naming a signing key made for this call and served beside it. It answers
+// the address of the description, the authorities the server is trusted by,
+// and the key's fingerprint. Two calls serve two different keys.
+func SignedUpstreamAt(t *testing.T) (string, *x509.CertPool, string) {
+	t.Helper()
+	signer, err := signing.Read(signingtest.Key(t, signingtest.Made, 0), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, roots := upstreamServing(t, string(signer.PublicKey()), signer.Fingerprint())
+	return address, roots, signer.Fingerprint()
+}
+
+// upstreamServing serves an upstream whose description names the armored
+// public key given by its fingerprint, or no key where it is empty.
+func upstreamServing(t *testing.T, public, fingerprint string) (string, *x509.CertPool) {
+	t.Helper()
 	mux := http.NewServeMux()
-	var base string
+	var base, keys string
 	mux.HandleFunc("/.well-known/csaf/provider-metadata.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"canonical_url":"`+base+`/.well-known/csaf/provider-metadata.json",`+
 			`"publisher":{"category":"vendor","name":"Example Upstream","namespace":"https://upstream.example.test"},`+
 			`"distributions":[{"rolie":{"feeds":[{"tlp_label":"WHITE","url":"`+base+`/.well-known/csaf/white/feed.json"}]}}],`+
-			`"role":"csaf_provider","metadata_version":"2.0"}`)
+			keys+`"role":"csaf_provider","metadata_version":"2.0"}`)
 	})
 	mux.HandleFunc("/.well-known/csaf/white/feed.json", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = io.WriteString(w, `{"feed":{"id":"feed","title":"feed","entry":[]}}`)
 	})
+	mux.HandleFunc("/.well-known/csaf/key.asc", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, public)
+	})
 	server := httptest.NewTLSServer(mux)
 	t.Cleanup(server.Close)
 	base = server.URL
+	if public != "" {
+		keys = `"public_openpgp_keys":[{"fingerprint":"` + fingerprint + `","url":"` +
+			base + `/.well-known/csaf/key.asc"}],`
+	}
 	roots := x509.NewCertPool()
 	roots.AddCert(server.Certificate())
 	return base + "/.well-known/csaf/provider-metadata.json", roots
