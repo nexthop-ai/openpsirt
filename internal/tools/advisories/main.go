@@ -573,7 +573,7 @@ func goReachedAt(root string, command []string, commit string) (map[string]bool,
 	defer func() { _ = os.RemoveAll(parent) }()
 	dir := filepath.Join(parent, "base")
 	if err := extract(root, commit, dir); err != nil {
-		return nil, fmt.Errorf("check out %s to scan it: %w", commit, err)
+		return nil, fmt.Errorf("write the tree of %s to scan it: %w", commit, err)
 	}
 	out, err := scan("go", dir, command)
 	if err != nil {
@@ -614,6 +614,13 @@ func extract(root, commit, dir string) error {
 		return err
 	}
 	written := writeTree(into, tar.NewReader(stream))
+	if written != nil {
+		// Nothing reads the rest of the stream, so git blocks on a full pipe
+		// and Wait never returns unless the process is stopped.
+		_ = archive.Process.Kill()
+		_ = archive.Wait()
+		return written
+	}
 	if err := archive.Wait(); err != nil {
 		return fmt.Errorf("git archive: %w\n%s", err, stderr.String())
 	}

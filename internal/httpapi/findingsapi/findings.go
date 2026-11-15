@@ -131,7 +131,7 @@ type FindingBody struct {
 	// whichever scoring generation rated it — 10.0 reads "high" under CVSS v2
 	// and "critical" under v3 — so two rows can tie on the number while their
 	// words disagree, and without the number that looks mis-sorted.
-	Score float64 `json:"score,omitempty" doc:"The severity as a number, which orders the findings inside one band when the list is sorted by severity"`
+	Score float64 `json:"score,omitempty" doc:"The severity as a number. The published score orders the findings inside one band when the list is sorted by severity"`
 	// ScoreVersion is the scheme that number is on. Two schemes are scorable
 	// here and their numbers are not comparable, so a row carrying the number
 	// without the scheme invites the comparison it cannot support.
