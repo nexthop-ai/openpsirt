@@ -385,7 +385,7 @@ function Tokens() {
                 <tr
                   key={`${row.name} ${row.created_at} ${i}`}
                   className="row"
-                  style={{ opacity: row.withdrawn ? 0.55 : 1 }}
+                  style={{ opacity: row.withdrawn ? "var(--dim)" : 1 }}
                 >
                   <td className="id">{row.name}</td>
                   <td>

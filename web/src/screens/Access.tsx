@@ -405,7 +405,7 @@ export function Access({ who: me }: { who: Who }) {
                             <span
                               key={`${held.everywhere ? "*" : held.product} ${held.role}`}
                               className="vchip"
-                              style={{ opacity: held.effective ? 1 : 0.55 }}
+                              style={{ opacity: held.effective ? 1 : "var(--dim)" }}
                               title={
                                 (held.source === "derived"
                                   ? "Derived from a group; withdrawn by changing the group. "
@@ -822,7 +822,7 @@ function Credentials({ me }: { me: Who }) {
                 <tr
                   key={`key ${key.name} ${key.created_at} ${i}`}
                   className="row"
-                  style={{ opacity: key.withdrawn ? 0.55 : 1 }}
+                  style={{ opacity: key.withdrawn ? "var(--dim)" : 1 }}
                 >
                   <td>
                     <span className="id">{key.name}</span>
@@ -868,7 +868,7 @@ function Credentials({ me }: { me: Who }) {
                 <tr
                   key={`token ${token.owner} ${token.name} ${token.created_at} ${i}`}
                   className="row"
-                  style={{ opacity: token.withdrawn ? 0.55 : 1 }}
+                  style={{ opacity: token.withdrawn ? "var(--dim)" : 1 }}
                 >
                   <td>
                     <span className="id">{token.name}</span>

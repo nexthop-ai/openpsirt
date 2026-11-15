@@ -295,7 +295,7 @@ export function Editor({
               aria-label="Attach a file"
               disabled={attaching}
               onClick={() => chooser.current?.click()}
-              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded px-2 text-sm text-[var(--muted)] hover:bg-[var(--raised)] hover:text-[var(--ink)] disabled:opacity-50"
+              className="inline-flex min-h-8 min-w-8 items-center justify-center rounded px-2 text-sm text-[var(--muted)] hover:bg-[var(--raised)] hover:text-[var(--ink)] disabled:opacity-[var(--dim)]"
             >
               {attaching ? "…" : <Icon name="paperclip" size={16} />}
             </button>

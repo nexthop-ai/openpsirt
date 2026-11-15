@@ -57,6 +57,14 @@ describe("a person's own page", () => {
     expect(cells).toContain("—");
   });
 
+  it("dims a withdrawn token by the shared dimming ratio", async () => {
+    deployment({ data: { items: [{ name: "ci", withdrawn: true }], total: 1 } });
+    mount.render(screen(<Me />));
+    await settle();
+    const row = mount.host().querySelector<HTMLTableRowElement>("tr.row");
+    expect(row?.style.opacity).toBe("var(--dim)");
+  });
+
   it("shows the digest as set once the server has taken it", async () => {
     const digest = { on: false };
     deployment({ data: { items: [], total: 0 } }, digest);
