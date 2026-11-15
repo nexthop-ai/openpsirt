@@ -267,6 +267,9 @@ func TestAnInstanceOlderThanTheSchemaStops(t *testing.T) {
 		if s.stopped.Load() != 1 {
 			t.Error("an instance older than the schema stopped without stopping its passes")
 		}
+		if s.paused.Load() != 1 {
+			t.Error("an instance older than the schema stopped its passes as a shutdown, so their jobs count as failed")
+		}
 	})
 }
 

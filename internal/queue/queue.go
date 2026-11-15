@@ -1018,9 +1018,10 @@ func (q *Queue) Settle(ctx context.Context, job *Job, worker, noun string,
 
 	var ended error
 	switch {
-	case work != nil && errors.Is(context.Cause(ctx), ErrPaused):
+	case work != nil && taken == nil && errors.Is(context.Cause(ctx), ErrPaused):
 		// Nothing about the job failed: the instance stopped its work while
-		// another changed the schema, so the attempt is given back.
+		// another changed the schema, so the attempt is given back. A claim
+		// at its ceiling or taken over keeps its own ending.
 		ended = q.Postpone(settled, job.ID, worker, 0, ErrPaused.Error())
 	case work != nil:
 		if recover != nil && ctx.Err() == nil && (taken == nil || ceiling) {

@@ -233,8 +233,8 @@ type phase struct {
 
 // errStranded is a schema an upgrade left with its record standing and
 // nothing changing it.
-var errStranded = errors.New("an upgrade left the schema changed without recording its version, as one " +
-	"failing part way on MySQL or MariaDB does: complete the upgrade or restore the backup taken before it")
+var errStranded = errors.New("an upgrade stopped after changing the schema and before recording its " +
+	"version: complete the upgrade or restore the backup taken before it")
 
 // errSchemaChanging is why a request the router was answering ended.
 var errSchemaChanging = errors.New("another instance is changing the schema")
@@ -507,8 +507,9 @@ func serveBeside(parent context.Context, cfg config.Config, logger *slog.Logger,
 	}
 	// Reading stops when the signal arrives, before the server drains, so a
 	// scan is not picked up during the seconds we are on our way out.
-	// A pause ends the passes with queue.ErrPaused as the cause, so a job a
-	// pause stopped is handed back untried rather than failed.
+	// A pause, and a stop the schema forces, end the passes with
+	// queue.ErrPaused as the cause, so a job they stopped is handed back
+	// untried.
 	running, endRunning := context.WithCancelCause(ctx)
 	stopRunning := func() { endRunning(nil) }
 	defer func() { stopRunning() }()
@@ -596,7 +597,9 @@ serving:
 				}
 			case schema.Superseded, schema.Behind:
 				server.pause()
-				stopRunning()
+				if !halted {
+					endRunning(queue.ErrPaused)
+				}
 				stopping = fmt.Errorf("the database is at schema version %d, which a later release "+
 					"applied while this build served it, and this build carries %d: a database is only "+
 					"ever upgraded, so this build stops and the release that upgraded it serves it",
