@@ -1010,18 +1010,18 @@ func (f Filter) acrossVariants(q *bun.SelectQuery) *bun.SelectQuery {
 		if f.VariantID == nil {
 			return q.Where("1 = 0")
 		}
-		others := q.NewSelect().TableExpr(`"build" AS "tg2"`).
-			ColumnExpr(`"tg2"."id"`).
-			Where(`"tg2"."branch_or_tag_id" = `+onThisRowsBranch).
-			Where(`"tg2"."variant_id" <> ?`, *f.VariantID)
+		others := q.NewSelect().TableExpr(`"build" AS "b2"`).
+			ColumnExpr(`"b2"."id"`).
+			Where(`"b2"."branch_or_tag_id" = `+onThisRowsBranch).
+			Where(`"b2"."variant_id" <> ?`, *f.VariantID)
 		return q.Where("NOT EXISTS (?)", heldElsewhere().
 			Where(`"f2"."build_id" IN (?)`, others))
 	case EveryVariant:
 		// No build on the row's own branch lacks it.
-		lacking := q.NewSelect().TableExpr(`"build" AS "tg2"`).
-			ColumnExpr(`"tg2"."id"`).
-			Where(`"tg2"."branch_or_tag_id" = `+onThisRowsBranch).
-			Where("NOT EXISTS (?)", heldElsewhere().Where(`"f2"."build_id" = "tg2"."id"`))
+		lacking := q.NewSelect().TableExpr(`"build" AS "b2"`).
+			ColumnExpr(`"b2"."id"`).
+			Where(`"b2"."branch_or_tag_id" = `+onThisRowsBranch).
+			Where("NOT EXISTS (?)", heldElsewhere().Where(`"f2"."build_id" = "b2"."id"`))
 		return q.Where("NOT EXISTS (?)", lacking)
 	}
 	return q

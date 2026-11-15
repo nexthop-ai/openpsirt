@@ -185,7 +185,7 @@ func orIncluded(subject access.Subject, where string, args []any, product, visib
 			}
 		}
 		if len(private) > 0 {
-			audience = append(audience, `"ilh"."product_id" IN (?)`)
+			audience = append(audience, `"icf"."product_id" IN (?)`)
 			audienceArgs = append(audienceArgs, bun.List(private))
 		}
 	}
@@ -193,7 +193,7 @@ func orIncluded(subject access.Subject, where string, args []any, product, visib
 		if subject.Reads(access.SecurityTesting, id) {
 			continue
 		}
-		audience = append(audience, `("ilh"."product_id" = ? AND "ilh"."vulnerability_id" IN (SELECT "imv"."id"
+		audience = append(audience, `("icf"."product_id" = ? AND "icf"."vulnerability_id" IN (SELECT "imv"."id"
 			FROM "vulnerability" AS "imv" JOIN "vulnerability" AS "imi" ON "imi"."issue_id" = "imv"."issue_id"
 			WHERE "imi"."id" IN (?)))`)
 		audienceArgs = append(audienceArgs, id, bun.List(subject.Cases(id)))
@@ -201,9 +201,9 @@ func orIncluded(subject access.Subject, where string, args []any, product, visib
 	if len(audience) == 0 {
 		return where, args
 	}
-	included := "(" + visibility + ` = ? AND EXISTS (SELECT 1 FROM "code_finding_flaw" AS "ilh"
-		WHERE "ilh"."product_id" = ` + product + ` AND "ilh"."occurrence_identity" = ` + occurrence + `
-		  AND "ilh"."included_at" IS NOT NULL AND "ilh"."disclosed_at" IS NULL
+	included := "(" + visibility + ` = ? AND EXISTS (SELECT 1 FROM "code_finding_flaw" AS "icf"
+		WHERE "icf"."product_id" = ` + product + ` AND "icf"."occurrence_identity" = ` + occurrence + `
+		  AND "icf"."included_at" IS NOT NULL AND "icf"."disclosed_at" IS NULL
 		  AND (` + strings.Join(audience, " OR ") + `)))`
 	args = append(append(append([]any{}, args...), access.SecurityTesting), audienceArgs...)
 	return "(" + where + " OR " + included + ")", args

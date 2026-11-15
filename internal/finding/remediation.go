@@ -348,8 +348,8 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		Join(DecisionOccurrenceIssue).
 		Join(`CROSS JOIN "finding" AS "f2"`).
 		Where(DecisionOccurrenceOf("f2")).
-		Join(`JOIN "build" AS "tg2" ON "tg2"."id" = "f2"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "tg2"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b2" ON "b2"."id" = "f2"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "b2"."branch_or_tag_id"`).
 		ColumnExpr(`"f2"."id" AS "finding_id"`).
 		Where(`"de"."product_id" = "st2"."product_id"`).
 		Where(`"de"."live_key" IS NOT NULL`).

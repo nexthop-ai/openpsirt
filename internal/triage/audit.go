@@ -444,8 +444,8 @@ func (s *Store) aboutEach(ctx context.Context, occurrences []DecisionOccurrence)
 		TableExpr(`"decision_occurrence" AS "de"`).
 		Join(finding.DecisionOccurrenceIssue).
 		Join(`JOIN "finding" AS "f2" ON `+finding.DecisionOccurrenceOf("f2")).
-		Join(`JOIN "build" AS "tg2" ON "tg2"."id" = "f2"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "tg2"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b2" ON "b2"."id" = "f2"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "b2"."branch_or_tag_id"`).
 		ColumnExpr(`"de"."id" AS "decision_occurrence_id"`).
 		ColumnExpr(`MIN("f2"."id") AS "finding_id"`).
 		Where(`"st2"."product_id" = "de"."product_id"`).
