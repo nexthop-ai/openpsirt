@@ -24,8 +24,8 @@ func (c Config) Limits() sbom.Limits {
 	}
 }
 
-// AnalysisLimits is what an analyzer's results are read within, with each
-// bound left unset at the reader's own default.
+// AnalysisLimits is what an analyzer's results are read within. As with
+// Limits, a bound left unset is zero, which the reader takes as its default.
 func (c Config) AnalysisLimits() sarif.Limits {
 	return sarif.Limits{
 		MaxBytes:          int64(c.AnalysisMaxBytes),
@@ -45,7 +45,7 @@ func (c Config) AnalysisLimits() sarif.Limits {
 		MaxProperties:     c.AnalysisMaxProperties,
 		MaxText:           c.AnalysisMaxText,
 		MaxHeld:           c.AnalysisMaxHeld,
-	}.OrDefault()
+	}
 }
 
 // AnalysisDocuments is how many documents one analyzer upload may carry.
