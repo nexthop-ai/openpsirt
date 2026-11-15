@@ -90,7 +90,7 @@ func TestAHalfBuiltDatabaseIsBuiltAgain(t *testing.T) {
 		}
 		half := openClosed(t, own)
 		if err := migrate.UpTo(ctx, half, slog.New(slog.NewTextHandler(io.Discard, nil)),
-			migrations.Baseline); err != nil {
+			migrations.Baseline, 0); err != nil {
 			t.Fatalf("apply the first migration: %v", err)
 		}
 		// What an interrupted schema statement leaves on MySQL and MariaDB:

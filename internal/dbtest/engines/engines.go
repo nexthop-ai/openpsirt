@@ -4,7 +4,7 @@
 // Package engines holds the rule for which engines a test run may touch.
 //
 // It exists as a package of its own, below dbtest, because two of the tests
-// that have to obey the rule cannot import dbtest: the migration lock's test
+// that have to obey the rule cannot import dbtest: the migration lease's test
 // is an internal test of the migrate package, and dbtest depends on migrate.
 // The alternative was a second copy of the parsing in that file, and a rule
 // written twice is a rule that differs in one of the copies.
@@ -63,7 +63,7 @@ func Selected() map[database.Engine]bool {
 //
 // For a test that opens a connection itself rather than through dbtest,
 // because what it pins is a property of the connection rather than of a
-// query: the pool's idle reaper, the migration lock, the version floor. One
+// query: the pool's idle reaper, the migration lease, the version floor. One
 // that reads the URL and connects without consulting Env reaches the servers
 // from a run narrowed to SQLite, and the quick loop, which needs no server,
 // fails when they stop.

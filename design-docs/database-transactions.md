@@ -24,7 +24,7 @@ and the one in-memory lock stops a process migrating twice.
 | Coordination | Mechanism |
 |---|---|
 | Two workers taking one job | A conditional update; row locking beside it is for throughput (`design-docs/queue.md` § Exclusive handout) |
-| Two replicas migrating at start | A database-level lock (`design-docs/database-migrations.md` § Migration locks) |
+| Two replicas migrating at start | A lease row: a claim inserts it, or writes over a lapsed one matched on the token it read, so the second claimant waits and matches nothing, and a cluster conflicts the two (`design-docs/database-migrations.md` § Migration lease) |
 | Two scans of one build | The apply takes the build's row first, so the second waits rather than interleaving, and a scan applies whole (REQ-06) |
 | A scan and a replaced-inventory check of one build | The check writes a fresh value into the build's row before reading, since a check is never the build's last run, so each waits for the other and a cluster conflicts the two (`design-docs/findings-closure.md` § Replaced inventories) |
 | Two scans merging overlapping issues | Each takes every issue it names by writing a fresh value into its row, and goes again where one is no longer its own issue, so the second waits and a cluster conflicts the two (`design-docs/findings-issues.md` § Merged issues) |
@@ -40,9 +40,10 @@ back.
 
 | Rule | Reason |
 |---|---|
-| Every transaction runs through one helper that retries it whole on a lost race: deadlock, lock-wait timeout, serialization failure, an error during commit, and a busy or locked SQLite database | |
+| Every transaction runs through one helper that retries it whole on a lost race: deadlock, lock-wait timeout, serialization failure, an error during commit, a row changed since it was read, and a busy or locked SQLite database | |
 | A file read a page at a time runs in one read-only snapshot, begun on the database handle and never inside a transaction, the one transaction a request makes outside that helper, ended by rolling back | It writes nothing, so nothing certifies it and it loses no race; a file written as it reads cannot be read again. A transaction already open reads at its own isolation, which on PostgreSQL moves between statements. Every engine takes the same options, and SQLite begins it without the write lock. On PostgreSQL it lifts the server's bounds on an idle transaction and on a transaction's length for itself, and its caller's context bounds it (`design-docs/analytics-exports.md` § Exports) |
 | An error during commit is retried on MySQL and MariaDB | Some cluster certification failures arrive as it rather than as a deadlock |
+| A row changed since it was read is retried on MariaDB | Under snapshot isolation, the default from MariaDB 11.6.2, a transaction writing a row another committed after its read is refused with it |
 | A busy or locked SQLite database is retried | A writer arriving while another holds the file is told so, and goes again once it is free |
 | Any other failure is reported, never retried | A constraint violation retried hammers the database and hangs |
 | Nothing a transaction depends on is read outside it | A retry re-runs the closure against a moved database |

@@ -52,7 +52,7 @@ func TestAFailureToServeStopsTheWorkersBeforeReturning(t *testing.T) {
 			}()
 			server.l.failed <- errors.New("accept: the listener failed")
 			return &workers
-		})
+		}, nil)
 	if err == nil {
 		t.Fatal("a server that failed to serve reported no error")
 	}
@@ -77,7 +77,7 @@ func TestAWorkerThatOverrunsTheGraceAfterAFailureToServeFailsTheExit(t *testing.
 			}()
 			server.l.failed <- errors.New("accept: the listener failed")
 			return &workers
-		})
+		}, nil)
 	if err == nil || !strings.Contains(err.Error(), "did not stop within") {
 		t.Errorf("an overrunning worker answered %v", err)
 	}
@@ -126,7 +126,7 @@ func signalled(t *testing.T, worker func(ctx context.Context)) error {
 			}()
 			cancel()
 			return &workers
-		})
+		}, nil)
 }
 
 // A worker still running past the grace after a signal fails the exit, as an

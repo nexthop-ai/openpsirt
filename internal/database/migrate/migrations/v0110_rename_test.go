@@ -281,7 +281,7 @@ func TestARenameWaitsForWhatHoldsItsTableAndSaysWhat(t *testing.T) {
 		var logged lockedBuffer
 		logger := slog.New(slog.NewTextHandler(&logged, nil))
 		done := make(chan error, 1)
-		go func() { done <- migrate.UpTo(context.WithoutCancel(ctx), db, logger, v0110) }()
+		go func() { done <- migrate.UpTo(context.WithoutCancel(ctx), db, logger, v0110, 0) }()
 
 		deadline := time.Now().Add(30 * time.Second)
 		for !strings.Contains(logged.String(), "a rename is waiting for a table something else holds") {

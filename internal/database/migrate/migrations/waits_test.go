@@ -27,6 +27,9 @@ const waiting = "a migration is waiting for a table something else holds"
 // several attempts and then applies, and another session's statement on the
 // table waits at most one attempt while it does. On SQLite the holder is a writer, the busy
 // timeout bounds each attempt, and a reader goes through beside the writer.
+//
+// The holder takes the table during the notice, once the migration holds its
+// lease: on SQLite a writer holding the file holds the claim back too.
 func TestAMigrationWaitsOutAHolderWithoutStallingOtherSessions(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -34,8 +37,6 @@ func TestAMigrationWaitsOutAHolderWithoutStallingOtherSessions(t *testing.T) {
 		dbtest.MigrateTo(t, db, migrations.Baseline)
 		noConnectionCarriesTheBound(t, db)
 		dbtest.MigrateTo(t, db, v0120)
-
-		holder, requests, holderID := holdTable(t, db)
 		if db.Server.Engine == database.SQLite {
 			// SQLite's attempt is its busy timeout, a minute from the URL,
 			// shortened here on the harness's one connection.
@@ -47,14 +48,15 @@ func TestAMigrationWaitsOutAHolderWithoutStallingOtherSessions(t *testing.T) {
 		done, finished := make(chan error, 1), make(chan struct{})
 		go func() {
 			defer close(finished)
-			done <- migrate.UpTo(migrating, db, slog.New(slog.NewTextHandler(log, nil)), v0130)
+			done <- migrate.UpTo(migrating, db, slog.New(slog.NewTextHandler(log, nil)), v0130, 3*time.Second)
 		}()
-		// A test that fails part way lets the holder go and waits for the
-		// migration to end before the test does.
-		t.Cleanup(func() {
-			_ = holder.Rollback()
-			<-finished
-		})
+		t.Cleanup(func() { <-finished })
+		heldToChange(t, db)
+
+		holder, requests, holderID := holdTable(t, db)
+		// A test that fails part way lets the holder go before it waits for
+		// the migration to end.
+		t.Cleanup(func() { _ = holder.Rollback() })
 
 		// Requests on the table keep going through for as long as the
 		// holder holds it: each waits one attempt at most.
@@ -101,6 +103,26 @@ func TestAMigrationWaitsOutAHolderWithoutStallingOtherSessions(t *testing.T) {
 		noConnectionCarriesTheBound(t, db)
 		leaveAtLatest(t, ctx, db)
 	})
+}
+
+// heldToChange waits up to half a minute for the migration lease to be held
+// to change the schema, read through a handle of its own on SQLite, whose
+// harness gives the migration its one connection.
+func heldToChange(t *testing.T, db *database.DB) {
+	t.Helper()
+	reading := servingBeside(t, db)
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		var holding string
+		err := reading.QueryRowContext(t.Context(), `SELECT "holding" FROM "`+migrate.LeaseTable+`"`).Scan(&holding)
+		if err == nil && holding == "change" {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the migration did not hold its lease to change the schema within 30s: %q, %v", holding, err)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 // shortBusy makes the busy timeout a tenth of a second on the one connection

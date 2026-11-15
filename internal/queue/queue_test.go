@@ -1208,3 +1208,40 @@ func said(t *testing.T, logged *bytes.Buffer, level slog.Level, what string, job
 		t.Errorf("%d records at %s say %q about job %d, want one; logged:\n%s", found, level, what, job, logged)
 	}
 }
+
+// Work a pause for a schema change stopped is handed back untried: the
+// attempt is given back, so pauses never fail a job. A shutdown still counts
+// it, and so does a claim at its ceiling during a pause.
+func TestWorkAPauseStoppedIsHandedBackUntried(t *testing.T) {
+	each(t, queue.DefaultOptions(), func(t *testing.T, db *database.DB, q *queue.Queue) {
+		for _, c := range []struct {
+			cause, taken error
+			attempts     int
+		}{{queue.ErrPaused, nil, 0}, {nil, nil, 1}, {queue.ErrPaused, queue.ErrHeldTooLong, 1}} {
+			added, err := q.Add(t.Context(), "ingest", fmt.Sprintf("paused-%v-%v", c.cause != nil, c.taken != nil))
+			if err != nil {
+				t.Fatal(err)
+			}
+			job, err := q.Claim(t.Context(), "worker", "ingest")
+			if err != nil || job == nil || job.ID != added.ID {
+				t.Fatalf("claim: %v", err)
+			}
+			working, stop := context.WithCancelCause(t.Context())
+			stop(c.cause)
+			q.Settle(working, job, "worker", "upload", nil, context.Canceled, c.taken, nil)
+			var attempts int
+			var state string
+			if err := db.QueryRowContext(t.Context(), `SELECT "attempts", "state" FROM "job" WHERE "id" = ?`,
+				job.ID).Scan(&attempts, &state); err != nil {
+				t.Fatal(err)
+			}
+			if attempts != c.attempts || state != string(queue.Pending) {
+				t.Errorf("work stopped with cause %v, claim %v, left the job %q after %d attempts, want pending after %d",
+					c.cause, c.taken, state, attempts, c.attempts)
+			}
+			if _, err := db.ExecContext(t.Context(), `DELETE FROM "job" WHERE "id" = ?`, job.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+}

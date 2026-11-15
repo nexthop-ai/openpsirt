@@ -275,8 +275,12 @@ func Build(ready Ready, in core.Deps) *Built {
 			if err != nil && !errors.Is(err, access.ErrDenied) {
 				// A credential that could not be looked up is a fault, not
 				// a stranger. Logged, and answered in words that say
-				// nothing about the caller or the database.
-				in.Log().Error("who is asking could not be resolved", "error", err)
+				// nothing about the caller or the database. A request
+				// whose context ended, as every request does when the
+				// instance pauses for a schema change, is no fault.
+				if r.Context().Err() == nil {
+					in.Log().Error("who is asking could not be resolved", "error", err)
+				}
 				unavailable(w)
 				return
 			}

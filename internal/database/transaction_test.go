@@ -34,6 +34,7 @@ func TestLosingARaceIsWorthRetryingAndAMistakeIsNot(t *testing.T) {
 		&mysql.MySQLError{Number: 1213, Message: "Deadlock found when trying to get lock"},
 		&mysql.MySQLError{Number: 1205, Message: "Lock wait timeout exceeded"},
 		&mysql.MySQLError{Number: 1180, Message: "Got error during COMMIT"},
+		&mysql.MySQLError{Number: 1020, Message: "Record has changed since last read in table 'schema_lease'"},
 		&pgconn.PgError{Code: "40001", Message: "could not serialize access"},
 		&pgconn.PgError{Code: "40P01", Message: "deadlock detected"},
 		// SQLite's contention as a sentence whose type did not survive, which

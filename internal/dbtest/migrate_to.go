@@ -24,7 +24,7 @@ import (
 func MigrateTo(t *testing.T, db *database.DB, version int64) {
 	t.Helper()
 	if err := migrate.UpTo(t.Context(), db, slog.New(slog.NewTextHandler(io.Discard, nil)),
-		version); err != nil {
+		version, 0); err != nil {
 		t.Fatalf("apply the migrations up to %d: %v", version, err)
 	}
 }
@@ -42,11 +42,11 @@ func Empty(t *testing.T, db *database.DB) {
 	ctx := t.Context()
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	t.Cleanup(func() {
-		if err := migrate.Up(context.WithoutCancel(ctx), db, quiet); err != nil {
+		if err := migrate.Up(context.WithoutCancel(ctx), db, quiet, 0); err != nil {
 			t.Errorf("migrate back to the latest: %v", err)
 		}
 	})
-	if err := migrate.Up(ctx, db, quiet); err != nil {
+	if err := migrate.Up(ctx, db, quiet, 0); err != nil {
 		t.Fatalf("migrate to the latest: %v", err)
 	}
 	// Children before the rows they reference, which is the order the list

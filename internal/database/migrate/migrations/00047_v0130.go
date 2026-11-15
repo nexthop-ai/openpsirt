@@ -19,7 +19,7 @@ func init() {
 //
 // Run in one transaction of its own, the way migrations 44 to 46 are.
 func upV0130(ctx context.Context, sqldb *sql.DB) error {
-	return inV020(ctx, sqldb, upgradeV0130)
+	return releaseUpgrade(ctx, sqldb, 47, upgradeV0130)
 }
 
 // upgradeV0130 changes the schema v0.12.0 built into v0.13.0's.
@@ -41,10 +41,13 @@ func upV0130(ctx context.Context, sqldb *sql.DB) error {
 //   - A decision occurrence records who withdrew it, where somebody did.
 //   - A package identifier holds no credential in a qualifier's address, on a
 //     component, a build's node, an image version or a scan's root identifier.
+//   - An upgrade changing the schema keeps a record of it until the schema is
+//     whole.
 func upgradeV0130(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{advisoryCoverLiveV0130,
 		advisoryOverrideLiveV0130, graphNodeStatedV0130, receivedStatementTimedV0130,
-		receivedStatementNewestV0130, decisionEndedByV0130, purlCredentialsV0130} {
+		receivedStatementNewestV0130, decisionEndedByV0130, purlCredentialsV0130,
+		schemaChangeMadeV0130} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

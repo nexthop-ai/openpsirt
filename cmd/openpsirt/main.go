@@ -229,16 +229,32 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 		if err := schemaIsCurrent(ctx, db, logger); err != nil {
 			return startupFailed(err, "checking the schema version", cfg)
 		}
+		watcher, err := schema.NewWatcher(db)
+		if err != nil {
+			return startupFailed(err, "preparing to watch the schema", cfg)
+		}
+		// Looked at before preparing, which writes, and again before
+		// serving, since preparing can outlast an upgrade's notice.
+		if err := lookBeforeServing(ctx, watcher.Look); err != nil {
+			return startupFailed(err, "checking the schema before preparing to serve", cfg)
+		}
 		handler, beside, err := prepare(ctx, cfg, logger, db)
 		if err != nil {
 			return err
 		}
-		server, err := listen(cfg, logger, handler)
+		if err := lookBeforeServing(startup, watcher.Look); err != nil {
+			return startupFailed(err, "checking the schema before serving", cfg)
+		}
+		// Opened answering as upgrading, so no request reaches the router
+		// before a phase that a pause ends.
+		server, err := listen(cfg, logger, httpapi.Upgrading())
 		if err != nil {
 			return err
 		}
+		server.answer(handler)
 		serving = true
-		return serveBeside(stopping, cfg, logger, server, beside.background)
+		return serveBeside(stopping, cfg, logger, server, beside.background,
+			watchSchema(logger, watcher.Look, schema.WatchEvery))
 	}
 
 	// Migrating before serving means a request never arrives against a schema
@@ -251,7 +267,7 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	// adding an index to a large finding table takes longer than a deployment
 	// starts in, so bounded at 60s it gives up, restarts, and begins the
 	// migration again — for ever. A second replica waits on the migration
-	// lock for as long as the first holds it, answering the same way.
+	// lease for as long as the first holds it, answering the same way.
 	//
 	// Every refusal that reads no database comes before the port opens and
 	// before the migration, so a bad value is refused in seconds. The ones
@@ -274,14 +290,27 @@ func run(args, environ []string, stdout, stderr *os.File) (err error) {
 	settled()
 	startup, settled = context.WithTimeout(stopping, cfg.StartupTimeout)
 	defer settled()
+	watcher, err := schema.NewWatcher(db)
+	if err != nil {
+		return server.abandon(cfg, logger, startupFailed(err, "preparing to watch the schema", cfg))
+	}
+	// Looked at before preparing, which writes, and again before serving,
+	// since preparing can outlast an upgrade's notice.
+	if err := lookBeforeServing(startup, watcher.Look); err != nil {
+		return server.abandon(cfg, logger, startupFailed(err, "checking the schema before preparing to serve", cfg))
+	}
 	handler, beside, err := prepareFrom(startup, cfg, logger, db, from)
 	if err != nil {
 		return server.abandon(cfg, logger, err)
 	}
+	if err := lookBeforeServing(startup, watcher.Look); err != nil {
+		return server.abandon(cfg, logger, startupFailed(err, "checking the schema before serving", cfg))
+	}
 	server.answer(handler)
 	logger.Info("serving")
 	serving = true
-	return serveBeside(stopping, cfg, logger, server, beside.background)
+	return serveBeside(stopping, cfg, logger, server, beside.background,
+		watchSchema(logger, watcher.Look, schema.WatchEvery))
 }
 
 // applySchema brings the database up to the schema this build expects as a

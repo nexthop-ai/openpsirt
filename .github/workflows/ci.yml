@@ -264,8 +264,8 @@ jobs:
         # the connection comes from an environment variable — asks each server
         # what it is and compares that against the label. With the old server
         # configured above it also checks the version floor refused it rather
-        # than skipped, and that the migration lock was exercised on each of
-        # the three servers.
+        # than skipped, and that the migration lease was exercised on each of
+        # the four engines.
         run: make check-engines
 
       # Written by "make check" above, by way of the sbom target. Published

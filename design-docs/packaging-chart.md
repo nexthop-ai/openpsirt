@@ -35,11 +35,11 @@ Satisfies REQ-02, REQ-03, REQ-49, and the probe behavior REQ-72 requires.
 | Check | Path | Reason |
 |---|---|---|
 | Keep the process | `/healthz` | It answers during a migration, which a failing check would cut short and restart |
-| Send it traffic | `/readyz` | It answers once the router serves and while the database answers |
+| Send it traffic | `/readyz` | It answers once the router serves, while the database answers, and while no other instance changes the schema |
 
 A load balancer with one check for both, such as an AWS Application Load
-Balancer in front of ECS, uses `/healthz`, and a migrating process answers its
-traffic with the upgrading response.
+Balancer in front of ECS, uses `/healthz`, and a migrating or paused process
+answers its traffic with the upgrading response.
 
 ## Chart security context
 

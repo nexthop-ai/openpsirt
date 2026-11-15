@@ -19,7 +19,8 @@ const upgradingRetry = "30"
 const upgradingSentence = "OpenPSIRT is upgrading its database"
 
 // Upgrading answers every request while the process applies the schema and
-// starts, before the router exists.
+// starts, before the router exists, and while another process changes the
+// schema under one that serves.
 //
 // Liveness answers, because the process is alive and working: a platform that
 // ends a process failing it ends the migration part way, and the migration

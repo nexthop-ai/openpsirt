@@ -101,7 +101,7 @@ func timeUpgradeV0110(t *testing.T, db *database.DB, rows int) map[string]time.D
 	t.Logf("seeded %d rows a table in %s", rows, time.Since(start))
 	phases := &phaseLog{took: map[string]time.Duration{}}
 	start = time.Now()
-	if err := migrate.UpTo(ctx, db, slog.New(phases), v0110); err != nil {
+	if err := migrate.UpTo(ctx, db, slog.New(phases), v0110, 0); err != nil {
 		t.Fatalf("upgrade %d rows a table: %v", rows, err)
 	}
 	t.Logf("upgraded %d rows a table in %s", rows, time.Since(start))
