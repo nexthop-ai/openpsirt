@@ -586,6 +586,94 @@ func TestAMergeMeetingTwoRecordsOfAnAttackKeepsTheNewerAndTellsTheTriagers(t *te
 	})
 }
 
+func TestARecordOfAnAttackUnderTheAbsorbedNameStandsForTheMergedIssue(t *testing.T) {
+	// The product recorded being attacked under the name that merges away.
+	// The record holds its key under the issue that stands, so every finding
+	// of the merged issue in the product reads as attacked, including the
+	// ones filed under the kept name all along.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		ctx := t.Context()
+		product, _, underNational, underAdvisory := f.twoNamesApart(t)
+		proposer, _ := f.triagers(t)
+		known := time.Now().UTC().Add(-72 * time.Hour).Truncate(time.Second)
+		record, _, err := triage.NewStore(f.db.DB).RecordIncident(ctx, proposer, product, underAdvisory,
+			known, "A customer's switch was taken over through the netlink parser.")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		f.reporting(t, named(national, libnl), named(advisory, swss, national))
+
+		var stands triage.Incident
+		if err := f.db.DB.NewSelect().Model(&stands).Where(`"id" = ?`, record.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if !stands.Standing() || stands.LiveVulnerabilityID == nil || *stands.LiveVulnerabilityID != underNational {
+			t.Errorf("the record stands %v under %v, want standing under the kept issue %d",
+				stands.Standing(), stands.LiveVulnerabilityID, underNational)
+		}
+		open := f.openFindings(t)
+		if len(open) != 2 {
+			t.Fatalf("%d open findings after the merge, want one on each component", len(open))
+		}
+		for _, row := range open {
+			if row.VulnerabilityID != underNational || !row.RankIncident {
+				t.Errorf("finding %d under issue %d reads attacked %v, want attacked under %d",
+					row.ID, row.VulnerabilityID, row.RankIncident, underNational)
+			}
+		}
+	})
+}
+
+func TestAMergeCarriesLabelsToTheKeptIssueOncePerWord(t *testing.T) {
+	// Both names were matched on the library and the product labeled each.
+	// A label is a word on a row, so the merged issue's row carries every
+	// word either name had, and a word both had once.
+	eachRun(t, func(t *testing.T, f *runFixture) {
+		ctx := t.Context()
+		f.reporting(t, named(national, libnl), named(advisory, libnl))
+		proposer, _ := f.triagers(t)
+		product, store, issues := f.rating(t)
+		underNational, err := issues.ByName(ctx, national)
+		if err != nil {
+			t.Fatal(err)
+		}
+		underAdvisory, err := issues.ByName(ctx, advisory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		component := f.openFindings(t)[0].ComponentID
+		for issue, words := range map[int64][]string{
+			underNational: {"reachable"},
+			underAdvisory: {"reachable", "needs-backport"},
+		} {
+			for _, word := range words {
+				if err := store.LabelIt(ctx, proposer, product, issue, component, word); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+
+		f.reporting(t, named(advisory, libnl, national))
+
+		var labels []finding.Label
+		if err := f.db.DB.NewSelect().Model(&labels).OrderExpr(`"ft"."label"`).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, l := range labels {
+			if l.VulnerabilityID != underNational || l.ComponentID != component || l.ProductID != product {
+				t.Errorf("label %q sits on issue %d, component %d, product %d; want the kept issue %d on %d in %d",
+					l.Label, l.VulnerabilityID, l.ComponentID, l.ProductID, underNational, component, product)
+			}
+			got = append(got, l.Label)
+		}
+		if strings.Join(got, ",") != "needs-backport,reachable" {
+			t.Errorf("the merged issue carries %v, want each word once", got)
+		}
+	})
+}
+
 // rating is the product the fixture's build belongs to, and the stores a
 // rating is recorded and read through.
 func (f *runFixture) rating(t *testing.T) (int64, *finding.Store, *finding.Vulnerabilities) {
