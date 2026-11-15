@@ -167,7 +167,7 @@ func TestWhatUpstreamCouldNotAnswerIsNarrowedToWhatMayBeRead(t *testing.T) {
 		// The names travel back narrowed as well as the rows. A label derived
 		// from a root is the name a product is published under, so the whole
 		// list tells a reader the scope of a product nobody announced to them
-		// — the exact name this change exists to keep out of an index's logs.
+		// — the exact name the narrowing keeps out of an index's logs.
 		if slices.Contains(body.Ours, "unannounced-corp") {
 			t.Errorf("somebody holding nothing here was told about %q: %v",
 				"unannounced-corp", body.Ours)

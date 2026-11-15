@@ -32,8 +32,7 @@ type listed struct {
 
 func TestTheFindingsListAnswersForEveryBuildWithTheBranchAndVariantLeftOut(t *testing.T) {
 	// The same issue in the same component in two variants is one piece of
-	// work, and while the list was a build's there was nowhere it could be
-	// read as one.
+	// work, and a list spanning builds is where it reads as one.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		r.ScannedAlso(t, "mellanox", "3.7.0")

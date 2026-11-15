@@ -358,9 +358,9 @@ func TestMovingADisclosureDateIsRecordedAndGatedTheSameWayADeferralIs(t *testing
 			t.Errorf("the history does not say which act it was: %+v", history.Items[0])
 		}
 
-		// And there is somewhere to be the second person. Until this, a
-		// request could be read on the finding it belongs to and nowhere else,
-		// so the only way to find one was to already know it existed.
+		// And there is somewhere to be the second person: a request is read
+		// in a queue as well as on the finding it belongs to, so finding one
+		// does not need knowing it exists.
 		var pending struct {
 			Items []struct {
 				ID            int64  `json:"id"`
@@ -607,13 +607,11 @@ func TestAVectorSettlesTheSeverityRatherThanBeingAskedTwice(t *testing.T) {
 }
 
 func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
-	// authorizing before resolving a name applied to issues. Every route
-	// shaped "this issue, at this occurrence" resolved the name first and
-	// checked what it reached second, so a name somebody holds and a name
-	// nobody holds came back differently — and on two of them the check
-	// that came second was not a refusal at all: a fix target answered an
-	// empty list and an assignment answered "done" while writing nothing.
-	// Both disclose by succeeding.
+	// Authorizing before resolving a name, applied to issues. Every route
+	// shaped "this issue, at this occurrence" answers a name somebody holds
+	// and a name nobody holds alike. Checked second, the check need not be a
+	// refusal: a fix target answering an empty list and an assignment
+	// answering "done" while writing nothing both disclose by succeeding.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 
@@ -791,12 +789,11 @@ func TestTheAffectedBuildsReadStopsWhereOneWriteDoes(t *testing.T) {
 }
 
 func TestARecordedSummaryGoesThroughTheSamePolicyAsAJustification(t *testing.T) {
-	// our own prose rendered says a summary somebody types goes through
-	// the same editor and the same submission policy as a justification.
-	// It went through neither: no scheme check, no refusal of raw HTML,
-	// and no bound on length at all — and it is rendered as markdown where
-	// it is read back, which is what makes the first two matter and what
-	// makes the third a rendering nobody bounded.
+	// A summary somebody types goes through the same editor and the same
+	// submission policy as a justification: the scheme check, the refusal of
+	// raw HTML and the bound on length. It is rendered as markdown where it is
+	// read back, which is what makes the first two matter and the third a
+	// bound on a rendering.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		const at = "/v1/products/mine/findings"

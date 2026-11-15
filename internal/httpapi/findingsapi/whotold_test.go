@@ -106,10 +106,9 @@ func TestAFlawCarriesWhoToldUsAndWhenItArrived(t *testing.T) {
 }
 
 func TestACVEAssignedLaterBecomesAnotherNameForTheSameIssue(t *testing.T) {
-	// The code anticipated this in a comment and nothing implemented it,
-	// so a published advisory shipped an internal identifier and no CVE —
-	// and nobody searching by the CVE found the advisory, which is the one
-	// lookup a published advisory exists to serve.
+	// A CVE assigned after the flaw was minted becomes another name for the
+	// same issue, so an advisory carries the CVE a reader searches by — the
+	// one lookup a published advisory exists to serve.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		minted := r.Embargoed(t)
