@@ -8,10 +8,12 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
 func TestAGroupBringsTheRolesItIsBoundTo(t *testing.T) {
@@ -109,6 +111,28 @@ func TestNoGroupsMeansNoRolesEvenForSomebodyAnAdministratorAssigned(t *testing.T
 		// above mean something.
 		if _, err := f.store.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: "someone"}, []string{"platform"}); err != nil {
 			t.Errorf("the mapped group did not admit them: %v", err)
+		}
+	})
+}
+
+func TestSwitchingToAModeThatDoesNotExistIsRefusedAndChangesNothing(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		person, err := f.store.Ensure(ctx, "someone", "Someone", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.GrantRole(ctx, person.ID, f.products["sonic"], access.PublicRead); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.store.SwitchTo(ctx, access.Mode("sideways")); !refusal.In(err) ||
+			!strings.Contains(err.Error(), "sideways") {
+			t.Fatalf("switching to an unknown mode answered %v, want a refusal naming it", err)
+		}
+		active, err := f.db.DB.NewSelect().Model((*access.Grant)(nil)).
+			Where(`"person_id" = ?`, person.ID).Where(`"active" = ?`, true).Count(ctx)
+		if err != nil || active != 1 {
+			t.Errorf("%d of their grants are in force after the refusal (%v), want the one assigned", active, err)
 		}
 	})
 }

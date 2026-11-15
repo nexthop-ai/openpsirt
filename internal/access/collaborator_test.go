@@ -82,6 +82,48 @@ func TestBringingSomebodyIntoACaseTwiceLeavesOneGrant(t *testing.T) {
 	})
 }
 
+func TestBringingSomebodyOntoACodeFindingTwiceLeavesOneGrant(t *testing.T) {
+	// The second add finds the standing grant and reports it changed
+	// nothing, rather than refusing or writing a second grant somebody is
+	// told about twice.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		product := f.products["sonic"]
+		person, err := f.store.Ensure(ctx, "ana", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		granter, err := f.store.Ensure(ctx, "bo", "", nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		const occurrence = "clang-tidy/bugprone-use-after-move src/orch.cpp"
+		for i, want := range []bool{true, false} {
+			added, err := f.store.AddToCodeFinding(ctx, product, occurrence, person.ID, granter.ID)
+			if err != nil || added != want {
+				t.Fatalf("bringing them on, attempt %d, answered %v (%v), want %v", i+1, added, err, want)
+			}
+		}
+		rows, err := f.store.CodeFindingRows(ctx, product, occurrence)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) != 1 || rows[0].PersonID != person.ID || rows[0].AddedBy != granter.ID {
+			t.Fatalf("the code finding carries %+v, want one grant to them by the granter", rows)
+		}
+
+		if err := f.store.RemoveFromCodeFinding(ctx, product, occurrence, person.ID, granter.ID); err != nil {
+			t.Fatal(err)
+		}
+		if rows, err := f.store.CodeFindingRows(ctx, product, occurrence); err != nil || len(rows) != 0 {
+			t.Errorf("taken off, the code finding carries %+v (%v)", rows, err)
+		}
+		if err := f.store.RemoveFromCodeFinding(ctx, product, occurrence, person.ID, granter.ID); !errors.Is(err, access.ErrNothingMatched) {
+			t.Errorf("taking them off again answered %v, want nothing matched", err)
+		}
+	})
+}
+
 // A revocation that matched nothing is ErrNothingMatched, never success. The
 // caller records a withdrawal on success, so answering one that did not
 // happen writes a trail row for an act nobody performed.

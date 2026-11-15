@@ -180,6 +180,15 @@ func TestTheValueEchoedAgainstASessionHasToBeThatSessions(t *testing.T) {
 	})
 }
 
+func TestASessionHoldingNoValueMatchesNoEchoedValue(t *testing.T) {
+	// Two empty strings compare equal, so a session carrying no value would
+	// otherwise accept a request that echoed none, which is every request a
+	// hostile page makes.
+	if (&access.Session{}).MatchesCSRF("") {
+		t.Error("a session holding no value accepted an empty one")
+	}
+}
+
 func TestAStrangersTokenReachesNothing(t *testing.T) {
 	each(t, func(t *testing.T, f *fixture) {
 		for _, token := range []string{"", "not-a-token", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"} {
