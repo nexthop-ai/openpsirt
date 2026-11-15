@@ -18,9 +18,9 @@ import (
 // A team whose members read nothing on the product is refused for the same
 // reason: the work would sit in a queue none of them can see.
 //
-// Verified by deleting the `if !reads` refusal under `strictest ==
-// access.Private` in carrying, and the one after teamMayHold: the embargoed
-// and the unreadable-team cases then answer 201.
+// Verified by deleting the undisclosed-work refusal in personAdmits and the
+// `if !reads` refusal in teamAdmits: the embargoed and the unreadable-team
+// cases then answer 201.
 func TestAnUpgradeIsNotHandedToSomebodyWhoMayNotReadWhatItCovers(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)

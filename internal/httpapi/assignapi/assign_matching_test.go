@@ -197,8 +197,8 @@ func TestAssigningByFilterAnswersNothingAboutAProductNobodyShowedYou(t *testing.
 			t.Errorf("assigning in a product nobody granted answered %d", got.Code)
 		}
 		got = httpapitest.AsPerson(t, r, "reader", http.MethodPost, matchingAt, `{"person":"reader"}`)
-		if got.Code != http.StatusForbidden && got.Code != http.StatusNotFound {
-			t.Errorf("a reader assigning answered %d", got.Code)
+		if got.Code != http.StatusForbidden {
+			t.Errorf("a reader assigning answered %d, want %d", got.Code, http.StatusForbidden)
 		}
 	})
 }

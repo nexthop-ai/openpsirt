@@ -423,13 +423,11 @@ func TestARuleWhoseSweepCannotBeQueuedIsNotRecorded(t *testing.T) {
 }
 
 func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
-	// The three routes built on the shared lookup carry no version to choose
-	// with, and the lookup answered "no open finding is recorded there" for a
-	// name the build ships at two versions. The finding is there — the caller
-	// had just read it on a screen that resolved the same name — so a 404 was
-	// wrong twice over. Narrowed to the versions carrying the issue first,
-	// exactly as the finding's own route does it, since most versions of a
-	// name carry nothing.
+	// Marking and assigning carry no version to choose with, and the build
+	// ships the name at two versions. Each is narrowed to the versions
+	// carrying the issue first, exactly as the finding's own route is, since
+	// most versions of a name carry nothing: the finding the caller just read
+	// under the bare name is the one they mark and assign.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		r.ShipsTwice(t)
@@ -441,13 +439,15 @@ func TestMarkingAndAssigningResolveANameTheBuildHoldsTwice(t *testing.T) {
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, at, ""); got.Code != http.StatusOK {
 			t.Fatalf("reading the finding answered %d: %s", got.Code, got.Body.String())
 		}
-		// So marking it must not answer that it is not there.
 		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
-			at+"/labels/waiting-on-vendor", ""); got.Code == http.StatusNotFound {
-			t.Errorf("marking a finding the same name resolves to answered 404: %s",
-				got.Body.String())
-		} else if got.Code >= 300 && got.Code != http.StatusConflict {
-			t.Errorf("marking answered %d: %s", got.Code, got.Body.String())
+			at+"/labels/waiting-on-vendor", ""); got.Code >= 300 {
+			t.Errorf("marking a finding the same name resolves to answered %d: %s",
+				got.Code, got.Body.String())
+		}
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPut,
+			at+"/assignment", `{"person":"triager"}`); got.Code >= 300 {
+			t.Errorf("assigning a finding the same name resolves to answered %d: %s",
+				got.Code, got.Body.String())
 		}
 	})
 }
