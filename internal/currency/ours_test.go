@@ -49,8 +49,6 @@ func TestTheNamespaceYieldsThreeSpellings(t *testing.T) {
 		{"a forge host alone names nobody", "https://github.com", nil},
 		{"an organization's page names its account", "https://github.com/orgs/acme", []string{"acme"}},
 		{"a project's page names the project", "https://sourceforge.net/projects/acme", []string{"acme"}},
-		{"a name stated twice in two spellings is held once",
-			"https://acme.test", []string{"acme", "acme.test", "test.acme"}},
 		{"nothing configured holds nothing back", "", nil},
 		{"whitespace is nothing configured", "   ", nil},
 	} {
@@ -171,8 +169,7 @@ func TestWhatTheDeploymentStatedIsHeldBackToo(t *testing.T) {
 	if got := ours.Labels(); !reflect.DeepEqual(got, []string{"acme-internal", "skunkworks"}) {
 		t.Fatalf("the labels read back as %q", got)
 	}
-	// Stated twice in two spellings, which reached the report twice: the
-	// duplicate check searched a slice the loop had not sorted yet.
+	// A name stated twice in two spellings is held once.
 	twice := currency.Ourselves("", []string{"Widgets", "acme", "ACME", "widgets"})
 	if got := twice.Labels(); !reflect.DeepEqual(got, []string{"acme", "widgets"}) {
 		t.Fatalf("a name stated twice reads back as %q", got)
