@@ -146,8 +146,8 @@ func TriagedEachAtItsOwn() Stated {
 // was taken, whatever narrowed it, and the request that produced it.
 //
 // The first two are written here rather than asked of every caller. An export
-// that cannot say what it is and when it was taken is not evidence, and nine
-// files each stating it their own way is nine chances for one of them not to.
+// that cannot say what it is and when it was taken is not evidence, and every
+// file stating it its own way is another chance for one of them not to.
 func preamble(out Exporting, now time.Time, asked string) []Stated {
 	said := make([]Stated, 0, len(out.About)+3)
 	if out.What != "" {

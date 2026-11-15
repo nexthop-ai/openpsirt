@@ -30,15 +30,15 @@ type Listing struct {
 	Store           *finding.Store
 }
 
-// ListNarrowed does the eight steps every such handler does, in the order they
-// have to happen in.
+// ListNarrowed does the steps every handler answering about one product's
+// findings does, in the order they have to happen in.
 //
-// One function rather than a copy at five sites. A hand-copied mapping leaves
-// nineteen filters out, with no error, so a screen's Export link produces a
+// One function rather than a copy at each site. A hand-copied mapping drops
+// filters silently, so a screen's Export link produces a
 // file answering a different question from the screen it came from — and a
 // filter that changes the population rather than narrowing it, like asking for
 // what has closed, silently produces a file that cannot contain a single row
-// of what was asked for. A sixth copy is a sixth chance at that, and the parts
+// of what was asked for. Every copy is another chance at that, and the parts
 // that must not be forgotten — the floor, the whole filter, the subtree
 // resolution — are exactly the parts a copy drops quietly.
 //
