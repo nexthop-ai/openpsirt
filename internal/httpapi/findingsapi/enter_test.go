@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
@@ -738,6 +740,8 @@ func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
 			{"which builds it affects", http.MethodPut,
 				"/v1/products/mine/issues/%s/builds",
 				`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}]}`},
+			{"which builds it is open at", http.MethodGet,
+				"/v1/products/mine/issues/%s/builds", ""},
 		}
 
 		// The prober triages this product and may not read undisclosed work,
@@ -760,6 +764,94 @@ func TestAHiddenIssueAndAnAbsentOneAnswerTheSameOnEveryRoute(t *testing.T) {
 				t.Errorf("%s: the two answers read differently\n hidden: %s\n unused: %s",
 					route.what, hidden.Body.String(), unused.Body.String())
 			}
+		}
+	})
+}
+
+func TestTheBuildsAFlawIsOpenAtReadAsTheWriteTakesThem(t *testing.T) {
+	// The affected-builds editor sends back what this read answered, so the
+	// answer is in the write's shape and sent back unchanged closes nothing.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.ScannedWithEvidence(t)
+		recorded := httpapitest.AsPerson(t, r, "private-triage", http.MethodPost,
+			"/v1/products/mine/findings",
+			`{"builds":[{"branch_or_tag":"master","variant":"broadcom"}],`+
+				`"summary":"The management socket answers before anyone authenticated.",`+
+				`"severity":"critical"}`)
+		if recorded.Code != http.StatusCreated {
+			t.Fatalf("recording answered %d: %s", recorded.Code, recorded.Body.String())
+		}
+		var flaw struct {
+			Identifier string `json:"identifier"`
+		}
+		if err := json.Unmarshal(recorded.Body.Bytes(), &flaw); err != nil {
+			t.Fatal(err)
+		}
+		at := "/v1/products/mine/issues/" + flaw.Identifier + "/builds"
+
+		read := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet, at, "")
+		if read.Code != http.StatusOK {
+			t.Fatalf("reading the builds answered %d: %s", read.Code, read.Body.String())
+		}
+		var held struct {
+			Items json.RawMessage `json:"items"`
+			More  bool            `json:"more"`
+		}
+		if err := json.Unmarshal(read.Body.Bytes(), &held); err != nil {
+			t.Fatal(err)
+		}
+		if string(held.Items) != `[{"branch_or_tag":"master","variant":"broadcom"}]` || held.More {
+			t.Fatalf("the builds read %s, more %v", held.Items, held.More)
+		}
+
+		written := httpapitest.AsPerson(t, r, "private-triage", http.MethodPut, at,
+			`{"builds":`+string(held.Items)+`}`)
+		var changed struct {
+			Added  int `json:"added"`
+			Closed int `json:"closed"`
+		}
+		if err := json.Unmarshal(written.Body.Bytes(), &changed); err != nil ||
+			written.Code != http.StatusOK || changed.Added != 0 || changed.Closed != 0 {
+			t.Errorf("sending the read back answered %d: %s", written.Code, written.Body.String())
+		}
+
+		// A product the reader cannot see answers as one that does not exist.
+		theirs := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/products/theirs/issues/"+flaw.Identifier+"/builds", "")
+		nowhere := httpapitest.AsPerson(t, r, "private-triage", http.MethodGet,
+			"/v1/products/nowhere/issues/"+flaw.Identifier+"/builds", "")
+		if theirs.Code != http.StatusNotFound || theirs.Body.String() != nowhere.Body.String() {
+			t.Errorf("an unseen product answered %d %s, and an absent one %s",
+				theirs.Code, theirs.Body.String(), nowhere.Body.String())
+		}
+	})
+}
+
+func TestTheAffectedBuildsReadStopsWhereOneWriteDoes(t *testing.T) {
+	// An answer cut short of the bound the write takes would be sent back as
+	// the whole set and close the builds past it.
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		item := r.API.OpenAPI().Paths["/v1/products/{product}/issues/{issue}/builds"]
+		if item == nil || item.Get == nil || item.Put == nil {
+			t.Fatal("the affected-builds read and write are not both published, so this checked nothing")
+		}
+		registry := r.API.OpenAPI().Components.Schemas
+		bound := func(schema *huma.Schema, field string) *int {
+			if schema.Ref != "" {
+				schema = registry.SchemaFromRef(schema.Ref)
+			}
+			if property := schema.Properties[field]; property != nil {
+				return property.MaxItems
+			}
+			return nil
+		}
+		write := bound(item.Put.RequestBody.Content["application/json"].Schema, "builds")
+		read := bound(item.Get.Responses["200"].Content["application/json"].Schema, "items")
+		if write == nil || read == nil {
+			t.Fatalf("a bound is missing: the write takes %v and the read answers %v", write, read)
+		}
+		if *write != *read {
+			t.Errorf("the write takes %d builds and the read answers %d", *write, *read)
 		}
 	})
 }

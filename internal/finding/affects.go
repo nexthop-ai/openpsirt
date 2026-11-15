@@ -373,6 +373,56 @@ func filedAgainst(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 	return rows, nil
 }
 
+// BuildHeld is one build of a product, by branch or tag and variant.
+type BuildHeld struct {
+	BranchOrTag string `bun:"branch_or_tag"`
+	Variant     string `bun:"variant"`
+}
+
+// HeldAt is the builds of one product where an issue stands open, the set
+// Affects replaces: one row per build, ordered by branch or tag and variant, at
+// most limit of them, and whether more stand open past those.
+//
+// One statement, so the set is one moment's answer: an editor writing it back
+// whole closes every build the set misses. Narrowed to what the subject may
+// read in the product, in the query.
+func (s *Store) HeldAt(ctx context.Context, subject access.Subject,
+	productID, vulnerabilityID int64, limit int) ([]BuildHeld, bool, error) {
+
+	if subject.Kind != access.Person {
+		return nil, false, access.Denied(fmt.Sprintf("read which builds hold it in product %d", productID))
+	}
+	readable, all := subject.Products()
+	if !all && !slices.Contains(readable, productID) {
+		return nil, false, nil
+	}
+	var out []BuildHeld
+	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
+	q := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		ColumnExpr(`DISTINCT "st"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
+		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Where(kinds, kindArgs...).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).
+		Where(`"f"."closed_at" IS NULL`)
+	err := inOneProduct(q, subject, productID, all).
+		OrderExpr(`"branch_or_tag", "variant"`).
+		// One past the bound, so a set larger than limit is told apart from
+		// one exactly that size.
+		Limit(int64(limit)+1).
+		Scan(ctx, &out)
+	if err != nil {
+		return nil, false, fmt.Errorf("read which builds hold it: %w", err)
+	}
+	if len(out) > limit {
+		return out[:limit], true, nil
+	}
+	return out, false, nil
+}
+
 // standingAt reports whether one of these findings is in that build.
 func standingAt(rows []Finding, buildID int64) bool {
 	for i := range rows {

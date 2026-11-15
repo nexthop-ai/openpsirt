@@ -429,6 +429,31 @@ components:
         - superseded
         - digest
       type: object
+    AffectedBuildsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AffectedBuildsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          description: The builds it is open at, ordered by branch or tag and variant, at most as many as one write names
+          items:
+            $ref: "#/components/schemas/BuildNamed"
+          maxItems: 200
+          type:
+            - array
+            - "null"
+        more:
+          description: Whether it is open at more builds than one write names, so items is not every build
+          type: boolean
+      required:
+        - items
+        - more
+      type: object
     AffectsBody:
       additionalProperties: false
       properties:
@@ -20958,13 +20983,13 @@ paths:
   /v1/issues/{issue}:
     get:
       description: |-
-        Every build that carries this issue, across every product you may see or in the one product `product` names, with how far it has been decided in each.
+        Every build that carries this issue, across every product you may see, with how far it has been decided in each.
 
-        One row per build and component, with a count of its occurrences, ordered by product, branch or tag, variant and component; `offset` reads the rows past a page.
+        One row per build and component, with a count of its occurrences.
 
         The rows, `total` and the count of products cover only products you may read.
 
-        An issue that affects nothing you may read answers `total` zero with empty `items`, whether nobody here has seen it or it sits only in products you cannot read. A `product` you cannot see is refused with 404, as one that does not exist is.
+        An issue that affects nothing you may read answers `total` zero with empty `items`, whether nobody here has seen it or it sits only in products you cannot read.
 
         Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
 
@@ -20978,13 +21003,6 @@ paths:
           schema:
             description: The issue, by any name it is known under
             type: string
-        - description: "Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused as not found"
-          explode: false
-          in: query
-          name: product
-          schema:
-            description: "Limit to one product, by name: the rows, the total and the count of products. Empty means every product you can see; a name you cannot see is refused as not found"
-            type: string
         - explode: false
           in: query
           name: limit
@@ -20993,15 +21011,6 @@ paths:
             format: int64
             maximum: 500
             minimum: 1
-            type: integer
-        - description: The number of rows skipped, in the order the rows are listed
-          explode: false
-          in: query
-          name: offset
-          schema:
-            description: The number of rows skipped, in the order the rows are listed
-            format: int64
-            minimum: 0
             type: integer
       responses:
         "200":
@@ -21016,7 +21025,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
-      summary: List findings for one issue
+      summary: List findings for one issue across every product
       tags:
         - Findings
       x-openpsirt-requires:
@@ -32325,6 +32334,55 @@ paths:
           - security-testing-triage
         note: A collaborator brought onto this issue may attach to it too.
   /v1/products/{product}/issues/{issue}/builds:
+    get:
+      description: |-
+        Every build of this product where the issue stands open, one row per build, in the shape setting the affected builds takes.
+
+        Answers at most as many builds as one write names, with `more` set where it is open at more. One read answers the whole set, so the set sent back to set the affected builds closes only the builds taken out of it.
+
+        Only builds whose findings you may read are listed.
+
+        Requires: public-read or public-triage or private-read or private-triage or security-testing-read or security-testing-triage on the product. Answers only what you may see.
+      operationId: list-affected-builds
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: The issue, by any name it is known under
+          in: path
+          name: issue
+          required: true
+          schema:
+            description: The issue, by any name it is known under
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffectedBuildsBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List the builds an issue is open at
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
+          - private-triage
+          - security-testing-read
+          - security-testing-triage
+        note: Answers only what you may see.
     put:
       description: |-
         Makes the builds this flaw is filed against exactly the ones named.

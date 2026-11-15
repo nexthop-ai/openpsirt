@@ -837,6 +837,16 @@ func movementBody(ctx context.Context, in core.Deps, rows []finding.Movement) ([
 	return out, nil
 }
 
+// affectsMost is the most builds one write of a flaw's affected builds names,
+// and the most the read beside it answers: the bound both operations publish.
+const affectsMost = 200
+
+// AffectedBuildsBody is the builds of one product a flaw is filed against.
+type AffectedBuildsBody struct {
+	Items []core.BuildNamed `json:"items" maxItems:"200" doc:"The builds it is open at, ordered by branch or tag and variant, at most as many as one write names"`
+	More  bool              `json:"more" doc:"Whether it is open at more builds than one write names, so items is not every build"`
+}
+
 // AffectsBody is the record of setting the builds.
 type AffectsBody struct {
 	Added  int `json:"added" doc:"Builds it is now filed against that it was not"`
@@ -919,4 +929,48 @@ func registerAffects(api huma.API, in core.Deps) {
 			Body: AffectsBody{Added: changed.Added, Closed: changed.Closed},
 		}, nil
 	})
+
+	huma.Register(api, core.Requiring(huma.Operation{
+		OperationID: "list-affected-builds", Method: http.MethodGet,
+		Path:    "/v1/products/{product}/issues/{issue}/builds",
+		Summary: "List the builds an issue is open at",
+		Description: "Every build of this product where the issue stands open, one row per " +
+			"build, in the shape setting the affected builds takes.\n\n" +
+			"Answers at most as many builds as one write names, with `more` set where it is " +
+			"open at more. One read answers the whole set, so the set sent back to set the " +
+			"affected builds closes only the builds taken out of it.\n\n" +
+			"Only builds whose findings you may read are listed.",
+		Tags: []string{"Findings"},
+	}, core.PerProduct, "Answers only what you may see.", core.ReadRights()...),
+		func(ctx context.Context, input *struct {
+			Product       string `path:"product"`
+			Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
+		}) (*struct{ Body AffectedBuildsBody }, error) {
+			in := core.Of(ctx, in)
+			subject, err := core.Reading(ctx)
+			if err != nil {
+				return nil, err
+			}
+			product, err := core.ProductNamedVisibly(ctx, in, subject, input.Product)
+			if err != nil {
+				return nil, err
+			}
+			issue, err := core.IssueHere(ctx, in, subject, product.ID, input.Vulnerability)
+			if err != nil {
+				return nil, err
+			}
+			rows, more, err := finding.NewStore(in.DB.DB).HeldAt(ctx, subject, product.ID, issue,
+				affectsMost)
+			if err != nil {
+				return nil, core.RefusedFinding(in, err)
+			}
+			out := &struct{ Body AffectedBuildsBody }{}
+			out.Body.Items = make([]core.BuildNamed, 0, len(rows))
+			for _, row := range rows {
+				out.Body.Items = append(out.Body.Items,
+					core.BuildNamed{BranchOrTag: row.BranchOrTag, Variant: row.Variant})
+			}
+			out.Body.More = more
+			return out, nil
+		})
 }

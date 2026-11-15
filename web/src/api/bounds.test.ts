@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error - a gate script, which is plain ESM with no types of its own
 import { apiDocument, bodyMaxItems, queryMaximum } from "../../scripts/api-document.mjs";
-import { BUILDS_MOST, ISSUE_MOST } from "./issue";
+import { BUILDS_MOST } from "./issue";
 import { NAMED_AT_ONCE } from "../screens/findingsHandover";
 import { CHANGES_MOST } from "../screens/AuditLog";
 import { BACK_LIMIT } from "../screens/Home";
@@ -27,12 +27,6 @@ describe("a bound the interface stops at", () => {
     const most = bodyMaxItems(document, "set-affected-builds", "builds");
     expect(most, "the document states no bound, so this checked nothing").toBeTypeOf("number");
     expect(BUILDS_MOST).toBe(most);
-  });
-
-  it("asks for an issue's whole answer in the largest page the server gives", () => {
-    const most = queryMaximum(document, "get-issue", "limit");
-    expect(most, "the document states no bound, so this checked nothing").toBeTypeOf("number");
-    expect(ISSUE_MOST).toBe(most);
   });
 
   it("asks a findings list for no larger page than the server gives", () => {

@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { unwrap } from "../api/queries";
-import { BUILDS_MOST, useIssueIn } from "../api/issue";
+import { BUILDS_MOST, useAffectedBuilds } from "../api/issue";
 import { Failed } from "../ui/Failed";
 import { buildKey, fromBuildKey } from "../ui/builds";
 import { Required } from "../ui/Required";
@@ -50,32 +50,20 @@ export function AffectedBuilds({
       unwrap(await api.GET("/v1/products/{product}/releases", { params: { path: { product } } })),
     retry: false,
   });
-  // The builds of this product holding it now, asked of this product alone so
-  // that rows in other products never make its answer look cut short.
-  const holds = useIssueIn(vulnerability, product, open);
+  // The builds of this product holding it now, in one read.
+  const holds = useAffectedBuilds(vulnerability, product, open);
 
-  // A page in hand that is the whole answer.
-  //
   // This editor sends the *complete* list of builds, and the server closes
-  // every build absent from it as never affected. So a set derived from a
-  // capped page is not a partial answer that loses a little — it is a write
-  // that closes the rows past the cap, with whatever reason was typed for a
-  // different build attached to them. There is no safe half: either the whole
-  // set is in hand or nothing is written.
-  const rows = holds.data?.items ?? [];
-
-  // Every row is this product's, since the server narrowed the answer to it
-  // by name regardless of capitals.
+  // every build absent from it as never affected. So a set past the most one
+  // write names is not a partial answer that loses a little: written back, it
+  // closes the builds past the bound, with whatever reason was typed for a
+  // different build attached to them. Either the whole set is in hand or
+  // nothing is written.
   const now = useMemo(
     () => new Set((holds.data?.items ?? []).map((row) => buildKey(row))),
     [holds.data],
   );
-  const cut = (holds.data?.total ?? rows.length) > rows.length;
-  // Past the most one write names, the whole list cannot be sent either.
-  const tooMany = now.size > BUILDS_MOST;
-  // The answer changed between two pages, so the rows held may skip one.
-  const moved = holds.data?.moved ?? false;
-  const partial = cut || tooMany || moved;
+  const tooMany = holds.data?.more ?? false;
 
   const set = useMutation({
     mutationFn: async (picked: string[]) =>
@@ -129,33 +117,14 @@ export function AffectedBuilds({
           error={builds.error ?? holds.error}
           what="The builds this is filed against could not be read."
         />
-      ) : moved ? (
-        <div className="alert">
-          <strong>This changed while it was read</strong>
-          <span>
-            It changed between pages, so what is shown may miss a build.{" "}
-            <button type="button" className="linkish" onClick={() => void holds.refetch()}>
-              Read it again
-            </button>
-          </span>
-        </div>
-      ) : partial ? (
+      ) : tooMany ? (
         <div className="alert">
           <strong>This is open at more builds than this screen can set</strong>
-          {tooMany ? (
-            <span>
-              {now.size.toLocaleString()} builds carry it here, and one change names at most{" "}
-              {BUILDS_MOST.toLocaleString()}. Close them one build at a time from each build&rsquo;s
-              own finding instead.
-            </span>
-          ) : (
-            <span>
-              {(holds.data?.total ?? 0).toLocaleString()} builds and components carry it here, and
-              this sends the whole list — so writing from what is shown would close the rest as
-              never affected. Close them one build at a time from each build&rsquo;s own finding
-              instead.
-            </span>
-          )}
+          <span>
+            More than {BUILDS_MOST.toLocaleString()} builds carry it here, and one change names at
+            most {BUILDS_MOST.toLocaleString()}. Close them one build at a time from each
+            build&rsquo;s own finding instead.
+          </span>
         </div>
       ) : (
         <>

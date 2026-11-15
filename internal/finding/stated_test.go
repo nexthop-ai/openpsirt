@@ -578,7 +578,7 @@ func TestEveryReaderOfAFindingNamesWhatItsOwnBuildStated(t *testing.T) {
 			return slices.Compact(said)
 		}
 
-		sightings, _, _, err := f.store.Everywhere(ctx, who, issue, 0, 50, 0)
+		sightings, _, _, err := f.store.Everywhere(ctx, who, issue, 50)
 		if err != nil {
 			t.Fatal(err)
 		}

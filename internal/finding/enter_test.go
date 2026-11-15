@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -460,6 +462,66 @@ func TestWhichBuildsAFlawAffectsIsCorrectedAsResearchGoes(t *testing.T) {
 			t.Error("a build was taken out with no reason on record")
 		}
 		_ = identifier
+	})
+}
+
+func TestTheBuildsAFlawIsOpenAtAreOneRowEachUpToTheBound(t *testing.T) {
+	// The affected-builds editor writes this set back whole, so it holds each
+	// build once however many occurrences it carries, leaves out a build taken
+	// back out, and says where a set runs past the bound.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.shipped(t, twoConsumers())
+		mellanox := f.anotherVariant(t, "mellanox")
+		f.shippedTo(t, mellanox, twoConsumers())
+		nvidia := f.anotherVariant(t, "nvidia")
+		f.shippedTo(t, nvidia, twoConsumers())
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		rows, _, err := f.store.Enter(ctx, who, finding.Entering{
+			BuildIDs: []int64{f.build, mellanox, nvidia}, Component: libnl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rows) <= 3 {
+			t.Fatalf("recorded %d rows in three builds, want more, so this proves nothing", len(rows))
+		}
+		issue := rows[0].VulnerabilityID
+		if _, err := f.store.Affects(ctx, who, f.productID, issue,
+			[]int64{f.build, mellanox}, "Never shipped there."); err != nil {
+			t.Fatal(err)
+		}
+
+		held, more, err := f.store.HeldAt(ctx, who, f.productID, issue, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []finding.BuildHeld{
+			{BranchOrTag: world.BranchName, Variant: world.CustomerVariant},
+			{BranchOrTag: world.BranchName, Variant: "mellanox"},
+		}
+		if !slices.Equal(held, want) || more {
+			t.Errorf("the builds it is open at read %+v, more %v; want %+v and no more", held, more, want)
+		}
+
+		held, more, err = f.store.HeldAt(ctx, who, f.productID, issue, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(held, want[:1]) || !more {
+			t.Errorf("past the bound the builds read %+v, more %v; want %+v and more", held, more, want[:1])
+		}
+
+		// A recorded flaw is undisclosed, and a reader of disclosed work is
+		// told of no build holding it.
+		held, _, err = f.store.HeldAt(ctx, f.holding(t, access.PublicRead), f.productID, issue, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(held) != 0 {
+			t.Errorf("a reader of disclosed work was told of %+v", held)
+		}
 	})
 }
 
