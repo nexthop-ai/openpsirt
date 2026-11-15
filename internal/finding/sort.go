@@ -3,7 +3,11 @@
 
 package finding
 
-import "github.com/nexthop-ai/openpsirt/internal/rating"
+import (
+	"fmt"
+
+	"github.com/nexthop-ai/openpsirt/internal/rating"
+)
 
 // SortKey is a column somebody may order the findings list by.
 //
@@ -46,7 +50,32 @@ const (
 // and the score only orders the issues inside one. A critical with no score
 // sorts above a high scored 8.1. One number, because a grouped page selects one
 // expression to sort by.
-var bySeverity = `MAX(` + rankCase(rating.BandExpr, 0) + ` * 10000 + COALESCE("v"."score_centi", 0))`
+//
+// An issue with no recognized word sorts in the band of its score, and below
+// every band with no score, as urgency ranks it and as the row reads. The
+// filters and the clocks fold it to medium instead, so it never leaves the list
+// or the clock; a sort only orders.
+var bySeverity = `MAX((CASE WHEN ` + rating.Recognized + ` THEN ` + rankCase(rating.BandExpr, 0) +
+	` ELSE ` + scoreRank(`"v"."score_centi"`) + ` END) * 10000 + COALESCE("v"."score_centi", 0))`
+
+// scoreRank is the band a score in hundredths falls in, numbered as rankCase
+// numbers it, and zero for no score.
+//
+// Each band's floor is read off SeverityWord at every hundredth, so the SQL
+// and the scorer cannot come to disagree about a threshold.
+func scoreRank(score string) string {
+	floors := map[string]int{}
+	for centi := maxScore; centi > 0; centi-- {
+		floors[SeverityWord(centi)] = centi
+	}
+	said := "CASE"
+	for i := len(ranked) - 1; i >= 0; i-- {
+		if floor, ok := floors[ranked[i]]; ok {
+			said += fmt.Sprintf(" WHEN %s >= %d THEN %d", score, floor, i+1)
+		}
+	}
+	return said + " ELSE 0 END"
+}
 
 // order is the expression each key sorts by, whether it needs the issue and
 // the product's rating of it joined, and whether the expression is the name of a column every grouped

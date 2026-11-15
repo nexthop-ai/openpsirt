@@ -87,3 +87,47 @@ func TestTheSeverityOrderReadsTheProductsOwnRating(t *testing.T) {
 		}
 	})
 }
+
+func TestTheSeverityOrderRanksAnUnratedIssueByItsScore(t *testing.T) {
+	// An issue no recognized word rates sorts in the band of its score, as
+	// urgency ranks it: "unknown" scored 9.8 is a critical, above a high
+	// scored 7.0. The filters' medium fold does not reach the order.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
+			ranked("CVE-2026-1", libnl, "unknown", 9.8),
+			ranked("CVE-2026-2", swss, "high", 7.0),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+		for list, got := range severityLeaders(t, f, who) {
+			if got != libnl.Name {
+				t.Errorf("%s ordered by severity leads with %q rather than the package holding the unrated 9.8",
+					list, got)
+			}
+		}
+	})
+}
+
+func TestTheSeverityOrderRanksAnUnratedUnscoredIssueBelowALow(t *testing.T) {
+	// An issue with no recognized word and no score sorts below every band,
+	// as urgency ranks it and the row reads "Unrated", rather than in the
+	// medium band the filters fold it to.
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if _, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{
+			ranked("CVE-2026-1", libnl, "unknown", 0),
+			ranked("CVE-2026-2", swss, "low", 2.0),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		who := f.holding(t, access.PublicTriage)
+		for list, got := range severityLeaders(t, f, who) {
+			if got != swss.Name {
+				t.Errorf("%s ordered by severity leads with %q rather than the package holding the low",
+					list, got)
+			}
+		}
+	})
+}

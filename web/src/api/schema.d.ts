@@ -19347,7 +19347,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "occurrences" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest occurrences, lowest first */
                 asc?: boolean;
@@ -19467,7 +19467,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "occurrences" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest occurrences, lowest first */
                 asc?: boolean;
@@ -24481,7 +24481,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "occurrences" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest occurrences, lowest first */
                 asc?: boolean;
@@ -24654,7 +24654,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "occurrences" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest occurrences, lowest first */
                 asc?: boolean;
@@ -24789,7 +24789,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "occurrences" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest occurrences, lowest first */
                 asc?: boolean;
@@ -24929,7 +24929,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "occurrences" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest occurrences, lowest first */
                 asc?: boolean;
@@ -25067,7 +25067,7 @@ export interface operations {
                 unconfirmed?: boolean;
                 /** @description Drop components of these names. One package can drown the list: on a switch image the kernel carried 4,943 of 6,822 rows */
                 exclude?: string[] | null;
-                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. A finding with no deadline sorts last whichever direction is asked for */
+                /** @description The order to page in. Urgency by default, which is what the list is designed around: what somebody with an hour should look at first. Severity orders by the band of the rating in force, the row's product's own where it states one, then by the published score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score. A finding with no deadline sorts last whichever direction is asked for */
                 sort?: "urgency" | "age" | "deadline" | "occurrences" | "epss" | "severity";
                 /** @description Order the other way — oldest, nearest deadline, fewest occurrences, lowest first */
                 asc?: boolean;
