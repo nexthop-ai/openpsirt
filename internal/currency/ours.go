@@ -105,10 +105,9 @@ func (o *Ours) add(labels ...string) {
 		}
 		o.labels = append(o.labels, label)
 	}
-	// Sorted before the duplicates are dropped, because dropping them is a
-	// walk over neighbours. Searched first, the search ran against a slice
-	// this loop had already left unsorted, and a name stated twice in two
-	// spellings reached the report twice.
+	// Sorted before the duplicates are dropped, because Compact removes only
+	// adjacent duplicates and a name stated twice in two spellings would
+	// otherwise reach the report twice.
 	sort.Strings(o.labels)
 	o.labels = slices.Compact(o.labels)
 }
@@ -131,7 +130,7 @@ const separators = "-._"
 // A label without a dot matches any dotted part of a segment the same way it
 // matches a segment. A Maven group always starts with a top-level domain, so
 // "com.skunkworks" never begins with "skunkworks"; matched only at the start,
-// an organization's own group names went to the index.
+// an organization's own group names would go to the index.
 //
 // Each bounded to a separator, so "example" takes neither "notexample" nor
 // "examples".
