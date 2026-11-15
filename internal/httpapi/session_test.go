@@ -105,8 +105,8 @@ func TestAKeyIsNotAskedToEchoAnythingOrToSayWhereItCameFrom(t *testing.T) {
 	// breaking every build.
 	//
 	// A write is what tests this. A read is safe for every credential type, so
-	// asserting on one would pass just as well if keys *were* being asked to
-	// echo a value — which is what the first version of this test did.
+	// asserting on one would pass just as well if keys were being asked to
+	// echo a value.
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		if got := r.AsKey(t, http.MethodGet,
 			"/v1/products/mine/branches-and-tags/master/variants/broadcom/sboms"); got != http.StatusOK {

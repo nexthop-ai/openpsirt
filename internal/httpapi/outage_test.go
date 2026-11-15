@@ -26,9 +26,9 @@ import (
 //
 // A read that could not be made is not an authoritative negative. Answered as
 // "no product is declared by that name", "nothing has been scanned there" or
-// "no open finding is recorded there", an outage tells every authenticated
+// "no open finding is recorded there", an outage would tell every authenticated
 // caller that their products, builds and findings are gone — and a body
-// carrying the driver's own message hands whoever asked the database host,
+// carrying the driver's own message would hand whoever asked the database host,
 // port and driver.
 //
 // Whoever is asking is resolved against a database that works, so what fails

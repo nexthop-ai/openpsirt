@@ -14,13 +14,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
-// Routes nothing reached.
+// Routes driven through the real router, each with its success shape and its
+// refusal.
 //
-// Eighteen registered operations sat at the coverage their `huma.Register`
-// call gets for running at suite start, and nothing else: the registration was
-// exercised and the handler never was. Two of them write, one produces a
-// document meant to be pasted into a customer release note, one deliberately
-// bypasses the visibility check, and one stores a shared signing secret.
+// A registered operation is covered by its `huma.Register` call running at
+// suite start whether or not its handler ever runs, so these drive the
+// handler. Among them are writes, a document meant to be pasted into a
+// customer release note, a read that deliberately bypasses the visibility
+// check, and one that stores a shared signing secret.
 //
 // Each needs the same pair — the success shape, and a subject holding
 // none of the declared roles refused with the exact status — so they are one
@@ -40,7 +41,7 @@ type reached struct {
 	body       string
 }
 
-func TestTheRoutesNothingReachedAnswerAndRefuse(t *testing.T) {
+func TestEachRouteAnswersItsHolderAndRefusesAnOutsider(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 
@@ -134,8 +135,7 @@ func TestTheRoutesNothingReachedAnswerAndRefuse(t *testing.T) {
 // `add-outbound` is the only place the https-only and no-userinfo rules on a
 // destination are enforced, and it stores a shared signing secret; the two
 // store methods behind the listing and the retirement take no subject, so the
-// only thing narrowing them is a check in the handler. No test named
-// `/v1/outbound` at all.
+// only thing narrowing them is a check in the handler.
 func TestADestinationIsNeverHandedBackWhatItIsSignedWith(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		const secret = "sixteen-characters-at-least"
@@ -302,8 +302,7 @@ func recordedIn(t *testing.T, r *httpapitest.Reach, variants ...string) string {
 }
 
 // TestClosingAFindingByHandGoesThroughTheRouteAndIsRefusedWithoutTheRight
-// reaches `resolve-finding`, the act that closes findings, which was pinned
-// nowhere through the router.
+// reaches `resolve-finding`, the act that closes findings, through the router.
 func TestClosingAFindingByHandGoesThroughTheRouteAndIsRefusedWithoutTheRight(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
@@ -353,12 +352,11 @@ func TestClosingAFindingByHandGoesThroughTheRouteAndIsRefusedWithoutTheRight(t *
 	})
 }
 
-// TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped reaches the write
-// whose counts nothing read back.
+// TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped pins the success
+// path of the write and both counts it publishes.
 //
-// The build-resolution loop decides which findings get closed as invalid, and
-// the only test that reached the route asserted a refusal — so the success
-// path, and both counts it publishes, were unpinned.
+// The build-resolution loop decides which findings get closed as invalid, so
+// a refusal alone does not pin the route.
 func TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
@@ -395,8 +393,7 @@ func TestNarrowingWhichBuildsAFlawAffectsClosesTheOnesDropped(t *testing.T) {
 			t.Fatal(err)
 		}
 		// Nothing added, and the dropped build's occurrences closed. The counts are
-		// what a caller acts on, and both came back from a handler nothing
-		// had ever run.
+		// what a caller acts on.
 		if affects.Added != 0 {
 			t.Errorf("narrowing added %d builds, want none", affects.Added)
 		}

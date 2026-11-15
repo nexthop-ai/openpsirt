@@ -340,8 +340,7 @@ func pendingFrom(ctx context.Context, in core.Deps, r *http.Request) (inProgress
 		return inProgress{}, errors.New("the sign-in in progress is incomplete")
 	}
 	// The same window the cookie was given, enforced where it can be: a value
-	// with no time in it is one sealed before this was checked at all, and it
-	// is refused rather than read as fresh.
+	// with no mint time is refused rather than read as fresh.
 	if held.Minted.IsZero() || time.Since(held.Minted) > pendingLife {
 		return inProgress{}, errors.New("the sign-in in progress has expired")
 	}
