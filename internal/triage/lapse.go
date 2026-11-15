@@ -82,8 +82,8 @@ func (s *Store) Lapse(ctx context.Context, buildID int64) (Lapsed, error) {
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Where(`"st"."product_id" = "de"."product_id"`).
 			Where(`"f"."closed_at" IS NULL`).
 			Apply(ofKinds(kind.VersionCarry, "f")).
@@ -108,9 +108,9 @@ func (s *Store) Lapse(ctx context.Context, buildID int64) (Lapsed, error) {
 				` WHERE "lc"."id" = "de"."decision_id" AND "lc"."outcome" = ?)`, Mismatched).
 			Where(`"de"."product_id" = (?)`, db.NewSelect().
 				ColumnExpr(`"st"."product_id"`).
-				TableExpr(`"build" AS "tg"`).
-				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-				Where(`"tg"."id" = ?`, buildID)).
+				TableExpr(`"build" AS "b"`).
+				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+				Where(`"b"."id" = ?`, buildID)).
 			Where("EXISTS (?)", openHere(db).Where("NOT ("+finding.VersionsMatch+")")).
 			Where("NOT EXISTS (?)", stillCovered(db)).
 			OrderExpr(`"de"."id"`).

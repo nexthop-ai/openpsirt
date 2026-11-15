@@ -18,7 +18,7 @@ import (
 // A credential and a build both carry identifiers, and a screen listing
 // either says the names somebody typed.
 func (s *Store) BranchesAndTagsByID(ctx context.Context, ids []int64) (map[int64]BranchOrTag, error) {
-	return rowsByID(ctx, s.db, `"s"."id"`, ids, func(row BranchOrTag) int64 { return row.ID },
+	return rowsByID(ctx, s.db, `"bt"."id"`, ids, func(row BranchOrTag) int64 { return row.ID },
 		"branches and tags")
 }
 

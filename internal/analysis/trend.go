@@ -245,7 +245,7 @@ func trendPoints(ctx context.Context, db bun.IDB, subject access.Subject, scope 
 // statisticsFindings is every finding of the Security testing statistics
 // consumer's kinds in the scope that the subject may read, one row per
 // finding, with its sighting under "si", its build under "t", its branch or
-// tag under "s" and its rule's rating under "rr", and no columns: each figure
+// tag under "bt" and its rule's rating under "rr", and no columns: each figure
 // names its own. A finding closed and a finding opened anew at its occurrence
 // are two rows.
 //
@@ -258,7 +258,7 @@ func statisticsFindings(db bun.IDB, subject access.Subject, scope Scope, visible
 	q := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
 		Where(kinds, kindArgs...).
 		Where(readable, readableArgs...)

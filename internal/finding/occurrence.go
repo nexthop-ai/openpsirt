@@ -571,8 +571,8 @@ func occurrenceColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(rating.Here, productID).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."visibility" AS "visibility"`).
 		// The upstream version where one is stated, and the component's own
 		// where none is. Most packages are not forks and state no upstream at

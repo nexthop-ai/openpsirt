@@ -214,8 +214,8 @@ func (s *Store) occurrenceOnLine(ctx context.Context, toBuild, occurrenceID int6
 		// build rather than about the decision, and the rule that refuses a
 		// dated decision on a tag reads it.
 		ColumnExpr(`(SELECT CASE WHEN "st"."kind" = ? THEN 1 ELSE 0 END
-			FROM "build" AS "tg" JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
-			WHERE "tg"."id" = ?) AS "on_tag"`, catalog.Tag, toBuild).
+			FROM "build" AS "b" JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"
+			WHERE "b"."id" = ?) AS "on_tag"`, catalog.Tag, toBuild).
 		Where(`"de"."id" = ?`, occurrenceID).
 		Scan(ctx, &row)
 	if err != nil {
@@ -361,10 +361,10 @@ func (s *Store) WouldCarry(ctx context.Context, subject access.Subject,
 	// the reasoning of undisclosed decisions elsewhere would come back.
 	var productID int64
 	if err := s.db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id"`).
-		Where(`"tg"."id" = ?`, toBuild).
+		Where(`"b"."id" = ?`, toBuild).
 		Scan(ctx, &productID); err != nil {
 		return nil, fmt.Errorf("look up which product this line belongs to: %w", err)
 	}

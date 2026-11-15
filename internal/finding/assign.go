@@ -552,8 +552,8 @@ func mayReadAllOf(ctx context.Context, tx bun.IDB, from, to int64) error {
 	kinds, kindArgs := kind.Assignment.Where(`"f"."kind"`)
 	if err := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`DISTINCT "st"."product_id" AS "product_id", "f"."visibility" AS "visibility"`).
 		Where(`"f"."assigned_to" = ?`, from).
 		Where(`"f"."closed_at" IS NULL`).
@@ -656,8 +656,8 @@ func (s *Store) HeldBy(ctx context.Context, subject access.Subject,
 	mine := func() *bun.SelectQuery {
 		query := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(notRecordedAsFlaw).
@@ -832,15 +832,15 @@ const codeFindingOccurrence = `CASE WHEN "f"."kind" = '` + string(kind.Analysis)
 // notRecordedAsFlaw is whether the finding under "f", in the product of the
 // branch or tag under "st", is no code finding recorded as a flaw. A code finding recorded as a flaw is
 // closed work for its holder: its flaw is held and listed as itself.
-const notRecordedAsFlaw = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
-	WHERE "lh"."product_id" = "st"."product_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
+const notRecordedAsFlaw = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "cff"
+	WHERE "cff"."product_id" = "st"."product_id" AND "cff"."occurrence_identity" = "f"."occurrence_identity")`
 
 // notRecordedAsFlawIn is notRecordedAsFlaw over the finding under "f" alone, in the
 // product its build is in, for a statement that joins no branch or tag.
-const notRecordedAsFlawIn = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
-	JOIN "branch_or_tag" AS "hs" ON "hs"."product_id" = "lh"."product_id"
+const notRecordedAsFlawIn = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "cff"
+	JOIN "branch_or_tag" AS "hs" ON "hs"."product_id" = "cff"."product_id"
 	JOIN "build" AS "ht" ON "ht"."branch_or_tag_id" = "hs"."id"
-	WHERE "ht"."id" = "f"."build_id" AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
+	WHERE "ht"."id" = "f"."build_id" AND "cff"."occurrence_identity" = "f"."occurrence_identity")`
 
 // pieceOfWork is what one piece of work held is grouped by, over the finding
 // under "f" and its branch or tag under "st": an issue in a component in a product,
@@ -959,8 +959,8 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 	}
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Where(kinds, kindArgs...).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(notRecordedAsFlaw)
@@ -970,7 +970,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 		if len(holders) == 0 {
 			q = q.Where(`"f"."assigned_to" IS NULL`)
 			if len(ended) > 0 {
-				q = q.Where(`("f"."kind" <> ? OR "tg"."branch_or_tag_id" NOT IN (?))`, kind.Analysis, bun.List(ended))
+				q = q.Where(`("f"."kind" <> ? OR "b"."branch_or_tag_id" NOT IN (?))`, kind.Analysis, bun.List(ended))
 			}
 		} else {
 			q = q.Where(`"f"."assigned_to" IN (?)`, bun.List(holders))
@@ -1156,13 +1156,13 @@ func namedBuilds(ctx context.Context, db bun.IDB, ids []int64) (map[int64]buildN
 	}
 	var builds []buildName
 	err := db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
-		ColumnExpr(`"tg"."id" AS "build_id"`).
+		ColumnExpr(`"b"."id" AS "build_id"`).
 		Apply(catalog.BuildNames("p", "st", "va")).
-		Where(`"tg"."id" IN (?)`, bun.List(ids)).
+		Where(`"b"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx, &builds)
 	if err != nil {
 		return nil, fmt.Errorf("name the builds on the page: %w", err)

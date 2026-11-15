@@ -44,10 +44,10 @@ func analysisRuns(db bun.IDB) *bun.SelectQuery {
 	return db.NewSelect().
 		TableExpr(`"series_run" AS "sr"`).
 		Join(`JOIN "series" AS "se" ON "se"."id" = "sr"."series_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "sr"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "sr"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"sr"."series_id" AS "series_id"`).

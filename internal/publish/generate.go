@@ -116,10 +116,10 @@ func (g *Generator) builds(ctx context.Context, subject access.Subject, product 
 		VariantShown     string `bun:"variant_shown"`
 	}
 	if err := g.db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		ColumnExpr(`"tg"."id" AS "build_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
+		ColumnExpr(`"b"."id" AS "build_id"`).
 		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"va"."id" AS "variant_id"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
@@ -129,7 +129,7 @@ func (g *Generator) builds(ctx context.Context, subject access.Subject, product 
 		Where(`"st"."product_id" = ?`, product.ID).
 		Where(`"st"."retired_at" IS NULL`).
 		Where(`"va"."retired_at" IS NULL`).
-		Where(`"tg"."last_scan_id" IS NOT NULL`).
+		Where(`"b"."last_scan_id" IS NOT NULL`).
 		OrderExpr(`"st"."name", "va"."name"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the builds of product %s: %w", product.Name, err)

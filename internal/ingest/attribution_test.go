@@ -120,10 +120,10 @@ func TestARunIsAttributedToOneUploadHoweverThePageFalls(t *testing.T) {
 func quietBuild(t *testing.T, s *ingest.Store, productID int64) int64 {
 	t.Helper()
 	var id int64
-	if err := s.DB().NewSelect().TableExpr("\"build\" AS \"tg\"").
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "v" ON "v"."id" = "tg"."variant_id"`).
-		Column("tg.id").
+	if err := s.DB().NewSelect().TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "v" ON "v"."id" = "b"."variant_id"`).
+		Column("b.id").
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"v"."name" = ?`, "mellanox").
 		Scan(t.Context(), &id); err != nil {

@@ -277,7 +277,7 @@ func DecisionArgument(c triage.Decision, reasoning string) DecisionOccurrenceBod
 	body := DecisionOccurrenceBody{DecisionID: c.ID, Outcome: Outcome(c.Outcome), Reasoning: reasoning}
 	// A decision about a code finding publishes nothing, so it has a reason and no
 	// scope.
-	if c.Outcome.AboutALead() {
+	if c.Outcome.AboutACodeFinding() {
 		if c.Justification != nil {
 			body.Reason = CodeFindingReason(*c.Justification)
 		}

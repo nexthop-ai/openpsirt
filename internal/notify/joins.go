@@ -36,9 +36,9 @@ func findingsWith(q *bun.SelectQuery, consumer bool) *bun.SelectQuery {
 	kinds, kindArgs := kind.Notifications.Where(`"f"."kind"`)
 	q = q.TableExpr(`"finding" AS "f"`).
 		Where(kinds, kindArgs...).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).

@@ -87,8 +87,8 @@ func recountOwn(ctx context.Context, db bun.IDB, productID int64, issues []int64
 	clocked, clockedArgs := catalog.OnTheClock("st", "p", now)
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(rating.Here, productID).

@@ -44,12 +44,12 @@ func HeldOpenIn(ctx context.Context, db bun.IDB, subject access.Subject, product
 	}
 	var scanned []int64
 	if err := db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`DISTINCT "tg"."branch_or_tag_id"`).
-		Where(`"tg"."branch_or_tag_id" IN (?)`, bun.List(branchesAndTags)).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`DISTINCT "b"."branch_or_tag_id"`).
+		Where(`"b"."branch_or_tag_id" IN (?)`, bun.List(branchesAndTags)).
 		Where(`"st"."product_id" = ?`, productID).
-		Where(`"tg"."last_run_id" IS NOT NULL`).
+		Where(`"b"."last_run_id" IS NOT NULL`).
 		Scan(ctx, &scanned); err != nil {
 		return nil, fmt.Errorf("read which releases have been scanned: %w", err)
 	}
@@ -64,11 +64,11 @@ func HeldOpenIn(ctx context.Context, db bun.IDB, subject access.Subject, product
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	q := db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`DISTINCT "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`DISTINCT "b"."branch_or_tag_id"`).
 		Where(kinds, kindArgs...).
-		Where(`"tg"."branch_or_tag_id" IN (?)`, bun.List(branchesAndTags)).
+		Where(`"b"."branch_or_tag_id" IN (?)`, bun.List(branchesAndTags)).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(HeldAs(`"f"."vulnerability_id"`), vulnerabilityID)

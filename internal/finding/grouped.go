@@ -74,9 +74,9 @@ func (s *Store) Grouped(ctx context.Context, subject access.Subject, buildID int
 	ecosystem string) ([]ListedGroup, error) {
 
 	var productID int64
-	if err := s.db.NewSelect().TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`"st"."product_id"`).Where(`"tg"."id" = ?`, buildID).
+	if err := s.db.NewSelect().TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"st"."product_id"`).Where(`"b"."id" = ?`, buildID).
 		Scan(ctx, &productID); err != nil {
 		return nil, fmt.Errorf("read the product of build %d: %w", buildID, err)
 	}

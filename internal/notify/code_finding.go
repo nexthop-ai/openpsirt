@@ -103,10 +103,10 @@ func codeFindingNamed(ctx context.Context, db bun.IDB, productID int64, occurren
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		ColumnExpr(`"v"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path" AS "path"`).
 		ColumnExpr(`"p"."display_name" AS "product"`).

@@ -1029,8 +1029,8 @@ func (s *Store) recordedAsFlaw(ctx context.Context, decisionIDs []int64) (map[in
 		var some []int64
 		if err := s.db.NewSelect().TableExpr(`"decision_occurrence" AS "de"`).
 			Join(`JOIN "vulnerability" AS "rv" ON "rv"."id" = "de"."vulnerability_id"`).
-			Join(`JOIN "code_finding_flaw" AS "lh" ON "lh"."product_id" = "de"."product_id"
-				AND "lh"."occurrence_identity" = "de"."occurrence_identity"`).
+			Join(`JOIN "code_finding_flaw" AS "cff" ON "cff"."product_id" = "de"."product_id"
+				AND "cff"."occurrence_identity" = "de"."occurrence_identity"`).
 			ColumnExpr(`DISTINCT "de"."decision_id"`).
 			Where(`"de"."decision_id" IN (?)`, bun.List(batch)).
 			Where(`"rv"."kind" = ?`, string(kind.Rule)).

@@ -655,15 +655,15 @@ func buildsNamed(ctx context.Context, db bun.IDB, ids []int64) (map[int64]build,
 	}
 	var rows []build
 	if err := db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		ColumnExpr(`"tg"."id" AS "id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
+		ColumnExpr(`"b"."id" AS "id"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(catalog.ShownExpr("st")+` AS "branch_or_tag_name"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
 		ColumnExpr(catalog.ShownExpr("va")+` AS "variant_name"`).
-		Where(`"tg"."id" IN (?)`, bun.List(ids)).
+		Where(`"b"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("name the builds a page sits in: %w", err)
 	}

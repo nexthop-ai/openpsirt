@@ -233,8 +233,8 @@ func (s *Store) LabelsInUse(ctx context.Context, subject access.Subject,
 	// matches nothing the caller may see would be its own small oracle.
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	onSomethingReadable := `EXISTS (SELECT 1 FROM "finding" AS "f"
-		JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"
-		JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
+		JOIN "build" AS "b" ON "b"."id" = "f"."build_id"
+		JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"
 		WHERE "st"."product_id" = "ft"."product_id"
 		  AND "f"."vulnerability_id" = "ft"."vulnerability_id"
 		  AND "f"."component_id" = "ft"."component_id"
@@ -291,8 +291,8 @@ func (s *Store) marksOnFolds(ctx context.Context, products, issues []int64, fold
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	seen := readable(s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr("1").
 		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = "ft"."product_id"`).

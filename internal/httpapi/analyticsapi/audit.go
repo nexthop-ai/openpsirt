@@ -290,7 +290,7 @@ func argued(decision *triage.Decision) (justification core.Justification, reason
 		return "", "", "", "", ""
 	}
 	if decision.Justification != nil {
-		if decision.Outcome.AboutALead() {
+		if decision.Outcome.AboutACodeFinding() {
 			reason = core.CodeFindingReason(*decision.Justification)
 		} else {
 			justification = core.Justification(*decision.Justification)

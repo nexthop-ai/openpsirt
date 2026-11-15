@@ -291,7 +291,7 @@ func (s *Store) BranchesAndTags(ctx context.Context, subject access.Subject, pro
 	var rows []BranchOrTag
 	query := s.db.NewSelect().Model(&rows).Where(`"product_id" = ?`, productID)
 	if !retired {
-		query = query.Where(`"s"."retired_at" IS NULL`)
+		query = query.Where(`"bt"."retired_at" IS NULL`)
 	}
 	err := query.Order("kind", "name").Scan(ctx)
 	if err != nil {
@@ -343,8 +343,8 @@ func (s *Store) BuiltAs(ctx context.Context, subject access.Subject, branchOrTag
 	}
 	var rows []Variant
 	err := s.db.NewSelect().Model(&rows).
-		Join(`JOIN "build" AS "tg" ON "tg"."variant_id" = "v"."id"`).
-		Where(`"tg"."branch_or_tag_id" = ?`, branchOrTagID).Order("v.name").Scan(ctx)
+		Join(`JOIN "build" AS "b" ON "b"."variant_id" = "v"."id"`).
+		Where(`"b"."branch_or_tag_id" = ?`, branchOrTagID).Order("v.name").Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list what a release is built as: %w", err)
 	}

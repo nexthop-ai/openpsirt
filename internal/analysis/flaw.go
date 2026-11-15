@@ -209,10 +209,10 @@ func newestCodeFinding(ctx context.Context, db bun.IDB, subject access.Subject, 
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."id", "f"."build_id", "f"."component_id", "ar"."path"`).
 		ColumnExpr(`"vu"."identifier" AS "rule", "si"."last_run_id", "si"."series_id"`).
-		Where(`"s"."product_id" = ?`, productID).
+		Where(`"bt"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(reach.Full, reach.FullArgs...).
 		Where(kinds, kindArgs...).
@@ -365,11 +365,11 @@ func togetherAt(ctx context.Context, db bun.IDB, productID int64, occurrenceIden
 	var others []string
 	if recorded != nil {
 		if err := db.NewSelect().Model((*finding.CodeFindingFlaw)(nil)).
-			Column("lh.occurrence_identity").
-			Where(`"lh"."product_id" = ?`, productID).
-			Where(`"lh"."vulnerability_id" = ?`, recorded.VulnerabilityID).
-			Where(`"lh"."occurrence_identity" <> ?`, occurrenceIdentity).
-			OrderExpr(`"lh"."id" ASC`).
+			Column("cff.occurrence_identity").
+			Where(`"cff"."product_id" = ?`, productID).
+			Where(`"cff"."vulnerability_id" = ?`, recorded.VulnerabilityID).
+			Where(`"cff"."occurrence_identity" <> ?`, occurrenceIdentity).
+			OrderExpr(`"cff"."id" ASC`).
 			Scan(ctx, &others); err != nil {
 			return nil, fmt.Errorf("read the code findings recorded as the flaw: %w", err)
 		}
@@ -390,8 +390,8 @@ func togetherAt(ctx context.Context, db bun.IDB, productID int64, occurrenceIden
 		Where(`"ov"."kind" = ?`, string(kind.Rule)).
 		Where(`"od"."live_key" IS NOT NULL`).
 		Where(`"od"."occurrence_identity" <> ?`, occurrenceIdentity).
-		Where(`NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
-			WHERE "lh"."product_id" = "od"."product_id" AND "lh"."occurrence_identity" = "od"."occurrence_identity")`).
+		Where(`NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "cff"
+			WHERE "cff"."product_id" = "od"."product_id" AND "cff"."occurrence_identity" = "od"."occurrence_identity")`).
 		OrderExpr(`"od"."occurrence_identity" ASC`).
 		Scan(ctx, &others); err != nil {
 		return nil, fmt.Errorf("read the code findings confirmed with the code finding: %w", err)
@@ -404,9 +404,9 @@ func togetherAt(ctx context.Context, db bun.IDB, productID int64, occurrenceIden
 func recordedWith(ctx context.Context, tx bun.IDB, h *finding.CodeFindingFlaw) ([]finding.CodeFindingFlaw, error) {
 	var rows []finding.CodeFindingFlaw
 	if err := tx.NewSelect().Model(&rows).
-		Where(`"lh"."product_id" = ?`, h.ProductID).
-		Where(`"lh"."vulnerability_id" = ?`, h.VulnerabilityID).
-		OrderExpr(`"lh"."id" ASC`).
+		Where(`"cff"."product_id" = ?`, h.ProductID).
+		Where(`"cff"."vulnerability_id" = ?`, h.VulnerabilityID).
+		OrderExpr(`"cff"."id" ASC`).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the code findings recorded as the flaw: %w", err)
 	}
@@ -531,13 +531,13 @@ func seenIn(ctx context.Context, db bun.IDB, productID int64, occurrenceIdentity
 	var out []BuildName
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`DISTINCT "t"."id" AS "build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
-		Where(`"s"."product_id" = ?`, productID).
+		ColumnExpr(`DISTINCT "t"."id" AS "build_id", "bt"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
+		Where(`"bt"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(kinds, kindArgs...).
-		OrderExpr(`"s"."name" ASC, "va"."name" ASC`).
+		OrderExpr(`"bt"."name" ASC, "va"."name" ASC`).
 		Scan(ctx, &out); err != nil {
 		return nil, fmt.Errorf("read the builds the code finding was seen in: %w", err)
 	}
@@ -552,9 +552,9 @@ func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, comp
 	// The product's builds in use, as a condition on the node, which the
 	// name is looked up within.
 	inUse := `"n"."build_id" IN (SELECT "t"."id" FROM "build" AS "t"
-		JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"
+		JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"
 		JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"
-		WHERE "s"."product_id" = ? AND "s"."retired_at" IS NULL AND "va"."retired_at" IS NULL)`
+		WHERE "bt"."product_id" = ? AND "bt"."retired_at" IS NULL AND "va"."retired_at" IS NULL)`
 	named, err := graph.NamedAs(ctx, db, component, inUse, productID)
 	if err != nil {
 		return nil, err
@@ -568,14 +568,14 @@ func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, comp
 		Purl    string `bun:"purl"`
 	}
 	if err := db.NewSelect().TableExpr(`"build" AS "t"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 		Join(`JOIN "graph_node" AS "n" ON "n"."build_id" = "t"."id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-		ColumnExpr(`"t"."id" AS "build_id", "s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
+		ColumnExpr(`"t"."id" AS "build_id", "bt"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
 		ColumnExpr(graph.NodeVersion("n", "c")+` AS "version", "c"."purl"`).
-		Where(`"s"."product_id" = ?`, productID).
-		Where(`"s"."retired_at" IS NULL`).
+		Where(`"bt"."product_id" = ?`, productID).
+		Where(`"bt"."retired_at" IS NULL`).
 		Where(`"va"."retired_at" IS NULL`).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."component_id" IN (?)`, bun.List(named)).
@@ -585,7 +585,7 @@ func unanalyzed(ctx context.Context, db bun.IDB, productID, seriesID int64, comp
 			graph.Folded(component), graph.Folded(component)).
 		Where(`NOT EXISTS (SELECT 1 FROM "series_run" AS "sr" WHERE "sr"."build_id" = "t"."id" AND "sr"."series_id" = ?)`,
 			seriesID).
-		OrderExpr(`"s"."name" ASC, "va"."name" ASC`).
+		OrderExpr(`"bt"."name" ASC, "va"."name" ASC`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read the builds holding %q that were never analyzed: %w", component, err)
 	}
@@ -665,10 +665,10 @@ func disclosing(ctx context.Context, db bun.IDB, subject access.Subject, product
 		return db.NewSelect().TableExpr(`"`+table+`" AS "`+alias+`"`).
 			Join(`JOIN "finding" AS "f" ON "f"."id" = "`+alias+`"."finding_id"`).
 			Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+			Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 			ColumnExpr(`COALESCE("`+alias+`"."path", '') AS "path", "`+alias+`"."`+message+`" AS "message_text"`).
 			ColumnExpr(`CASE WHEN "`+alias+`"."snippet" IS NULL THEN NULL ELSE TRUE END AS "snippet"`).
-			Where(`"s"."product_id" = ?`, productID).
+			Where(`"bt"."product_id" = ?`, productID).
 			Where(`"f"."occurrence_identity" IN (?)`, bun.List(occurrences)).
 			Where(kinds, kindArgs...)
 	}
@@ -1065,8 +1065,8 @@ func CodeFindingName(ctx context.Context, db bun.IDB, h *finding.CodeFindingFlaw
 		ColumnExpr(`(SELECT MAX("vu"."identifier") FROM "finding" AS "f"
 			JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"
 			JOIN "build" AS "t" ON "t"."id" = "f"."build_id"
-			JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"
-			WHERE "s"."product_id" = "p"."id" AND "f"."occurrence_identity" = ? AND `+kinds+`) AS "rule"`,
+			JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"
+			WHERE "bt"."product_id" = "p"."id" AND "f"."occurrence_identity" = ? AND `+kinds+`) AS "rule"`,
 			append([]any{h.OccurrenceIdentity}, kindArgs...)...).
 		Where(`"p"."id" = ?`, h.ProductID).
 		Scan(ctx, &names); err != nil {

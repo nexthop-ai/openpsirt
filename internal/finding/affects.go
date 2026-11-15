@@ -359,8 +359,8 @@ func filedAgainst(ctx context.Context, db bun.IDB, productID, vulnerabilityID in
 	var rows []Finding
 	kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 	err := db.NewSelect().Model(&rows).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Where(kinds, kindArgs...).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."vulnerability_id" = ?`, vulnerabilityID).

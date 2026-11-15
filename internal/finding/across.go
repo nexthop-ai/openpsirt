@@ -497,9 +497,9 @@ func (s *Store) packagesAcross(ctx context.Context, buildIDs []int64, held heldB
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "n"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "n"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`LEFT JOIN (?) AS "pl" ON "pl"."build_id" = "n"."build_id" AND "pl"."component_id" = "n"."component_id"`, pullers).
 		ColumnExpr(`"n"."build_id" AS "build_id"`).
 		ColumnExpr(`"n"."component_id" AS "component_id"`).

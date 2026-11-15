@@ -200,13 +200,13 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		Variant     string `bun:"variant"`
 	}
 	if err := s.db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
-		ColumnExpr(`"tg"."id" AS "build_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
+		ColumnExpr(`"b"."id" AS "build_id"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
-		Where(`"tg"."id" IN (?)`, bun.List(ids)).
+		Where(`"b"."id" IN (?)`, bun.List(ids)).
 		Scan(ctx, &named); err != nil {
 		return nil, whole, fmt.Errorf("read the builds of this product: %w", err)
 	}

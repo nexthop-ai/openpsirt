@@ -92,7 +92,7 @@ func (p Product) Retired() bool { return p.RetiredAt != nil }
 // Both live here because they differ in one respect only — a branch moves and
 // a tag does not — and share everything else.
 type BranchOrTag struct {
-	bun.BaseModel `bun:"table:branch_or_tag,alias:s"`
+	bun.BaseModel `bun:"table:branch_or_tag,alias:bt"`
 
 	ID          int64  `bun:"id,pk,autoincrement"`
 	ProductID   int64  `bun:"product_id,notnull"`
@@ -406,7 +406,7 @@ func (s *Store) setEndOfLife(ctx context.Context, model any, id int64, on *time.
 // not make one of them supported for longer than the other.
 func (s *Store) EndOfLifeForBuild(ctx context.Context, buildID int64) (EndOfLife, error) {
 	return s.endOfLife(ctx,
-		`"s"."id" IN (SELECT "tg"."branch_or_tag_id" FROM "build" AS "tg" WHERE "tg"."id" = ?)`, buildID,
+		`"bt"."id" IN (SELECT "b"."branch_or_tag_id" FROM "build" AS "b" WHERE "b"."id" = ?)`, buildID,
 		"build", buildID)
 }
 
@@ -416,9 +416,9 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 		Product     *time.Time `bun:"product_eol"`
 	}
 	err := s.db.NewSelect().
-		TableExpr(`"branch_or_tag" AS "s"`).
-		Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
-		ColumnExpr(`"s"."eol_on" AS "branch_or_tag_eol"`).
+		TableExpr(`"branch_or_tag" AS "bt"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "bt"."product_id"`).
+		ColumnExpr(`"bt"."eol_on" AS "branch_or_tag_eol"`).
 		ColumnExpr(`"p"."eol_on" AS "product_eol"`).
 		Where(where, arg).
 		Scan(ctx, &stated)
@@ -441,9 +441,9 @@ func (s *Store) endOfLife(ctx context.Context, where string, arg any, what strin
 func (s *Store) BuildMoves(ctx context.Context, buildID int64) (bool, error) {
 	var kind string
 	err := s.db.NewSelect().
-		TableExpr(`"branch_or_tag" AS "s"`).
-		ColumnExpr(`"s"."kind"`).
-		Where(`"s"."id" IN (SELECT "tg"."branch_or_tag_id" FROM "build" AS "tg" WHERE "tg"."id" = ?)`, buildID).
+		TableExpr(`"branch_or_tag" AS "bt"`).
+		ColumnExpr(`"bt"."kind"`).
+		Where(`"bt"."id" IN (SELECT "b"."branch_or_tag_id" FROM "build" AS "b" WHERE "b"."id" = ?)`, buildID).
 		Scan(ctx, &kind)
 	if err != nil {
 		return false, missingOr(err, fmt.Sprintf("build %d", buildID), "read whether that release moves")
@@ -459,9 +459,9 @@ func (s *Store) BuildMoves(ctx context.Context, buildID int64) (bool, error) {
 func (s *Store) TagBranchesAndTags(ctx context.Context) ([]int64, error) {
 	var ids []int64
 	if err := s.db.NewSelect().
-		TableExpr(`"branch_or_tag" AS "s"`).
-		ColumnExpr(`"s"."id"`).
-		Where(`"s"."kind" = ?`, Tag).Scan(ctx, &ids); err != nil {
+		TableExpr(`"branch_or_tag" AS "bt"`).
+		ColumnExpr(`"bt"."id"`).
+		Where(`"bt"."kind" = ?`, Tag).Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read which releases were built once: %w", err)
 	}
 	return ids, nil
@@ -492,14 +492,14 @@ func (s *Store) BranchesAndTagsEndingBy(ctx context.Context, by time.Time) ([]in
 // answering to its own date where it states one and to its product's
 // otherwise.
 func (s *Store) branchesAndTagsEndingBy(ctx context.Context, at time.Time) ([]int64, error) {
-	past, args := PastEndOfLife("s", "p", at)
+	past, args := PastEndOfLife("bt", "p", at)
 	var ids []int64
 	err := s.db.NewSelect().
-		TableExpr(`"branch_or_tag" AS "s"`).
-		Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
-		ColumnExpr(`"s"."id"`).
+		TableExpr(`"branch_or_tag" AS "bt"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "bt"."product_id"`).
+		ColumnExpr(`"bt"."id"`).
 		Where(past, args...).
-		OrderExpr(`"s"."id"`).
+		OrderExpr(`"bt"."id"`).
 		Scan(ctx, &ids)
 	if err != nil {
 		return nil, fmt.Errorf("read which releases are out of support: %w", err)
@@ -608,23 +608,23 @@ func (s *Store) OutOfSupport(ctx context.Context, subject access.Subject,
 			ProductEOL    *time.Time `bun:"product_eol"`
 		}
 		q := s.db.NewSelect().
-			TableExpr(`"branch_or_tag" AS "s"`).
-			Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
-			ColumnExpr(`"s"."id" AS "branch_or_tag_id"`).
-			ColumnExpr(`"s"."name" AS "branch_or_tag"`).
-			ColumnExpr(`"s"."kind" AS "kind"`).
-			ColumnExpr(`"s"."eol_on" AS "own_eol"`).
+			TableExpr(`"branch_or_tag" AS "bt"`).
+			Join(`JOIN "product" AS "p" ON "p"."id" = "bt"."product_id"`).
+			ColumnExpr(`"bt"."id" AS "branch_or_tag_id"`).
+			ColumnExpr(`"bt"."name" AS "branch_or_tag"`).
+			ColumnExpr(`"bt"."kind" AS "kind"`).
+			ColumnExpr(`"bt"."eol_on" AS "own_eol"`).
 			ColumnExpr(`"p"."id" AS "product_id"`).
 			ColumnExpr(`"p"."name" AS "product"`).
 			ColumnExpr(`"p"."eol_on" AS "product_eol"`).
 			ColumnExpr(ShownExpr("p")+` AS "product_name"`).
-			ColumnExpr(ShownExpr("s")+` AS "branch_or_tag_name"`).
-			Where(`"s"."id" IN (?)`, bun.List(batch)).
-			Where(`"s"."retired_at" IS NULL`).
+			ColumnExpr(ShownExpr("bt")+` AS "branch_or_tag_name"`).
+			Where(`"bt"."id" IN (?)`, bun.List(batch)).
+			Where(`"bt"."retired_at" IS NULL`).
 			Where(`"p"."retired_at" IS NULL`).
-			OrderExpr(`"p"."name", "s"."name"`)
+			OrderExpr(`"p"."name", "bt"."name"`)
 		if !all {
-			q = q.Where(`"s"."product_id" IN (?)`, bun.List(products))
+			q = q.Where(`"bt"."product_id" IN (?)`, bun.List(products))
 		}
 		if err := q.Scan(ctx, &rows); err != nil {
 			return fmt.Errorf("read the releases that are out of support: %w", err)
@@ -1030,7 +1030,7 @@ func now() time.Time { return time.Now().UTC().Truncate(time.Microsecond) }
 // against, and what everything downstream points at, so a single identifier
 // runs from a scan through to a finding.
 type Build struct {
-	bun.BaseModel `bun:"table:build,alias:tg"`
+	bun.BaseModel `bun:"table:build,alias:b"`
 
 	ID            int64     `bun:"id,pk,autoincrement"`
 	BranchOrTagID int64     `bun:"branch_or_tag_id,notnull"`
@@ -1188,10 +1188,10 @@ func readsBuild(ctx context.Context, db bun.IDB, subject access.Subject, buildID
 		VariantID     int64 `bun:"variant_id"`
 	}
 	if err := db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`"st"."product_id", "tg"."branch_or_tag_id", "tg"."variant_id"`).
-		Where(`"tg"."id" = ?`, buildID).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"st"."product_id", "b"."branch_or_tag_id", "b"."variant_id"`).
+		Where(`"b"."id" = ?`, buildID).
 		Scan(ctx, &build); err != nil {
 		return 0, missingOr(err, fmt.Sprintf("build %d", buildID), fmt.Sprintf("look up which build %d is", buildID))
 	}

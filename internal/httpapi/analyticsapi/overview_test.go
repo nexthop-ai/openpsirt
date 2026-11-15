@@ -216,8 +216,8 @@ func TestARunSaysWhatItOpenedAndClosed(t *testing.T) {
 		// cannot be doing the authorizing while the identifier does the
 		// reading.
 		var elsewhere int64
-		if err := r.DB.DB.NewSelect().TableExpr("\"build\" AS \"tg\"").ColumnExpr(`"tg"."id"`).
-			Where(`"tg"."id" <> (SELECT "sr"."build_id" FROM "scan_run" AS "sr" WHERE "sr"."id" = ?)`, runID).
+		if err := r.DB.DB.NewSelect().TableExpr(`"build" AS "b"`).ColumnExpr(`"b"."id"`).
+			Where(`"b"."id" <> (SELECT "sr"."build_id" FROM "scan_run" AS "sr" WHERE "sr"."id" = ?)`, runID).
 			Limit(1).Scan(t.Context(), &elsewhere); err != nil {
 			t.Fatal(err)
 		}

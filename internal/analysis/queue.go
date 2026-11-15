@@ -126,10 +126,10 @@ func (scope Scope) bound() productBound {
 	return inProduct(scope.ProductID)
 }
 
-// inScope keeps a statement over the branch or tag under "s" to the
+// inScope keeps a statement over the branch or tag under "bt" to the
 // scope's product, or its products across.
 func (scope Scope) inScope(q *bun.SelectQuery) *bun.SelectQuery {
-	where, args := scope.productIn(`"s"."product_id"`)
+	where, args := scope.productIn(`"bt"."product_id"`)
 	return q.Where(where, args...)
 }
 
@@ -196,7 +196,7 @@ func (scope Scope) visible(subject access.Subject) ([]access.Visibility, error) 
 // visibilities, bound per product.
 func (scope Scope) readable(subject access.Subject, visible []access.Visibility) (string, []any) {
 	if scope.across() {
-		return access.VisibleWhere(`"s"."product_id"`, `"f"."visibility"`, access.Split(scope.Across, subject.Reads))
+		return access.VisibleWhere(`"bt"."product_id"`, `"f"."visibility"`, access.Split(scope.Across, subject.Reads))
 	}
 	reach := finding.CodeFindingReach(subject, scope.ProductID)
 	return `("f"."visibility" IN (?) OR ` + reach.Included + `)`, append([]any{bun.List(visible)}, reach.IncludedArgs...)
@@ -209,7 +209,7 @@ func (scope Scope) builds(ctx context.Context, db bun.IDB) ([]int64, error) {
 		return []int64{*scope.BuildID}, nil
 	}
 	q := scope.inScope(db.NewSelect().TableExpr(`"build" AS "t"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		ColumnExpr(`"t"."id"`))
 	if scope.BranchOrTagID != nil {
 		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
@@ -490,13 +490,13 @@ func codeFindingsOf(ctx context.Context, db bun.IDB, subject access.Subject, sco
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "vulnerability" AS "vu" ON "vu"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		Join(`JOIN "product" AS "p" ON "p"."id" = "s"."product_id"`).
+		Join(`JOIN "product" AS "p" ON "p"."id" = "bt"."product_id"`).
 		ColumnExpr(`"p"."name" AS "product", `+catalog.ShownExpr("p")+` AS "product_name"`).
 		ColumnExpr(`"f"."occurrence_identity", "vu"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path", "ar"."start_line", "ar"."enclosing", "ar"."message_text"`).
-		ColumnExpr(`"s"."name" AS "branch_or_tag", "va"."name" AS "variant", "f"."assigned_to"`).
+		ColumnExpr(`"bt"."name" AS "branch_or_tag", "va"."name" AS "variant", "f"."assigned_to"`).
 		Join(`JOIN "component" AS "co" ON "co"."id" = "f"."component_id"`).
 		ColumnExpr(placedOn, true).
 		// A finding has one sighting, and its last run is the run the evidence
@@ -543,7 +543,7 @@ func codeFindingFindings(db bun.IDB, subject access.Subject, scope Scope, visibl
 		Join(`JOIN "sighting" AS "si" ON "si"."finding_id" = "f"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		Join(`LEFT JOIN "rule_rating" AS "rr" ON "rr"."vulnerability_id" = "f"."vulnerability_id"`).
 		ColumnExpr(`"f"."id", "f"."occurrence_identity", "f"."build_id", "f"."component_id", "f"."opened_at", "si"."series_id", "t"."branch_or_tag_id"`).
 		ColumnExpr(`COALESCE("rr"."weakness_tier", 0) AS "tier"`).
@@ -627,7 +627,7 @@ func identifiers(db bun.IDB, set *bun.SelectQuery) *bun.SelectQuery {
 // builds' code findings they are compared with.
 func (scope Scope) builtIn(q *bun.SelectQuery) *bun.SelectQuery {
 	q = q.Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`)
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`)
 	if scope.BranchOrTagID != nil {
 		q = q.Where(`"t"."branch_or_tag_id" = ?`, *scope.BranchOrTagID)
 	}

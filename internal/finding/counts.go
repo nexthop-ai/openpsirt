@@ -35,9 +35,9 @@ func (l Level) column() (string, bool) {
 	case ByProduct:
 		return `"st"."product_id"`, true
 	case ByBranchOrTag:
-		return `"tg"."branch_or_tag_id"`, true
+		return `"b"."branch_or_tag_id"`, true
 	case ByVariant:
-		return `"tg"."variant_id"`, true
+		return `"b"."variant_id"`, true
 	}
 	return "", false
 }
@@ -67,8 +67,8 @@ func (s *Store) OpenBy(ctx context.Context, subject access.Subject, scope Scope,
 	inner := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(column+` AS "grouped_by"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"f"."component_id" AS "component_id"`).

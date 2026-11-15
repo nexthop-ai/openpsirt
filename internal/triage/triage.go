@@ -200,7 +200,7 @@ func OutcomesDismissing() []Outcome {
 // later checks. A code finding's outcomes dismiss nothing the dismissal counts read,
 // because those read the vulnerability kinds alone. Approval quality reads
 // code finding decisions and files a code finding's dismissal standing alone with these.
-func (o Outcome) Dismisses() bool { return !o.AboutALead() && o.HidesRisk() && !o.Dated() }
+func (o Outcome) Dismisses() bool { return !o.AboutACodeFinding() && o.HidesRisk() && !o.Dated() }
 
 // Valid reports whether o is one we recognize.
 func (o Outcome) Valid() bool {
@@ -263,8 +263,8 @@ func (o Outcome) StandsAtAnyVersion() bool {
 	return slices.Contains(finding.AnyVersionOutcomes(), string(o))
 }
 
-// AboutALead reports whether this is an outcome a decision about a code finding records.
-func (o Outcome) AboutALead() bool { return slices.Contains(CodeFindingOutcomes(), o) }
+// AboutACodeFinding reports whether this is an outcome a decision about a code finding records.
+func (o Outcome) AboutACodeFinding() bool { return slices.Contains(CodeFindingOutcomes(), o) }
 
 // NeedsJustification reports whether this outcome says which recognized reason
 // applies, which a decision that something is not the problem here makes.

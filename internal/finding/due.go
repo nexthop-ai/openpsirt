@@ -403,9 +403,9 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 	narrow := func(q *bun.SelectQuery) *bun.SelectQuery {
 		q = q.TableExpr(`"finding" AS "f"`).
 			Where(kinds, kindArgs...).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-			Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+			Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			// Each row's own product rates its own findings. The list spans
@@ -669,8 +669,8 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 			var moments []time.Time
 			err = s.db.NewSelect().
 				TableExpr(`"finding" AS "f"`).
-				Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+				Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 				ColumnExpr(string(database.Column(s.db, "f."+start.column))).
 				Where(kinds, kindArgs...).
 				Where(`"f"."closed_at" IS NULL`).
@@ -798,8 +798,8 @@ func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
 	if !on {
 		clocked = "NOT " + clocked
 	}
-	return `"build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
-		JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"
+	return `"build_id" IN (SELECT "b"."id" FROM "build" AS "b"
+		JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"
 		JOIN "product" AS "p" ON "p"."id" = "st"."product_id"
 		WHERE "st"."product_id" = ? AND ` + clocked + `)`, append([]any{productID}, args...)
 }
@@ -891,8 +891,8 @@ func (s *Store) clearClockOn(ctx context.Context, branchesAndTags []int64, why s
 			Where(kinds, kindArgs...).
 			Where(`"closed_at" IS NULL`).
 			Where(`"due_at" IS NOT NULL`).
-			Where(`"build_id" IN (SELECT "tg"."id" FROM "build" AS "tg"
-				WHERE "tg"."branch_or_tag_id" IN (?))`, bun.List(batch)).
+			Where(`"build_id" IN (SELECT "b"."id" FROM "build" AS "b"
+				WHERE "b"."branch_or_tag_id" IN (?))`, bun.List(batch)).
 			Exec(ctx)
 		if err != nil {
 			return fmt.Errorf("take the deadline off %s: %w", why, err)

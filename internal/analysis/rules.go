@@ -393,8 +393,8 @@ func coverage(ctx context.Context, db bun.IDB, subject access.Subject, productID
 		CodeFindings int   `bun:"code_findings"`
 	}
 	if err := db.NewSelect().TableExpr(`"suppression_rule" AS "lr"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."product_id" = "lr"."product_id"`).
-		Join(`JOIN "build" AS "t" ON "t"."branch_or_tag_id" = "s"."id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."product_id" = "lr"."product_id"`).
+		Join(`JOIN "build" AS "t" ON "t"."branch_or_tag_id" = "bt"."id"`).
 		Join(`JOIN "finding" AS "f" ON "f"."build_id" = "t"."id"`).
 		Join(`JOIN "analysis_result" AS "ar" ON "ar"."finding_id" = "f"."id"`).
 		ColumnExpr(`"lr"."id", COUNT(DISTINCT "f"."occurrence_identity") AS "code_findings"`).

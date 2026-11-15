@@ -56,7 +56,7 @@ func TestWhatEachOutcomeClaimsIsPublishedFromTheRulesTheServerApplies(t *testing
 		// The reports read dismissals from the record, which holds decisions
 		// about code findings, and count vulnerabilities alone.
 		for _, got := range who.Outcomes {
-			if got.Dismisses && triage.Outcome(got.Outcome).AboutALead() {
+			if got.Dismisses && triage.Outcome(got.Outcome).AboutACodeFinding() {
 				t.Errorf("%s, an outcome about a code finding, is published as a dismissal the reports count", got.Outcome)
 			}
 		}

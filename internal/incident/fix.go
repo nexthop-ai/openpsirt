@@ -119,8 +119,8 @@ func (s *Store) NameFix(ctx context.Context, subject access.Subject, recordID in
 		}
 		branchOrTag := new(catalog.BranchOrTag)
 		if err := tx.NewSelect().Model(branchOrTag).
-			Where(`"s"."product_id" = ?`, record.ProductID).
-			Where(`"s"."name" = ?`, typedname.Matching(release)).
+			Where(`"bt"."product_id" = ?`, record.ProductID).
+			Where(`"bt"."name" = ?`, typedname.Matching(release)).
 			Scan(ctx); err != nil {
 			if database.IsNoRows(err) {
 				return ErrNoSuchRelease
@@ -199,8 +199,8 @@ func (s *Store) WithdrawFix(ctx context.Context, subject access.Subject, recordI
 			return ErrNoSuchFix
 		}
 		var name string
-		if err := tx.NewSelect().Model((*catalog.BranchOrTag)(nil)).ColumnExpr(`"s"."name"`).
-			Where(`"s"."id" = ?`, fix.BranchOrTagID).Scan(ctx, &name); err != nil {
+		if err := tx.NewSelect().Model((*catalog.BranchOrTag)(nil)).ColumnExpr(`"bt"."name"`).
+			Where(`"bt"."id" = ?`, fix.BranchOrTagID).Scan(ctx, &name); err != nil {
 			return fmt.Errorf("read the release named as carrying the fix: %w", err)
 		}
 		return noteFix(ctx, tx, subject, record, trail.Said(name, true), nil)

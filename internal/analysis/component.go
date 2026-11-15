@@ -94,13 +94,13 @@ func CountsOfComponent(ctx context.Context, db bun.IDB, subject access.Subject, 
 		TableExpr(`(?) AS "l"`, codeFindingFindings(db, subject, scope, visible, Open)).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "l"."component_id"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "l"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
-		ColumnExpr(`"s"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
+		ColumnExpr(`"bt"."name" AS "branch_or_tag", "va"."name" AS "variant"`).
 		ColumnExpr(finding.SourceVersion+` AS "source_version"`).
 		ColumnExpr(`COUNT(DISTINCT "l"."occurrence_identity") AS "open"`).
-		GroupExpr(`"s"."name", "va"."name", `+finding.SourceVersion).
-		OrderExpr(`"s"."name", "va"."name", `+finding.SourceVersion).
+		GroupExpr(`"bt"."name", "va"."name", `+finding.SourceVersion).
+		OrderExpr(`"bt"."name", "va"."name", `+finding.SourceVersion).
 		Scan(ctx, &out.Builds); err != nil {
 		return nil, fmt.Errorf("count the open code findings of a component per build in product %d: %w", scope.ProductID, err)
 	}

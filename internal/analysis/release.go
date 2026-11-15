@@ -74,7 +74,7 @@ func ByRelease(ctx context.Context, db bun.IDB, subject access.Subject, scope Sc
 		Join(`JOIN "series_run" AS "sr" ON "sr"."build_id" = "t"."id"`).
 		Join(`JOIN "series" AS "se" ON "se"."id" = "sr"."series_id"`).
 		ColumnExpr(`1`).
-		Where(`"t"."branch_or_tag_id" = "s"."id"`).
+		Where(`"t"."branch_or_tag_id" = "bt"."id"`).
 		Where(`"sr"."status" = ?`, series.Applied).
 		Where(named, namedArgs...)
 	analyzed = scope.runsIn(analyzed)
@@ -86,13 +86,13 @@ func ByRelease(ctx context.Context, db bun.IDB, subject access.Subject, scope Sc
 	}
 	// The day it went out, where somebody said, and the day it was declared
 	// otherwise, as the release line of vulnerabilities orders them.
-	if err := db.NewSelect().TableExpr(`"branch_or_tag" AS "s"`).
-		ColumnExpr(`"s"."id", "s"."name", `+catalog.ShownExpr("s")+` AS "shown"`).
-		ColumnExpr(`COALESCE("s"."released_on", "s"."created_at") AS "cut"`).
-		Where(`"s"."product_id" = ?`, scope.ProductID).
-		Where(`"s"."kind" = ?`, catalog.Tag).
+	if err := db.NewSelect().TableExpr(`"branch_or_tag" AS "bt"`).
+		ColumnExpr(`"bt"."id", "bt"."name", `+catalog.ShownExpr("bt")+` AS "shown"`).
+		ColumnExpr(`COALESCE("bt"."released_on", "bt"."created_at") AS "cut"`).
+		Where(`"bt"."product_id" = ?`, scope.ProductID).
+		Where(`"bt"."kind" = ?`, catalog.Tag).
 		Where(`EXISTS (?)`, analyzed).
-		OrderExpr(`"cut", "s"."name"`).
+		OrderExpr(`"cut", "bt"."name"`).
 		Scan(ctx, &tags); err != nil {
 		return nil, fmt.Errorf("read the analyzed releases of product %d: %w", scope.ProductID, err)
 	}

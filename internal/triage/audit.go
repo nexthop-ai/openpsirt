@@ -144,8 +144,8 @@ func aboutTheSameOccurrences(q *bun.SelectQuery, subject access.Subject, f Filte
 	if f.BuildID != 0 {
 		mayRead, readArgs := readableFindingsOn(subject, "bf", `"de"."product_id"`)
 		clause := `EXISTS (SELECT 1 FROM "finding" AS "bf"
-			JOIN "build" AS "bt" ON "bt"."id" = "bf"."build_id"
-			JOIN "branch_or_tag" AS "bs" ON "bs"."id" = "bt"."branch_or_tag_id"
+			JOIN "build" AS "bb" ON "bb"."id" = "bf"."build_id"
+			JOIN "branch_or_tag" AS "bs" ON "bs"."id" = "bb"."branch_or_tag_id"
 			WHERE ` + finding.DecisionOccurrenceFiledAt("de", "bf") + `
 			  AND "bf"."build_id" = ? AND "bs"."product_id" = "de"."product_id"`
 		args := []any{f.BuildID}
@@ -455,8 +455,8 @@ func (s *Store) aboutEach(ctx context.Context, occurrences []DecisionOccurrence)
 	err := s.db.NewSelect().
 		TableExpr(`(?) AS "earliest"`, earliest).
 		Join(`JOIN "finding" AS "f" ON "f"."id" = "earliest"."finding_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).

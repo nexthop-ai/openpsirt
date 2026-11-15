@@ -1012,8 +1012,8 @@ func (f *Fetcher) shipped(ctx context.Context, productID int64) (map[string]bool
 		TableExpr(`"component" AS "c"`).
 		ColumnExpr(`"c"."name_folded"`).
 		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "n"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "n"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, false).

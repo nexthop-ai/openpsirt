@@ -23,7 +23,7 @@ import (
 // Flaw record is a confirmed code finding recorded as a flaw here, by its occurrence in a
 // product.
 type CodeFindingFlaw struct {
-	bun.BaseModel `bun:"table:code_finding_flaw,alias:lh"`
+	bun.BaseModel `bun:"table:code_finding_flaw,alias:cff"`
 
 	ID                 int64  `bun:"id,pk,autoincrement"`
 	ProductID          int64  `bun:"product_id,notnull"`
@@ -143,8 +143,8 @@ func (h CodeFindingFlaw) Disclosed() bool { return h.DisclosedAt != nil }
 func CodeFindingFlawAt(ctx context.Context, db bun.IDB, productID int64, occurrenceIdentity string) (*CodeFindingFlaw, error) {
 	var h CodeFindingFlaw
 	err := db.NewSelect().Model(&h).
-		Where(`"lh"."product_id" = ?`, productID).
-		Where(`"lh"."occurrence_identity" = ?`, occurrenceIdentity).
+		Where(`"cff"."product_id" = ?`, productID).
+		Where(`"cff"."occurrence_identity" = ?`, occurrenceIdentity).
 		Scan(ctx)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -190,21 +190,21 @@ func (s *Store) CodeFindingFlawManaged(ctx context.Context, subject access.Subje
 
 // includedCodeFinding is the condition that the code finding finding under "f", in the product
 // bound, was included in its flaw's disclosure.
-const includedCodeFinding = `EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
-	WHERE "lh"."product_id" = ? AND "lh"."occurrence_identity" = "f"."occurrence_identity" AND "lh"."included_at" IS NOT NULL)`
+const includedCodeFinding = `EXISTS (SELECT 1 FROM "code_finding_flaw" AS "cff"
+	WHERE "cff"."product_id" = ? AND "cff"."occurrence_identity" = "f"."occurrence_identity" AND "cff"."included_at" IS NOT NULL)`
 
 // includedInto is includedCodeFinding narrowed to the flaws bound in its second
 // placeholder, and every issue merged into them.
-const includedInto = `EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
-	WHERE "lh"."product_id" = ? AND "lh"."occurrence_identity" = "f"."occurrence_identity" AND "lh"."included_at" IS NOT NULL
-	  AND ` + `"lh"."vulnerability_id" IN (SELECT "mv"."id" FROM "vulnerability" AS "mv"
+const includedInto = `EXISTS (SELECT 1 FROM "code_finding_flaw" AS "cff"
+	WHERE "cff"."product_id" = ? AND "cff"."occurrence_identity" = "f"."occurrence_identity" AND "cff"."included_at" IS NOT NULL
+	  AND ` + `"cff"."vulnerability_id" IN (SELECT "mv"."id" FROM "vulnerability" AS "mv"
 	    JOIN "vulnerability" AS "mi" ON "mi"."issue_id" = "mv"."issue_id" WHERE "mi"."id" IN (?)))`
 
 // undisclosedCodeFinding is the condition that the code finding finding under "f", in the
 // product bound, has a flaw nobody disclosed: a code finding grant reaches it only
 // then.
-const undisclosedCodeFinding = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
-	WHERE "lh"."product_id" = ? AND "lh"."occurrence_identity" = "f"."occurrence_identity" AND "lh"."disclosed_at" IS NOT NULL)`
+const undisclosedCodeFinding = `NOT EXISTS (SELECT 1 FROM "code_finding_flaw" AS "cff"
+	WHERE "cff"."product_id" = ? AND "cff"."occurrence_identity" = "f"."occurrence_identity" AND "cff"."disclosed_at" IS NOT NULL)`
 
 // caseVisibilities is what an included code finding holds while its flaw is a case and
 // once it is disclosed.
@@ -286,9 +286,9 @@ func CodeFindingVisible(s access.Subject, productID int64) ([]access.Visibility,
 func codeFindingsFollow(ctx context.Context, db bun.IDB, productID, vulnerabilityID int64, now time.Time) error {
 	var recorded []CodeFindingFlaw
 	if err := db.NewSelect().Model(&recorded).
-		Where(`"lh"."product_id" = ?`, productID).
+		Where(`"cff"."product_id" = ?`, productID).
 		Where(filed.Under(filed.FlawIssue), vulnerabilityID).
-		Where(`"lh"."disclosed_at" IS NULL`).
+		Where(`"cff"."disclosed_at" IS NULL`).
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read the code findings recorded as this flaw: %w", err)
 	}
@@ -353,10 +353,10 @@ func StripDisclosedCodeFindings(ctx context.Context, db bun.IDB, productID int64
 	if err := database.IDsInBatches(ctx, findingIDs, func(ctx context.Context, batch []int64) error {
 		var some []string
 		if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "code_finding_flaw" AS "lh" ON "lh"."occurrence_identity" = "f"."occurrence_identity"`).
+			Join(`JOIN "code_finding_flaw" AS "cff" ON "cff"."occurrence_identity" = "f"."occurrence_identity"`).
 			ColumnExpr(`DISTINCT "f"."occurrence_identity"`).
-			Where(`"lh"."product_id" = ?`, productID).
-			Where(`"lh"."visibility" = ?`, access.Public).
+			Where(`"cff"."product_id" = ?`, productID).
+			Where(`"cff"."visibility" = ?`, access.Public).
 			Where(`"f"."id" IN (?)`, bun.List(batch)).
 			Scan(ctx, &some); err != nil {
 			return err

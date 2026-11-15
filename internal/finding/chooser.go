@@ -76,11 +76,11 @@ func (s *Store) Matching(ctx context.Context, subject access.Subject, scope Scop
 		ID        int64 `bun:"id"`
 		ProductID int64 `bun:"product_id"`
 	}
-	q := s.db.NewSelect().TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		ColumnExpr(`"tg"."id", "st"."product_id"`).
+	q := s.db.NewSelect().TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"b"."id", "st"."product_id"`).
 		Where(`"st"."product_id" IN (?)`, bun.List(products))
-	if err := scope.Narrow(q).OrderExpr(`"tg"."id"`).Scan(ctx, &builds); err != nil {
+	if err := scope.Narrow(q).OrderExpr(`"b"."id"`).Scan(ctx, &builds); err != nil {
 		return nil, fmt.Errorf("read the builds to search: %w", err)
 	}
 	if len(builds) == 0 {
@@ -96,8 +96,8 @@ func (s *Store) Matching(ctx context.Context, subject access.Subject, scope Scop
 	like := "%" + database.LikeEscaped(graph.Folded(term)) + "%"
 	shipped := s.db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "n"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "n"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(sourceFolded+` AS "source_folded"`).
 		ColumnExpr(SourceName+` AS "source_name"`).

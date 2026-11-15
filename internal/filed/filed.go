@@ -31,7 +31,7 @@ const (
 	// CaseIssue is the issue a case grant names.
 	CaseIssue Column = `"cc"."vulnerability_id"`
 	// FlawIssue is the flaw a code finding was recorded as.
-	FlawIssue Column = `"lh"."vulnerability_id"`
+	FlawIssue Column = `"cff"."vulnerability_id"`
 	// AbsorbedIssue is the issue a merge folded into another.
 	AbsorbedIssue Column = `"vm"."absorbed_id"`
 )

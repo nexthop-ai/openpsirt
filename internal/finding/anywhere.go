@@ -123,8 +123,8 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		q = filter.Workable.where(q, pastEOL)
 		kinds, kindArgs := kind.Triage.Where(`"f"."kind"`)
 		q = q.TableExpr(`"finding" AS "f"`).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Where(kinds, kindArgs...)
 		held, heldArgs := openOn("f", filter.OpenOn)
 		q = q.Where(held, heldArgs...)
@@ -277,7 +277,7 @@ func (s *Store) Anywhere(ctx context.Context, subject access.Subject,
 		decorated
 	}
 	body := groupDecorations(narrow(s.db.NewSelect()).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`MIN("p"."name") AS "product"`).

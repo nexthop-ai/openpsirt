@@ -152,7 +152,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			"resolved inside a loop over the builds a request names",
 			`func f() {
 				for _, build := range input.Body.Builds {
-					at, err := names.LocateVisible(ctx, subject, product, build.Stream, build.Variant)
+					at, err := names.LocateVisible(ctx, subject, product, build.BranchOrTag, build.Variant)
 					_ = err
 					rows := db.NewSelect().Where("build_id = ?", at.BranchOrTagID).Scan(ctx)
 					_ = rows
@@ -263,7 +263,7 @@ func TestABuildResolvedForACollaborator(t *testing.T) {
 			`func f() {
 				var builds []int64
 				for _, build := range input.Body.Builds {
-					at, err := names.LocateVisible(ctx, subject, p, build.Stream, build.Variant)
+					at, err := names.LocateVisible(ctx, subject, p, build.BranchOrTag, build.Variant)
 					_ = err
 					build, err := core.BuildRow(ctx, in, at.BranchOrTagID, at.VariantID)
 					_ = err

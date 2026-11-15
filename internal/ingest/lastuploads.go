@@ -131,10 +131,10 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 	// case this exists to report, and joining the scan table would drop
 	// exactly those rows.
 	query := s.db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		ColumnExpr(`"st"."product_id" AS "product_id"`).
 		ColumnExpr(`"st"."id" AS "branch_or_tag_id"`).
 		ColumnExpr(`"p"."name" AS "product"`).
@@ -142,7 +142,7 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"st"."kind" AS "branch_or_tag_kind"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
-		ColumnExpr(`"tg"."created_at" AS "declared_at"`).
+		ColumnExpr(`"b"."created_at" AS "declared_at"`).
 		// Out of use at any of the three levels. A build is a product, a
 		// release and a variant together, and retiring any one of them stops
 		// a scan being filed against it.
@@ -155,15 +155,15 @@ func (s *Store) LastUploads(ctx context.Context, subject access.Subject, scope f
 		// it as perfectly quiet on the one report whose subject is that
 		// silence must not look like health.
 		ColumnExpr(`(SELECT MAX("sc"."received_at") FROM "scan" AS "sc" `+
-			`WHERE "sc"."build_id" = "tg"."id" AND "sc"."status" = ?) AS "last_seen"`, Accepted).
+			`WHERE "sc"."build_id" = "b"."id" AND "sc"."status" = ?) AS "last_seen"`, Accepted).
 		// And whether anybody is trying. Quiet says nothing arrived; this says
 		// whether something arrived and was turned away, which is a different
 		// fault with a different person to tell — a pipeline nobody wired up,
 		// against one failing nightly and reporting success to its own log.
 		ColumnExpr(`(SELECT "sr"."at" FROM "scan_refusal" AS "sr" ` +
-			`WHERE "sr"."build_id" = "tg"."id") AS "last_refused"`).
+			`WHERE "sr"."build_id" = "b"."id") AS "last_refused"`).
 		ColumnExpr(`(SELECT "sr"."reason" FROM "scan_refusal" AS "sr" ` +
-			`WHERE "sr"."build_id" = "tg"."id") AS "refused_why"`)
+			`WHERE "sr"."build_id" = "b"."id") AS "refused_why"`)
 	if !all {
 		query = query.Where(`"st"."product_id" IN (?)`, bun.List(products))
 	}

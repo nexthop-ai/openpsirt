@@ -463,8 +463,8 @@ func (s *Store) firstOpened(ctx context.Context, narrow trendNarrowing, within W
 	}
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`MIN("f"."opened_at") AS "opened"`)
 	if !within.Purl.Empty() {
 		q = q.ColumnExpr(`"f"."component_id" AS "component_id"`).GroupExpr(`"f"."component_id"`)
@@ -625,8 +625,8 @@ func (s *Store) dismissedSpans(ctx context.Context, narrow trendNarrowing, since
 	}
 	q := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		// The consumer, for the version a decision is keyed on.
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).

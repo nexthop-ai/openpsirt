@@ -134,15 +134,15 @@ func (p *Pass) reaching(ctx context.Context) (bool, error) {
 func Again(ctx context.Context, db bun.IDB, q *queue.Queue, productID int64) error {
 	var buildIDs []int64
 	if err := db.NewSelect().
-		TableExpr(`"build" AS "tg"`).
-		ColumnExpr(`"tg"."id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		TableExpr(`"build" AS "b"`).
+		ColumnExpr(`"b"."id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"st"."retired_at" IS NULL`).
 		Where(`"va"."retired_at" IS NULL`).
-		Where(`"tg"."last_scan_id" IS NOT NULL`).
-		OrderExpr(`"tg"."id"`).
+		Where(`"b"."last_scan_id" IS NOT NULL`).
+		OrderExpr(`"b"."id"`).
 		Scan(ctx, &buildIDs); err != nil {
 		return fmt.Errorf("read which builds a product holds: %w", err)
 	}

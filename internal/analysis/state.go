@@ -55,8 +55,8 @@ func standingOutcomeIn(product productBound) string {
 // recordedAsFlawIn is whether the code finding under "f" in the product bound
 // was recorded as a flaw. It binds the product's arguments once.
 func recordedAsFlawIn(product productBound) string {
-	return `EXISTS (SELECT 1 FROM "code_finding_flaw" AS "lh"
-	WHERE "lh"."product_id" = ` + product.sql + ` AND "lh"."occurrence_identity" = "f"."occurrence_identity")`
+	return `EXISTS (SELECT 1 FROM "code_finding_flaw" AS "cff"
+	WHERE "cff"."product_id" = ` + product.sql + ` AND "cff"."occurrence_identity" = "f"."occurrence_identity")`
 }
 
 // stateOf is the state of the finding under "f", whose sighting is under
@@ -173,11 +173,11 @@ func (scope Scope) decidedIn(db bun.IDB, which decided) *bun.SelectQuery {
 		Join(`JOIN "vulnerability" AS "dv" ON "dv"."id" = "de"."vulnerability_id"`).
 		Join(`JOIN "finding" AS "f" ON `+finding.DecisionOccurrenceOf("f")).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		ColumnExpr(`"f"."id"`).
 		Where(products, productArgs...).
 		Where(`"de"."live_key" IS NOT NULL`).
-		Where(`"s"."product_id" = "de"."product_id"`).
+		Where(`"bt"."product_id" = "de"."product_id"`).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(kinds, kindArgs...)
 	if which == waiting {
@@ -191,7 +191,7 @@ func (scope Scope) decidedIn(db bun.IDB, which decided) *bun.SelectQuery {
 
 // productBound is the product the product-bound conditions of a statement
 // compare with: one product, bound as a value, or the product of the branch
-// or tag under "s", for a list across products. The conditions take it rather
+// or tag under "bt", for a list across products. The conditions take it rather
 // than a fragment of SQL, so what they splice into a statement is one of the
 // two built here.
 type productBound struct {
@@ -214,9 +214,9 @@ func inProduct(productID int64) productBound {
 	return productBound{sql: "?", args: []any{productID}}
 }
 
-// eachProduct is the product of the branch or tag under "s", which binds
+// eachProduct is the product of the branch or tag under "bt", which binds
 // nothing: each row is compared within its own product.
-var eachProduct = productBound{sql: `"s"."product_id"`}
+var eachProduct = productBound{sql: `"bt"."product_id"`}
 
 // times is what n conditions naming the product bind, in order. Binding
 // nothing is nil, since the query builder warns of arguments given to a

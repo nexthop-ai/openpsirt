@@ -428,8 +428,8 @@ func (s *Store) regate(ctx context.Context, tx bun.Tx, findings *finding.Store,
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`DISTINCT "f"."build_id"`).
 		Where(`"de"."decision_id" = ?`, decision.ID).
 		Where(`"de"."live_key" IS NOT NULL`).

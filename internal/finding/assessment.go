@@ -591,8 +591,8 @@ func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 	// rows learning it from the ones that already carried it.
 	if err := tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Where(kinds, kindArgs...).
 		ColumnExpr(`"f"."id" AS "id"`).
@@ -724,8 +724,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 	}
 	err = tx.NewSelect().
 		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
 		Join(rating.Here, productID).
@@ -870,8 +870,8 @@ func (s *Store) Assessments(ctx context.Context, subject access.Subject, product
 			readable := onlyReadable(s.db.NewSelect().
 				ColumnExpr("1").
 				TableExpr(IssueFindings("f")).
-				Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+				Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+				Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 				Where(kinds, kindArgs...).
 				Where(`"si"."id" = "asm"."vulnerability_id"`).
 				Where(`"st"."product_id" = "asm"."product_id"`),
@@ -1044,8 +1044,8 @@ func (s *Store) WhatAgreeingWouldDo(ctx context.Context, subject access.Subject,
 		var read []group
 		q := s.db.NewSelect().
 			TableExpr(IssueFindings("f")).
-			Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(rating.For(rating.OnBranchOrTag)).
 			ColumnExpr(`"si"."id" AS "filed"`).

@@ -298,8 +298,8 @@ func openUnder(q *bun.SelectQuery) *bun.SelectQuery {
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Where(finding.DecisionOccurrenceFiledAt("de", "f")).
 		Where(`"f"."closed_at" IS NULL`).
 		Apply(ofKinds(kind.Decisions, "f")).
@@ -448,9 +448,9 @@ func (s *Store) buildsCovered(ctx context.Context, subject access.Subject, decis
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
-		Join(`JOIN "variant" AS "va" ON "va"."id" = "tg"."variant_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		// Grouped on the names and shown in the spelling somebody declared:
 		// the list is text a person reads, and one build is one entry
@@ -590,8 +590,8 @@ func (s *Store) outliersFor(ctx context.Context, subject access.Subject, decisio
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Join(`JOIN "build" AS "tg" ON "tg"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).

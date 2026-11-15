@@ -83,13 +83,13 @@ func CoverageOf(ctx context.Context, db bun.IDB, subject access.Subject, scope S
 		q := db.NewSelect().TableExpr(`"series_run" AS "sr"`).
 			Join(`JOIN "series" AS "se" ON "se"."id" = "sr"."series_id"`).
 			Join(`JOIN "build" AS "t" ON "t"."id" = "sr"."build_id"`).
-			Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+			Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 			Join(`JOIN "variant" AS "va" ON "va"."id" = "t"."variant_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "se"."product_id"`).
 			Where(inProducts, inProductsArgs...).
-			Where(`"s"."product_id" = "se"."product_id"`).
+			Where(`"bt"."product_id" = "se"."product_id"`).
 			Where(named, namedArgs...).
-			Where(`"s"."retired_at" IS NULL`).
+			Where(`"bt"."retired_at" IS NULL`).
 			Where(`"va"."retired_at" IS NULL`).
 			Where(`"p"."retired_at" IS NULL`)
 		return scope.runsIn(q)
@@ -115,7 +115,7 @@ func CoverageOf(ctx context.Context, db bun.IDB, subject access.Subject, scope S
 	}
 	withNames := func(q *bun.SelectQuery) *bun.SelectQuery {
 		return q.ColumnExpr(`"sr"."series_id", "sr"."build_id", "t"."branch_or_tag_id", "p"."name" AS "product"`).
-			ColumnExpr(`"s"."name" AS "branch_or_tag", ` + catalog.ShownExpr("s") + ` AS "branch_or_tag_shown"`).
+			ColumnExpr(`"bt"."name" AS "branch_or_tag", ` + catalog.ShownExpr("bt") + ` AS "branch_or_tag_shown"`).
 			ColumnExpr(`"va"."name" AS "variant", ` + catalog.ShownExpr("va") + ` AS "variant_shown"`).
 			ColumnExpr(`"se"."name" AS "series", "se"."kind"`)
 	}
@@ -171,7 +171,7 @@ func CoverageOf(ctx context.Context, db bun.IDB, subject access.Subject, scope S
 		ColumnExpr(`MAX("sr"."received_at") AS "comparable_at"`).
 		Where(`"sr"."status" = ?`, series.Applied).
 		Where(`"sr"."comparable" = TRUE`).
-		GroupExpr(`"sr"."series_id", "sr"."build_id", "t"."branch_or_tag_id", "p"."name", "s"."name", "s"."display_name"`).
+		GroupExpr(`"sr"."series_id", "sr"."build_id", "t"."branch_or_tag_id", "p"."name", "bt"."name", "bt"."display_name"`).
 		GroupExpr(`"va"."name", "va"."display_name", "se"."name", "se"."kind"`).
 		Scan(ctx, &comparable); err != nil {
 		return nil, fmt.Errorf("read the newest comparable analyzer runs of product %d: %w", scope.ProductID, err)
@@ -194,7 +194,7 @@ func CoverageOf(ctx context.Context, db bun.IDB, subject access.Subject, scope S
 		Where(`"sr"."status" IN (?)`, bun.List([]series.Status{series.Applied, series.Failed})).
 		Where(`"sr"."received_at" >= ?`, since).
 		Where(`"sr"."received_at" < ?`, until).
-		GroupExpr(`"sr"."series_id", "sr"."build_id", "t"."branch_or_tag_id", "p"."name", "s"."name", "s"."display_name"`).
+		GroupExpr(`"sr"."series_id", "sr"."build_id", "t"."branch_or_tag_id", "p"."name", "bt"."name", "bt"."display_name"`).
 		GroupExpr(`"va"."name", "va"."display_name", "se"."name", "se"."kind", "sr"."status", "sr"."comparable"`).
 		Scan(ctx, &window); err != nil {
 		return nil, fmt.Errorf("count the analyzer runs of product %d: %w", scope.ProductID, err)

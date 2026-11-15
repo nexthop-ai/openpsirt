@@ -448,11 +448,11 @@ func (s *Store) Enter(ctx context.Context, subject access.Subject, in Entering) 
 		clocked, clockedArgs := catalog.OnTheClock("st", "p", now)
 		var onClock []int64
 		if err := tx.NewSelect().
-			TableExpr(`"build" AS "tg"`).
-			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "tg"."branch_or_tag_id"`).
+			TableExpr(`"build" AS "b"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Join(`JOIN "product" AS "p" ON "p"."id" = "st"."product_id"`).
-			ColumnExpr(`"tg"."id"`).
-			Where(`"tg"."id" IN (?)`, bun.List(in.BuildIDs)).
+			ColumnExpr(`"b"."id"`).
+			Where(`"b"."id" IN (?)`, bun.List(in.BuildIDs)).
 			Where(clocked, clockedArgs...).
 			Scan(ctx, &onClock); err != nil {
 			return fmt.Errorf("read which builds carry deadlines: %w", err)

@@ -194,9 +194,9 @@ func CodeFindingEnded(ctx context.Context, db bun.IDB, productID int64, occurren
 	var branchesAndTags []int64
 	if err := db.NewSelect().TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "build" AS "t" ON "t"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "s" ON "s"."id" = "t"."branch_or_tag_id"`).
+		Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "t"."branch_or_tag_id"`).
 		ColumnExpr(`DISTINCT "t"."branch_or_tag_id"`).
-		Where(`"s"."product_id" = ?`, productID).
+		Where(`"bt"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrenceIdentity).
 		Where(kinds, kindArgs...).
 		Scan(ctx, &branchesAndTags); err != nil {
