@@ -134,15 +134,11 @@ func registerComparisonExport(api huma.API, in core.Deps) {
 		Summary: "Export a comparison of two builds",
 		Description: "What was fixed, what is newly present and what is still there between " +
 			"two builds, as a file.\n\n" +
-			"One file with a `change` column rather than three files: it is one comparison, " +
-			"and three of anything that has to be kept together is three chances to send " +
-			"somebody two of them.\n\n" +
-			"Each fixed row says why it went. `superseded` is the one to read carefully — the " +
-			"version moved and the issue came with it, so it was not fixed at all. A " +
-			"still-present row carrying `arrived from` is that same failure from the other " +
-			"side.\n\n" +
-			"Public findings only unless you ask otherwise, because the destination is " +
-			"usually a public document.",
+			"One file, with a `change` column saying which of the three each row is.\n\n" +
+			"Each fixed row says why it went. `superseded` means the version moved and the " +
+			"issue came with it, so it was not fixed. A still-present row carrying " +
+			"`arrived from` is the same move seen from the newer version.\n\n" +
+			"Public findings only unless you ask otherwise.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -257,16 +253,13 @@ func registerAuditExport(api huma.API, in core.Deps) {
 			"One row per occurrence a decision covers, with the decision it belongs to, who proposed it, who has a " +
 			"standing agreement on it, and whether a second person does. Every occurrence one " +
 			"act covered shares a decision, and `GET /v1/audit/decisions` lists them grouped by it. " +
-			"Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a " +
-			"list; the JSON keeps them as one field of the same shape.\n\n" +
+			"Approvals are joined with `;` in the CSV; the JSON keeps them as one field of " +
+			"the same shape.\n\n" +
 			"`agreements` is the whole of the record, with dates: who agreed, when, " +
 			"whether the agreement was carried from an earlier decision, and when it was taken " +
-			"back. `approved by` stays who agrees *now*, because those are different " +
-			"questions and a column mixing them is the one answer an auditor must not be " +
-			"given.\n\n" +
-			"Read with your own visibility, as it streams. Nothing about a report is " +
-			"exempt from the rules the screens follow — a file showing more than the screen " +
-			"that summarizes it would be a way around them.\n\n" +
+			"back. `approved by` is who agrees now.\n\n" +
+			"Read with your own visibility, as it streams, under the rules the screens " +
+			"follow.\n\n" +
 			"Takes every filter the audit list takes, including the period.\n\n" + core.ExportsBusy,
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Exports only what you may see."), func(ctx context.Context, input *struct {
@@ -457,10 +450,7 @@ func registerComponentExport(api huma.API, in core.Deps) {
 		Summary: "Export findings by component",
 		Description: "One row per component and version, with how many distinct issues are " +
 			"open against it and how many occurrences those sit at — every row, not one page.\n\n" +
-			"This is the shape a release meeting argues over: where the weight is rather " +
-			"than what is wrong. On a switch operating-system image the kernel carried 4,943 " +
-			"of 6,822 findings rows and the next largest contributor carried 58, which is a " +
-			"one-line answer here and invisible in a list of issues.\n\n" +
+
 			"Takes the same filters as the by-component list, and the line this deployment " +
 			"triages at is stated in the file.\n\n" + core.ExportsBusy,
 		Tags: []string{"Findings"},

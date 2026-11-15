@@ -253,8 +253,7 @@ func registerPlanUpgrade(api huma.API, in core.Deps) {
 			"the date the work will be done.\n\n" +
 			"Coverage is the component, not a version pair. Moving to 3.5.2 states " +
 			"that it answers what is open on the package — including findings recorded as " +
-			"fixed in 3.5.0 — and the next scan says which of that was true. Deciding it " +
-			"from the versions would need an ordering per ecosystem this does not have.\n\n" +
+			"fixed in 3.5.0 — and the next scan says which of that was true.\n\n" +
 			"Whether a second person agrees depends on the date. At or before the " +
 			"earliest deadline among what this covers, it stands on its own: nothing is " +
 			"hidden for longer than the policy already allowed. Past it, the promise defers " +

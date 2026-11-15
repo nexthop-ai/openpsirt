@@ -59,23 +59,19 @@ func registerMeasures(api huma.API, in core.Deps) {
 			"decision waits for a second person, what each person got through, and how much " +
 			"came back.\n\n" +
 			"The two waits come back three ways each — the middle, what nine in ten came " +
-			"in under, and the longest — so a caller reads three numbers per wait rather " +
-			"than one.\n\n" +
-			"Per severity, because a critical waiting a week and a low waiting a week " +
-			"are not the same fact.\n\n" +
-			"A period or a rolling window. `from` and `to` name the stretch a manager or " +
-			"an auditor is reporting on; `days` is the rolling window, and the two are ways " +
-			"of saying the same thing so only one may be sent.\n\n" +
+			"in under, and the longest.\n\n" +
+			"Each wait is given per severity.\n\n" +
+			"A period or a rolling window. `from` and `to` name a period; `days` is the " +
+			"rolling window. Only one of the two may be sent.\n\n" +
 			"Bounded, and it says so. The two waits are worked out from at most the most " +
 			"recent few thousand decisions in the window; `sampled` says how many and `capped` " +
-			"says whether the ceiling was reached. A figure quoted from part of a window " +
-			"without saying so is the one thing a number like this must not be.\n\n" +
+			"says whether the ceiling was reached.\n\n" +
 			"Send-backs are counted for the deployment rather than per person: the record " +
 			"holds that a decision was sent back and not by whom, and the reason travels as a " +
 			"comment.\n\n" +
-			"Narrowed to what you may read, like every count here — so two people asking get " +
-			"different answers rather than one of them getting an error. A narrowing to a team is " +
-			"the exception: from anybody but an administrator it is refused with 403.\n\n" +
+			"Narrowed to what you may read, like every count here, so two people asking may " +
+			"get different answers. A narrowing to a team from anybody but an administrator " +
+			"is refused with 403.\n\n" +
 			"Asked for neither a period nor a window, this is the last 90 days.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {

@@ -235,13 +235,9 @@ func registerReaffirmDecision(api huma.API, in core.Deps) {
 		Description: "Re-makes every occurrence of this decision that stopped applying because an " +
 			"upstream version moved, at the versions each occurrence has now, as one act with one " +
 			"reasoning.\n\n" +
-			"Deciding is bulk-capable and re-deciding was not. A team answering one kernel " +
-			"issue writes one decision over all of its occurrences in one action; when the kernel " +
-			"moves, those lapse, and restoring them was one request each with a separately " +
-			"typed justification.\n\n" +
-			"Only the person who made the original may do this. It normally needs no second " +
-			"approver, for the reason the single form does not: two people already agreed, and " +
-			"a version upgrade is a prompt to re-check rather than a new decision.\n\n" +
+			"Only the person who made the original may do this. Like re-affirming one " +
+			"finding's decision, it needs no second approver unless an occurrence would need " +
+			"approval again.\n\n" +
 			"One act, one approval. Where any occurrence would need approval again — nothing was " +
 			"ever agreed to, or the issue is rated a band worse since it was agreed to and " +
 			"the decision is one a severity bears on — the whole act does. An approver works at the unit " +

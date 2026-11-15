@@ -97,9 +97,9 @@ func registerPlannedUpgrades(api huma.API, in core.Deps) {
 			"released nothing for is not in one.\n\n" +
 			"Grouping is presentation: one act still records its decision separately at " +
 			"every occurrence of every component.\n\n" +
-			"Takes the same selection as the findings list, and six of its filters: " +
-			"severity, exploited, component, search, ecosystem and state. Not the rest: a " +
-			"filter that answers about an occurrence or a deadline has no row here to narrow.\n\n" +
+			"Takes the same selection as the findings list, and these of its filters: " +
+			"severity, exploited, component, search, ecosystem and state. A filter that " +
+			"answers about an occurrence or a deadline has no row here to narrow.\n\n" +
 			"Ordered worst first, and `sort` takes any of: what the upgrade would close " +
 			"(`issues`, `occurrences`), how far it reaches (`builds`), how bad the worst of it is " +
 			"(`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). " +

@@ -72,10 +72,8 @@ func registerWhoTold(api huma.API, in core.Deps) {
 			"answered them, and how they wish to be credited.\n\n" +
 			"Its notes and correspondence are read from the report itself, under the product " +
 			"`product` names, by whoever may read that product's reports.\n\n" +
-			"The received date is what the embargo runs from: a report arriving " +
-			"on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the " +
-			"one the reporter has a publication scheduled against, and they are the party who " +
-			"will publish regardless.\n\n" +
+			"The received date is the day the embargo runs from, whenever the report was " +
+			"recorded here.\n\n" +
 			"Answers 404 where no report is the record of this issue — every issue a scan " +
 			"reported that nobody wrote in about — and to somebody who may not read the " +
 			"product's vulnerability reports.",
@@ -111,19 +109,15 @@ func registerWhoTold(api huma.API, in core.Deps) {
 		Summary: "Record another name for an issue",
 		Description: "Records that this issue is also known by another identifier — a CVE or " +
 			"a GHSA assigned after we minted our own.\n\n" +
-			"Nothing about the finding, the decisions or the approvals moves, because " +
-			"they are keyed on the issue rather than on what it is called. What changes is " +
-			"that the name travels with it: a report arriving under the new name resolves " +
-			"here rather than opening a second issue, the finding shows it, and the advisory " +
-			"carries it in the field a reader looks in — which is the one lookup a published " +
-			"advisory exists to serve.\n\n" +
-			"A name is identity, and identity is deployment-wide. From here on a scan of " +
-			"any product reporting that name resolves to this issue and inherits its " +
-			"decisions. So this asks for the right to triage the issue in every product it " +
-			"is currently open in, at the visibility each one carries, and is refused rather " +
-			"than partly done.\n\n" +
-			"Only on a flaw recorded here: an issue a scan reported answers 422, because " +
-			"its names are the ones the scans carry. The name is a CVE (CVE-2027-0001) or " +
+			"Nothing about the finding, the decisions or the approvals moves. A report " +
+			"arriving under the new name resolves to this issue, the finding shows the name, " +
+			"and the advisory carries it.\n\n" +
+			"A name holds across the deployment: from here on a scan of any product " +
+			"reporting it resolves to this issue and inherits its decisions. So this asks for " +
+			"the right to triage the issue in every product it is currently open in, at the " +
+			"visibility each one carries, and is refused whole where one is missing.\n\n" +
+			"Only on a flaw recorded here: an issue a scan reported answers 422, since its " +
+			"names are the ones the scans carry. The name is a CVE (CVE-2027-0001) or " +
 			"a GitHub advisory (GHSA-2c4j-5f6m-7q8r); anything else answers 422.\n\n" +
 			"Recording a name it already goes by succeeds and changes nothing.",
 		Tags: []string{"Findings"}, DefaultStatus: http.StatusNoContent,

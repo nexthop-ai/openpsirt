@@ -11538,7 +11538,7 @@ components:
           readOnly: true
           type: string
         summary:
-          description: The revision's summary, for the document's revision history. A history whose every entry reads the same is one nobody reads
+          description: The revision's summary, for the document's revision history
           maxLength: 191
           type: string
       type: object
@@ -15883,11 +15883,11 @@ paths:
       description: |-
         Every advisory you may see, newest first.
 
-        An advisory covering a product you hold nothing on is not listed, and the total says the same. A document is read whole or not at all: one with a product quietly left out reads as a complete statement about a product it says nothing about.
+        An advisory covering a product you hold nothing on is not listed, and the total says the same.
 
-        `issues` and `products` are both given because one issue in three products and three issues in one are different documents, and a single count reads the same for each.
+        `issues` counts the issues an advisory covers and `products` the products they are covered in.
 
-        `product` and `vulnerability` narrow it to what covers them, which is what a screen about one flaw asks before somebody starts another advisory about it.
+        `product` and `vulnerability` narrow it to the advisories covering them.
 
         Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. What you hold decides what comes back rather than whether you may ask
       operationId: list-advisories
@@ -15949,9 +15949,9 @@ paths:
       description: |-
         Mints an identifier and returns the empty advisory under it.
 
-        The identifier is minted here rather than chosen. It is what a reader cites the document by and what a revision of it keeps, so two advisories under one name is a state this has no way back from.
+        The identifier is minted here and cannot be chosen. Every revision of the advisory keeps it.
 
-        An advisory covers issues, which are added one at a time and each names the product it is covered in. Until one is added the advisory generates no document: the standard requires at least one vulnerability, and a document about nothing is not a draft of anything.
+        An advisory covers issues, which are added one at a time and each names the product it is covered in. Until one is added the advisory generates no document, because the standard requires at least one vulnerability.
 
         Requires a prefix configured for this deployment to mint under.
 
@@ -16058,7 +16058,7 @@ paths:
 
         `changed` is absent where nothing has gone out, where it covers nothing, and where no publisher is configured, since then there is no document to compare.
 
-        An advisory covering a product you hold nothing on answers as one that does not exist. Told apart, the pair of answers says what exists.
+        An advisory covering a product you hold nothing on answers as one that does not exist.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-advisory
@@ -16093,9 +16093,9 @@ paths:
       description: |-
         Gives the advisory a new title, as a new edition of what it says.
 
-        Every agreement standing on the old title is taken back. A second person agreed to particular words, and different words are a document nobody has agreed to.
+        Every agreement standing on the old title is taken back.
 
-        Requires a triage role on every product the advisory covers, because what it says about one of them is part of the same document as what it says about another.
+        Requires a triage role on every product the advisory covers.
 
         Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on every product the advisory covers. What it says about one product is part of the same document as what it says about another.
       operationId: retitle-advisory
@@ -16223,13 +16223,13 @@ paths:
 
         One entry per issue and one product branch per product, so several flaws released together are one document on one date.
 
-        The document is generated, not published. Nothing is sent anywhere. Recording that it was issued is a separate request, and what it keeps is a digest of what was generated, so that whether what you published is still what this would generate can be answered.
+        The document is generated and sent nowhere. Recording that it was issued is a separate request, which keeps a digest of what was generated.
 
         The `Advisory-Edition` header names the edition the advisory pointed at before the document was generated, never newer than what it states; agreeing names the oldest edition read, as the approval says.
 
         How far the document may travel is its distribution label, red while anything it covers is still held back. `tracking.status` says where the document is in its life. Reaching a disclosure date discloses nothing, so nothing here does either.
 
-        An advisory covering no issue is refused: the standard requires at least one. Requires a publisher configured for this deployment, because a document naming none is not a valid CSAF document.
+        An advisory covering no issue is refused: the standard requires at least one. Requires a publisher configured for this deployment.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-advisory-document
@@ -16267,11 +16267,7 @@ paths:
   /v1/advisories/{advisory}/issuance:
     get:
       description: |-
-        What has been published for this advisory, oldest first: which revision, when, and what the document hashed to at the time.
-
-        Readable without generating a document. Every issuance is in the document's own revision history, which is right for a reader of the document — but it made "has this gone out, and is what is published still what we would generate" a question you had to build a CSAF document to answer, and somebody deciding whether to publish a revision is asking before they generate anything.
-
-        The digest is what makes the comparison possible, and it was taken from the document generated here rather than from anything sent.
+        What has been published for this advisory, oldest first: the revision, the time, and the digest of the document generated here when it was recorded. Generates no document.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-advisory-issuances
@@ -16304,11 +16300,9 @@ paths:
       description: |-
         Records that this advisory was published: when, by whom, and a digest of the document as it stands now.
 
-        A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once the record it came from has moved on — a release is added, a decision is revised, a fix lands — so if it is not written down when it happens it is gone.
+        Each issuance after the first is a revision: the next document carries it in its revision history and under a higher version.
 
-        It is what lets a second document be a revision. Without it a second document cannot carry a revision history or a higher version, and both are things CSAF validators check; a document that fails validation is one a customer's tooling drops.
-
-        The document as it goes out is kept, because it cannot be worked out again: what would be generated tomorrow is a different document. The digest beside it makes "is what is published still what we generate" a question with an answer, and it is taken from the document generated here rather than from anything sent — a digest of whatever a caller says answers nothing.
+        The document as it goes out is kept. The digest is taken from the document generated here, never from anything sent, and is what the advisory's `changed` compares against.
 
         Answers 409 where nobody has agreed to what the advisory says.
 
@@ -16353,9 +16347,9 @@ paths:
       description: |-
         Names an issue in a product as covered by this advisory.
 
-        The pair, not the issue alone: an issue in two products is two entries, because the releases that carry it differ and a status is stated about releases.
+        An entry is an issue and a product, so an issue in two products is two entries.
 
-        Only a flaw recorded here. An issue a scanner reported against a third-party component is refused, and refused at this point rather than when the document is generated, so the refusal names the issue you chose.
+        Only a flaw recorded here is accepted. An issue a scanner reported against a third-party component is refused, naming the issue.
 
         Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
       operationId: add-advisory-issue
@@ -16398,7 +16392,7 @@ paths:
       description: |-
         Removes one issue in one product from this advisory.
 
-        Nothing here asks whether the advisory has gone out. An issuance records what went out at a moment, and editing the advisory afterwards is how the next revision differs from the last.
+        An advisory that has gone out may still be edited. The issuance keeps what went out, and the next revision carries the change.
 
         Requires: public-triage or private-triage, held by a signed-in person and not a pipeline key. A triage role on the product named in the request, and on every product the advisory already covers. Naming a flaw on an advisory is what puts it into a document published about that product, and opens an edition of the whole document.
       operationId: drop-advisory-issue
@@ -16909,9 +16903,7 @@ paths:
 
         `reports` counts the open vulnerability reports each holds, in the products where you read reports; somebody holding only reports is listed with no findings.
 
-        Counted in pieces of work — an issue in a component in a product, or one static analysis code finding — which is the unit the list behind each person is in. `occurrences` says how many findings those cover: one flaw in a kernel is one thing to answer and can be dozens of rows to write.
-
-        The number worth watching is not how many findings exist but how many are waiting behind somebody: an idle account holding nothing is harmless, and work stuck behind a person who has gone is the problem — nothing tells this software that somebody has left.
+        Counted in pieces of work — an issue in a component in a product, or one static analysis code finding — which is the unit the list behind each person is in. `occurrences` says how many findings those cover.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-holdings
@@ -17015,13 +17007,13 @@ paths:
       description: |-
         Every decision recorded in a period, once for each occurrence it covers, newest first, with what it was about, the reasoning it rests on, who proposed it and when, and who agreed and when — including agreements later taken back.
 
-        The period is the date a decision was proposed, not approved: a decision belongs to when it was argued, and dating it by its agreement would move it out of that period whenever an approval came late, which is the ordinary case.
+        A decision falls in the period by the date it was proposed, never the date it was approved.
 
-        Narrowed by what you may see, like every other list here. Nothing about this view is exempt from the visibility rules — a report showing more than the screens it summarizes would be a way around them.
+        Narrowed by what you may see, like every other list here.
 
-        `alone=true` returns decisions no second person has a standing agreement on. That population is large and legitimate on its own — an outcome that hides nothing needs no second person, and a short deferral stands alone — so ask it with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, `mismatched`, `wont-fix` and `already-fixed` all require approval, so a row in that answer is a control that failed.
+        `alone=true` returns decisions no second person has a standing agreement on. Outcomes that need no second person, and short deferrals, are among them, so ask it with an outcome. Asked of a dismissal (`not-applicable`, `mismatched`, `wont-fix` or `already-fixed`, which all require approval) every row it returns is a control that failed.
 
-        `in_force=true` returns what applies now rather than what was once agreed to. With `outcome=mismatched` that is the set of standing corrections: the matches this deployment has recorded as wrong, which no version bump expires.
+        `in_force=true` returns what applies now, leaving out what was once agreed to and no longer applies. With `outcome=mismatched` that is the set of standing corrections: the matches this deployment has recorded as wrong, which no version bump expires.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-audit
@@ -17190,11 +17182,11 @@ paths:
       description: |-
         The audit list as a file: every decision the same filters would show, not one page of them.
 
-        One row per occurrence a decision covers, with the decision it belongs to, who proposed it, who has a standing agreement on it, and whether a second person does. Every occurrence one act covered shares a decision, and `GET /v1/audit/decisions` lists them grouped by it. Approvals are joined with `;` in the CSV because a spreadsheet has one cell per column and an auditor reads them as a list; the JSON keeps them as one field of the same shape.
+        One row per occurrence a decision covers, with the decision it belongs to, who proposed it, who has a standing agreement on it, and whether a second person does. Every occurrence one act covered shares a decision, and `GET /v1/audit/decisions` lists them grouped by it. Approvals are joined with `;` in the CSV; the JSON keeps them as one field of the same shape.
 
-        `agreements` is the whole of the record, with dates: who agreed, when, whether the agreement was carried from an earlier decision, and when it was taken back. `approved by` stays who agrees *now*, because those are different questions and a column mixing them is the one answer an auditor must not be given.
+        `agreements` is the whole of the record, with dates: who agreed, when, whether the agreement was carried from an earlier decision, and when it was taken back. `approved by` is who agrees now.
 
-        Read with your own visibility, as it streams. Nothing about a report is exempt from the rules the screens follow — a file showing more than the screen that summarizes it would be a way around them.
+        Read with your own visibility, as it streams, under the rules the screens follow.
 
         Takes every filter the audit list takes, including the period.
 
@@ -19030,9 +19022,7 @@ paths:
       description: |-
         Re-makes every occurrence of this decision that stopped applying because an upstream version moved, at the versions each occurrence has now, as one act with one reasoning.
 
-        Deciding is bulk-capable and re-deciding was not. A team answering one kernel issue writes one decision over all of its occurrences in one action; when the kernel moves, those lapse, and restoring them was one request each with a separately typed justification.
-
-        Only the person who made the original may do this. It normally needs no second approver, for the reason the single form does not: two people already agreed, and a version upgrade is a prompt to re-check rather than a new decision.
+        Only the person who made the original may do this. Like re-affirming one finding's decision, it needs no second approver unless an occurrence would need approval again.
 
         One act, one approval. Where any occurrence would need approval again — nothing was ever agreed to, or the issue is rated a band worse since it was agreed to and the decision is one a severity bears on — the whole act does. An approver works at the unit the proposer acted at. A severity bears on every decision except `already-fixed`, and `not-applicable` because the component or the vulnerable code is not present or not in the execute path.
 
@@ -21036,11 +21026,11 @@ paths:
       description: |-
         What the issue is, every build of yours that carries it, what was decided about each and the reasoning behind it, as markdown — the form a customer inquiry is answered from.
 
-        It is an internal document and says so. The reasoning is this deployment's own argument; what goes to a customer is the advisory or the VEX document, both of which are assembled elsewhere and say less on purpose.
+        It is an internal document and says so. What goes to a customer is the advisory or the VEX document, which say less.
 
-        Narrowed by what you may see, like every other read: two people asking get different documents rather than one of them getting an error.
+        Narrowed by what you may see, like every other read, so two people asking may get different documents.
 
-        Nothing of yours affected is an answer, and the document says that rather than refusing — which is what the inquiry is usually asking.
+        Where nothing of yours is affected, the document says so; it is not refused.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-issue-document
@@ -21286,17 +21276,17 @@ paths:
       description: |-
         Four figures about how this deployment is working, as against what it holds: how long a finding sits before anybody proposes anything, how long a decision waits for a second person, what each person got through, and how much came back.
 
-        The two waits come back three ways each — the middle, what nine in ten came in under, and the longest — so a caller reads three numbers per wait rather than one.
+        The two waits come back three ways each — the middle, what nine in ten came in under, and the longest.
 
-        Per severity, because a critical waiting a week and a low waiting a week are not the same fact.
+        Each wait is given per severity.
 
-        A period or a rolling window. `from` and `to` name the stretch a manager or an auditor is reporting on; `days` is the rolling window, and the two are ways of saying the same thing so only one may be sent.
+        A period or a rolling window. `from` and `to` name a period; `days` is the rolling window. Only one of the two may be sent.
 
-        Bounded, and it says so. The two waits are worked out from at most the most recent few thousand decisions in the window; `sampled` says how many and `capped` says whether the ceiling was reached. A figure quoted from part of a window without saying so is the one thing a number like this must not be.
+        Bounded, and it says so. The two waits are worked out from at most the most recent few thousand decisions in the window; `sampled` says how many and `capped` says whether the ceiling was reached.
 
         Send-backs are counted for the deployment rather than per person: the record holds that a decision was sent back and not by whom, and the reason travels as a comment.
 
-        Narrowed to what you may read, like every count here — so two people asking get different answers rather than one of them getting an error. A narrowing to a team is the exception: from anybody but an administrator it is refused with 403.
+        Narrowed to what you may read, like every count here, so two people asking may get different answers. A narrowing to a team from anybody but an administrator is refused with 403.
 
         Asked for neither a period nor a window, this is the last 90 days.
 
@@ -22034,7 +22024,7 @@ paths:
       description: |-
         Returns all their open findings and vulnerability reports to the unassigned lists. For when somebody has left.
 
-        Nothing tells this software that somebody has gone — membership is read at sign-in, and a person who has left never signs in again. So this is an action an administrator takes rather than something that happens on its own, and until it is taken their work is in no list at all: not in the shared one because it is assigned, and not in anybody's own because they are not here.
+        Nothing does this on its own: membership is read at sign-in, and a person who has left never signs in again. Until it is done their work stays assigned to them and is in no unassigned list.
 
         Send `to` instead to hand it to a named person rather than to nobody. That is refused with 422 where they hold no role in a product any of the work is in, have been deactivated, or may not read the visibility some of it sits at.
 
@@ -22517,7 +22507,7 @@ paths:
       description: |-
         Returns every analyzer series on every build in use of the product: its newest applied run, what that run analyzed against what it was meant to, its newest comparable run, the runs in the weeks asked that were applied, not comparable or failed, and its own expected interval between runs on that build.
 
-        A series is quiet when no comparable run arrived for three of its own usual gaps between applied runs, never under a day, once three runs were applied. Each series is judged on its own interval, so a quarterly series is not quiet after a week. A retired build is left out; a release past its end of life is listed and never quiet. Quiet first, then the longest silent.
+        A series is quiet when no comparable run arrived for three of its own usual gaps between applied runs, never under a day, once three runs were applied. A retired build is left out; a release past its end of life is listed and never quiet. Quiet first, then the longest silent.
 
         Refused to anybody who does not read security testing material in the product.
 
@@ -24388,7 +24378,7 @@ paths:
       description: |-
         The build's dependency graph, seen upward from your own work: from each component you hold a finding on, up to the build's root.
 
-        This is what the tree is for somebody who holds no reading on the product. Descended from the root, that tree is the inventory of what the product contains — the breadth they were not granted — so it cannot be offered with rows hidden: a container's count would still say how much sits under it. The chain upward is the part that makes a finding judgeable, because it says what pulled the thing in, and every node on it sits above something already granted.
+        Only the chains are returned, never what lies beneath their nodes.
 
         The counts are yours. A node says how much of your own work hangs beneath it along these chains, never how much the build holds there.
 
@@ -25047,13 +25037,13 @@ paths:
       description: |-
         Puts a free-text label on one issue in one component of this product.
 
-        No fixed vocabulary, because none has been earned yet. A label that becomes universal is a signal that it should be promoted to a real concept — "waiting on vendor" is a state the tool would want to reason about rather than a string somebody typed.
+        Labels are free text, with no fixed vocabulary.
 
-        One issue in one component of one product, not one occurrence and not one build: a kernel flaw at sixty occurrences is one thing somebody is labeling, and a label is about the work rather than about a release.
+        A label is on one issue in one component of one product, so it covers every occurrence and every build of it.
 
         Matched without regard to capitals and shown back as it was typed. Labeling what already carries the label succeeds and keeps the first spelling.
 
-        Labeling is triage, so it asks for the triage right: a label changes what a filtered list answers, and somebody who may only read should not move work into or out of a saved filter.
+        Requires the triage right, because a label changes what a filtered list answers.
 
         Requires: public-triage or private-triage or security-testing-triage on the product
       operationId: label-finding
@@ -26629,11 +26619,9 @@ paths:
       description: |-
         Records that the document for this build was published: when, by whom, and a digest of the document as it stands now. Answers with the document that was recorded, which is the one to send: it carries the version it is recorded under, and a document generated before recording may not.
 
-        A fact about a moment rather than a derived value. What was published on a date cannot be worked out again once a decision is withdrawn or revised or a scan closes a finding.
+        Each issuance is what the document's version counts, so a later document supersedes this one under the same identifier.
 
-        It is what the document's version counts. A document is assembled from what stands now and holds no history of its own, so without this every generation is the first revision of something, and a reader keeping documents by their identifier cannot tell which supersedes which.
-
-        The digest is taken from the document generated here rather than from anything sent: a digest of whatever a caller says answers nothing. The public document, never the preview that includes work nobody has announced.
+        The digest is taken from the public document generated here, never from anything sent and never from the preview that includes work nobody has announced.
 
         Requires: public-triage on the product. The document is this deployment's word to a customer. The second pair of eyes on each statement it carries was taken when the decision was approved.
       operationId: record-published-vex
@@ -28347,11 +28335,11 @@ paths:
       description: |-
         What was fixed, what is newly present and what is still there between two builds, as a file.
 
-        One file with a `change` column rather than three files: it is one comparison, and three of anything that has to be kept together is three chances to send somebody two of them.
+        One file, with a `change` column saying which of the three each row is.
 
-        Each fixed row says why it went. `superseded` is the one to read carefully — the version moved and the issue came with it, so it was not fixed at all. A still-present row carrying `arrived from` is that same failure from the other side.
+        Each fixed row says why it went. `superseded` means the version moved and the issue came with it, so it was not fixed. A still-present row carrying `arrived from` is the same move seen from the newer version.
 
-        Public findings only unless you ask otherwise, because the destination is usually a public document.
+        Public findings only unless you ask otherwise.
 
         Requires: any signed-in person, and not a pipeline key. Exports only what you may see.
       operationId: export-comparison
@@ -28610,15 +28598,15 @@ paths:
   /v1/products/{product}/comparison/notes:
     get:
       description: |-
-        The same comparison as markdown, in the form somebody pastes into a release note. Returned as `text/markdown` rather than as a string in a JSON field, because the point of it is that it goes straight in.
+        The same comparison as markdown release notes, returned as `text/markdown`.
 
-        It carries what was fixed and nothing else. Not what is still present, not what newly appeared, and not an upgrade that carried the issue with it — those are statements about what a build contains, and the document for them is a VEX, which a customer's own scanner reads. The comparison itself still answers all three.
+        It lists what was fixed and nothing else. What is still present, what newly appeared, and an upgrade that carried the issue with it are answered by the comparison itself.
 
         Worst first and stably ordered, so two runs over the same pair of builds produce the same document. A lead line names both builds, the day, and the scanner and vulnerability-database versions the later build was last measured with.
 
         Public findings only unless you ask otherwise, as the comparison itself is. Where fixes are left out for not having been disclosed, the note says how many and never which.
 
-        A release that fixed nothing answers with a sentence saying so, not with an empty body: zero bytes is also what a truncated response and the wrong pair of builds look like.
+        A release that fixed nothing answers with a sentence saying so, never with an empty body.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: get-release-notes
@@ -28794,7 +28782,7 @@ paths:
       description: |-
         Answers everything open against a component in the releases named, in one act: each is recorded as `upgrade-needed`, carrying the version it moves to and the date the work will be done.
 
-        Coverage is the component, not a version pair. Moving to 3.5.2 states that it answers what is open on the package — including findings recorded as fixed in 3.5.0 — and the next scan says which of that was true. Deciding it from the versions would need an ordering per ecosystem this does not have.
+        Coverage is the component, not a version pair. Moving to 3.5.2 states that it answers what is open on the package — including findings recorded as fixed in 3.5.0 — and the next scan says which of that was true.
 
         Whether a second person agrees depends on the date. At or before the earliest deadline among what this covers, it stands on its own: nothing is hidden for longer than the policy already allowed. Past it, the promise defers the worst thing it covers and it waits for approval. The response says which.
 
@@ -31360,8 +31348,6 @@ paths:
       description: |-
         One row per component and version, with how many distinct issues are open against it and how many occurrences those sit at — every row, not one page.
 
-        This is the shape a release meeting argues over: where the weight is rather than what is wrong. On a switch operating-system image the kernel carried 4,943 of 6,822 findings rows and the next largest contributor carried 58, which is a one-line answer here and invisible in a list of issues.
-
         Takes the same filters as the by-component list, and the line this deployment triages at is stated in the file.
 
         Answers 503 with `Retry-After` when the deployment is already writing as many files as it takes at once; ask again after that many seconds.
@@ -32117,11 +32103,11 @@ paths:
       description: |-
         Records that this issue is also known by another identifier — a CVE or a GHSA assigned after we minted our own.
 
-        Nothing about the finding, the decisions or the approvals moves, because they are keyed on the issue rather than on what it is called. What changes is that the name travels with it: a report arriving under the new name resolves here rather than opening a second issue, the finding shows it, and the advisory carries it in the field a reader looks in — which is the one lookup a published advisory exists to serve.
+        Nothing about the finding, the decisions or the approvals moves. A report arriving under the new name resolves to this issue, the finding shows the name, and the advisory carries it.
 
-        A name is identity, and identity is deployment-wide. From here on a scan of any product reporting that name resolves to this issue and inherits its decisions. So this asks for the right to triage the issue in every product it is currently open in, at the visibility each one carries, and is refused rather than partly done.
+        A name holds across the deployment: from here on a scan of any product reporting it resolves to this issue and inherits its decisions. So this asks for the right to triage the issue in every product it is currently open in, at the visibility each one carries, and is refused whole where one is missing.
 
-        Only on a flaw recorded here: an issue a scan reported answers 422, because its names are the ones the scans carry. The name is a CVE (CVE-2027-0001) or a GitHub advisory (GHSA-2c4j-5f6m-7q8r); anything else answers 422.
+        Only on a flaw recorded here: an issue a scan reported answers 422, since its names are the ones the scans carry. The name is a CVE (CVE-2027-0001) or a GitHub advisory (GHSA-2c4j-5f6m-7q8r); anything else answers 422.
 
         Recording a name it already goes by succeeds and changes nothing.
 
@@ -33063,7 +33049,7 @@ paths:
 
         Its notes and correspondence are read from the report itself, under the product `product` names, by whoever may read that product's reports.
 
-        The received date is what the embargo runs from: a report arriving on 1 June and typed in on 15 June otherwise puts our clock two weeks behind the one the reporter has a publication scheduled against, and they are the party who will publish regardless.
+        The received date is the day the embargo runs from, whenever the report was recorded here.
 
         Answers 404 where no report is the record of this issue — every issue a scan reported that nobody wrote in about — and to somebody who may not read the product's vulnerability reports.
 
@@ -33374,7 +33360,7 @@ paths:
 
         Grouping is presentation: one act still records its decision separately at every occurrence of every component.
 
-        Takes the same selection as the findings list, and six of its filters: severity, exploited, component, search, ecosystem and state. Not the rest: a filter that answers about an occurrence or a deadline has no row here to narrow.
+        Takes the same selection as the findings list, and these of its filters: severity, exploited, component, search, ecosystem and state. A filter that answers about an occurrence or a deadline has no row here to narrow.
 
         Ordered worst first, and `sort` takes any of: what the upgrade would close (`issues`, `occurrences`), how far it reaches (`builds`), how bad the worst of it is (`urgency`, `severity`) and the soonest deadline it would meet (`deadline`). `asc` orders the other way. The default answers what should worry you; `sort=issues` answers what to do this afternoon.
 
@@ -33681,11 +33667,11 @@ paths:
   /v1/products/{product}/releases:
     get:
       description: |-
-        One number per build, which is what a release-over-release chart is drawn from. The comparison endpoint says what changed between two builds; this says whether the estate is getting better or worse across all of them.
+        How much is open in each build of the product, as one count per build and the same count by severity. The comparison endpoint says what changed between two builds.
 
-        Counted before any minimum severity is applied, so it agrees with the findings list rather than with whatever a product has decided is worth working on — a line is about what to spend an afternoon on, not about what exists.
+        Counted before any minimum severity is applied, as the findings list counts.
 
-        Severities are folded the same four ways everything else here ranks by, through the one expression the working list and the deadline also read, so a chart cannot disagree with a list about what counts as high.
+        Severities are folded into the four bands the findings list and deadlines use.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-releases
@@ -34882,7 +34868,7 @@ paths:
       description: |-
         The suppliers configured for this product, when each was last tried, when one last succeeded, and how far through what they publish this deployment has read.
 
-        Two moments rather than one. An attempt that failed still happened, so how long a supplier has been unreachable is the gap between them; the reason the last attempt stopped is returned beside them.
+        A failed attempt moves the last try and leaves the last success, so the gap between them is how long a supplier has been unreachable. The reason the last attempt stopped is returned beside them.
 
         Requires: administrator
       operationId: list-supplier-advisory-feeds
@@ -35506,9 +35492,9 @@ paths:
 
         Uploading a later revision of the same document sets aside what the earlier one said rather than deleting it, so what an approval was granted on the strength of stays readable. Another document from the same publisher replaces nothing of this one, and of the publisher's statements about one product and vulnerability, the newest stands, whichever document carried it: by the statement's own time, its `last_updated` else its `timestamp`, else its document's, else the upload order; a time after the upload is none. A document is its publisher and its own identifier: an OpenVEX `@id` or a CSAF tracking id. The publisher is the `publisher` parameter, else the one the document names: an OpenVEX author or a CSAF publisher name. A document naming none is refused unless the parameter names one.
 
-        OpenVEX and CSAF-VEX both read. The two say the same thing in different shapes — one puts the status on a statement, the other in which list a product identifier appears in — and both become the same claim here, because what a publisher is saying does not depend on which file they wrote it in. Which of the two a document is decides itself; anything else is refused with a sentence rather than half-read.
+        OpenVEX and CSAF-VEX are both read, and a statement in either becomes the same claim. The format is detected from the document; anything else is refused with a sentence and nothing of it is read.
 
-        A CSAF security advisory is refused here and taken by the supplier-advisory endpoint instead. It is a document about somebody's own flaws, one per issue, and what a later upload of it replaces is the advisory of the same name rather than everything that publisher has said.
+        A CSAF security advisory is refused here; send it to the supplier-advisory endpoint, where a later upload replaces the advisory of the same name.
 
         Answers 503 with `Retry-After` when the deployment is already reading as many uploads as it takes at once; send again after that many seconds.
 
@@ -36971,9 +36957,9 @@ paths:
       description: |-
         Lists the teams work can be assigned to.
 
-        A team holds work and grants nothing: no role, no visibility, no capability. One team therefore carries mixed clearance as a matter of course, and what each member sees of the work assigned to it is what they could see anyway.
+        A team holds work and grants nothing: no role, no visibility, no capability. What each member sees of the work assigned to it is what they could see anyway.
 
-        Names to anybody, membership to an administrator. Assigning work to a team means naming one, so anybody who may hand work around has to be able to see the names; who is on it is the same question as who is here, and that is answered where the rest of the record is.
+        Names are listed to anybody, since assigning work to a team means naming one. Membership is listed to an administrator alone.
 
         Requires: any signed-in person, and not a pipeline key. Membership is listed for an administrator; anybody else sees the names.
       operationId: list-teams
@@ -37714,11 +37700,9 @@ paths:
       description: |-
         Returns open findings with no assignee, across every product you can see, most urgent first. Static analysis code findings are included where you read them, one item per code finding, with `occurrence` set.
 
-        Deliberately not scoped to one product: work falling between people is exactly what hides when every screen shows one product and nobody looks at the others.
+        One item per issue in a component in a product, covering every build that holds the same versions, since one decision answers them all. `builds` says how many that is. Two builds shipping different versions of the component appear separately.
 
-        One item per issue in a component in a product, not one per build. The same code built as several variants is one piece of work — a decision is keyed on the product and the code rather than on the build, so answering it once answers every build holding the same versions. `builds` says how many that is. Where two builds ship different versions of the component they are different work and appear separately.
-
-        `family` keeps dependency findings or code findings alone, and `total` then counts that family: a rule at a place and an advisory at a component are different units.
+        `family` keeps dependency findings or code findings alone, and `total` then counts that family.
 
         Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
       operationId: list-unassigned

@@ -219,19 +219,16 @@ func registerAudit(api huma.API, in core.Deps) {
 		Description: "Every decision recorded in a period, once for each occurrence it covers, newest first, with what it was " +
 			"about, the reasoning it rests on, who proposed it and when, and who agreed and " +
 			"when — including agreements later taken back.\n\n" +
-			"The period is the date a decision was proposed, not approved: a decision " +
-			"belongs to when it was argued, and dating it by its agreement would move it out " +
-			"of that period whenever an approval came late, which is the ordinary case.\n\n" +
-			"Narrowed by what you may see, like every other list here. Nothing about this view " +
-			"is exempt from the visibility rules — a report showing more than the screens it " +
-			"summarizes would be a way around them.\n\n" +
+			"A decision falls in the period by the date it was proposed, never the date it " +
+			"was approved.\n\n" +
+			"Narrowed by what you may see, like every other list here.\n\n" +
 			"`alone=true` returns decisions no second person has a standing agreement on. " +
-			"That population is large and legitimate on its own — an outcome that hides " +
-			"nothing needs no second person, and a short deferral stands alone — so ask it " +
-			"with an outcome. Asked of a dismissal it should return nothing: `not-applicable`, " +
-			"`mismatched`, `wont-fix` and `already-fixed` all require approval, so a row in " +
-			"that answer is a control that failed.\n\n" +
-			"`in_force=true` returns what applies now rather than what was once agreed to. " +
+			"Outcomes that need no second person, and short deferrals, are among them, so ask " +
+			"it with an outcome. Asked of a dismissal (`not-applicable`, `mismatched`, " +
+			"`wont-fix` or `already-fixed`, which all require approval) every row it returns " +
+			"is a control that failed.\n\n" +
+			"`in_force=true` returns what applies now, leaving out what was once agreed to " +
+			"and no longer applies. " +
 			"With `outcome=mismatched` that is the set of standing corrections: the matches " +
 			"this deployment has recorded as wrong, which no version bump expires.",
 		Tags: []string{"Analytics"},

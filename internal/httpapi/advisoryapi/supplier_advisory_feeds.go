@@ -42,9 +42,9 @@ func registerSupplierAdvisoryFeeds(api huma.API, in core.Deps) {
 		Description: "The suppliers configured for this product, when each was last " +
 			"tried, when one last succeeded, and how far through what they publish this " +
 			"deployment has read.\n\n" +
-			"Two moments rather than one. An attempt that failed still happened, so how " +
-			"long a supplier has been unreachable is the gap between them; the reason the " +
-			"last attempt stopped is returned beside them.",
+			"A failed attempt moves the last try and leaves the last success, so the gap " +
+			"between them is how long a supplier has been unreachable. The reason the last " +
+			"attempt stopped is returned beside them.",
 		Tags: []string{"Administration"},
 	}, core.DeploymentWide, ""), func(ctx context.Context, input *struct {
 		Product string `path:"product"`

@@ -126,15 +126,12 @@ func registerAnalytics(api huma.API, in core.Deps) {
 		OperationID: "list-releases", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/releases",
 		Summary: "Report what is open in each build of a product",
-		Description: "One number per build, which is what a release-over-release chart is " +
-			"drawn from. The comparison endpoint says what changed between two builds; " +
-			"this says whether the estate is getting better or worse across all of them.\n\n" +
-			"Counted before any minimum severity is applied, so it agrees with the findings list " +
-			"rather than with whatever a product has decided is worth working on — a line is " +
-			"about what to spend an afternoon on, not about what exists.\n\n" +
-			"Severities are folded the same four ways everything else here ranks by, through " +
-			"the one expression the working list and the deadline also read, so a chart cannot " +
-			"disagree with a list about what counts as high.",
+		Description: "How much is open in each build of the product, as one count per build " +
+			"and the same count by severity. The comparison endpoint says what changed " +
+			"between two builds.\n\n" +
+			"Counted before any minimum severity is applied, as the findings list counts.\n\n" +
+			"Severities are folded into the four bands the findings list and deadlines " +
+			"use.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`
@@ -324,23 +321,19 @@ func registerNotes(api huma.API, in core.Deps) {
 		OperationID: "get-release-notes", Method: http.MethodGet,
 		Path:    "/v1/products/{product}/comparison/notes",
 		Summary: "Render a comparison as release notes",
-		Description: "The same comparison as markdown, in the form somebody pastes into a " +
-			"release note. Returned as `text/markdown` rather than as a string in a JSON " +
-			"field, because the point of it is that it goes straight in.\n\n" +
-			"It carries what was fixed and nothing else. Not what is still present, not " +
-			"what newly appeared, and not an upgrade that carried the issue with it — those are " +
-			"statements about what a build contains, and the document for them is a VEX, " +
-			"which a customer's own scanner reads. The comparison itself still answers all " +
-			"three.\n\n" +
+		Description: "The same comparison as markdown release notes, returned as " +
+			"`text/markdown`.\n\n" +
+			"It lists what was fixed and nothing else. What is still present, what newly " +
+			"appeared, and an upgrade that carried the issue with it are answered by the " +
+			"comparison itself.\n\n" +
 			"Worst first and stably ordered, so two runs over the same pair of builds produce " +
 			"the same document. A lead line names both builds, the day, and the scanner and " +
 			"vulnerability-database versions the later build was last measured with.\n\n" +
 			"Public findings only unless you ask otherwise, as the comparison itself is. " +
 			"Where fixes are left out for not having been disclosed, the note says how many " +
 			"and never which.\n\n" +
-			"A release that fixed nothing answers with a sentence saying so, not with an " +
-			"empty body: zero bytes is also what a truncated response and the wrong pair of " +
-			"builds look like.",
+			"A release that fixed nothing answers with a sentence saying so, never with an " +
+			"empty body.",
 		Tags: []string{"Analytics"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Product string `path:"product"`

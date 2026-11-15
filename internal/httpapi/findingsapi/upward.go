@@ -46,12 +46,7 @@ func registerUpward(api huma.API, in core.Deps) {
 		Summary: "Show the chains your own findings sit on",
 		Description: "The build's dependency graph, seen upward from your own work: from each " +
 			"component you hold a finding on, up to the build's root.\n\n" +
-			"This is what the tree is for somebody who holds no reading on the product. " +
-			"Descended from the root, that tree is the inventory of what the product " +
-			"contains — the breadth they were not granted — so it cannot be offered with rows " +
-			"hidden: a container's count would still say how much sits under it. The chain " +
-			"upward is the part that makes a finding judgeable, because it says what pulled " +
-			"the thing in, and every node on it sits above something already granted.\n\n" +
+			"Only the chains are returned, never what lies beneath their nodes.\n\n" +
 			"The counts are yours. A node says how much of your own work hangs beneath it " +
 			"along these chains, never how much the build holds there.\n\n" +
 			"Rows come back in the order they are drawn, parents before children, the fullest " +

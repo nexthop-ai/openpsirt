@@ -47,13 +47,11 @@ func registerIssueDocument(api huma.API, in core.Deps) {
 		Description: "What the issue is, every build of yours that carries it, what was " +
 			"decided about each and the reasoning behind it, as markdown — the form a " +
 			"customer inquiry is answered from.\n\n" +
-			"It is an internal document and says so. The reasoning is this deployment's " +
-			"own argument; what goes to a customer is the advisory or the VEX document, both " +
-			"of which are assembled elsewhere and say less on purpose.\n\n" +
-			"Narrowed by what you may see, like every other read: two people asking get " +
-			"different documents rather than one of them getting an error.\n\n" +
-			"Nothing of yours affected is an answer, and the document says that rather than " +
-			"refusing — which is what the inquiry is usually asking.",
+			"It is an internal document and says so. What goes to a customer is the advisory " +
+			"or the VEX document, which say less.\n\n" +
+			"Narrowed by what you may see, like every other read, so two people asking may " +
+			"get different documents.\n\n" +
+			"Where nothing of yours is affected, the document says so; it is not refused.",
 		Tags: []string{"Findings"},
 	}, core.AnyPerson, "Answers only what you may see."), func(ctx context.Context, input *struct {
 		Vulnerability string `path:"issue" doc:"The issue, by any name it is known under"`
