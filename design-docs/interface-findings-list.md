@@ -137,7 +137,7 @@ close: a build's planned upgrades read from the triager's end.
 |---|---|
 | No action column; the package name opens the component, where the upgrade is planned: one source of three binaries is one upgrade and three links | |
 | Versions are listed and never ordered, one package once per version upstream released, with no nearest or latest | An ordering is per ecosystem |
-| The filters it cannot apply are named on the screen; it takes six of the list's. A filter the selection drops is in force nowhere and is not named | The rest ask about an occurrence, a deadline or an assignee |
+| The filters it cannot apply are named on the screen; it takes the list's search, severity floor, exploited, component, ecosystem and state filters. A filter the selection drops is in force nowhere and is not named | The rest ask about an occurrence, a deadline or an assignee |
 | Nothing counts occurrences: it says the packages moved, the issues closed, the builds holding it | An upgrade is a fold |
 | The word on screen is "upgrade" | The decisions' word |
 
@@ -152,7 +152,7 @@ The next finding is reachable without going back (REQ-60); the form sat at about
 | The page the list holds answers first: a neighbor on either side, or an end of the whole list, asks nothing; a finding at a page edge with more beyond asks for the window below, where that window is wider than the page | |
 | The window is the list's page widened by one row at each end, and a neighbor is handed the list at its own page; at the largest page the window is the page and the walk ends at its edge | Widening backward alone leaves the page's last row outside its own window |
 | The row is found by what it is, its product included across products; where it cannot be, there is no walk | Under a state filter it may have moved |
-| A walk from the list across every product reads that list's rows, steps into each neighbor's own product, and returns to that list; the finding's address marks it, and the mark never reaches a server | One product's rows are a subsequence of the spanning order |
+| A walk from the list across every product reads that list's rows, finds the finding among them by its product regardless of capitals, steps into each neighbor's own product, and returns to that list; the finding's address marks it, and the mark never reaches a server | One product's rows are a subsequence of the spanning order |
 | A list that asked for everything is a list: present-and-empty differs from absent | |
 | What a saved filter prepares travels with the walk (`design-docs/interface-filters.md` § Saved filters) | |
 

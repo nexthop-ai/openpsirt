@@ -33,8 +33,16 @@ function row(vulnerability: string) {
 
 describe("where a finding sits in the list it was opened from", () => {
   let seen: ReturnType<typeof useFindingNeighbors> = null;
-  function Walk({ walking, from }: { walking: boolean; from: string }) {
-    seen = useFindingNeighbors(at, walking, from, "kept");
+  function Walk({
+    walking,
+    from,
+    product = at.product,
+  }: {
+    walking: boolean;
+    from: string;
+    product?: string;
+  }) {
+    seen = useFindingNeighbors({ ...at, product }, walking, from, "kept");
     return null;
   }
 
@@ -109,6 +117,27 @@ describe("where a finding sits in the list it was opened from", () => {
     expect(seen?.previous?.row.product).toBe("edgeos");
     expect(seen?.previous?.row.vulnerability).toBe("CVE-2026-0002");
     expect(seen?.next?.row.vulnerability).toBe("CVE-2026-0003");
+  });
+
+  it("finds itself across products where the address names its product in other capitals", async () => {
+    serve((path) =>
+      path === "/v1/findings"
+        ? {
+            data: {
+              items: [
+                { ...row("CVE-2026-0001"), product: "edgeos" },
+                { ...row("CVE-2026-0002"), product: "edgeos" },
+                { ...row("CVE-2026-0002"), product: "sonic" },
+              ],
+              total: 3,
+            },
+          }
+        : undefined,
+    );
+    mount.render(screen(<Walk walking from="state=undecided&across=1" product="SONiC" />));
+    await settle();
+    expect(seen?.at).toBe(2);
+    expect(seen?.previous?.row.product).toBe("edgeos");
   });
 
   // The page the findings list drew under an address, cached where the list

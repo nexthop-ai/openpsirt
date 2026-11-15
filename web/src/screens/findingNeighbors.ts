@@ -66,7 +66,7 @@ export function useFindingNeighbors(
     () => (items: Item[]) =>
       items.findIndex(
         (row) =>
-          (!across || (row.product ?? "") === product) &&
+          (!across || (row.product ?? "").toLowerCase() === product.toLowerCase()) &&
           row.vulnerability === vulnerability &&
           row.component === component &&
           (row.version ?? "") === version &&
