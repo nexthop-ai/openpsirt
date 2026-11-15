@@ -741,3 +741,51 @@ func TestACredentialInAPackageIdentifierIsNeverPublished(t *testing.T) {
 		}
 	})
 }
+
+// An issue is stated under every name it has: a CVE as the document's CVE,
+// and every other name under the system it opens with. An issue reported
+// with a CVE among its aliases is filed under the CVE.
+func TestAnIssueIsStatedUnderEveryNameItHas(t *testing.T) {
+	for _, c := range []struct {
+		name, filed, cve string
+		aliases, ids     []string
+	}{
+		{"named by no CVE", "GHSA-AAAA-BBBB-CCCC", "", []string{"GO-2026-0001", "OSV2026"},
+			[]string{"GHSA GHSA-AAAA-BBBB-CCCC", "GO GO-2026-0001", "alias OSV2026"}},
+		{"a CVE among its aliases", "CVE-2026-9001", "CVE-2026-9001", []string{"CVE-2026-9001", "GO-2026-0001"},
+			[]string{"GHSA GHSA-AAAA-BBBB-CCCC", "GO GO-2026-0001"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			fixture.Each(t, func(t *testing.T, f *fixture.World) {
+				w := newWorld(t, f)
+				w.shipped()
+				w.Report(w.Build, finding.Reported{
+					Issue: finding.Named{Identifier: "GHSA-AAAA-BBBB-CCCC", Severity: "high",
+						Description: "What it is.", Aliases: c.aliases},
+					Component: openssl,
+				})
+				w.decide(w.Build, c.filed, openssl,
+					decision{outcome: triage.NotApplicable, justification: triage.CodeNotPresent})
+				w.publishes(w.Product, true)
+				w.write()
+
+				doc := w.csafAbout(w.Product, c.filed)
+				if doc == nil {
+					t.Fatalf("no CSAF document about %s", c.filed)
+				}
+				got := doc.Vulnerabilities[0]
+				if got.CVE != c.cve {
+					t.Errorf("the document's CVE is %q, want %q", got.CVE, c.cve)
+				}
+				var ids []string
+				for _, id := range got.IDs {
+					ids = append(ids, id.SystemName+" "+id.Text)
+				}
+				slices.Sort(ids)
+				if !slices.Equal(ids, c.ids) {
+					t.Errorf("the document names the issue %q, want %q", ids, c.ids)
+				}
+			})
+		})
+	}
+}
