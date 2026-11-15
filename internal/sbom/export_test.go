@@ -52,6 +52,8 @@ func VocabularyOverlap() map[string][]string {
 func TopLevelKeys() map[string][]string {
 	keys := map[string][]string{}
 	for _, v := range vocabularies {
+		// Present for a vocabulary claiming nothing, so a caller can say so.
+		keys[v.name] = []string{}
 		for key := range v.top {
 			keys[v.name] = append(keys[v.name], key)
 		}

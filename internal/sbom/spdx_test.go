@@ -105,6 +105,15 @@ func TestTheFormatsClaimNoKeyInCommon(t *testing.T) {
 	// has necessarily said which format it is — a producer sorting its keys
 	// puts one format's packages ahead of its own version statement. That is
 	// only safe while no key means two things.
+	claimed := sbom.TopLevelKeys()
+	if len(claimed) == 0 {
+		t.Fatal("no vocabularies were found, so this checked nothing")
+	}
+	for name, keys := range claimed {
+		if len(keys) == 0 {
+			t.Errorf("the vocabulary %q claims no top-level key, so nothing is routed to it", name)
+		}
+	}
 	shared := sbom.VocabularyOverlap()
 	for key, by := range shared {
 		t.Errorf("the top-level key %q is claimed by %v, so which one reads it "+
