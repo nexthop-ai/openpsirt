@@ -236,10 +236,11 @@ demo-up: demo-down
 	@# The proxy's address must fall inside DEMO_SUBNET, which the deployment
 	@# trusts sign-in headers from, so a network left on another range, or one
 	@# that cannot be made, stops here naming the range.
-	@if subnet=$$($(DOCKER) network inspect -f '{{(index .IPAM.Config 0).Subnet}}' $(DEMO_NET) 2>/dev/null); then \
-	  if [ "$$subnet" != "$(DEMO_SUBNET)" ]; then \
+	@if $(DOCKER) network inspect $(DEMO_NET) >/dev/null 2>&1; then \
+	  subnet=$$($(DOCKER) network inspect -f '{{range .IPAM.Config}}{{.Subnet}} {{end}}' $(DEMO_NET)); \
+	  if ! printf ' %s ' "$$subnet" | grep -qF ' $(DEMO_SUBNET) '; then \
 	    echo "  $(DEMO_NET) exists on $$subnet, not $(DEMO_SUBNET)."; \
-	    echo "  Remove it with $(DOCKER) network rm $(DEMO_NET), or set DEMO_SUBNET=$$subnet."; \
+	    echo "  Remove it with $(DOCKER) network rm $(DEMO_NET), or set DEMO_SUBNET to one of its ranges."; \
 	    exit 1; \
 	  fi; \
 	elif ! $(DOCKER) network create --subnet $(DEMO_SUBNET) $(DEMO_NET) >/dev/null; then \
@@ -329,8 +330,11 @@ demo-up: demo-down
 	      '    proxy_set_header Host $$http_host;' \
 	      '    proxy_set_header X-Forwarded-For $$remote_addr;' \
 	      '    client_max_body_size 512m;' \
+	      '    proxy_http_version 1.1;' \
 	      '    proxy_buffering off;' \
+	      '    proxy_request_buffering off;' \
 	      '    proxy_read_timeout 300s;' \
+	      '    proxy_send_timeout 300s;' \
 	      '  }' \
 	      '}' >> $(DEMO_DIR)/proxy.conf; \
 	  done
