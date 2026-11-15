@@ -32,9 +32,10 @@ type switched struct {
 	addr      string
 	standings chan sighting
 	done      chan error
-	// inside closes once the held route has written; silent and finished once
-	// the routes answering nothing and answering a success have begun.
-	inside, silent, finished chan struct{}
+	// inside closes once the held route has written; silent, finished and
+	// refused once the routes answering nothing, a success and a refusal have
+	// begun.
+	inside, silent, finished, refused chan struct{}
 	// starts counts the times the passes were started, and stopped the times
 	// a start's context ended.
 	starts, stopped atomic.Int32
@@ -46,7 +47,7 @@ type switched struct {
 func serveSwitched(t *testing.T, db *database.DB) *switched {
 	t.Helper()
 	s := &switched{standings: make(chan sighting), done: make(chan error, 1), inside: make(chan struct{}),
-		silent: make(chan struct{}), finished: make(chan struct{}), release: make(chan struct{})}
+		silent: make(chan struct{}), finished: make(chan struct{}), release: make(chan struct{}), refused: make(chan struct{})}
 	t.Cleanup(func() { close(s.release) })
 	router := http.NewServeMux()
 	router.HandleFunc("/held", func(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +69,11 @@ func serveSwitched(t *testing.T, db *database.DB) *switched {
 	router.HandleFunc("/silent", func(_ http.ResponseWriter, r *http.Request) {
 		close(s.silent)
 		<-r.Context().Done()
+	})
+	router.HandleFunc("/refused", func(w http.ResponseWriter, r *http.Request) {
+		close(s.refused)
+		<-r.Context().Done()
+		http.NotFound(w, r)
 	})
 	router.HandleFunc("/finished", func(w http.ResponseWriter, r *http.Request) {
 		close(s.finished)
@@ -179,6 +185,7 @@ func TestAnInstanceStopsServingWhileAnotherChangesTheSchema(t *testing.T) {
 		held := inFlight("/held", s.inside)
 		silent := inFlight("/silent", s.silent)
 		finished := inFlight("/finished", s.finished)
+		refused := inFlight("/refused", s.refused)
 
 		s.see(t, schema.Changes)
 		select {
@@ -189,12 +196,14 @@ func TestAnInstanceStopsServingWhileAnotherChangesTheSchema(t *testing.T) {
 		case <-time.After(30 * time.Second):
 			t.Fatal("the request held across the pause did not end within 30s")
 		}
-		// A handler that answers nothing is answered as upgrading; one that
-		// answers a success keeps it, since what it did took effect.
+		// A handler that answers nothing, or answers its ended lookup as a
+		// refusal, is answered as upgrading; one that answers a success keeps
+		// it, since what it did took effect.
 		for path, want := range map[string]struct {
 			got    <-chan answer
 			status int
-		}{"/silent": {silent, http.StatusServiceUnavailable}, "/finished": {finished, http.StatusOK}} {
+		}{"/silent": {silent, http.StatusServiceUnavailable}, "/finished": {finished, http.StatusOK},
+			"/refused": {refused, http.StatusServiceUnavailable}} {
 			select {
 			case got := <-want.got:
 				if got.status != want.status {

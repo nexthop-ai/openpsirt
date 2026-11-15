@@ -317,7 +317,7 @@ outage for as long as its migrations take.
 | On a database holding a schema, the upgrade waits 46 seconds holding the change lock before its first statement | For every serving instance to see the lock, 15 seconds: the rest of a look that asked just before the lock was taken, an interval, and one whole look; then 30 seconds for the longest write a stopped request or pass goes on with (recording a patch branch visit, cleaning up an attachment), and a second more. A test helper migrating a database it alone holds waits none |
 | A statement already running when an instance pauses holds its tables, and the upgrade waits for it | § Statement lock waits |
 | `openpsirt migrate up` takes the change lock and waits the same way | It is the same upgrade under other credentials |
-| A serving instance looks every second: is the change lock held or a record standing, and which version is applied | One look costs under a millisecond on every engine: 0.79 ms on PostgreSQL, the slowest (`design-docs/database-measurements.md` § Schema watch looks) |
+| A serving instance looks every second: is the change lock held or a record standing, and which version is applied, read before and after | One look costs under two milliseconds on every engine: 1.12 ms on PostgreSQL, the slowest, with a count of a table holding no row beside it where the lock is free (`design-docs/database-measurements.md` § Schema watch looks) |
 | A look takes nothing an upgrade waits for | PostgreSQL reads the lock table; MySQL and MariaDB ask who holds the named lock; SQLite takes a shared lock on the file for the moment of looking, never through a link and never waiting on a file that is not a regular one, and the upgrade tries again past it |
 | A look takes a connection of its own from the pool, waiting up to ten seconds, then asks within two | A pool busy with requests delays a look without failing it |
 | A look that cannot take a connection, fails, or overruns either bound reads as Changes, logged once until a look succeeds | An instance that cannot tell whether the schema is changing does not serve it |
@@ -340,8 +340,8 @@ outage for as long as its migrations take.
 |---|---|
 | Answers every request as it answers while it migrates at start (`design-docs/packaging.md` § Starting and stopping) | Readiness fails, and every other path is 503 with `Retry-After` |
 | Ends every request the router was answering | Its transaction rolls back |
-| Answers a request it ended as upgrading where the handler's answer is a server failure or nothing | The failure is the ending of its context |
-| Keeps the answer of a request whose handler answered a success | What it did took effect, and a retry would repeat it |
+| Answers a request it ended as upgrading where the handler's answer is a refusal, a failure or nothing | A handler whose context ended may answer its failed lookup as a refusal |
+| Keeps the answer of a request whose handler wrote a success or a redirect | What it did took effect, and a retry would repeat it |
 | Stops every pass and the queue's workers | No pass writes while another instance migrates |
 | Answers through the router again at Serves, whether or not the stopped passes have ended | The router does not depend on the passes |
 | Starts the passes again once the stopped ones have ended | Two copies of one pass never run at once |
@@ -357,7 +357,7 @@ outage for as long as its migrations take.
 |---|---|
 | The watch runs whether automatic migration is on or off | A separate `openpsirt migrate up` changes the schema the same way |
 | The watch ends with serving | It reads a database the process closes once serving ends |
-| No interval setting | A look every second costs under a millisecond, so a slower one earns nothing |
+| No interval setting | A look every second costs under two milliseconds, so a slower one earns nothing |
 
 ## Limits
 
