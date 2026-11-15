@@ -24,7 +24,7 @@ import (
 func MigrateTo(t *testing.T, db *database.DB, version int64) {
 	t.Helper()
 	if err := migrate.UpTo(t.Context(), db, slog.New(slog.NewTextHandler(io.Discard, nil)),
-		version); err != nil {
+		version, 0); err != nil {
 		t.Fatalf("apply the migrations up to %d: %v", version, err)
 	}
 }

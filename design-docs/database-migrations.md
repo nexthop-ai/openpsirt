@@ -2,8 +2,8 @@
 
 How the schema is created and moved forward: application at start, the chain
 from the baseline, the record each release keeps, the rehearsal before a tag,
-the lock that lets one instance migrate at a time, and the lock that stops
-every other instance serving while it does.
+the lease that lets one instance migrate at a time and stops every other
+instance serving while it changes the schema.
 
 Satisfies REQ-72, REQ-76.
 
@@ -16,7 +16,7 @@ Satisfies REQ-72, REQ-76.
 - [Release records](#release-records)
 - [Upgrade rehearsal](#upgrade-rehearsal)
 - [Statement lock waits](#statement-lock-waits)
-- [Migration locks](#migration-locks)
+- [Migration lease](#migration-lease)
 - [Instances during an upgrade](#instances-during-an-upgrade)
 - [Limits](#limits)
 
@@ -31,7 +31,7 @@ upgrade is deploying it.
 | Automatic application can be turned off, and `openpsirt migrate up\|status` runs migrations separately | An operator may use other credentials at a time they choose |
 | The command refuses an unknown action before contacting anything | |
 | It connects within the startup timeout; the migration itself is unbounded | A schema change on a large table takes longer than a start |
-| A run that applied a migration to a database holding a schema ends by analyzing every table, inside the lock | The statistics describe the schema before it (`design-docs/database-schema.md` § Planner statistics) |
+| A run that applied a migration to a database holding a schema ends by analyzing every table, under the lease | The statistics describe the schema before it (`design-docs/database-schema.md` § Planner statistics) |
 | With automatic application off, the schema version is compared before anything is served | Uncompared, a build with a new migration passes the readiness probe, a ping, fails every request touching the new table, and in a rolling deployment retires the last working replica |
 | The version a binary carries is the highest among its embedded migrations, read from their file names | The migration library applies the same rule |
 | Migrations are written in Go | They branch on the engine. A timestamp has no portable spelling: PostgreSQL has no `DATETIME`, and MySQL's `TIMESTAMP` is 32-bit and can acquire an implicit default and on-update clause from server configuration |
@@ -253,49 +253,62 @@ for up to ten minutes (`design-docs/analytics-exports.md` § Exports).
 | Each attempt that waits out its bound is logged with its number, the time waited, the statement, and every other session on the database with a transaction open, oldest first, twenty at most | A holder that never lets go holds the start, and the log names the session to end |
 | On PostgreSQL a session whose state is hidden is named after the open transactions, whether it holds one or sits idle | Another role's state and times show only to a role that reads every session's statistics |
 | On MySQL and MariaDB an account that cannot see every process is shown its own other sessions on the database | Open transactions list only for an account that sees every process, and no other account's sessions show |
-| Where MySQL and MariaDB list no open transaction, every session on the database the account can see is named, idle ones included, the migrating instance's own among them | The session holding the migration lock is one of them, and ending it gives the lock up mid-migration (§ Migration locks) |
+| Where MySQL and MariaDB list no open transaction, every session on the database the account can see is named, idle ones included, the migrating instance's own among them | Ending one of the migrating instance's sessions ends a statement or a renewal, never the lease (§ Migration lease) |
 | On PostgreSQL a retried upgrade runs its earlier statements again, holding each table it takes until the attempt ends | A statement queued on such a table waits at most one attempt and the statements before it |
 | The v0.11.0 renames wait in their own attempts of three seconds with a pause of a second, inside the upgrade's transaction on PostgreSQL | Their migration is the release's record, and is amended only for a fix the owner approves |
 | The baseline never waits | It makes its tables in an empty database, where no session holds one |
 
-## Migration locks
+## Migration lease
 
-One instance migrates at a time (REQ-72).
+One instance migrates at a time (REQ-72), through one mechanism on all four
+engines (REQ-71).
 
-| Lock | Excludes | Mechanism |
+| Exclusion | Excludes | Mechanism |
 |---|---|---|
-| Migration mutex | Other goroutines in the process | A mutex. The migration library keeps its dialect in package state, so two goroutines race whatever the database lock |
-| Advisory lock | Other instances on the database | `pg_advisory_lock`, held by the database; `GET_LOCK` on a name carrying the database, since a MySQL named lock belongs to the server; an operating-system lock on a file beside a SQLite database |
-| Schema change lock | Serving, on every other instance, while migrations are applied (§ Instances during an upgrade) | The same mechanisms under another key, name or file, taken on the advisory lock's session |
+| Migration mutex | Other goroutines in the process | A mutex. The migration library keeps its dialect in package state, so two goroutines race whatever the lease |
+| Migration lease | Other instances on the database | A row in the lease table, written by committed transactions |
+| The lease held to change the schema | Serving, on every other instance, while migrations are applied (§ Instances during an upgrade) | The same row, holding `change` |
+
+| Lease row column | Holds |
+|---|---|
+| Name | `schema`, the one lease |
+| Token | A random value the holder made as it claimed |
+| Holding | `migrate` from before the version is read; `change` from before the first migration's statements to after the last |
+| Holder | The process and host, for a waiter's log |
+| Lapse | When the lease lapses unless written again, in microseconds since the epoch by the database's clock |
 
 | Rule | Reason |
 |---|---|
-| SQLite's lock is taken outside the database | It cannot take one inside, and it migrates on its one connection |
-| The file lock is the operating system's advisory lock, never a lock file written by hand | The kernel drops it however a process ends. A platform without it refuses |
-| The lock file is opened only as a regular file with one name, never through a symbolic or hard link | The holder truncates it and writes its name into it, so a planted link would clobber the file it points at |
-| A waiter reads the holder's name through the file it opened and checked, never through the path again | The path can name something else by then, and the name reaches the log |
-| SQLite's pool is narrowed to one connection while migrating, and restored after | Foreign keys are turned off on a connection before the transaction opens, which on a wider pool lands elsewhere. A release's upgrade holds one connection throughout, because a pool of one still recycles one past its lifetime. A dangling reference at commit refuses the upgrade |
-| The advisory lock is taken on a pinned connection | A session lock released through the pool can land on another connection, and fails to release silently |
-| The release result is read | PostgreSQL and the MySQL-protocol servers report "you did not hold this" as a value |
-| A lock not held at its release fails the migration | The session was lost part way and another instance may have migrated alongside |
-| A waiter waits as long as the lock is held, on every engine, in attempts of five seconds, checking between them whether to stop | The v0.9.0 upgrade took 873 s on a production-shaped PostgreSQL database, and a five-minute bound gave up at 300 s |
+| The lease is a committed row, never a session lock | A session lock lives on one server, so on a cluster taking writes on every node (Galera, Group Replication) two instances on two nodes both hold it. A row is certified at commit like every other write (`design-docs/database-transactions.md` § Replica coordination) |
+| The lease table is the migrator's own, made where absent before the first claim, and no migration declares it | A lease taken to apply the first migration cannot live in a table a migration makes. A database refused as before the baseline or ahead of the build is refused before it is made |
+| The lease table is asked for in the catalog before it is made | A credential without the right to make tables passes where it stands. Two instances making it at once on PostgreSQL may see the second refused as a duplicate, which is the table made |
+| Its columns are text and an integer, spelled alike on every engine, and no migration reshapes it | It is made before any engine-specific declaration runs, and instances of two releases claim it during an upgrade |
+| A claim is one transaction through the retry helper: it reads the row and the database's clock, inserts the row where none stands, writes over one that has lapsed matched on the token it read, and otherwise writes nothing | On one server the second claimant waits for the first's commit and then matches nothing; on a cluster the second to commit is refused and tries again. Exactly one wins on every engine, which a test races twenty times on each |
+| Every write sets a new token or a later lapse | MySQL and MariaDB skip a row whose values are unchanged, and a cluster certifies only rows written |
+| Time is the database's clock, read inside the transaction | One primary is one clock where instances are many. Reading it is spelled per engine in the database package (`design-docs/database.md` § Engine-specific code) |
+| The lease lapses 30 seconds after it was last written | A holder that died holds the next start that long at most |
+| The holder writes it again every 5 seconds, on a pooled connection, never the one the migration runs on | A data-definition statement runs for minutes, and on MySQL and MariaDB commits alone |
+| A renewal that finds the row gone or another's token stops the holder | Another instance may be migrating |
+| On the server engines each renewal is bounded by 5 seconds, and a holder whose renewals have gone unanswered for 20 seconds stops | It stops 10 seconds before the lapse it last wrote, the room for the clocks of a cluster's nodes to differ |
+| On SQLite a renewal waits as long as it takes, and the holder stops only on finding its lease gone or taken | A migration's transaction holds the file's one write, so a renewal waits for it, and so does a claimant's takeover. The migration runs on the pool's one connection, and a renewal waiting for it takes it before the migration's next statement |
+| Everything under the lease runs under one context, which a lost lease ends | A statement whose context has ended is refused before it is sent, so a holder that stops sends nothing further |
+| A statement already running when its holder stops cannot be fenced | PostgreSQL and SQLite are asked to cancel it, and its transaction rolls back; MySQL and MariaDB may finish a data-definition statement. A stopped holder leaves what a killed process leaves (§ Migrations that stop half way) |
+| A lease lost part way fails the migration, whatever the work answered | Another instance may have migrated alongside |
+| A holder that lost its lease clears no record of a change | The instance that took it clears what the version reached |
+| The release deletes the row matched on the token, within five seconds whatever happened to the start | A row not there to delete is a lease lost part way. A row the release could not reach lapses |
+| On SQLite a claim waits for any writer holding the file, and a waiter says so about once a minute | A claim is a write, and the file admits one at a time |
+| A waiter claims every second for as long as the lease is held, checking between claims whether to stop | The v0.9.0 upgrade took 873 s on a production-shaped PostgreSQL database, and a five-minute bound gave up at 300 s |
+| A waiter names the holder, what it holds and when its lease lapses unless renewed, at its first claim and about once a minute after | A holder wedged part way holds every replacement behind it |
+| A waiter that takes over a lapsed lease logs the holder it took it from, at Warn | A holder died part way |
 | A waiting process answers its health check | A replica started beside a long migration waits it out |
-| A waiter names the holder at its first timed-out attempt and about once a minute after | A holder wedged part way holds every replacement behind it |
-| A holder that dies releases the lock | Session locks go with the session and a file lock with the process. The waiter takes it and applies the schema from where the rolled-back migration left it |
-| A stop ends a wait at once | The attempt in progress is canceled |
 | `openpsirt migrate up` waits the same way | A job started beside a migrating replica waits, then finds the work done |
-| The holder is named: the connection number on MySQL and MariaDB, the server process with user and application on PostgreSQL where the role may see them, and on SQLite the process and host the holder writes into the lock file | Any account that can connect may take the lock, and "another instance holds it" sends an operator looking for a replica that may not exist |
-| The pinned connection is used every half minute while held | Checked out past the idle timeout, a server's or intermediary's idle timeout would end the session and release the lock to a waiter |
-| A keep-alive use carries no deadline | Both drivers close a connection whose query outlives its context, which loses the lock the same way |
-| The release is bounded, as unwinding the session is, and waits for a keep-alive use no longer than that | A stalled connection otherwise holds the start for as long as the operating system retransmits, after the work is done. The failure is reported, and the connection is closed once its use ends, never returned to the pool, so its session ends and the server frees the lock |
-| An unlock that fails closes its connection, never returning it to the pool | A statement whose context has already ended is refused before it is sent, and neither driver closes the connection for it, so its session still holds the lock |
-| A pool of one is refused before the lock is taken, on the three servers, naming `OPENPSIRT_DB_MAX_OPEN` | The lock holds one connection and the migration needs another, so it would wait for ever |
-| PostgreSQL's attempt bound is a session setting unwound before the connection goes back, on every path | Left set, one pooled connection carries a five-second bound and the same query waits or is canceled by which connection it gets. `GET_LOCK` takes its bound as an argument |
+| A pool of one is refused before the lease is claimed, on the three servers, naming `OPENPSIRT_DB_MAX_OPEN` | A renewal would wait behind a long statement and the holder stop part way |
+| SQLite's pool is narrowed to one connection while migrating, and restored after | Foreign keys are turned off on a connection before the transaction opens, which on a wider pool lands elsewhere. A release's upgrade holds one connection throughout, because a pool of one still recycles one past its lifetime. A dangling reference at commit refuses the upgrade |
 
 A SQLite URL is accepted with a warning beside a chart that runs one process.
-Four processes on one file with no lock leave the schema correct, with three
-failing on the library's bookkeeping; the lock makes them wait and find the work
-done.
+Four processes on one file with no exclusion leave the schema correct, with
+three failing on the library's bookkeeping; the lease makes them wait and find
+the work done.
 
 ## Instances during an upgrade
 
@@ -305,35 +318,31 @@ outage for as long as its migrations take.
 
 | Rule | Reason |
 |---|---|
-| An upgrade takes the schema change lock after reading the version, where a migration is outstanding, and lets it go after the last migration and the statistics refresh, on every path | A start with nothing to apply takes the migration lock alone, so a replica starting beside others pauses none of them |
-| On MySQL and MariaDB, once the notice has passed and before the first statement, the upgrade writes a row to the schema change record, where the database has that table, naming the last version it applies | The lock goes with its session; the row outlives an upgrade that fails part way |
+| An upgrade holds the lease to change the schema after reading the version, where a migration is outstanding, and holds it to migrate again after the last migration and the statistics refresh, on every path | A start with nothing to apply holds it to migrate alone, so a replica starting beside others pauses none of them |
+| On MySQL and MariaDB, once the notice has passed and before the first statement, the upgrade writes a row to the schema change record, where the database has that table, naming the last version it applies | The lease lapses once its holder is gone; the row outlives an upgrade that fails part way |
 | On every engine, a release's migration writes a row naming its version in its own transaction, which a test holds for every release migration from v0.13.0's on | It commits with the schema and rolls back with it, so a process killed after the commit and before the migration library records the version leaves a row |
 | An upgrade ending any way removes every row naming a version no later than the one then applied | A success leaves no row; a failure leaves the rows of what is still outstanding |
 | A row counts while the version applied is behind the one it names | A row left by a process ended after its last migration, or by a removal that failed, pauses nobody |
 | A start with nothing to apply removes every row the version applied has reached | The record holds only upgrades still outstanding |
 | On MySQL and MariaDB a failed upgrade's row stays | Each data-definition statement commits alone, so the schema is part changed, and nothing serves it until an upgrade reaches the version the row names or the backup is restored |
-| On PostgreSQL and SQLite no row is written before the first statement | The change lock and a migration's transaction end together, a killed process included, so a row written ahead would outlive a schema left whole |
-| The row is written after the notice | The lock alone covers the notice, and a row written earlier would outlive a process killed during it with nothing changed |
-| On a database holding a schema, the upgrade waits 46 seconds holding the change lock before its first statement | For every serving instance to see the lock, 15 seconds: the rest of a look that asked just before the lock was taken, an interval, and one whole look; then 30 seconds for the longest write a stopped request or pass goes on with (recording a patch branch visit, cleaning up an attachment), and a second more. A test helper migrating a database it alone holds waits none |
+| On PostgreSQL and SQLite no row is written before the first statement | A migration's transaction rolls back when its holder fails or is killed, and the lease lapses, so a row written ahead would outlive a schema left whole |
+| The row is written after the notice | The lease alone covers the notice, and a row written earlier would outlive a process killed during it with nothing changed |
+| On a database holding a schema, the upgrade waits 46 seconds holding the lease to change the schema before its first statement | For every serving instance to see the lease, 15 seconds: the rest of a look that asked just before the lease was written, an interval, and one whole look; then 30 seconds for the longest write a stopped request or pass goes on with (recording a patch branch visit, cleaning up an attachment), and a second more. A test helper migrating a database it alone holds waits none |
 | A statement already running when an instance pauses holds its tables, and the upgrade waits for it | § Statement lock waits |
-| `openpsirt migrate up` takes the change lock and waits the same way | It is the same upgrade under other credentials |
-| A serving instance looks every second: is the change lock held or a record standing, and which version is applied, read before and after | One look costs under two milliseconds on every engine: 1.12 ms on PostgreSQL, the slowest, with a count of a table holding no row beside it where the lock is free (`design-docs/database-measurements.md` § Schema watch looks) |
-| A look takes nothing an upgrade waits for | PostgreSQL reads the lock table; MySQL and MariaDB ask who holds the named lock; SQLite takes a shared lock on the file for the moment of looking, never through a link and never waiting on a file that is not a regular one, and the upgrade tries again past it |
+| `openpsirt migrate up` holds the lease to change the schema and waits the same way | It is the same upgrade under other credentials |
+| A serving instance looks every second: is the lease held to change the schema and not lapsed, or a record standing, and which version is applied, read before and after | One look costs under a millisecond on every engine: 0.71 ms on PostgreSQL, the slowest (`design-docs/database-measurements.md` § Schema watch looks) |
+| A look reads rows, and reads the database's clock only where the lease is held to change the schema | It takes nothing an upgrade waits for, and outside an upgrade asks no clock |
+| A lease held to change the schema that has lapsed pauses nobody | Its holder is gone: on PostgreSQL and SQLite its transaction rolled back, and on MySQL and MariaDB the record keeps instances paused |
 | A look takes a connection of its own from the pool, waiting up to ten seconds, then asks within two | A pool busy with requests delays a look without failing it |
 | A look that cannot take a connection, fails, or overruns either bound reads as Changes, logged once until a look succeeds | An instance that cannot tell whether the schema is changing does not serve it |
 | A look reads the version first, and a version ahead is Superseded even where asking about a change then fails | A later release may have reshaped what that asks |
 | A start looks once more just before its router opens, and refuses to start unless the look finds Serves | Preparing to serve takes up to the startup deadline, longer than the notice |
-| SQLite's change lock file gains read for every user after opening, whatever the umask; where the file system refuses, the upgrade logs it and goes on | Migrations may run as another user than the server, whose looks would otherwise fail and pause it |
-| On SQLite a change lock held past one attempt at the migration lock is logged about once a minute | A serving instance's look holds it for a moment; anything longer is a holder outside the application |
-| On the server engines the change lock held by a session outside the application refuses the upgrade, naming the holder | Only the migration lock's holder takes it |
-| The change lock's statements and the keep-alive never overlap on the lock's connection | A driver may close a connection asked a second question before it has read the first answer, and both locks go with the session |
-| A change lock whose release failed has its connection closed when the migration lock is let go, never pooled | A pooled connection holding it would pause every instance until the pool retired it |
 
 | Standing | When | The instance |
 |---|---|---|
 | Serves | The applied version is this build's and nothing is changing it | Serves through the router, and runs its passes |
-| Changes | The change lock is held, at a version not ahead of this build's | Pauses, and resumes at Serves |
-| Stranded | A record stands of an upgrade to a later version than the one applied, with the lock free, at a version not ahead of this build's | Pauses, logging at Error that the upgrade must complete or the backup be restored, and resumes at Serves; a start refuses with the same words |
+| Changes | The lease is held to change the schema and has not lapsed, at a version not ahead of this build's | Pauses, and resumes at Serves |
+| Stranded | A record stands of an upgrade to a later version than the one applied, with no lease held to change the schema, at a version not ahead of this build's | Pauses, logging at Error that the upgrade must complete or the backup be restored, and resumes at Serves; a start refuses with the same words |
 | Behind | The applied version is behind this build's and nothing is changing it, such as a restored backup | Stops |
 | Superseded | The applied version is ahead of this build's, whether or not anything is changing it | Stops |
 
@@ -360,13 +369,13 @@ outage for as long as its migrations take.
 |---|---|
 | The watch runs whether automatic migration is on or off | A separate `openpsirt migrate up` changes the schema the same way |
 | The watch ends with serving | It reads a database the process closes once serving ends |
-| No interval setting | A look every second costs under two milliseconds, so a slower one earns nothing |
+| No interval setting | A look every second costs under a millisecond, so a slower one earns nothing |
 
 ## Limits
 
 | Limit | Detail |
 |---|---|
-| The concurrency test does not cover the advisory lock | Every caller takes the in-process mutex first, so goroutines driven through the normal path pass with the advisory lock deleted. The suite drives the advisory lock from two pools directly (`design-docs/database.md` § Test harness) |
-| Any account can hold the migration lock and the change lock | Any account on a MySQL or MariaDB server, or any role with CONNECT on the PostgreSQL database, can take the migration lock and hold every start behind it; the waiter's log line names the connection to end. The same account taking the change lock pauses every serving instance until its session ends |
-| An instance of a release without the change lock does not look | It serves through an upgrade; the upgrade note says to stop every instance of the earlier release first |
+| The concurrency test does not cover the lease | Every caller takes the in-process mutex first, so goroutines driven through the normal path pass with the lease deleted. The suite drives claims from two pools directly (`design-docs/database.md` § Test harness) |
+| Any account that writes the lease table can hold the lease | It holds every start behind it, and holding it to change the schema pauses every serving instance, for as long as it writes the lapse forward. The holder the waiter's log names is what the row says; deleting the row ends it |
+| An instance of a release before the lease does not look | It serves through an upgrade; the upgrade note says to stop every instance of the earlier release first |
 | On MySQL and MariaDB a data step waits for a row as the server's own bound says, and a writer holding the row past it fails the migration. | Retrying the step where it stands loses the work before it under `innodb_rollback_on_timeout`, and retrying from the start runs again each data-definition statement already committed |

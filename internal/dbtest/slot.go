@@ -30,7 +30,7 @@ const harnessPrefix = "openpsirt_t_"
 
 // slotNamespace keeps the PostgreSQL slot locks apart from every other
 // advisory lock on the server. The two-key form of an advisory lock never
-// shares a key with the one-key form the migration lock takes.
+// shares a key with the one-key form.
 const slotNamespace int32 = 0x6f707374
 
 // errNoSlot is the refusal when every slot of a schema is held.

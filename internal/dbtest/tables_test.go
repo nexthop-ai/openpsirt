@@ -41,7 +41,9 @@ func TestTheTableListNamesEveryTableTheSchemaMakes(t *testing.T) {
 		for _, name := range made {
 			// The migration bookkeeping table is the schema's own and holds
 			// what version is applied. Emptying it would undo the migration.
-			if name == migrate.VersionTable {
+			// The lease table is the migrator's, and holds no row once a
+			// migration has let it go.
+			if name == migrate.VersionTable || name == migrate.LeaseTable {
 				continue
 			}
 			if !listed[name] {

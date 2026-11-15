@@ -106,17 +106,18 @@ of the upgraded database took 1.2 s.
 
 ## Schema watch looks
 
-The mean of 2,000 looks of each kind against the CI engines on one development
-host, after 50 to warm the pool. The change lock look on SQLite is a file with
-nobody holding it. `design-docs/database-migrations.md` § Instances during an
-upgrade holds the rule.
+The mean of 2,000 of each against the CI engines on one development host,
+after 50 to warm the pool, in two runs, the slower kept. A whole look reads the
+version, the lease row, the record of schema changes and the version again on
+one connection of its own. `design-docs/database-migrations.md` § Instances
+during an upgrade holds the rule.
 
-| Engine | Change lock | Version |
-|---|---|---|
-| PostgreSQL | 0.46 ms | 0.33 ms |
-| MySQL | 0.12 ms | 0.19 ms |
-| MariaDB | 0.11 ms | 0.16 ms |
-| SQLite | 0.002 ms | 0.013 ms |
+| Engine | Version | Lease, none standing | Lease held to change, with the clock | Whole look, no lease | Whole look, lease held to change |
+|---|---|---|---|---|---|
+| PostgreSQL | 0.16 ms | 0.16 ms | 0.31 ms | 0.67 ms | 0.71 ms |
+| MySQL | 0.08 ms | 0.08 ms | 0.14 ms | 0.36 ms | 0.34 ms |
+| MariaDB | 0.07 ms | 0.07 ms | 0.15 ms | 0.33 ms | 0.33 ms |
+| SQLite | 0.007 ms | 0.006 ms | 0.011 ms | 0.037 ms | 0.039 ms |
 
-The record of schema changes adds one count of a table holding no row, on the
-server engines only where the change lock is free.
+A whole look held to change the schema skips the count of the record, which is
+why it costs no more than one with no lease.

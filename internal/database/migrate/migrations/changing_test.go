@@ -30,11 +30,12 @@ func servingBeside(t *testing.T, db *database.DB) *database.DB {
 	return dbtest.Open(t, "sqlite://"+file)
 }
 
-// An upgrade holds the schema change lock from before its first statement,
-// through the notice it gives, to after its last; a serving instance sees the
-// lock while the version is still the one it served, and the version moved
-// once the lock is let go. An upgrade with nothing to apply never takes it.
-func TestAnUpgradeHoldsTheChangeLockFromBeforeItsFirstStatement(t *testing.T) {
+// An upgrade holds the lease to change the schema from before its first
+// statement, through the notice it gives, to after its last; a serving
+// instance sees it while the version is still the one it served, and the
+// version moved once it is let go. An upgrade with nothing to apply never
+// holds it to change the schema.
+func TestAnUpgradeHoldsTheLeaseToChangeTheSchemaFromBeforeItsFirstStatement(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
@@ -75,7 +76,7 @@ func TestAnUpgradeHoldsTheChangeLockFromBeforeItsFirstStatement(t *testing.T) {
 			time.Sleep(20 * time.Millisecond)
 		}
 		if _, applied, err := look(); err != nil || applied != v0120 {
-			t.Errorf("as the change lock was taken the schema was at %d (%v), not %d", applied, err, v0120)
+			t.Errorf("as the lease was held to change the schema, the schema was at %d (%v), not %d", applied, err, v0120)
 		}
 		if err := <-done; err != nil {
 			t.Fatalf("the upgrade: %v", err)
@@ -87,7 +88,8 @@ func TestAnUpgradeHoldsTheChangeLockFromBeforeItsFirstStatement(t *testing.T) {
 			t.Errorf("after the upgrade the schema was at %d (%v), not %d", applied, err, expected)
 		}
 
-		// Nothing to apply: the lock is never taken, though a notice is given.
+		// Nothing to apply: the lease is never held to change the schema, though a
+		// notice is given.
 		done = make(chan error, 1)
 		go func() { done <- migrate.Up(context.WithoutCancel(ctx), db, quiet(), notice) }()
 		for {
@@ -96,7 +98,7 @@ func TestAnUpgradeHoldsTheChangeLockFromBeforeItsFirstStatement(t *testing.T) {
 				t.Fatal(err)
 			}
 			if changing {
-				t.Fatal("an upgrade with nothing to apply took the schema change lock")
+				t.Fatal("an upgrade with nothing to apply held the lease to change the schema")
 			}
 			select {
 			case err := <-done:

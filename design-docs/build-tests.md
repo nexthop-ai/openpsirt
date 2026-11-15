@@ -285,8 +285,8 @@ inventory and the interface checks.
 
 | Rule | Reason |
 |---|---|
-| The pool's idle reaper, the migration lock and the version floor read it too | Otherwise the quick loop opens the servers and a stopped container reads as a regression |
-| The rule lives in one package below the harness and the migration runner | The migration lock's internal test cannot import the harness |
+| The pool's idle reaper, the migration lease and the version floor read it too | Otherwise the quick loop opens the servers and a stopped container reads as a regression |
+| The rule lives in one package below the harness and the migration runner | The migration lease's internal test cannot import the harness |
 
 ## Commit durability
 

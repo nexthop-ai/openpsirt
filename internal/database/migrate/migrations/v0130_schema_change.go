@@ -15,13 +15,14 @@ func schemaChangeV0130(t *columnTypes) []string {
 	return []string{
 		// A row for each upgrade that began changing the schema and has not
 		// ended with it whole. An instance serving the database pauses while
-		// one stands, as it does while the schema change lock is held. The
-		// lock goes with its session; this outlives an upgrade that fails
-		// part way on an engine whose schema changes each commit alone, so
-		// nothing serves the part-changed schema until an upgrade succeeds or
-		// the backup is restored. A row names the version its upgrade was
-		// reaching, and stops counting once the version applied reaches it,
-		// so one a process left after its last migration pauses nobody.
+		// one stands, as it does while the migration lease is held to change
+		// the schema. The lease lapses once its holder is gone; this outlives
+		// an upgrade that fails part way on an engine whose schema changes
+		// each commit alone, so nothing serves the part-changed schema until
+		// an upgrade succeeds or the backup is restored. A row names the
+		// version its upgrade was reaching, and stops counting once the
+		// version applied reaches it, so one a process left after its last
+		// migration pauses nobody.
 		`CREATE TABLE "schema_change" (
 			"id"             ` + t.id + `,
 			"started_at"     ` + t.timestamp + ` NOT NULL,

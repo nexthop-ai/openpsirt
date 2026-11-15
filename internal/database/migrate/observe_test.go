@@ -47,91 +47,69 @@ func changingWithin(t *testing.T, o *Observer, want bool, doing string) {
 	}
 }
 
-// A serving instance sees the schema change lock from another pool while an
-// instance holds it, and stops seeing it once it is let go. The migration lock
-// alone is not seen, since a start with nothing to apply takes it.
-func TestAServingInstanceSeesTheSchemaChangeLockWhileItIsHeld(t *testing.T) {
+// A serving instance sees, from another pool, a lease held to change the
+// schema, and stops seeing it once the holder goes back to migrating or lets
+// it go. A lease held to migrate alone is not seen, since a start with nothing
+// to apply holds it.
+func TestAServingInstanceSeesALeaseHeldToChangeTheSchema(t *testing.T) {
 	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
 		ctx := t.Context()
 		migrating, serving := open(t, address), open(t, address)
+		freshLease(t, migrating)
 		observer, err := NewObserver(ctx, serving)
 		if err != nil {
 			t.Fatal(err)
 		}
-		changingWithin(t, observer, false, "before any lock")
+		changingWithin(t, observer, false, "before any lease")
 
 		lock, err := acquire(ctx, migrating)
 		if err != nil {
 			t.Fatal(err)
 		}
-		released := false
-		defer func() {
-			if !released {
-				_ = lock.release(context.Background())
-			}
-		}()
-		changingWithin(t, observer, false, "with the migration lock alone")
+		defer func() { _ = lock.release(context.Background()) }()
+		changingWithin(t, observer, false, "with the lease held to migrate")
 
 		stopChanging, err := lock.change(ctx)
 		if err != nil {
-			t.Fatalf("take the schema change lock: %v", err)
+			t.Fatalf("hold the lease to change the schema: %v", err)
 		}
-		changingWithin(t, observer, true, "with the schema change lock held")
+		changingWithin(t, observer, true, "with the lease held to change the schema")
 
 		if err := stopChanging(ctx); err != nil {
-			t.Fatalf("release the schema change lock: %v", err)
+			t.Fatalf("hold the lease to migrate again: %v", err)
 		}
-		changingWithin(t, observer, false, "after the schema change lock was let go")
-		released = true
-		if err := lock.release(ctx); err != nil {
-			t.Fatalf("release the migration lock: %v", err)
-		}
+		changingWithin(t, observer, false, "with the lease held to migrate again")
 
-		// Let go cleanly, both are taken again.
-		again, err := acquire(ctx, migrating)
-		if err != nil {
-			t.Fatal(err)
+		if _, err := lock.change(ctx); err != nil {
+			t.Fatalf("hold the lease to change the schema a second time: %v", err)
 		}
-		stopAgain, err := again.change(ctx)
-		if err != nil {
-			t.Fatalf("take the schema change lock a second time: %v", err)
+		changingWithin(t, observer, true, "with the lease held to change the schema again")
+		if err := lock.release(ctx); err != nil {
+			t.Fatalf("let the lease go: %v", err)
 		}
-		_ = stopAgain(ctx)
-		_ = again.release(ctx)
+		changingWithin(t, observer, false, "after the lease was let go")
 	})
 }
 
-// A schema change lock whose release failed leaves its session closed rather
-// than pooled, so no pooled connection goes on holding it and every serving
-// instance stays paused.
-func TestAChangeLockNotLetGoIsNotPooled(t *testing.T) {
-	servers(t, func(t *testing.T, _ database.Engine, address string) {
+// A lease held to change the schema by a process that died pauses serving
+// instances until it lapses, and no longer: the schema it left is whole on
+// PostgreSQL and SQLite, and on MySQL and MariaDB the record keeps them paused.
+func TestServingInstancesResumeWhenALeaseHeldToChangeTheSchemaLapses(t *testing.T) {
+	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
 		ctx := t.Context()
-		migrating, serving := open(t, address), open(t, address)
+		db, serving := open(t, address), open(t, address)
+		freshLease(t, db)
 		observer, err := NewObserver(ctx, serving)
 		if err != nil {
 			t.Fatal(err)
 		}
-		lock, err := acquire(ctx, migrating)
-		if err != nil {
-			t.Fatal(err)
+		leftBy(t, db, holdingChange, 2*time.Second)
+		changingWithin(t, observer, true, "before the lease lapsed")
+		lapsed := time.Now().Add(2 * time.Second)
+		changingWithin(t, observer, false, "after the lease lapsed")
+		if early := time.Until(lapsed); early > 500*time.Millisecond {
+			t.Errorf("a serving instance resumed %s before the lease lapsed", early)
 		}
-		stopChanging, err := lock.change(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// A context already ended refuses the statement before it is sent,
-		// so the session still holds the change lock.
-		ended, cancel := context.WithCancel(ctx)
-		cancel()
-		if err := stopChanging(ended); err == nil {
-			t.Fatal("a release under an ended context reported the change lock let go")
-		}
-		// A driver may close the connection for the refused statement, and
-		// the release then says the session is gone; either way none holds
-		// the change lock.
-		_ = lock.release(ctx)
-		changingWithin(t, observer, false, "after the migration lock was let go")
 	})
 }
 
@@ -183,13 +161,14 @@ func versionTable(t *testing.T, db *database.DB) func(version int64) {
 
 // An upgrade that fails leaves its record where the engine leaves the schema
 // part changed, MySQL and MariaDB, so a serving instance stays paused once
-// the change lock is let go. Elsewhere no record is written before the first
-// statement, and the change lock alone says the schema is changing. A success
+// the lease is let go. Elsewhere no record is written before the first
+// statement, and the lease alone says the schema is changing. A success
 // clears the record on every engine.
 func TestAFailedUpgradeKeepsServingInstancesPausedWhereItLeftThePartChanged(t *testing.T) {
 	everyEngine(t, func(t *testing.T, engine database.Engine, address string) {
 		ctx := t.Context()
 		migrating, serving := open(t, address), open(t, address)
+		freshLease(t, migrating)
 		recordTable(t, migrating)
 		applied := versionTable(t, migrating)
 		applied(0)
@@ -215,8 +194,8 @@ func TestAFailedUpgradeKeepsServingInstancesPausedWhereItLeftThePartChanged(t *t
 		end := begin()
 		changingWithin(t, observer, true, "while the upgrade changes the schema")
 		partChanged := engine == database.MySQL || engine == database.MariaDB
-		// Elsewhere the lock ends with the transaction, a killed process
-		// included, so a row would outlive a schema left whole.
+		// Elsewhere the transaction rolls back when the upgrade fails, a
+		// killed process included, so a row would outlive a schema left whole.
 		var rows int
 		if err := migrating.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+ChangeTable+`"`).Scan(&rows); err != nil {
 			t.Fatal(err)
@@ -271,6 +250,7 @@ func TestNoRecordIsWrittenDuringTheNotice(t *testing.T) {
 	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
 		ctx := t.Context()
 		migrating := open(t, address)
+		freshLease(t, migrating)
 		recordTable(t, migrating)
 		lock, err := acquire(ctx, migrating)
 		if err != nil {

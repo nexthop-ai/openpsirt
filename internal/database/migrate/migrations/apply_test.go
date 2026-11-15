@@ -17,7 +17,7 @@ import (
 )
 
 // This package cannot use dbtest: dbtest builds the schema and the schema is
-// these migrations, and Go allows no such cycle. The migration lock's own test
+// these migrations, and Go allows no such cycle. The migration lease's own test
 // is in the same position and opens a connection the same way.
 var serverURLs = map[database.Engine]string{
 	database.Postgres: "OPENPSIRT_TEST_POSTGRES_URL",

@@ -16,18 +16,18 @@ import (
 func TestConcurrentMigrationsInOneProcessDoNotCollide(t *testing.T) {
 	// This covers goroutines in a single process, and nothing more.
 	//
-	// Two things serialize the callers: the in-process mutex, and the lock
-	// that excludes other instances — on SQLite a lock on a file beside the
-	// database. Either alone is enough, so this pins the pair; the lock that
-	// excludes other instances is tested on its own in
+	// Two things serialize the callers: the in-process mutex, and the
+	// migration lease that excludes other instances. Either alone is enough,
+	// so this pins the pair; the lease is tested on its own in
 	// internal/database/migrate, driving acquire directly from two pools.
 	//
 	// The database starts empty, so every migration is applied while the
 	// four callers race for it; on one already migrated each Up has nothing
 	// to do and no collision is possible. A new empty database is a file on
 	// SQLite and a server-side database elsewhere, so this runs on SQLite.
-	// Verified by deleting the mutex's Lock and Unlock and making the file
-	// lock a no-op: every caller but one fails creating the version table.
+	// Verified by deleting the mutex's Lock and Unlock and making every
+	// claim of the lease win: the callers fail, each finding its lease
+	// written over by another.
 	dbtest.Only(t, database.SQLite, func(t *testing.T, _ *database.DB) {
 		db := dbtest.Open(t, "sqlite://"+filepath.Join(t.TempDir(), "fresh.db"))
 		const instances = 4

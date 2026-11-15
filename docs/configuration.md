@@ -158,11 +158,12 @@ connected to the database, and then applies the schema. Until it serves:
 
 A second process started while one applies the schema waits for it, answers
 the same way, and logs about once a minute which process holds the migration
-lock. Where the holder stops part way, the waiter applies the schema itself.
-The lock is the server's own, so any account on a MySQL or MariaDB server,
-or any role allowed to connect to the PostgreSQL database, can take it and
-hold every start behind it. The waiter's log line names that connection; end
-it to let the start go on.
+lease and when the lease lapses. The lease is a row in the `schema_lease`
+table, which the process applying the schema writes again every five seconds.
+Where the holder dies part way, its lease lapses within 30 seconds and the
+waiter applies the schema itself. Any account that may write the table can hold
+the lease and hold every start behind it; deleting the row lets the start go
+on.
 
 No process serves while another applies the schema, because an answer read
 from a schema part way through a change cannot be trusted. A process that is
@@ -209,7 +210,7 @@ decides whether ECS keeps the task. Either of two arrangements works:
 |---|---|---|---|
 | `OPENPSIRT_DATABASE_URL` | `database.url` | Which database and how to reach it: `postgres://user:password@host:5432/name`, `mysql://…`, `mariadb://…`, or `sqlite:///absolute/path.db`. A `/`, `?`, `#` or `@` in the user name or password is percent-encoded, as `%2F`, `%3F`, `%23` and `%40`, and a URL holding one unencoded is refused. SQLite is for development and a single-pod trial, never production. Encryption is negotiated but not required — see below. **Required** | unset |
 | `OPENPSIRT_AUTO_MIGRATE` | `database.auto_migrate` | Apply outstanding schema changes at startup, so deploying the binary is the whole upgrade. Turn it off to run `openpsirt migrate up` yourself, under different credentials, at a time you choose. With it off, a process whose database is behind the build refuses to start rather than serving against a schema it is ahead of, and `openpsirt migrate status` says where both stand. That compares version numbers, not schema content: below 1.0 a schema change edits what declares the thing rather than adding a migration beside it, so a database can be at the expected version and still hold what an earlier build created | `true` |
-| `OPENPSIRT_DB_MAX_OPEN` | `database.max_open` | Most connections open at once, on every engine. At least 2 on a server engine to migrate: the migration lock holds one connection while the migrations use another | `25` |
+| `OPENPSIRT_DB_MAX_OPEN` | `database.max_open` | Most connections open at once, on every engine. At least 2 on a server engine to migrate: the migration lease is renewed on one connection while the migrations use another | `25` |
 | `OPENPSIRT_DB_MAX_IDLE` | `database.max_idle` | Most connections kept open idle | `25` |
 | `OPENPSIRT_DB_IDLE_TIMEOUT` | `database.idle_timeout` | How long an idle connection is kept before it is closed. Shorter than anything between the process and the server would close it, so nothing closes one behind the process's back | `1m` |
 | `OPENPSIRT_DB_CONN_LIFETIME` | `database.connection_lifetime` | How long a connection is used before it is replaced | `30m` |
@@ -1730,6 +1731,7 @@ v0.10.2 named `reaffirm-claim`.
 | The findings list, the list spanning products and the by-component view sorted by severity order by the band of the rating in force, the product's own where it states one, then by score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score, and the planned upgrades sorted by severity, an approver's outliers and a release note's fixes rank it the same way. A planned upgrade whose worst issue is unrated reads `unrated`, which v0.12.0 drew as `medium`, and the list and its file carry that issue's score in a new `score` field and column. v0.12.0 ordered by the published score alone, so an issue with a word and no score sorted last and a product's own rating moved nothing | A script reading the planned-upgrade file by column position reads it by name |
 | `POST /v1/keys` refuses with 422 a request carrying `secret`, `withdrawn`, `created_at`, `last_used_at` or `product_name`, the fields only its answer holds. v0.12.0 accepted them and ignored them | Send `name`, `product`, `branch_or_tag` and `variant` alone |
 | A serving process stops serving while another process changes the schema, answering as it does while it migrates at start, and exits 1 once a later release has changed it ([Health checks](#health-checks)). An upgrade that changes the schema waits 46 seconds before its first change. v0.12.0 kept serving through another process's upgrade | Stop every v0.12.0 process before this upgrade, which the chart's default `Recreate` does. On ECS, set `minimumHealthyPercent` to 0 for this and every later upgrade |
+| Processes take turns applying the schema through a row in a new table, `schema_lease`, on every database engine. A process that dies while applying it holds the next start for at most 30 seconds. v0.12.0 took a lock held by its database session on PostgreSQL, MySQL and MariaDB, which two processes on two nodes of a cluster taking writes on every node could both hold, and a lock on the file `<database>.migrate-lock` beside a SQLite database | Where processes serve under a credential granted table by table, with `OPENPSIRT_AUTO_MIGRATE` off, grant it reading `schema_lease` once the upgrade has made it. A SQLite deployment may delete `<database>.migrate-lock` |
 
 #### VEX statements from v0.12.0
 

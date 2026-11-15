@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
 // describe is a database's schema as lines of text, one per column, index and
@@ -25,7 +26,8 @@ import (
 //
 // The migration library's own bookkeeping table is left out. The library
 // creates it and chooses its column types, and a release of the library
-// changes them without any migration here changing.
+// changes them without any migration here changing. So is the migration
+// lease's table, which the migrator makes before any migration runs.
 func describe(t *testing.T, ctx context.Context, db *database.DB) []string {
 	t.Helper()
 	var queries []string
@@ -90,7 +92,7 @@ func describe(t *testing.T, ctx context.Context, db *database.DB) []string {
 const bookkeeping = "goose_db_version"
 
 // ours is a description without the lines about the migration library's
-// bookkeeping table. A line names its table after the kind of thing it
+// bookkeeping table and the migration lease's table. A line names its table after the kind of thing it
 // describes, and a column line names it before a dot.
 func ours(lines []string) []string {
 	return slices.DeleteFunc(lines, func(line string) bool {
@@ -103,7 +105,7 @@ func ours(lines []string) []string {
 		}
 		table, _, _ := strings.Cut(rest, " ")
 		table, _, _ = strings.Cut(table, ".")
-		return table == bookkeeping
+		return table == bookkeeping || table == migrate.LeaseTable
 	})
 }
 

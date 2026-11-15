@@ -39,7 +39,7 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger) error {
 	if err := migrate.Up(ctx, db, logger, Notice); err != nil {
 		return err
 	}
-	// Asked again once the lock is released: a later release may have
+	// Asked again once the lease is let go: a later release may have
 	// migrated while this one waited on it, which leaves this one nothing to
 	// apply and a schema it cannot read.
 	return NotAhead(ctx, db)
@@ -59,12 +59,12 @@ const (
 	LookWithin    = 2 * time.Second
 )
 
-// Notice is how long an upgrade waits, holding the schema change lock, before
-// its first statement: for every serving instance to see the lock, the rest
-// of a look that asked just before the lock was taken, an interval and one
-// whole look; then the thirty seconds the longest write a stopped request or
-// pass goes on with is bounded by (recording a patch branch visit, cleaning
-// up an attachment), and a second more.
+// Notice is how long an upgrade waits, holding the migration lease to change
+// the schema, before its first statement: for every serving instance to see
+// it, the rest of a look that asked just before it was written, an interval
+// and one whole look; then the thirty seconds the longest write a stopped
+// request or pass goes on with is bounded by (recording a patch branch visit,
+// cleaning up an attachment), and a second more.
 const Notice = LookWithin + WatchEvery + AcquireWithin + LookWithin + 30*time.Second + time.Second
 
 // Standing is what an instance serving a database makes of its schema.
@@ -80,7 +80,7 @@ const (
 	// serves again.
 	Superseded
 	// Stranded is a schema at or behind this build's version that an upgrade
-	// left with its record standing and nothing holding the lock: on MySQL or
+	// left with its record standing and no lease held to change it: on MySQL or
 	// MariaDB part changed by an upgrade that failed, or committed by a
 	// migration whose version was never recorded. Nothing serves it until an
 	// upgrade reaches the version the record names or the backup is restored.

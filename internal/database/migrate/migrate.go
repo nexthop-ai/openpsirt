@@ -29,11 +29,11 @@ import (
 //
 // It exists because the migration library keeps its dialect and logger in
 // package-level state. Two goroutines migrating at once would race on those
-// regardless of any database lock — a real race, and one the race detector
+// regardless of the migration lease — a real race, and one the race detector
 // finds immediately. Migrations are rare and brief, so serializing them
 // process-wide costs nothing and removes the whole class of problem.
 //
-// This is separate from the database lock, which excludes *other processes*.
+// This is separate from the migration lease, which excludes *other processes*.
 // Both are needed: this one for goroutines here, that one for instances
 // elsewhere.
 var running sync.Mutex
@@ -90,14 +90,15 @@ func gooseDialect(e database.Engine) (goose.Dialect, error) {
 	return "", fmt.Errorf("no migration dialect for %s", e)
 }
 
-// Up applies every outstanding migration, holding the lock while it does.
+// Up applies every outstanding migration, holding the migration lease while
+// it does.
 //
-// Where a migration is outstanding it also holds the schema change lock, from
-// before the first statement until after the last, which tells an instance
-// serving the database to stop. On a database holding a schema it then waits
-// notice before the first statement, for those instances to see the lock and
-// stop. A start with nothing to apply never takes the change lock, so a
-// replica starting beside others pauses none of them.
+// Where a migration is outstanding it holds the lease to change the schema,
+// from before the first statement until after the last, which tells an
+// instance serving the database to stop. On a database holding a schema it
+// then waits notice before the first statement, for those instances to see it
+// and stop. A start with nothing to apply never holds it to change the
+// schema, so a replica starting beside others pauses none of them.
 func Up(ctx context.Context, db *database.DB, logger *slog.Logger, notice time.Duration) error {
 	return withLock(ctx, db, logger, func(ctx context.Context, lock *held) (failed error) {
 		before, err := goose.GetDBVersionContext(ctx, db.DB.DB)
@@ -129,7 +130,7 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger, notice time.D
 	})
 }
 
-// changeSchema takes the schema change lock where a migration after before
+// changeSchema holds the lease to change the schema where a migration after before
 // and up to target is outstanding, waits notice on a database holding a
 // schema, records the change where the database keeps that record, and answers
 // what ends the change given how the upgrade ended. Where nothing is
@@ -141,8 +142,8 @@ func Up(ctx context.Context, db *database.DB, logger *slog.Logger, notice time.D
 // changed, so the record stays, and every serving instance stays paused,
 // until an upgrade reaches the version it names or the backup is restored.
 //
-// A release of the lock that fails is logged: the migration lock's release
-// follows on the same session, and reports a session lost part way.
+// Going back to holding the lease to migrate is logged where it fails: the
+// lease's release follows, and reports a lease lost part way.
 func changeSchema(ctx context.Context, db *database.DB, lock *held, logger *slog.Logger, before, target int64,
 	notice time.Duration) (func(error), error) {
 	nothing := func(error) {}
@@ -162,8 +163,8 @@ func changeSchema(ctx context.Context, db *database.DB, lock *held, logger *slog
 	return beginChange(ctx, db, lock, logger, before, outstanding[len(outstanding)-1].Version, notice)
 }
 
-// beginChange takes the schema change lock, waits notice on a database
-// holding a schema, and records the change, as changeSchema says.
+// beginChange holds the lease to change the schema, waits notice on a
+// database holding a schema, and records the change, as changeSchema says.
 func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.Logger, before, target int64,
 	notice time.Duration) (func(error), error) {
 	release, err := lock.change(ctx)
@@ -172,7 +173,7 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 	}
 	let := func() {
 		if err := releaseWithin(ctx, release); err != nil {
-			logger.Warn("could not release the schema change lock", "error", err)
+			logger.Warn("could not hold the migration lease to migrate again", "error", err)
 		}
 	}
 	if before != 0 && notice > 0 {
@@ -185,13 +186,18 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 		}
 	}
 	// Written once the notice has passed, just before the first statement:
-	// the lock alone covers the notice, and a record written earlier would
+	// the lease alone covers the notice, and a record written earlier would
 	// outlive a process killed during it with nothing changed.
 	if err := recordChange(ctx, db, target); err != nil {
 		let()
 		return nil, err
 	}
 	stop := func(failed error) {
+		// A holder that lost its lease sends nothing more; the instance
+		// that took it clears what the version reached.
+		if lost := context.Cause(lock.ctx); errors.Is(lost, errLeaseLost) {
+			return
+		}
 		applied, err := appliedNow(ctx, db)
 		if err != nil {
 			logger.Warn("could not read the schema version after changing it, so every record of the "+
@@ -250,20 +256,20 @@ func recordChange(ctx context.Context, db *database.DB, target int64) error {
 	return nil
 }
 
-// appliedNow reads the schema version an upgrade reached, bounded as a
-// release is, whatever happened to ctx.
+// appliedNow reads the schema version an upgrade reached, within cleanupWait,
+// whatever happened to ctx.
 func appliedNow(ctx context.Context, db *database.DB) (int64, error) {
-	reading, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+	reading, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
 	defer cancel()
 	return goose.GetDBVersionContext(reading, db.DB.DB)
 }
 
 // clearReached removes every record of an upgrade changing the schema to a
 // version no later than reached, which nothing reads as changing any more.
-// Bounded as a release is, whatever happened to ctx; a failure is logged,
-// since a record the version applied has reached pauses nobody.
+// Within cleanupWait, whatever happened to ctx; a failure is logged, since a
+// record the version applied has reached pauses nobody.
 func clearReached(ctx context.Context, db *database.DB, reached int64, logger *slog.Logger) {
-	clearing, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+	clearing, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
 	defer cancel()
 	there, err := tableExists(clearing, db, ChangeTable)
 	if err == nil && there {
@@ -275,7 +281,7 @@ func clearReached(ctx context.Context, db *database.DB, reached int64, logger *s
 }
 
 // refreshStatistics analyzes every table once migrations have changed the
-// schema, under the lock and with no deadline, as the migration has none.
+// schema, under the lease and with no deadline, as the migration has none.
 //
 // An upgrade leaves the planner's statistics describing a schema that is
 // gone. On SQLite an index the upgrade adds has none beside indexes that keep
@@ -333,15 +339,15 @@ func upFailed(engine database.Engine, before int64, err error) error {
 }
 
 // UpTo applies the outstanding migrations up to and including a version,
-// holding the lock while it does. A test builds the schema a release shipped
-// with it.
-func UpTo(ctx context.Context, db *database.DB, logger *slog.Logger, version int64) error {
+// holding the lease while it does, and giving notice as Up does. A test
+// builds the schema a release shipped with it.
+func UpTo(ctx context.Context, db *database.DB, logger *slog.Logger, version int64, notice time.Duration) error {
 	return withLock(ctx, db, logger, func(ctx context.Context, lock *held) (failed error) {
 		before, err := goose.GetDBVersionContext(ctx, db.DB.DB)
 		if err != nil {
 			return fmt.Errorf("read schema version: %w", err)
 		}
-		stopChanging, err := changeSchema(ctx, db, lock, logger, before, version, 0)
+		stopChanging, err := changeSchema(ctx, db, lock, logger, before, version, notice)
 		if err != nil {
 			return err
 		}
@@ -394,13 +400,13 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger,
 	if err := prepare(db); err != nil {
 		return err
 	}
-	// The lock holds one pooled connection for the whole migration and the
-	// migration runs on another. A pool of one would have the migration wait
-	// for the lock's connection, with no deadline, for ever. SQLite is exempt:
-	// its lock is on a file rather than a connection.
+	// The lease is renewed on a pooled connection while the migration runs
+	// on another. On a pool of one a renewal would wait out a long statement
+	// and the holder stop part way. SQLite is exempt: it migrates on one
+	// connection, and its renewals wait for it.
 	if db.Server.Engine != database.SQLite && db.Stats().MaxOpenConnections == 1 {
-		return fmt.Errorf("the migration lock holds one connection and the migrations "+
-			"need another: raise %s to at least 2", dbMaxOpen)
+		return fmt.Errorf("the migration lease is renewed on one connection while the migrations "+
+			"use another: raise %s to at least 2", dbMaxOpen)
 	}
 	ctx = WithEngine(ctx, db.Server.Engine, logger)
 
@@ -429,29 +435,30 @@ func withLock(ctx context.Context, db *database.DB, logger *slog.Logger,
 	defer func() {
 		err := releaseWithin(ctx, lock.release)
 		switch {
+		case errors.Is(err, errLeaseLost):
+			// A lease lost part way may have been taken by another instance,
+			// which then migrated alongside. What ran under it is not
+			// certain, and that is reported whatever the work answered.
+			if failed != nil {
+				logger.Warn("the migration ended part way", "error", failed)
+			}
+			failed = fmt.Errorf("the migration lost its lease, so another instance may have migrated "+
+				"at the same time: %w", err)
 		case err == nil:
 		case failed == nil:
-			// A lock this session no longer holds when the work is done is
-			// one it may have lost part way, and another instance may have
-			// migrated alongside it. The work finished; what it ran under is
-			// not certain, and that is reported rather than logged.
-			failed = fmt.Errorf("the migration finished and its lock could not be released "+
-				"as held, so another instance may have migrated at the same time: %w", err)
+			failed = fmt.Errorf("the migration finished and its lease could not be let go: %w", err)
 		default:
-			logger.Warn("could not release the migration lock", "error", err)
+			logger.Warn("could not let the migration lease go", "error", err)
 		}
 	}()
 
-	return fn(ctx, lock)
+	return fn(lock.ctx, lock)
 }
 
-// releaseWithin releases the migration lock within resetWait, whatever
-// happened to ctx, and a release answering past it is reported. An unlock
-// that fails has its connection closed, never pooled, which ends the session
-// and frees the lock on the server. A keep-alive use still running leaves the
-// connection to be closed once that use ends.
+// releaseWithin lets the migration lease go within cleanupWait, whatever
+// happened to ctx. A row left standing lapses leaseFor after its last renewal.
 func releaseWithin(ctx context.Context, release unlock) error {
-	releasing, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+	releasing, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupWait)
 	defer cancel()
 	return release(releasing)
 }

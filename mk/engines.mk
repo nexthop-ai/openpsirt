@@ -71,9 +71,8 @@ ifneq ($(ENGINES_MISSING),)
 	@exit 1
 endif
 	@every=$$($(GO) run ./internal/tools/engines) || exit 1; \
-	  servers=$$($(GO) run ./internal/tools/engines servers) || exit 1; \
 	  partial=$$($(GO) run ./internal/tools/engines partial) || exit 1; \
-	  [ -n "$$every" ] && [ -n "$$servers" ] && [ -n "$$partial" ] \
+	  [ -n "$$every" ] && [ -n "$$partial" ] \
 	    || { echo "the engine list came back empty, so these greps check nothing"; exit 1; }; \
 	  out=$$(mktemp); trap 'rm -f "$$out"' EXIT; \
 	  $(GO) test $(ENGINES_TEST) ./internal/schema/ -count=1 -v -run TestMigrationsApplyOnEveryEngine \
@@ -82,11 +81,11 @@ endif
 	    grep -q "PASS: TestMigrationsApplyOnEveryEngine/$$engine" "$$out" \
 	      || { echo "$$engine did not run"; exit 1; }; \
 	  done; \
-	  $(GO) test $(ENGINES_TEST) ./internal/database/migrate/ -count=1 -v -run TestLockExcludes \
+	  $(GO) test $(ENGINES_TEST) ./internal/database/migrate/ -count=1 -v -run TestOneClaimantHoldsTheLeaseAtATime \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \
-	  for engine in $$servers; do \
-	    grep -q "PASS: TestLockExcludesAnotherConnection/$$engine" "$$out" \
-	      || { echo "the migration lock was not exercised on $$engine"; exit 1; }; \
+	  for engine in $$every; do \
+	    grep -q "PASS: TestOneClaimantHoldsTheLeaseAtATime/$$engine" "$$out" \
+	      || { echo "the migration lease was not exercised on $$engine"; exit 1; }; \
 	  done; \
 	  $(GO) test $(ENGINES_TEST) ./internal/dbtest/ -count=1 -v -run TestEachEngineIsTheEngineItSaysItIs \
 	    > "$$out" 2>&1 || { cat "$$out"; exit 1; }; \

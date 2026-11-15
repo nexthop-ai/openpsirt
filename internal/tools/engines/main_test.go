@@ -14,7 +14,6 @@ func TestEachListIsReadFromTheEnumeration(t *testing.T) {
 		want  string
 	}{
 		{"", "[postgres mysql mariadb sqlite]"},
-		{"servers", "[postgres mysql mariadb]"},
 		{"partial", "[mysql mariadb]"},
 	} {
 		got, err := listed(c.which)

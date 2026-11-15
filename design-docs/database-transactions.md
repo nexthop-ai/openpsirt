@@ -24,7 +24,7 @@ and the one in-memory lock stops a process migrating twice.
 | Coordination | Mechanism |
 |---|---|
 | Two workers taking one job | A conditional update; row locking beside it is for throughput (`design-docs/queue.md` § Exclusive handout) |
-| Two replicas migrating at start | A database-level lock (`design-docs/database-migrations.md` § Migration locks) |
+| Two replicas migrating at start | A lease row: a claim inserts it, or writes over a lapsed one matched on the token it read, so the second claimant waits and matches nothing, and a cluster conflicts the two (`design-docs/database-migrations.md` § Migration lease) |
 | Two scans of one build | The apply takes the build's row first, so the second waits rather than interleaving, and a scan applies whole (REQ-06) |
 | A scan and a replaced-inventory check of one build | The check writes a fresh value into the build's row before reading, since a check is never the build's last run, so each waits for the other and a cluster conflicts the two (`design-docs/findings-closure.md` § Replaced inventories) |
 | Two scans merging overlapping issues | Each takes every issue it names by writing a fresh value into its row, and goes again where one is no longer its own issue, so the second waits and a cluster conflicts the two (`design-docs/findings-issues.md` § Merged issues) |

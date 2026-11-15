@@ -5,11 +5,9 @@
 // per line, so that the makefile's checks read the enumeration rather than
 // repeating it.
 //
-// With "servers" it prints the production engines alone, which is what the
-// migration lock is exercised on: SQLite is one process and one file, so there
-// is no second connection to exclude. With "partial" it prints the engines
-// that commit around every data-definition statement, which is where a
-// half-applied migration is run again.
+// With "partial" it prints the engines that commit around every
+// data-definition statement, which is where a half-applied migration is run
+// again.
 package main
 
 import (
@@ -25,12 +23,10 @@ func listed(which string) ([]database.Engine, error) {
 	switch which {
 	case "":
 		keep = func(database.Engine) bool { return true }
-	case "servers":
-		keep = database.Engine.IsProduction
 	case "partial":
 		keep = database.Engine.CommitsDataDefinition
 	default:
-		return nil, fmt.Errorf("engines: %q is not a list this prints; ask for servers, partial or nothing", which)
+		return nil, fmt.Errorf("engines: %q is not a list this prints; ask for partial or nothing", which)
 	}
 	var out []database.Engine
 	for _, engine := range database.Engines() {
