@@ -1061,7 +1061,7 @@ setting.</p>
 <tbody>
 <tr>
 <td><code>strategy</code></td>
-<td><code>Recreate</code> by default, so every pod of the earlier release stops before a pod of this one starts</td>
+<td><code>Recreate</code> by default, so every pod of the earlier release stops before a pod of this one starts. With <code>RollingUpdate</code>, an earlier pod stops serving once a new pod starts changing the schema and exits once the schema is past its own, so an upgrade that changes the schema is an outage either way. A pod of a release whose <a href="../configuration/#from-v0120">upgrade note</a> says it serves through another's upgrade does not stop, so scale to zero first</td>
 </tr>
 <tr>
 <td><code>autoMigrate</code></td>

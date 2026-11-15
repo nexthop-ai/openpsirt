@@ -2353,7 +2353,7 @@ writes <code>text</code>.</p>
 </tr>
 <tr>
 <td><code>/readyz</code></td>
-<td>Once the process serves, and while its database answers</td>
+<td>Once the process serves, while its database answers, and while no other process is changing the schema</td>
 <td>A check that decides whether to send it traffic: a readiness probe, a load balancer's target check</td>
 </tr>
 </tbody>
@@ -2389,11 +2389,68 @@ connected to the database, and then applies the schema. Until it serves:</p>
 </table>
 <p>A second process started while one applies the schema waits for it, answers
 the same way, and logs about once a minute which process holds the migration
-lock. Where the holder stops part way, the waiter applies the schema itself.
-The lock is the server's own, so any account on a MySQL or MariaDB server,
-or any role allowed to connect to the PostgreSQL database, can take it and
-hold every start behind it. The waiter's log line names that connection; end
-it to let the start go on.</p>
+lease and when the lease lapses. The lease is a row in the <code>schema_lease</code>
+table, which the process applying the schema writes again every five seconds.
+Where the holder dies part way, its lease lapses within 30 seconds and the
+waiter applies the schema itself. Any account that may write the table can hold
+the lease and hold every start behind it; deleting the row lets the start go
+on.</p>
+<p>No process serves while another applies the schema, because an answer read
+from a schema part way through a change cannot be trusted. A process that is
+already serving looks every second for another one changing the schema, and
+the one changing it waits 46 seconds before its first change:</p>
+<table>
+<thead>
+<tr>
+<th>The serving process sees</th>
+<th>It</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Another process changing the schema</td>
+<td>Answers as above, so <code>/readyz</code> fails</td>
+</tr>
+<tr>
+<td></td>
+<td>Ends every request it was answering, rolling back its writes; one whose work had already succeeded keeps its answer</td>
+</tr>
+<tr>
+<td></td>
+<td>Stops its background work</td>
+</tr>
+<tr>
+<td></td>
+<td>Serves again once the change ends and the schema is the one it was built for</td>
+</tr>
+<tr>
+<td>A look at the database that cannot take a connection within ten seconds, fails, or takes over two seconds</td>
+<td>Does the same as for a change, and logs it once</td>
+</tr>
+<tr>
+<td>An upgrade on MySQL or MariaDB that failed part way</td>
+<td>Stays paused until an upgrade completes or the backup is restored, because those engines commit each schema change alone</td>
+</tr>
+<tr>
+<td>A schema a later release applied</td>
+<td>Stops, exiting 1 and naming both schema versions, so the platform replaces it</td>
+</tr>
+<tr>
+<td>A schema behind its own, such as a restored backup</td>
+<td>Stops the same way; its next start migrates the database or refuses it</td>
+</tr>
+</tbody>
+</table>
+<p>A process starting while another begins changing the schema refuses to start, and the platform starts it again.</p>
+<p>An upgrade that changes the schema is therefore an outage for as long as its
+migrations take, whatever the deployment's update strategy. One that changes
+nothing pauses nobody.</p>
+<p>A platform that keeps a minimum number of healthy tasks through a deployment
+has to allow none. On ECS, set the service's <code>minimumHealthyPercent</code> to 0, so
+ECS may stop the earlier tasks before it starts the new one, as the chart's
+<code>Recreate</code> does. The earlier tasks stop serving while the new one migrates
+whatever the setting, so a higher minimum keeps nothing serving and holds
+tasks that are about to exit.</p>
 <p>A check on <code>/readyz</code> that ends the process ends a long migration part way, and
 the next process starts it again from the beginning. An AWS Application Load
 Balancer in front of ECS has one health check, which both routes traffic and
@@ -2445,7 +2502,7 @@ decides whether ECS keeps the task. Either of two arrangements works:</p>
 <tr>
 <td><code>OPENPSIRT_DB_MAX_OPEN</code></td>
 <td><code>database.max_open</code></td>
-<td>Most connections open at once, on every engine. At least 2 on a server engine to migrate: the migration lock holds one connection while the migrations use another</td>
+<td>Most connections open at once, on every engine. At least 2 on a server engine to migrate: the migration lease is renewed on one connection while the migrations use another</td>
 <td><code>25</code></td>
 </tr>
 <tr>
@@ -4638,7 +4695,7 @@ from, and every section after it.</p>
 </tr>
 <tr>
 <td>Stop every process of the earlier release</td>
-<td>The Helm chart does this by default: its <code>strategy</code> is <code>Recreate</code>, so every earlier pod stops before a new one starts. With <code>strategy.type: RollingUpdate</code>, scale the deployment to zero first. An upgrade can drop and reshape tables the earlier release reads and writes, so a replica left serving fails on them</td>
+<td>The Helm chart does this by default: its <code>strategy</code> is <code>Recreate</code>, so every earlier pod stops before a new one starts. Coming from a release whose upgrade note says it serves through another process's upgrade, with <code>strategy.type: RollingUpdate</code>, scale the deployment to zero first: it fails on tables the upgrade drops and reshapes. A later release stops serving on its own while another process changes the schema (<a href="#health-checks">Health checks</a>)</td>
 </tr>
 <tr>
 <td>Deploy this release</td>
@@ -5621,6 +5678,14 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <tr>
 <td><code>POST /v1/keys</code> refuses with 422 a request carrying <code>secret</code>, <code>withdrawn</code>, <code>created_at</code>, <code>last_used_at</code> or <code>product_name</code>, the fields only its answer holds. v0.12.0 accepted them and ignored them</td>
 <td>Send <code>name</code>, <code>product</code>, <code>branch_or_tag</code> and <code>variant</code> alone</td>
+</tr>
+<tr>
+<td>A serving process stops serving while another process changes the schema, answering as it does while it migrates at start, and exits 1 once a later release has changed it (<a href="#health-checks">Health checks</a>). An upgrade that changes the schema waits 46 seconds before its first change. v0.12.0 kept serving through another process's upgrade</td>
+<td>Stop every v0.12.0 process before this upgrade, which the chart's default <code>Recreate</code> does. On ECS, set <code>minimumHealthyPercent</code> to 0 for this and every later upgrade</td>
+</tr>
+<tr>
+<td>Processes take turns applying the schema through a row in a new table, <code>schema_lease</code>, on every database engine. A process that dies while applying it holds the next start for at most 30 seconds. v0.12.0 took a lock held by its database session on PostgreSQL, MySQL and MariaDB, which two processes on two nodes of a cluster taking writes on every node could both hold, and a lock on the file <code>&lt;database&gt;.migrate-lock</code> beside a SQLite database</td>
+<td>Where processes serve under a credential granted table by table, with <code>OPENPSIRT_AUTO_MIGRATE</code> off, grant it reading <code>schema_lease</code> and <code>schema_change</code> once the upgrade has made them; a process that cannot read either refuses to start, and pauses where it is serving. A SQLite deployment may delete <code>&lt;database&gt;.migrate-lock</code></td>
 </tr>
 </tbody>
 </table>
