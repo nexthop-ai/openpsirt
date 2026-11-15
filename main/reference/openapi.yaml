@@ -429,6 +429,31 @@ components:
         - superseded
         - digest
       type: object
+    AffectedBuildsBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AffectedBuildsBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          description: The builds it is open at, ordered by branch or tag and variant, at most as many as one write names
+          items:
+            $ref: "#/components/schemas/BuildNamed"
+          maxItems: 200
+          type:
+            - array
+            - "null"
+        more:
+          description: Whether it is open at more builds than one write names, so items is not every build
+          type: boolean
+      required:
+        - items
+        - more
+      type: object
     AffectsBody:
       additionalProperties: false
       properties:
@@ -15466,6 +15491,10 @@ components:
           enum:
             - person
           type: string
+        most_weaknesses:
+          description: The number of weaknesses one recorded flaw states at most. A screen picking them stops at it
+          format: int64
+          type: integer
         name:
           description: The display name, where one is recorded
           type: string
@@ -20956,11 +20985,11 @@ paths:
       description: |-
         Every build that carries this issue, across every product you may see, with how far it has been decided in each.
 
-        One row per build and component, not per occurrence: the same component in two builds is two things somebody ships, and sixty occurrences of it in one build is one piece of work with a count.
+        One row per build and component, with a count of its occurrences.
 
-        Narrowed the way every other read is, per product and per visibility. A page that spans products is exactly where filtering afterwards gets forgotten, and the count is the leak even when no row is shown.
+        The rows, `total` and the count of products cover only products you may read.
 
-        Nothing affected is an answer, not a 404: `total` is zero and `items` is empty, which is what a customer inquiry is asking for. An identifier nobody here has seen answers the same way as one that sits only in products you cannot read — told apart, the pair would say which issues this deployment holds, one guess at a time.
+        An issue that affects nothing you may read answers `total` zero with empty `items`, whether nobody here has seen it or it sits only in products you cannot read.
 
         Answers by any name the issue goes by, with when it was published and last modified as OSV states them.
 
@@ -32305,6 +32334,55 @@ paths:
           - security-testing-triage
         note: A collaborator brought onto this issue may attach to it too.
   /v1/products/{product}/issues/{issue}/builds:
+    get:
+      description: |-
+        Every build of this product where the issue stands open, one row per build, in the shape setting the affected builds takes.
+
+        Answers at most as many builds as one write names, with `more` set where it is open at more. One read answers the whole set, so the set sent back to set the affected builds closes only the builds taken out of it.
+
+        Only builds whose findings you may read are listed.
+
+        Requires: public-read or public-triage or private-read or private-triage or security-testing-read or security-testing-triage on the product. Answers only what you may see.
+      operationId: list-affected-builds
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+        - description: The issue, by any name it is known under
+          in: path
+          name: issue
+          required: true
+          schema:
+            description: The issue, by any name it is known under
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AffectedBuildsBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List the builds an issue is open at
+      tags:
+        - Findings
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-read
+          - public-triage
+          - private-read
+          - private-triage
+          - security-testing-read
+          - security-testing-triage
+        note: Answers only what you may see.
     put:
       description: |-
         Makes the builds this flaw is filed against exactly the ones named.
