@@ -56,6 +56,22 @@ func TestTheHeaderOfTheSecondFormatIsReadWithoutItsContents(t *testing.T) {
 	}
 }
 
+func TestTheFilesOfTheSecondFormatAreWalkedPastOnAHeaderRead(t *testing.T) {
+	// A header read answers a question about the document's own record, so
+	// its files are not walked, and charged, as the full read charges them.
+	withFiles := strings.Replace(minimalSPDX, `"relationships"`,
+		`"files": [{"SPDXID": "SPDXRef-f1", "fileName": "a"}, {"SPDXID": "SPDXRef-f2", "fileName": "b"}],
+  "relationships"`, 1)
+	if _, err := sbom.Read(strings.NewReader(withFiles), sbom.Limits{MaxFiles: 1}); err == nil {
+		t.Fatal("a full read of two files under a bound of one was not refused, so this tests nothing")
+	}
+	header, err := sbom.ReadHeader(strings.NewReader(withFiles), sbom.Limits{MaxFiles: 1})
+	if err != nil {
+		t.Fatalf("a header read was refused for the files it walks past: %v", err)
+	}
+	assertMinimalHeader(t, header.Serial, header.BuiltAt)
+}
+
 func TestBothFormatsAreRefusedByNameRatherThanAtAField(t *testing.T) {
 	for _, tc := range []struct {
 		name, body, want string

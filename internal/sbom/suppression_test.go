@@ -267,6 +267,10 @@ func TestTheComponentATargetNamesIsThePackagesName(t *testing.T) {
 			t.Errorf("%s names component %q, want %q", tc.purl, got, tc.want)
 		}
 	}
+	// An identifier that is not a package identifier names its last segment.
+	if got := (sbom.Target{Purl: "not-a-purl/x"}).ComponentNamed(); got != "x" {
+		t.Errorf("an identifier that is not a package identifier names component %q, want x", got)
+	}
 	if got := (sbom.Target{Purl: "pkg:deb/debian/frr", Name: "frr-shim"}).ComponentNamed(); got != "frr-shim" {
 		t.Errorf("a target with a name of its own names %q", got)
 	}

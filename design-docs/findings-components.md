@@ -52,6 +52,7 @@ ships is not built.
 | Several licenses on one component are one conjunction: joined with AND, repeats dropped, producer's order; a compound entry is parenthesized; a name with spaces is one license | |
 | An identifier beats a name beside it | Another tool can match it |
 | A license element is resolved after the whole document is read | One format points at license elements in no fixed order, possibly at the license list's own address without describing it |
+| A listed license is named by its address in the license list; a listed-license element at any other address names none | An address outside the list is no license's name |
 | Never part of identity; a later report fills a gap | As for suppliers |
 | Bounded to 4,096 characters, cut on a character; the supplier likewise (REQ-69) | One component can list licenses to the document's size |
 | Absent where nothing is stated, and a screen says so | A component scanned before the column existed carries none until a scan of a build shipping it |

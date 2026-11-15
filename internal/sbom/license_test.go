@@ -93,6 +93,23 @@ func TestAnSPDX3LicenseNamedOnlyByTheListIsRead(t *testing.T) {
 	}
 }
 
+func TestAnSPDX3ListedLicenseElementIsReadByItsAddressInTheList(t *testing.T) {
+	// An element at an address outside the list names no listed license,
+	// so its address is never taken for the license's name.
+	doc := read(t, `{"@context":"https://spdx.org/rdf/3.0.1/spdx-context.jsonld","@graph":[
+		{"type":"software_Package","spdxId":"p1","name":"listed","software_packageVersion":"1"},
+		{"type":"software_Package","spdxId":"p2","name":"elsewhere","software_packageVersion":"1"},
+		{"type":"expandedlicensing_ListedLicense","spdxId":"https://spdx.org/licenses/MIT"},
+		{"type":"expandedlicensing_ListedLicense","spdxId":"urn:x:MIT"},
+		{"type":"Relationship","spdxId":"r1","from":"p1","relationshipType":"hasDeclaredLicense",
+		 "to":["https://spdx.org/licenses/MIT"]},
+		{"type":"Relationship","spdxId":"r2","from":"p2","relationshipType":"hasDeclaredLicense","to":["urn:x:MIT"]}]}`)
+	got := licenses(doc)
+	if got["listed"] != "MIT" || got["elsewhere"] != "" {
+		t.Errorf("licenses %v, want MIT for the listed address and none for the other", got)
+	}
+}
+
 func TestADeclaredLicenseStandsOverAConcludedOne(t *testing.T) {
 	// Every fixture package either declares nothing or declares what it
 	// concludes, so these are the only inputs where the order shows.
