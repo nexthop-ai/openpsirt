@@ -130,9 +130,8 @@ func TestAStatementAboutOnePackageIsNotShownAgainstAnotherOfTheSameName(t *testi
 	// A component in the graph is called by its short name, so a statement is
 	// stored and matched under that — and a short name is not a package. Two
 	// registries and two namespaces hold different packages under one, so a
-	// publisher's statement about a scoped npm package was shown against
-	// every component called `parser`, from anywhere, with that publisher's
-	// name on it.
+	// publisher's statement about a scoped npm package is shown against the
+	// package it names and never against every component called `parser`.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		who := f.planner(t, access.PublicTriage, access.PrivateTriage)

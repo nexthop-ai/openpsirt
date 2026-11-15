@@ -97,8 +97,8 @@ type Deciding struct {
 	// Summary, Exploited and LikelihoodPPM are what the issue is and how
 	// likely it is to be used, for somebody judging many issues at once.
 	// Deciding in bulk on less evidence than deciding singly is the wrong way
-	// round: the bulk screen narrows *by* the description and showed neither
-	// it, nor the exploited flag, nor the estimate.
+	// round: the bulk screen narrows by the description, so it shows it, the
+	// exploited flag and the estimate.
 	Summary       string
 	Exploited     bool
 	LikelihoodPPM int
@@ -481,9 +481,9 @@ func (s *Store) OccurrencesOnComponentWithin(ctx context.Context, db bun.IDB,
 // OccurrencesFor resolves every occurrence one issue occupies in one component.
 //
 // This is what a decision made on the finding covers: all of them by default,
-// with a narrower set chosen deliberately. Deciding one occurrence at a time was
-// the only thing on offer, and a finding sitting at thirty occurrences then meant
-// thirty decisions — which is how somebody stops reading.
+// with a narrower set chosen deliberately. Deciding one occurrence at a time, a
+// finding sitting at thirty occurrences would mean thirty decisions — which is
+// how somebody stops reading.
 //
 // Read in one statement and grouped here rather than asked per occurrence. An
 // occurrence is a pair of names and the rows under one are ordered the same way
@@ -577,7 +577,7 @@ func occurrenceColumns(q *bun.SelectQuery, productID int64) *bun.SelectQuery {
 		// The upstream version where one is stated, and the component's own
 		// where none is. Most packages are not forks and state no upstream at
 		// all — measured on a real image, 88% of them — so reading only the
-		// stated one left the version half of the key empty for almost
+		// stated one would leave the version half of the key empty for almost
 		// everything, and a key that never changes is a decision occurrence
 		// that never lapses. A dismissal written about one version would
 		// suppress the same issue in every later one, forever.

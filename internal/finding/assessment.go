@@ -831,9 +831,8 @@ func redue(ctx context.Context, tx bun.IDB, productID, vulnerabilityID int64,
 // reaches a product's own ratings.
 //
 // Paged, with the total counted over the same narrowing rather than summed
-// from the page. Capped at two hundred with no offset and no total, a
-// deployment past that could not read the rest through the API at all and the
-// screen showed a subset and reported it as the list.
+// from the page, because a cap with no offset and no total leaves the rest
+// unreadable through the API and a screen showing a subset as the list.
 func (s *Store) Assessments(ctx context.Context, subject access.Subject, productID int64,
 	state string, limit, offset int) ([]Assessment, map[int64]string, int, error) {
 

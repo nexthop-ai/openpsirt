@@ -17,11 +17,8 @@ import (
 
 // A product's standing, per build.
 //
-// There was no page for one product. "How is SONiC doing" was five
-// requests and a spreadsheet: what is open per build, how much of it is
-// overdue, how much has been decided, when each build was last scanned. Every
-// piece existed and none of them sat together, so the question was answered by
-// somebody who already knew where to look.
+// "How is SONiC doing" in one place: what is open per build, how much of it
+// is overdue, how much has been decided, when each build was last scanned.
 
 // BuildStanding is one build of a product and how far its work has got.
 //

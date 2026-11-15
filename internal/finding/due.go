@@ -250,12 +250,12 @@ type Late struct {
 // OffTheClock is the condition under which a decision standing at a finding
 // takes it off the clock, as SQL, with the values it binds.
 //
-// One spelling, because there were two. What is running out of time excluded
-// any live decision, so a proposal waiting for a second person took a finding off
-// that list for as long as it sat in the queue; what each person was holding
-// excluded nothing, so the same finding still counted as overdue against
-// whoever held it. Two screens answering "is this late" differently is the
-// kind of disagreement that gets one of them ignored.
+// Every reader asking whether a finding is late uses this one predicate, so
+// what is running out of time and what each person is holding agree on it: a
+// proposal waiting for a second person does not take a finding off one list
+// while it still counts as overdue on the other. Two screens answering "is
+// this late" differently is the kind of disagreement that gets one of them
+// ignored.
 //
 // It says what the triage package says when it asks whether a decision applies
 // to an occurrence, and nothing else: this product's decision about this issue
@@ -422,10 +422,9 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 			Where(`"f"."due_at" <= ?`, s.now().UTC().Add(within)).
 			// Nothing the build or a supplier already argued away, and nothing
 			// a decision takes off the clock. Not merely any decision: a
-			// proposal waiting for a second person suppresses nothing, and it
-			// took findings off this list for as long as it sat in the queue —
-			// a quarter, on one — while the same findings still counted as
-			// overdue against whoever held them.
+			// proposal waiting for a second person suppresses nothing, so a
+			// finding stays on this list while it sits in the queue, as it
+			// still counts as overdue against whoever holds it.
 			Where(NotArguedAway).
 			Where("NOT "+standing, args...)
 		if !all {
@@ -455,8 +454,8 @@ func (s *Store) RunningOutPage(ctx context.Context, subject access.Subject, scop
 		// of it is not.
 		ColumnExpr(soleHolderExpr + ` AS "assigned_to"`).
 		// The number of groups the question has, counted over the grouped
-		// result and before the limit. A screen that counted its own page said
-		// two hundred over a list of four hundred and sixty-two.
+		// result and before the limit, because a page's own length is not the
+		// size of the list.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
 		GroupExpr(grouping).
 		// Total over the grouping, so every row has one place and a paged

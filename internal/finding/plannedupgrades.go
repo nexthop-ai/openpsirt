@@ -8,10 +8,7 @@ package finding
 //
 // Two reads that are the same shape and a different question from the findings
 // list: one row per upstream bump with everything it would close, and one row
-// per component with everything open against it. They lived in read.go beside
-// the list itself, which is how a file gets to two and a half thousand lines —
-// each addition is small and beside something related, and nothing is ever the
-// one that made it too long.
+// per component with everything open against it.
 
 import (
 	"context"
@@ -588,9 +585,9 @@ const byBump = "urgency DESC, issues DESC, upstream, fixed_in, fold"
 
 // plannedUpgradeSorted is how the planned-upgrade list is ordered.
 //
-// The list had no order to ask for at all, though every field worth ordering
-// by was already on the row. The ranking it has answers what should worry
-// somebody; nothing answered what to do this afternoon.
+// Any field on the row worth ordering by can be asked for. The default ranking
+// answers what should worry somebody; the others answer what to do this
+// afternoon.
 func plannedUpgradeSorted(filter Filter) string {
 	by, asked := plannedUpgradeOrder[filter.PlannedUpgradeSort]
 	if !asked {
@@ -609,9 +606,9 @@ const byWeight = `issues DESC, places DESC, "f"."component_id"`
 //
 // Weight by default, and any of the keys the findings list takes on request —
 // through the same allowlist and with the same direction, because this is the
-// same population grouped one level up. It answered two of the six and
-// discarded the direction in silence, so somebody asking which package has
-// something due this week was told which package has the most findings.
+// same population grouped one level up. The direction asked for applies to
+// every key, so somebody asking which package has something due this week is
+// told that, never which package has the most findings.
 //
 // The urgency is what is already read for the exploited flag, so asking for it
 // costs nothing: exploited ranks in a band of its own above every severity,
@@ -638,9 +635,9 @@ func componentOrder(filter Filter) string {
 // joined to it, and an issue counts once in its component's band however many
 // fixes its occurrences name. This product's rating where it has stated one,
 // which is what every other surface judges a finding by. Read without it, the
-// strip on each row drew the published rating and a product that had re-rated
-// an issue saw its own decision in the list and the world's in the bars over
-// it.
+// strip on each row would draw the published rating, and a product that had
+// re-rated an issue would see its own decision in the list and the world's in
+// the bars over it.
 //
 // Ranking by count alone is the wrong answer to the question this view asks.
 // A package with forty-four issues outranks one with three criticals, and

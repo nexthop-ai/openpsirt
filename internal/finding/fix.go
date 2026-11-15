@@ -23,11 +23,9 @@ import (
 // Upgrade is one build's commitment to move a fold.
 //
 // Keyed on the build and the fold — the source package at the version it was
-// built at — because that is the unit the work is done in. It was keyed per
-// issue and per component and per target version, so changing which version a
-// release was moving to meant rewriting every row of it, and an issue that
-// arrived overnight against the same package was not covered until somebody
-// declared it too.
+// built at — because that is the unit the work is done in. One row per build
+// and fold means a version change is one row, and a later issue on the
+// package is covered without anybody declaring it again.
 //
 // Coverage is a join, not a stamp. A finding is covered when its component
 // folds to this key in this build; nothing is written onto findings. So one row

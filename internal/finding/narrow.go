@@ -79,9 +79,9 @@ type Filter struct {
 	//
 	// The issue half is what an advisory landing actually asks for. The
 	// first question a PSIRT is asked is "where is CVE-2026-9079 in what we
-	// ship", and matching component names alone answered nothing at all for
-	// it — the box said it searched issues and returned an empty list, which
-	// reads as "we do not ship it".
+	// ship", and matching component names alone answers nothing at all for
+	// it — an empty list from a box that says it searches issues reads as
+	// "we do not ship it".
 	//
 	// Aliases count. An issue is one thing under several names, so
 	// searching the name a reporter used has to reach the row filed under
@@ -275,7 +275,7 @@ type Filter struct {
 	Overdue   bool
 	// FixStates keeps only what upstream has done one of these things
 	// about. HasFix above is the same question asked as a flag and is kept
-	// because it is what the screen's own control has always sent; this
+	// because it is what the screen's own control sends; this
 	// answers the two it cannot — nothing released, and upstream declining
 	// to fix, which is the population that needs a decision rather than a
 	// bump. Those two are one question asked together often enough that a
@@ -290,9 +290,8 @@ type Filter struct {
 	// reported. Empty asks for both.
 	//
 	// A word rather than a flag, because the question has three answers and a
-	// flag has two: the screen offered "Scanner" and could only send the
-	// absence of "entered by hand", so choosing it was indistinguishable from
-	// choosing nothing while the panel went on showing it as chosen.
+	// flag has two: the absence of "entered by hand" cannot say "Scanner", so
+	// choosing it would be indistinguishable from choosing nothing.
 	Origin Origin
 	// Planned keeps or drops what a promised upgrade covers.
 	//
@@ -314,7 +313,7 @@ type Filter struct {
 	// filing, and asking for two of somebody's labels means "either pile".
 	Labels []string
 	// SentBack keeps groups where a live decision is with its author, which is
-	// the row a proposer is looking for and cannot ask for today.
+	// the row a proposer is looking for.
 	SentBack bool
 	// Decision keeps what sits at an occurrence one decision wrote a row for,
 	// and DecisionStates narrows those rows to the ones in these states. Zero
@@ -406,9 +405,7 @@ func (f Filter) severities() []string {
 // and for a word that is not a band.
 func AtLeast(word string) []string {
 	// Compared without regard to capitals, like every other name somebody
-	// types. Compared exactly, a caller sending "High" matched no word and
-	// got no narrowing at all rather than a refusal — the filter silently
-	// did nothing.
+	// types; an unknown word narrows nothing.
 	wanted := strings.ToLower(strings.TrimSpace(word))
 	for i, each := range ranked {
 		if each == wanted {
@@ -621,9 +618,9 @@ func (f Filter) narrowRows(q *bun.SelectQuery) *bun.SelectQuery {
 	if words := f.severities(); len(words) > 0 {
 		// The rating in force here, not the published one. Being able to say
 		// a published rating is wrong is pointless if the filter then ignores
-		// us: a finding reassessed from low to critical had its urgency and
-		// its deadline moved and then disappeared from the list it was now
-		// at the top of. The same expression the floor and the deadline
+		// us: a finding reassessed from low to critical has its urgency and
+		// its deadline moved, and stays on the list it is now at the top of.
+		// The same expression the floor and the deadline
 		// compare, so the three cannot come to disagree.
 		if f.Across {
 			// A list spanning products joins each row's own product's rating
@@ -877,10 +874,10 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 	if f.HasFix {
 		// Unanimity, like the fix-state filter below, which the documentation
 		// above calls the same question asked as a flag. A minimum skips nulls,
-		// so one occurrence with a fixed version admitted the whole group — and
-		// a fold covering a package with a fix and one without answered yes to
-		// this, no to fix_state=fixed and yes to fix_state=mixed: three answers
-		// to one question.
+		// so alone one occurrence with a fixed version would admit the whole
+		// group, and a fold covering a package with a fix and one without would
+		// answer yes to this, no to fix_state=fixed and yes to
+		// fix_state=mixed: three answers to one question.
 		q = q.Having(`MIN("f"."fixed_in") IS NOT NULL AND MIN("f"."fixed_in") <> ?`+
 			" AND "+g.occurrences()+" = "+g.withFix(), "")
 	}
@@ -1118,8 +1115,8 @@ func (f Filter) heldBy(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 		// Something was asked for and none of it could be turned into a
 		// condition: a word this does not know, or "mine" from a subject that
 		// holds no party. That is a narrowing that cannot be applied rather
-		// than no narrowing, and dropping it answered with every finding there
-		// is while the screen went on showing the filter as on.
+		// than no narrowing, and dropping it would answer with every finding
+		// there is while the screen shows the filter as on.
 		return having(q, "1 = 0")
 	}
 	return having(q, "("+strings.Join(says, " OR ")+")", args...)
@@ -1220,10 +1217,9 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 // did — a method rather than a bare field so that a caller who forgets cannot
 // get 1 January year one, which as a deadline reads as "everything is late".
 //
-// Read through the store so a frozen clock reaches it. Reading the wall
-// clock directly is what left the overdue filter untestable, and it meant one
-// request compared "is this overdue" against one moment and "is anything off
-// the clock" against another.
+// Read through the store so a frozen clock reaches it, which makes the
+// overdue filter testable, and so one request compares "is this overdue" and
+// "is anything off the clock" against the same moment.
 func (f Filter) at() time.Time {
 	if f.now != nil {
 		return f.now()
@@ -1272,8 +1268,7 @@ func foldedNames(names []string) []string {
 // The escape character is `#`, and a backslash is what it must not be.
 // MySQL and MariaDB treat a backslash as an escape inside a string literal, so
 // `ESCAPE '\'` is an unterminated string: a syntax error there, and parsed
-// happily by the other two. Caught by the four-engine run, which is the whole
-// reason that run exists.
+// happily by the other two, which only the four-engine run catches.
 //
 // Case is folded here and again by the engine, which is a compromise worth
 // naming. Folding the term in Go is Unicode-aware; `LOWER()` on the column is

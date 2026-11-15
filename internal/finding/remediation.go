@@ -169,9 +169,8 @@ func (s *Store) Remediation(ctx context.Context, subject access.Subject, scope S
 		until = now
 	}
 	// An absent start is the beginning, which is what a zero side of a period
-	// means and what the reports beside this one already do. Substituted with
-	// a default here, a caller asking for an end alone got a window it never
-	// asked for under a response saying the period ran from the beginning.
+	// means and what the reports beside this one do, so a zero since is left
+	// as it is.
 
 	out := &Remediation{TimeToFix: map[string]time.Duration{},
 		FromPublication: map[string]time.Duration{}, Undated: map[string]int{}}

@@ -362,9 +362,9 @@ type Carried struct {
 //
 // The one thing a version comparison can never see. A distribution carries
 // a fix into a package without moving its version, and the only evidence of it
-// is the build saying so in its own inventory — which is stored here and, until
-// now, read by nothing a person could reach. So the answer to "when did we
-// start carrying this, and are we still" was in the database and nowhere else.
+// is the build saying so in its own inventory, stored here, so the build's own
+// claims are the answer to "when did we start carrying this, and are we
+// still".
 //
 // Held over intervals against scans, like the graph: a build argues the
 // same things night after night, and the stretch is what makes this a history

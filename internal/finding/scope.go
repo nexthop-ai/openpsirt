@@ -80,9 +80,9 @@ func (s *Store) Builds(ctx context.Context, scope Scope) ([]int64, error) {
 // A selection that names one whole build is not narrowed by it. The
 // question these two answer is which releases to consider, and a request that
 // has already named the release has answered it. Applied anyway, the defaults —
-// branches, in support — made a tag's own findings screen report "0 of 0"
-// about a build holding twenty-five, and a release past its end of life do the
-// same: correct filters answering a question the caller did not ask.
+// branches, in support — would exclude a tag or a release past its end of
+// life, and its own findings screen would report "0 of 0": correct filters
+// answering a question the caller did not ask.
 func (s *Store) buildsWorking(ctx context.Context, scope Scope, only Workable) ([]int64, error) {
 	if scope.wholeBuild() {
 		only = Workable{}

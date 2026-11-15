@@ -57,9 +57,9 @@ const (
 // Rating is everything on record about an issue that decides where its
 // findings sit and how long they have.
 //
-// One type, read from the issue in one place, because the alternative is what
-// this project keeps being bitten by: the same fact spelled once at ingest and
-// again on reassessment, agreeing until one of them is changed.
+// One type, read from the issue in one place, because the alternative is the
+// same fact spelled once at ingest and again on reassessment, agreeing until
+// one of them is changed.
 type Rating struct {
 	// Published is the word the world rated it. Never overwritten by a
 	// rating of ours — a rating of ours shown where the world's goes reads

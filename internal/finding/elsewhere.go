@@ -84,10 +84,8 @@ type Match struct {
 // The decision itself is skipped: the rows in this build at the very
 // versions being decided are what `at.Occurrences` already counts.
 //
-// One occurrence, answered by the read that takes many. The two were the same
-// statement written out twice, differing by a column, a predicate and a group
-// term — and only the many-occurrence side had any coverage, so the one a route
-// calls was the untested copy.
+// One occurrence, answered by the read that takes many, so there is one
+// statement and the many-occurrence tests cover the route that asks about one.
 func (s *Store) Reaching(ctx context.Context, subject access.Subject, at Deciding,
 	hereBuildID int64) (Reach, error) {
 

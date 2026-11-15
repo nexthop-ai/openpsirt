@@ -146,11 +146,11 @@ func distributionAnswer(identifier string, parts graph.Parts) (Link, bool) {
 // PackagePage is where the package an identifier names is published, or
 // nothing where this knows no address for that kind of package.
 //
-// Exported because the interface had a second table doing the same work, in a
-// second language, with a different membership and different answers: it sent
-// every Debian-family package to Debian's own tracker, so an Ubuntu package's
-// link landed on a record for different code with a different version history
-// and different advisory status. There is one table, and it is this one.
+// Exported so the interface reads the one table of package pages. A second
+// table in a second language would answer differently: sending every
+// Debian-family package to Debian's own tracker lands an Ubuntu package's
+// link on a record for different code with a different version history and
+// different advisory status.
 func PackagePage(purl string) (address, name string) {
 	link, found := packagePage(graph.PartsOfPurl(purl))
 	if !found {
@@ -185,9 +185,8 @@ func packagePage(parts graph.Parts) (Link, bool) {
 		}
 		return Link{URL: "https://packages.debian.org/" + name, Name: "Debian package"}, true
 	// An RPM is not one distribution's, so the namespace decides — the same
-	// rule the arm above follows. Sent to Fedora unconditionally, as the
-	// interface's own table did, a SUSE or Rocky package landed on a record
-	// for different code, which is the failure that table was deleted for. A
+	// rule the arm above follows. Sent to Fedora unconditionally, a SUSE or
+	// Rocky package would land on a record for different code. A
 	// namespace this does not know produces nothing rather than a guess, which
 	// leaves the distribution's own answer for a CVE as what such a package
 	// gets.

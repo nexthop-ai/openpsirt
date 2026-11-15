@@ -39,7 +39,7 @@ type Statement struct {
 	// the four fold differently outside ASCII, and asking them to would
 	// make whether a statement attaches to a finding depend on which one
 	// is running. It also leaves the index over these columns usable,
-	// which wrapping them in a function did not.
+	// which wrapping them in a function would defeat.
 	Publisher     string `bun:"publisher,notnull"`
 	Vulnerability string `bun:"vulnerability,notnull"`
 	Purl          string `bun:"purl"`
@@ -589,8 +589,8 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	// Asked about the issue rather than about the product, because what comes
 	// back is narrowed to this issue's names and this component — it is
 	// evidence for the one finding, and a collaborator brought in on that
-	// finding is who it is for. Asked product-wide, the detail route answered
-	// a fault for the one row their grant exists to let them open.
+	// finding is who it is for. Asked product-wide, the detail route would
+	// answer a fault for the one row their grant exists to let them open.
 	if _, err := access.ReadableOn(subject, productID, vulnerabilityID); err != nil {
 		return nil, err
 	}
@@ -716,9 +716,10 @@ func placedAbove(one Statement, above []graph.Component) bool {
 // The stored name is the short one, because that is what a component in the
 // graph is called and matching on anything else would match nothing. A short
 // name is not a package, though: two registries and two namespaces hold
-// different packages under one, so a publisher's statement about
-// `pkg:npm/@acme/parser` was shown against every component called `parser`,
-// from anywhere, with that publisher's name on it.
+// different packages under one, so matched on the short name alone, a
+// publisher's statement about `pkg:npm/@acme/parser` would be shown against
+// every component called `parser`, from anywhere, with that publisher's name
+// on it.
 //
 // Compared in the type and the namespace, never the version: a statement says
 // which versions it is about in its own terms, and this only asks whether the

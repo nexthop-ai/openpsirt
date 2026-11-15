@@ -150,13 +150,11 @@ func (s *Store) Everywhere(ctx context.Context, subject access.Subject,
 	// so that column is not read and not computed.
 	err = decisionCounts(sightings, `"st"."product_id"`, nil,
 		decisionWaiting, decisionApproved, decisionLapsed).
-		// Grouped on the component itself, not on its name. The total beside
-		// this list counts one sighting per component, and a build that ships
-		// two versions of a name — which is ordinary — folded them into one
-		// row here while the total counted both, so a page of nine rows said
-		// ten. Folding them was wrong on its own terms too: the row carries
-		// one version and one fix version, and two versions of a name are two
-		// different pieces of work.
+		// Grouped on the component itself, not on its name, so each row and
+		// the total beside this list count one sighting per component
+		// version. A build shipping two versions of a name is ordinary, and
+		// the row carries one version and one fix version: two versions of a
+		// name are two different pieces of work.
 		// The name and version the build stated are grouped on as well, one
 		// value each for a component in a build.
 		GroupExpr(`"p"."name", "p"."display_name", "st"."name", "va"."name", "c"."name", "c"."version", "c"."id", `+

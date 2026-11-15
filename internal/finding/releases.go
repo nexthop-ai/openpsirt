@@ -26,10 +26,9 @@ type Release struct {
 	// at there.
 	//
 	// Not a row count. Rows are occurrences, and a component reached twenty
-	// ways carries the same issue twenty times — counting them reported
-	// 241,161 for a build every other screen reports at 7,546. The trend chart
-	// made exactly this mistake and its comment records the fix; this is the
-	// same lesson arriving in a second place.
+	// ways carries the same issue twenty times — counting them reports
+	// 241,161 for a build every other screen reports at 7,546. The trend
+	// chart counts the same way.
 	Open int
 	// BySeverity is that total split the four ways everything else here ranks
 	// by, folded through the one expression the line and the deadline use so a

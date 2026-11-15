@@ -105,9 +105,8 @@ type Group struct {
 	// its author, which is the row the proposer is looking for in the list.
 	SentBack bool
 	// Undisclosed says nothing here has been announced, and DiscloseAt
-	// when the embargo ends. Everything about disclosure existed in the
-	// API and appeared nowhere a person could see it: an undisclosed
-	// recorded flaw rendered identically to any other row.
+	// when the embargo ends, so an undisclosed recorded flaw does not render
+	// identically to any other row.
 	Undisclosed bool
 	DiscloseAt  *time.Time
 	// PublicationUnknown says an occurrence a replaced inventory's check
@@ -301,7 +300,7 @@ func (s *Store) inScope(ctx context.Context, subject access.Subject, scope Scope
 	filter.reader = subject
 	// The store's clock, so the deadline filters compare against the same
 	// moment everything else here does — and so a frozen clock reaches them,
-	// which is what left the overdue filter with no test.
+	// which is what makes the overdue filter testable.
 	filter.now = s.now
 	// The number of builds the selection holds, which is what "differs between
 	// builds" is measured against. The filter cannot see it. The builds
@@ -411,9 +410,9 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 	// walk of one index with nothing looked up. Everything else the row shows
 	// — likelihood and score, how far it has been decided, how many ways
 	// down there are, the fix — is read in a second statement over the fifty
-	// groups on the page. The first version asked all of it in one statement,
-	// and the five correlated decision lookups per row ran against every one
-	// of a build's 240,945 open rows to produce fifty answers.
+	// groups on the page. Asked in one statement, the five correlated
+	// decision lookups per row would run against every one of a build's
+	// 240,945 open rows to produce fifty answers.
 	heads, total, err := s.heads(ctx, buildIDs, visible, limit, offset, filter)
 	if err != nil {
 		return nil, 0, err
@@ -555,11 +554,9 @@ func (s *Store) Groups(ctx context.Context, subject access.Subject, scope Scope,
 
 // groupFrom is the row a person reads, from what the page read about it.
 //
-// The part both lists share. It was written twice, once in each, and the
-// copies had drifted where it matters most: the cross-product list named the
-// severity a report published where the per-product list named the rating in
-// force, so an issue reassessed here read one way on one list and another way
-// on the other — which is the whole point of reassessing it.
+// The part both lists share, so the severity a row reads is the rating in
+// force on each: an issue reassessed here reads the same way on both lists,
+// which is the whole point of reassessing it.
 //
 // Each list's own additions are what differ between them: the way down, for a
 // list of one build; the product and the build to link to, for a list that
@@ -1140,10 +1137,10 @@ func firstLineOf(description string) string {
 		said = said[:stop+1]
 	}
 	// Measured in characters, which is what a reader sees. Measured in bytes,
-	// a summary written in a script taking three bytes a character was cut to
-	// a third of the line — and the search for a space to break at was a byte
-	// index into it, so a line with no space in its first 160 bytes reached
-	// the client cut inside a character.
+	// a summary written in a script taking three bytes a character would be
+	// cut to a third of the line, and a byte index for the space to break at
+	// would cut a line with no space in its first 160 bytes inside a
+	// character.
 	const most = 160
 	if utf8.RuneCountInString(said) > most {
 		cut := bound.HeadRunes(said, most)

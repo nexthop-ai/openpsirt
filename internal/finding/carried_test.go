@@ -15,9 +15,8 @@ import (
 func TestWhatABuildCarriesReadsBackAsAHistory(t *testing.T) {
 	// A distribution carries a fix into a package without moving its
 	// version, and the only evidence is the build saying so in its own
-	// inventory. That was stored and read by nothing, so "when did we
-	// start carrying this, and are we still" had an answer only in the
-	// database.
+	// inventory, so that is what answers "when did we start carrying this,
+	// and are we still".
 	//
 	// A history rather than a list of what is true tonight: a claim that
 	// stopped is the interesting row — somebody dropped a patch, and the
