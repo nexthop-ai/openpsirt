@@ -229,7 +229,7 @@ func TestTheChangeLockFileIsReadableByEveryUserUnderAnyUmask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != changeMode {
-		t.Errorf("the change lock file was created %v under umask 077, want %v", info.Mode().Perm(), changeMode)
+	if info.Mode().Perm()&0o444 != 0o444 {
+		t.Errorf("the change lock file was created %v under umask 077, not readable by every user", info.Mode().Perm())
 	}
 }

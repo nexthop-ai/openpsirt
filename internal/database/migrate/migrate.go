@@ -148,8 +148,7 @@ func changeSchema(ctx context.Context, db *database.DB, lock *held, logger *slog
 	nothing := func(error) {}
 	var outstanding goose.Migrations
 	if target > before {
-		// The library answers an error, not an empty list, where none is
-		// outstanding.
+		// The library answers ErrNoMigrationFiles where none is outstanding.
 		var err error
 		outstanding, err = goose.CollectMigrations(".", before, target)
 		if err != nil && !errors.Is(err, goose.ErrNoMigrationFiles) {
@@ -176,17 +175,22 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 			logger.Warn("could not release the schema change lock", "error", err)
 		}
 	}
-	if err := recordChange(ctx, db, target); err != nil {
+	by, err := recordChange(ctx, db, target)
+	if err != nil {
 		let()
 		return nil, err
 	}
 	stop := func(failed error) {
-		partChanged := failed != nil && partChanges(db.Server.Engine)
-		if partChanged {
+		applied, err := appliedNow(ctx, db)
+		if err != nil {
+			logger.Warn("could not read the schema version after changing it, so every record of the "+
+				"change stands", "error", err)
+		} else {
+			clearReached(ctx, db, applied, logger)
+		}
+		if failed != nil && partChanges(db.Server.Engine) {
 			logger.Warn("the schema is left part changed, so every serving instance stays paused " +
 				"until an upgrade succeeds or the backup taken before it is restored")
-		} else {
-			clearReached(ctx, db, target, logger)
 		}
 		let()
 	}
@@ -194,8 +198,10 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 		logger.Info("waiting for serving instances to stop before changing the schema", "wait", notice)
 		select {
 		case <-ctx.Done():
-			// Nothing has changed yet, on any engine.
-			stop(nil)
+			// Nothing has changed yet, on any engine, so this upgrade's own
+			// record goes.
+			withdraw(ctx, db, by, target, logger)
+			let()
 			return nil, fmt.Errorf("stopped before changing the schema: %w", ctx.Err())
 		case <-time.After(notice):
 		}
@@ -205,9 +211,9 @@ func beginChange(ctx context.Context, db *database.DB, lock *held, logger *slog.
 
 // partChanges reports whether an upgrade on engine that fails part way leaves
 // the schema part changed: MySQL and MariaDB commit each data-definition
-// statement alone. Elsewhere the change lock and the migration's transaction
-// end together, whether the process fails or is killed, so the lock alone
-// says the schema is changing and no record is written.
+// statement alone, so the record is written before the first. Elsewhere a
+// release's migration writes its record in its own transaction, which
+// commits with the schema and rolls back with it, a killed process included.
 func partChanges(engine database.Engine) bool {
 	return engine == database.MySQL || engine == database.MariaDB
 }
@@ -224,13 +230,13 @@ const ChangeTable = "schema_change"
 // A record names the version its upgrade was reaching, so one left by a
 // process ended after its last migration, or by a removal that failed, stops
 // counting once the version applied reaches it.
-func recordChange(ctx context.Context, db *database.DB, target int64) error {
+func recordChange(ctx context.Context, db *database.DB, target int64) (string, error) {
 	if !partChanges(db.Server.Engine) {
-		return nil
+		return "", nil
 	}
 	there, err := tableExists(ctx, db, ChangeTable)
 	if err != nil || !there {
-		return err
+		return "", err
 	}
 	host, err := os.Hostname()
 	if err != nil || host == "" {
@@ -240,9 +246,31 @@ func recordChange(ctx context.Context, db *database.DB, target int64) error {
 	by = bound.HeadRunes(by, database.NameWidth)
 	if _, err := db.ExecContext(ctx, `INSERT INTO "`+ChangeTable+`" ("started_at", "started_by", "target_version")
 		VALUES (?, ?, ?)`, time.Now().UTC(), by, target); err != nil {
-		return fmt.Errorf("record the schema change: %w", err)
+		return "", fmt.Errorf("record the schema change: %w", err)
 	}
-	return nil
+	return by, nil
+}
+
+// withdraw removes the record an upgrade wrote before changing anything,
+// once it stops without changing anything. Bounded as a release is.
+func withdraw(ctx context.Context, db *database.DB, by string, target int64, logger *slog.Logger) {
+	if by == "" {
+		return
+	}
+	clearing, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+	defer cancel()
+	if _, err := db.ExecContext(clearing, `DELETE FROM "`+ChangeTable+`"
+		WHERE "started_by" = ? AND "target_version" = ?`, by, target); err != nil {
+		logger.Warn("could not clear the record of the schema change", "error", err)
+	}
+}
+
+// appliedNow reads the schema version an upgrade reached, bounded as a
+// release is, whatever happened to ctx.
+func appliedNow(ctx context.Context, db *database.DB) (int64, error) {
+	reading, cancel := context.WithTimeout(context.WithoutCancel(ctx), resetWait)
+	defer cancel()
+	return goose.GetDBVersionContext(reading, db.DB.DB)
 }
 
 // clearReached removes every record of an upgrade changing the schema to a

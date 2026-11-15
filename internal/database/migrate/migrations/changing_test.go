@@ -171,3 +171,38 @@ func TestARecordTheVersionHasReachedPausesNobody(t *testing.T) {
 		}
 	})
 }
+
+// A release's upgrade committed with its version left unrecorded, as a process
+// killed between the two leaves it, keeps every serving instance paused on
+// every engine; the upgrade that records the version lets them go.
+func TestAnUpgradeCommittedWithoutItsVersionKeepsInstancesPaused(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0120)
+		if err := migrations.RunV0130Unrecorded(ctx, db); err != nil {
+			t.Fatal(err)
+		}
+		observer, err := migrate.NewObserver(ctx, servingBeside(t, db))
+		if err != nil {
+			t.Fatal(err)
+		}
+		look := func() (bool, int64) {
+			t.Helper()
+			changing, applied, err := observer.Look(ctx, time.Minute, time.Minute)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return changing, applied
+		}
+		if changing, applied := look(); !changing || applied != v0120 {
+			t.Errorf("after the upgrade committed unrecorded a serving instance saw changing %v at %d", changing, applied)
+		}
+		if err := migrate.Up(ctx, db, quiet(), 0); err != nil {
+			t.Fatal(err)
+		}
+		if changing, _ := look(); changing {
+			t.Error("after an upgrade recorded the version a serving instance still saw the schema changing")
+		}
+	})
+}

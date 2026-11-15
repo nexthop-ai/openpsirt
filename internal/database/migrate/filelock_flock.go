@@ -107,20 +107,21 @@ func releaseFile(file *os.File, what string) unlock {
 	}
 }
 
-// changeMode is the schema change lock file's mode: readable by every user.
+// changeMode is the mode the schema change lock file is created with.
 const changeMode os.FileMode = 0o644
 
-// readableByAll gives the schema change lock file changeMode where it lacks
-// it.
+// readableByAll adds read for every user to the schema change lock file's
+// mode where it lacks it, leaving the rest of the mode as it is.
 func readableByAll(file *os.File) error {
 	info, err := file.Stat()
 	if err != nil {
 		return fmt.Errorf("read the schema change lock beside the database: %w", err)
 	}
-	if info.Mode().Perm() == changeMode {
+	perm := info.Mode().Perm()
+	if perm&0o444 == 0o444 {
 		return nil
 	}
-	if err := file.Chmod(changeMode); err != nil {
+	if err := file.Chmod(perm | 0o444); err != nil {
 		return fmt.Errorf("make the schema change lock beside the database readable by every user: %w", err)
 	}
 	return nil
@@ -138,16 +139,17 @@ const changeEvery = 10 * time.Millisecond
 // the wait is logged about once every waitLogEvery.
 //
 // The file holds nothing, and any process that may serve the database reads
-// it, whichever user applies the migrations. Its mode is set after opening,
-// since the process's umask narrows the mode a file is created with.
+// it, whichever user applies the migrations. Read for every user is added
+// after opening, since the process's umask narrows the mode a file is created
+// with; where the file system refuses, the upgrade goes on and says so.
 func changeFile(ctx context.Context, path string, logger *slog.Logger) (unlock, error) {
 	file, err := openLockFile(path, "schema change lock", changeMode)
 	if err != nil {
 		return nil, err
 	}
 	if err := readableByAll(file); err != nil {
-		_ = file.Close()
-		return nil, err
+		logger.Warn("serving instances running as another user cannot look at the schema change lock, "+
+			"and pause until it is readable", "error", err)
 	}
 	since := time.Now()
 	waits := waiting{logger: logger, since: since, change: true}

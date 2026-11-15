@@ -88,6 +88,13 @@ func RunV0110ReportStep(ctx context.Context, db *database.DB) error {
 	})
 }
 
+// RunV0130Unrecorded runs the v0.13.0 upgrade and leaves its version
+// unrecorded: a process killed after the upgrade committed and before the
+// migration library recorded the version.
+func RunV0130Unrecorded(ctx context.Context, db *database.DB) error {
+	return upV0130(migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler)), db.DB.DB)
+}
+
 // RunV0120CheckedStep runs the v0.12.0 upgrade's checked-run step alone, in a
 // transaction of its own as on MySQL and MariaDB: a start that stopped after
 // it, at a later step.

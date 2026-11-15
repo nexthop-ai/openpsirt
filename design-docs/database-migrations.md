@@ -306,11 +306,14 @@ outage for as long as its migrations take.
 | Rule | Reason |
 |---|---|
 | An upgrade takes the schema change lock after reading the version, where a migration is outstanding, and lets it go after the last migration and the statistics refresh, on every path | A start with nothing to apply takes the migration lock alone, so a replica starting beside others pauses none of them |
-| On MySQL and MariaDB, beside the lock, the upgrade writes a row to the schema change record, where the database has that table, naming the last version it applies, and removes it once the upgrade succeeds | The lock goes with its session; the row outlives an upgrade that fails part way |
+| On MySQL and MariaDB, beside the lock, the upgrade writes a row to the schema change record, where the database has that table, naming the last version it applies | The lock goes with its session; the row outlives an upgrade that fails part way |
+| On every engine, a release's migration writes a row naming its version in its own transaction | It commits with the schema and rolls back with it, so a process killed after the commit and before the migration library records the version leaves a row |
+| An upgrade ending any way removes every row naming a version no later than the one then applied | A success leaves no row; a failure leaves the rows of what is still outstanding |
 | A row counts while the version applied is behind the one it names | A row left by a process ended after its last migration, or by a removal that failed, pauses nobody |
 | A start with nothing to apply removes every row the version applied has reached | The record holds only upgrades still outstanding |
-| On MySQL and MariaDB an upgrade ending any other way than success leaves its row | Each data-definition statement commits alone, so the schema is part changed, and nothing serves it until an upgrade reaches the version the row names or the backup is restored |
-| On PostgreSQL and SQLite the upgrade writes no row | The change lock and the migration's transaction end together, a killed process included, leaving the schema of the version recorded |
+| On MySQL and MariaDB a failed upgrade's row stays | Each data-definition statement commits alone, so the schema is part changed, and nothing serves it until an upgrade reaches the version the row names or the backup is restored |
+| On PostgreSQL and SQLite no row is written before the first statement | The change lock and a migration's transaction end together, a killed process included, so a row written ahead would outlive a schema left whole |
+| An upgrade stopped during the notice removes the row it wrote | Nothing has changed |
 | On a database holding a schema, the upgrade waits 46 seconds holding the change lock before its first statement | For every serving instance to see the lock, 15 seconds: the rest of a look that asked just before the lock was taken, an interval, and one whole look; then 30 seconds for the longest write a stopped request or pass goes on with (recording a patch branch visit, cleaning up an attachment), and a second more. A test helper migrating a database it alone holds waits none |
 | A statement already running when an instance pauses holds its tables, and the upgrade waits for it | § Statement lock waits |
 | `openpsirt migrate up` takes the change lock and waits the same way | It is the same upgrade under other credentials |
@@ -320,7 +323,7 @@ outage for as long as its migrations take.
 | A look that cannot take a connection, fails, or overruns either bound reads as Changes, logged once until a look succeeds | An instance that cannot tell whether the schema is changing does not serve it |
 | A look reads the version first, and a version ahead is Superseded even where asking about a change then fails | A later release may have reshaped what that asks |
 | A start looks once more just before its router opens, and refuses to start unless the look finds Serves | Preparing to serve takes up to the startup deadline, longer than the notice |
-| SQLite's change lock file is created readable by every user | Migrations may run as another user than the server, whose looks would otherwise fail |
+| SQLite's change lock file gains read for every user after opening, whatever the umask; where the file system refuses, the upgrade logs it and goes on | Migrations may run as another user than the server, whose looks would otherwise fail and pause it |
 | On SQLite a change lock held past one attempt at the migration lock is logged about once a minute | A serving instance's look holds it for a moment; anything longer is a holder outside the application |
 | On the server engines the change lock held by a session outside the application refuses the upgrade, naming the holder | Only the migration lock's holder takes it |
 | The change lock's statements and the keep-alive never overlap on the lock's connection | A driver may close a connection asked a second question before it has read the first answer, and both locks go with the session |
