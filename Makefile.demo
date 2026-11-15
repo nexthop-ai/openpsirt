@@ -233,7 +233,19 @@ demo-image:
 
 demo-up: demo-down
 	@mkdir -p $(DEMO_DIR)/data $(DEMO_DIR)/grype $(DEMO_DIR)/repositories
-	@$(DOCKER) network create --subnet $(DEMO_SUBNET) $(DEMO_NET) >/dev/null 2>&1 || true
+	@# The proxy's address must fall inside DEMO_SUBNET, which the deployment
+	@# trusts sign-in headers from, so a network left on another range, or one
+	@# that cannot be made, stops here naming the range.
+	@if subnet=$$($(DOCKER) network inspect -f '{{(index .IPAM.Config 0).Subnet}}' $(DEMO_NET) 2>/dev/null); then \
+	  if [ "$$subnet" != "$(DEMO_SUBNET)" ]; then \
+	    echo "  $(DEMO_NET) exists on $$subnet, not $(DEMO_SUBNET)."; \
+	    echo "  Remove it with $(DOCKER) network rm $(DEMO_NET), or set DEMO_SUBNET=$$subnet."; \
+	    exit 1; \
+	  fi; \
+	elif ! $(DOCKER) network create --subnet $(DEMO_SUBNET) $(DEMO_NET) >/dev/null; then \
+	  echo "  could not create $(DEMO_NET) on $(DEMO_SUBNET); set DEMO_SUBNET to a free range."; \
+	  exit 1; \
+	fi
 	@# The vulnerability database is a gigabyte and does not change hourly, so
 	@# it is kept between runs. Removing it is "make demo-reset --hard", which
 	@# is deliberately not a thing: deleting .demo does it.
@@ -316,7 +328,8 @@ demo-up: demo-down
 	      '    # this deployment believes it answers.' \
 	      '    proxy_set_header Host $$http_host;' \
 	      '    proxy_set_header X-Forwarded-For $$remote_addr;' \
-	      '    client_max_body_size 256m;' \
+	      '    client_max_body_size 512m;' \
+	      '    proxy_buffering off;' \
 	      '    proxy_read_timeout 300s;' \
 	      '  }' \
 	      '}' >> $(DEMO_DIR)/proxy.conf; \
@@ -718,14 +731,15 @@ demo-flaw:
 	@# Nothing here refuses a second one: an identifier is minted per record,
 	@# so recording the same flaw twice files two of them. Asked first rather
 	@# than left to the reader to notice they have three.
-	@# `origin=manual` is the parameter the list declares for this. Nothing
-	@# rejects a parameter the list has not heard of, so a wrong one is
-	@# dropped, the count comes back as every finding in the product, and the
-	@# target reports "already recorded" on any deployment ever scanned.
-	@held=$$(curl -sS --noproxy '*' \
-	    "$(DEMO_URL)/v1/products/openpsirt/findings?origin=manual&limit=1" \
-	  | sed -e 's/.*"total":\([0-9]*\).*/\1/' -e 's/^{.*/0/'); \
-	if [ "$${held:-0}" != "0" ]; then \
+	@# `origin=manual` is the parameter the list declares; an undeclared one
+	@# is refused with 400. A count that cannot be read files nothing, since
+	@# filing on a failed read would record a second flaw.
+	@listed=$$(curl -fsS --noproxy '*' \
+	    "$(DEMO_URL)/v1/products/openpsirt/findings?origin=manual&limit=1") \
+	  || { echo "  could not read what is recorded; nothing filed"; exit 1; }; \
+	held=$$(printf '%s' "$$listed" | sed -n 's/.*"total":\([0-9][0-9]*\).*/\1/p'); \
+	case "$$held" in ''|*[!0-9]*) echo "  the count of recorded flaws is unreadable; nothing filed"; exit 1;; esac; \
+	if [ "$$held" != "0" ]; then \
 	  echo "  a flaw is already recorded here — nothing to do"; exit 0; \
 	fi; \
 	filed=$$(curl -sS --noproxy '*' \
@@ -905,5 +919,5 @@ dev-status:
 
 
 dev-reset: dev-down
-	@rm -f $(DEV_DB)
+	@rm -f $(DEV_DB) $(DEV_DB)-wal $(DEV_DB)-shm
 	@echo "  removed $(DEV_DB)"
