@@ -4,7 +4,7 @@
 import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Decide } from "./Decide";
-import { change } from "../test/controls";
+import { change, only, press, tick } from "../test/controls";
 import { DECIDING_AT as at, serveDecider } from "../test/deciding";
 import { accept, client, mounted, screen, settle, watchInvalidations } from "../test/mount";
 
@@ -161,5 +161,76 @@ describe("the decision form's Ctrl+Enter", () => {
         "findings",
       ]),
     );
+  });
+});
+
+describe("what a decision covers", () => {
+  // Three occurrences under two consumers, none decided.
+  const OCCURRENCES = [
+    {
+      occurrence: "kernel/netfilter",
+      component: "openssl",
+      chain: [{ component: "image" }, { component: "kernel" }, { component: "netfilter" }],
+    },
+    {
+      occurrence: "kernel/crypto",
+      component: "openssl",
+      chain: [{ component: "image" }, { component: "kernel" }, { component: "crypto" }],
+    },
+    {
+      occurrence: "sshd/sshd",
+      component: "openssl",
+      chain: [{ component: "image" }, { component: "sshd" }, { component: "sshd" }],
+    },
+  ];
+
+  async function affected() {
+    const sent = accept(() => ({
+      data: { decision_id: 9, recorded: 2, covered: 2, left: 1, needs_approval: false },
+    }));
+    mount.render(screen(<Decide at={at} occurrences={OCCURRENCES} onDone={() => undefined} />));
+    await settle();
+    await press(mount.host(), "Affected");
+    change(mount.host().querySelector("textarea"), "Reachable from the management port.");
+    return sent;
+  }
+
+  it("sends the occurrences left in when some were excluded", async () => {
+    serveDecider();
+    const sent = await affected();
+    await press(mount.host(), "Exclude occurrences…");
+    tick(mount.host(), "sshd");
+    await press(mount.host(), "Submit decision");
+    await settle();
+    const body = only(sent)[1].body as { occurrences?: string[] };
+    expect(body.occurrences).toEqual(["kernel/netfilter", "kernel/crypto"]);
+  });
+
+  it("sends no occurrence list where none was excluded, so it covers every open one", async () => {
+    serveDecider();
+    const sent = await affected();
+    await press(mount.host(), "Submit decision");
+    await settle();
+    expect(only(sent)[1].body).toEqual({
+      outcome: "affected",
+      reasoning: "Reachable from the management port.",
+    });
+  });
+
+  it("sends each other build ticked in review with the version the reach named", async () => {
+    serveDecider({
+      automatic: [],
+      differing: [{ branch_or_tag: "202411", variant: "x", version: "3.0.1", occurrences: 2 }],
+    });
+    const sent = await affected();
+    await press(mount.host(), "Submit decision");
+    const sheet = mount.host().querySelector<HTMLElement>('[role="dialog"]');
+    if (!sheet) throw new Error("no review sheet");
+    tick(sheet, "3.0.1");
+    await press(sheet, "Review and submit → ↵");
+    await press(sheet, "Confirm and submit ↵");
+    await settle();
+    const body = only(sent)[1].body as { also?: unknown };
+    expect(body.also).toEqual([{ branch_or_tag: "202411", variant: "x", version: "3.0.1" }]);
   });
 });
