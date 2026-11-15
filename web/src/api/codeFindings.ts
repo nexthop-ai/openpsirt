@@ -353,14 +353,13 @@ export function useFlawOffer(build: Build, occurrence: string, wanted: boolean) 
 }
 
 // Everything recording as a flaw or including in disclosure can change: the
-// code finding, the queue, the decisions and a flaw that is now on the findings
-// lists.
+// code finding, the queue, the decisions, the flaw offered, and a flaw that is
+// now on the findings lists, which the decision set already moves.
 function useAfterRecordAsFlaw() {
   const queries = useQueryClient();
   const after = useAfterCodeFinding();
   return () => {
     void queries.invalidateQueries({ queryKey: ["code-finding-flaw"] });
-    void queries.invalidateQueries({ queryKey: ["findings"] });
     after();
   };
 }

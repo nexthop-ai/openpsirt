@@ -1,15 +1,26 @@
 // Copyright Nexthop Systems Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
-import { codeFindingTrendRead, useCodeFindings, useAssignCodeFinding } from "./codeFindings";
+import {
+  codeFindingTrendRead,
+  useApproveSuppressionRule,
+  useAssignCodeFinding,
+  useCodeFindings,
+  useDecideCodeFinding,
+  useFixCodeFinding,
+  useIncludeCodeFinding,
+  useProposeSuppressionRule,
+  useRecordAsFlaw,
+  useRetireSuppressionRule,
+  useUndoRecordAsFlaw,
+} from "./codeFindings";
 import { acted } from "../test/acted";
+import { EVERY_DECISION_KEY } from "../test/decisionKeys";
 import { mounted, screen, serve, settle } from "../test/mount";
 
 const mount = mounted();
-
-afterEach(() => vi.restoreAllMocks());
 
 const build = { product: "sonic", branch_or_tag: "master", variant: "broadcom" };
 
@@ -23,6 +34,57 @@ describe("a code finding handed to a holder, once it lands", () => {
       { kind: "team" as const, identity: "kernel" },
     );
     expect(invalidated).toEqual(expect.arrayContaining(["assigned", "holdings", "team-assigned"]));
+  });
+});
+
+// A code finding or a rule moves every decision read and the rules, whose
+// coverage follows either. A key dropped from one of these sets leaves a
+// screen showing what the act changed as it stood before.
+const AFTER_CODE_FINDING = [...EVERY_DECISION_KEY, "suppression-rules"].sort();
+
+// Recording as a flaw also moves the flaw offered and the findings lists the
+// flaw now sits on.
+const AFTER_FLAW = [...AFTER_CODE_FINDING, "code-finding-flaw"].sort();
+
+describe("an act on a code finding or a rule, once it lands", () => {
+  it.each([
+    [
+      "deciding",
+      "POST",
+      () => useDecideCodeFinding(build, "o1"),
+      { state: "false-positive", because: "x" },
+    ],
+    ["fixing", "POST", () => useFixCodeFinding(build, "o1"), { because: "x", fixedIn: 3 }],
+    ["proposing a rule", "POST", () => useProposeSuppressionRule("sonic"), { reasoning: "x" }],
+    ["approving a rule", "POST", () => useApproveSuppressionRule("sonic"), 4],
+    ["retiring a rule", "DELETE", () => useRetireSuppressionRule("sonic"), 4],
+  ] as const)("%s moves every decision read and the rules", async (_, method, hook, vars) => {
+    const { sent, invalidated } = await acted(
+      mount.render,
+      mount.host,
+      method,
+      hook as never,
+      vars as never,
+    );
+    expect(sent).toHaveLength(1);
+    expect(invalidated).toEqual(AFTER_CODE_FINDING);
+  });
+
+  it.each([
+    ["recording as a flaw", "POST", () => useRecordAsFlaw(build, "o1"), { reasoning: "x" }],
+    ["withdrawing the flaw", "POST", () => useUndoRecordAsFlaw(build, "o1"), "x"],
+    ["including in disclosure", "PUT", () => useIncludeCodeFinding(build, "o1"), true],
+    ["leaving out of disclosure", "DELETE", () => useIncludeCodeFinding(build, "o1"), false],
+  ] as const)("%s moves the flaw offered as well", async (_, method, hook, vars) => {
+    const { sent, invalidated } = await acted(
+      mount.render,
+      mount.host,
+      method,
+      hook as never,
+      vars as never,
+    );
+    expect(sent).toHaveLength(1);
+    expect(invalidated).toEqual(AFTER_FLAW);
   });
 });
 
