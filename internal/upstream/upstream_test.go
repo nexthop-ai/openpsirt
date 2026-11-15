@@ -5,6 +5,7 @@ package upstream_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -375,6 +376,53 @@ func TestDecliningAStatementAsksForTriage(t *testing.T) {
 			map[int64][]access.Role{w.fork.ID: {access.PublicRead}}, 0)
 		if _, err := w.findings.Decline(t.Context(), reader, said.ID); err != finding.ErrStatementNotFound {
 			t.Errorf("somebody who only reads the fork declined a statement: %v", err)
+		}
+	})
+}
+
+// Declining sets aside an upstream's word alone. A supplier's VEX statement
+// or advisory is refused by a triager of the product, and stays in force.
+func TestDecliningAStatementThatIsNotAnUpstreamsIsRefused(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		said := w.statement(ownBuild, "")
+		if said == nil {
+			t.Fatal("the statement about the upstream's own build was not recorded")
+		}
+		if _, err := w.DB.DB.NewUpdate().Model((*finding.Statement)(nil)).
+			Set(`"source" = ?`, finding.FromVex).Where(`"id" = ?`, said.ID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.findings.Decline(t.Context(), w.proposer, said.ID); !errors.Is(err, finding.ErrNotUpstream) {
+			t.Errorf("declining a supplier's statement answered %v, want not an upstream's", err)
+		}
+		var declined *time.Time
+		if err := w.DB.DB.NewSelect().Model((*finding.Statement)(nil)).Column("declined_at").
+			Where(`"id" = ?`, said.ID).Scan(t.Context(), &declined); err != nil {
+			t.Fatal(err)
+		}
+		if declined != nil {
+			t.Errorf("the supplier's statement was declined at %s", declined)
+		}
+	})
+}
+
+// The offers of a product are refused to somebody who does not read it,
+// rather than answered as none.
+func TestTheOffersOfAProductTheReaderCannotSeeAreRefused(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		if offers, err := w.findings.Offers(t.Context(), w.proposer, w.fork.ID); err != nil || len(offers) == 0 {
+			t.Fatalf("the fork's triager was offered %d (%v), want the upstream's own-build statements", len(offers), err)
+		}
+		stranger := access.NewPerson(w.proposer.ID, "stranger", false,
+			map[int64][]access.Role{w.Product.ID: {access.PublicRead}}, 0)
+		if offers, err := w.findings.Offers(t.Context(), stranger, w.fork.ID); !errors.Is(err, access.ErrDenied) || offers != nil {
+			t.Errorf("somebody who does not read the fork got %d offers and %v, want a denial", len(offers), err)
 		}
 	})
 }
