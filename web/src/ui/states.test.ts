@@ -8,13 +8,27 @@ import { drawn, said, STATES } from "./states";
 describe("a decision state drawn on any screen", () => {
   // The findings list, the issue screen, a comparison and the register draw
   // the same fact about a group; one color per state, whichever draws it.
-  it("takes the same class on the lists as on a comparison", () => {
-    for (const state of STATES) expect(decidedAs(state).cls).toBe(drawn(state));
+  it("draws each state in its own class", () => {
+    expect(STATES.map(drawn)).toEqual(["open", "waiting", "agreed", "lapsed"]);
   });
 
-  it("takes the same class for a group some occurrences answered and the rest did not", () => {
-    expect(drawn(undefined)).toBe(decidedAs(undefined).cls);
-    expect(drawn("")).toBe(decidedAs("").cls);
+  it("draws a group some occurrences answered and the rest did not as waiting", () => {
+    expect(drawn(undefined)).toBe("waiting");
+    expect(drawn("")).toBe("waiting");
+  });
+
+  it("names each state by the word a row shows, in the class a comparison draws", () => {
+    expect(STATES.map((state) => decidedAs(state))).toEqual([
+      { word: "Undecided", cls: "open" },
+      { word: "Pending", cls: "waiting" },
+      { word: "Decided", cls: "agreed" },
+      { word: "Lapsed", cls: "lapsed" },
+    ]);
+    expect(decidedAs("")).toEqual({ word: "Partly", cls: "waiting" });
+  });
+
+  it("draws a decision sent back to its author as rejected, whatever its state", () => {
+    expect(decidedAs("waiting", true)).toEqual({ word: "Rejected", cls: "lapsed" });
   });
 
   it("is drawn as open where the word is one nobody here knows", () => {

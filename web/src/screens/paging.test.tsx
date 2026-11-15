@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { DisclosureDeadlines } from "./DisclosureDeadlines";
 import { Assignments } from "./Assignments";
 import { location, screen, serve, settle, mounted } from "../test/mount";
+import { change, press } from "../test/controls";
 import { readingDependencies } from "../test/reach";
 
 // A list narrowed or switched starts at its own beginning, and a page past the
@@ -59,6 +60,7 @@ describe("the disclosure deadlines screen", () => {
   it("starts a narrowed list at its beginning", async () => {
     const asked: unknown[] = [];
     serve((path, init) => {
+      if (path === "/v1/session/me") return { data: me };
       if (path === "/v1/disclosure-deadlines") {
         asked.push((init as { params: { query: { offset: number } } }).params.query.offset);
         return { data: { items: [], total: 250 } };
@@ -67,15 +69,10 @@ describe("the disclosure deadlines screen", () => {
     });
     mount.render(screen(<DisclosureDeadlines />, "/disclosure-deadlines"));
     await settle();
-    const next = Array.from(mount.host().querySelectorAll<HTMLButtonElement>("button.chip")).at(-1);
-    act(() => next?.click());
+    await press(mount.host(), "Next");
     await settle();
-    const within = mount.host().querySelector<HTMLSelectElement>("select");
-    act(() => {
-      if (!within) return;
-      within.value = "7";
-      within.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    expect(asked).toEqual([0, 100]);
+    change(mount.host().querySelector("select"), "7");
     await settle();
     expect(asked.at(-1)).toBe(0);
   });

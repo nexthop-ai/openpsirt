@@ -102,7 +102,7 @@ describe("a printed sheet's header", () => {
     );
     mount.render(screen(<Effort />, "/analytics/effort-by-component"));
     await settle();
-    expect(mount.host().textContent).toContain("80");
+    expect(mount.host().textContent).toContain("Showing 1–50 of 80");
   });
 });
 

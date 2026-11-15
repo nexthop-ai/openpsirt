@@ -122,6 +122,7 @@ async function component(as: Who) {
 describe("the component screen", () => {
   it("shows a reader without dependency read no zero and nothing called clean", async () => {
     await component(DEVELOPER);
+    expect(text()).toContain("Releases shipping it1 release");
     expect(text()).not.toContain("nothing open");
     expect(text()).not.toContain("no dependency findings open");
     expect(text()).not.toContain("0 open");
@@ -346,6 +347,7 @@ describe("the home page", () => {
 
   it("draws no lapsed decisions where the reader reads neither family", async () => {
     await home(OTHER_PRODUCT);
+    expect(panels()).toContain("Pending your approval");
     expect(panels()).not.toContain("Lapsed decisions");
   });
 
