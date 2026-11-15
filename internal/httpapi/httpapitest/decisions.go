@@ -68,13 +68,22 @@ func (r *Reach) ScannedTwoIssuesArguing(t *testing.T, hash string, claims []sbom
 // it with the rows it wrote.
 func (r *Reach) Claimed(t *testing.T, who, vulnerability, component, body string) (decision int64, ids []int64) {
 	t.Helper()
-	path := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-		"/findings/%s/components/%s/decision", vulnerability, component)
+	_, decision, ids = r.decided(t, who, fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+		"/findings/%s/components/%s/decision", vulnerability, component), body)
+	return decision, ids
+}
+
+// decided posts a decision as who to path, failing the test unless it is
+// recorded, and answers with the row the response names, the decision and
+// every row it wrote.
+func (r *Reach) decided(t *testing.T, who, path, body string) (row, decision int64, ids []int64) {
+	t.Helper()
 	got := AsPerson(t, r, who, http.MethodPost, path, body)
 	if got.Code != http.StatusCreated {
 		t.Fatalf("deciding answered %d: %s", got.Code, got.Body.String())
 	}
 	var out struct {
+		ID         int64   `json:"id"`
 		DecisionID int64   `json:"decision_id"`
 		IDs        []int64 `json:"ids"`
 	}
@@ -84,7 +93,17 @@ func (r *Reach) Claimed(t *testing.T, who, vulnerability, component, body string
 	if out.DecisionID == 0 {
 		t.Fatalf("a decision came back without its identifier: %s", got.Body.String())
 	}
-	return out.DecisionID, out.IDs
+	return out.ID, out.DecisionID, out.IDs
+}
+
+// BulkDecided records one decision as who over the issues body names at a
+// component of the scanned build, and answers with the decision and the rows
+// it wrote.
+func (r *Reach) BulkDecided(t *testing.T, who, component, body string) (decision int64, ids []int64) {
+	t.Helper()
+	_, decision, ids = r.decided(t, who, "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+		"/components/"+component+"/bulk-decision", body)
+	return decision, ids
 }
 
 const Dismissal = `{"outcome":"not-applicable","justification":"vulnerable_code_not_present",` +
@@ -97,59 +116,37 @@ func (r *Reach) AgreedThenLapsed(t *testing.T) int64 {
 	t.Helper()
 	ctx := t.Context()
 	// One decision over the fold: two packages, two occurrences, one decision.
-	decided := AsPerson(t, r, "triager", http.MethodPost,
-		"/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-			"/components/libcurl4t64/bulk-decision",
+	decision, ids := r.BulkDecided(t, "triager", "libcurl4t64",
 		`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
 			`"justification":"vulnerable_code_cannot_be_controlled_by_adversary",`+
 			`"selected_by":"the transfer path",`+
 			`"reasoning":"Nothing an attacker sends reaches the transfer path."}`)
-	if decided.Code != http.StatusCreated {
-		t.Fatalf("the bulk decision answered %d: %s", decided.Code, decided.Body.String())
+	if len(ids) != 2 {
+		t.Fatalf("the decision covers %d occurrences, want the two of the fold", len(ids))
 	}
-	var made struct {
-		DecisionID int64   `json:"decision_id"`
-		IDs        []int64 `json:"ids"`
-	}
-	if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
-		t.Fatal(err)
-	}
-	if len(made.IDs) != 2 {
-		t.Fatalf("the decision covers %d occurrences, want the two of the fold", len(made.IDs))
-	}
-	r.Agreed(t, made.DecisionID)
+	r.Agreed(t, decision)
 
 	// The code moves under them, which is what a lapse is.
 	r.CurlMovedTo(t, "8.6.0")
 	lapsed, err := r.DB.DB.NewSelect().Table("decision_occurrence").
-		Where(`"decision_id" = ?`, made.DecisionID).Where(`"state" = ?`, "lapsed").Count(ctx)
+		Where(`"decision_id" = ?`, decision).Where(`"state" = ?`, "lapsed").Count(ctx)
 	if err != nil || lapsed != 2 {
 		t.Fatalf("%d rows of the decision lapsed (err %v), want both", lapsed, err)
 	}
 
-	return made.DecisionID
+	return decision
 }
 
 // AgreedAcrossTheFold decides one issue over the curl fold with the reason
 // given, has it agreed to, and answers with the decision.
 func (r *Reach) AgreedAcrossTheFold(t *testing.T, issue, justification string) int64 {
 	t.Helper()
-	decided := AsPerson(t, r, "triager", http.MethodPost,
-		"/v1/products/mine/branches-and-tags/master/variants/broadcom/components/libcurl4t64/bulk-decision",
+	decision, _ := r.BulkDecided(t, "triager", "libcurl4t64",
 		fmt.Sprintf(`{"vulnerabilities":[%q],"outcome":"not-applicable",`+
 			`"justification":%q,"selected_by":"the transfer path",`+
 			`"reasoning":"Judged at 8.4.0."}`, issue, justification))
-	if decided.Code != http.StatusCreated {
-		t.Fatalf("deciding answered %d: %s", decided.Code, decided.Body.String())
-	}
-	var made struct {
-		DecisionID int64 `json:"decision_id"`
-	}
-	if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
-		t.Fatal(err)
-	}
-	r.Agreed(t, made.DecisionID)
-	return made.DecisionID
+	r.Agreed(t, decision)
+	return decision
 }
 
 // Agreed has the reviewer agree to a decision.
@@ -172,10 +169,18 @@ func (r *Reach) AgreedBy(t *testing.T, who string, decision int64) {
 // is what lapses the decisions made about the old one.
 func (r *Reach) CurlMovedTo(t *testing.T, upstream string) {
 	t.Helper()
+	r.MovedTo(t, "%curl%", upstream)
+}
+
+// MovedTo moves every component whose name is like nameLike to a new upstream
+// version and sweeps every build, which is what lapses the decisions made
+// about the old one.
+func (r *Reach) MovedTo(t *testing.T, nameLike, upstream string) {
+	t.Helper()
 	ctx := t.Context()
 	if _, err := r.DB.DB.NewUpdate().Table("component").
 		Set(`"version" = ?`, upstream+"-1").Set(`"upstream_version" = ?`, upstream).
-		Where(`"name" LIKE ?`, "%curl%").Exec(ctx); err != nil {
+		Where(`"name" LIKE ?`, nameLike).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var buildIDs []int64

@@ -839,26 +839,13 @@ func TestABulkDecisionRecordsANarrowingAnApproverCanCheck(t *testing.T) {
 	// has to be able to act on.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedSiblings(t)
-		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
-			"/components/libcurl4t64/bulk-decision"
-
 		// Everything the component holds, described as though it were a subset.
-		everything := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+		everything, _ := r.BulkDecided(t, "triager", "libcurl4t64",
 			`{"vulnerabilities":["CVE-2026-CURL1","CVE-2026-CURL2"],`+
 				`"outcome":"not-applicable",`+
 				`"justification":"vulnerable_code_not_in_execute_path",`+
 				`"selected_by":"only the ones in the transfer path",`+
 				`"reasoning":"The transfer path is never reached from this image."}`)
-		if everything.Code != http.StatusCreated {
-			t.Fatalf("the bulk decision answered %d: %s",
-				everything.Code, everything.Body.String())
-		}
-		var made struct {
-			DecisionID int64 `json:"decision_id"`
-		}
-		if err := json.Unmarshal(everything.Body.Bytes(), &made); err != nil {
-			t.Fatal(err)
-		}
 
 		var detail struct {
 			Decision struct {
@@ -870,7 +857,7 @@ func TestABulkDecisionRecordsANarrowingAnApproverCanCheck(t *testing.T) {
 				} `json:"selection"`
 			} `json:"decision"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.DecisionID), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", everything), &detail)
 		decision := detail.Decision
 		if decision.Selection == nil {
 			t.Fatal("a bulk decision records no narrowing an approver could re-run")
@@ -910,22 +897,11 @@ func TestANarrowedDecisionRecordsWhatThatNarrowingReaches(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		const at = "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
-			"/components/libcurl4t64/bulk-decision"
-		decided := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+		decision, _ := r.BulkDecided(t, "triager", "libcurl4t64",
 			`{"vulnerabilities":["CVE-2026-CURL1"],"outcome":"not-applicable",`+
 				`"justification":"vulnerable_code_not_in_execute_path",`+
 				`"selected_by":"the transfer driver","contains":"driver",`+
 				`"reasoning":"The transfer path is never reached from this image."}`)
-		if decided.Code != http.StatusCreated {
-			t.Fatalf("the bulk decision answered %d: %s", decided.Code, decided.Body.String())
-		}
-		var made struct {
-			DecisionID int64 `json:"decision_id"`
-		}
-		if err := json.Unmarshal(decided.Body.Bytes(), &made); err != nil {
-			t.Fatal(err)
-		}
 		var detail struct {
 			Decision struct {
 				Selection *struct {
@@ -935,7 +911,7 @@ func TestANarrowedDecisionRecordsWhatThatNarrowingReaches(t *testing.T) {
 				} `json:"selection"`
 			} `json:"decision"`
 		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.DecisionID), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", decision), &detail)
 		if detail.Decision.Selection == nil {
 			t.Fatal("a narrowed decision records no narrowing")
 		}
@@ -949,18 +925,12 @@ func TestANarrowedDecisionRecordsWhatThatNarrowingReaches(t *testing.T) {
 		// And a term holding a percent matches the text that holds one rather
 		// than everything. Spliced raw it is a wildcard, and the decision would
 		// record three where the person saw one.
-		escaped := httpapitest.AsPerson(t, r, "triager", http.MethodPost, at,
+		escaped, _ := r.BulkDecided(t, "triager", "libcurl4t64",
 			`{"vulnerabilities":["CVE-2026-CURL2"],"outcome":"not-applicable",`+
 				`"justification":"vulnerable_code_not_in_execute_path",`+
 				`"selected_by":"the ones mentioning a percentage","contains":"100%",`+
 				`"reasoning":"The transfer path is never reached from this image."}`)
-		if escaped.Code != http.StatusCreated {
-			t.Fatalf("the bulk decision answered %d: %s", escaped.Code, escaped.Body.String())
-		}
-		if err := json.Unmarshal(escaped.Body.Bytes(), &made); err != nil {
-			t.Fatal(err)
-		}
-		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", made.DecisionID), &detail)
+		httpapitest.Read(t, r, "triager", fmt.Sprintf("/v1/decisions/%d", escaped), &detail)
 		if detail.Decision.Selection == nil {
 			t.Fatal("a narrowed decision records no narrowing")
 		}

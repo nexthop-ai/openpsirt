@@ -14,7 +14,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
-	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // reaffirmedMany is the answer to one act over many decisions.
@@ -518,21 +517,7 @@ func TestReAffirmingADatedOutcomeOnATagIsRefused(t *testing.T) {
 
 		// The component moves, which lapses the deferral, and the release it
 		// sits in is a tag.
-		if _, err := r.DB.DB.NewUpdate().Table("component").
-			Set(`"version" = ?`, "3.8.0-1").Set(`"upstream_version" = ?`, "3.8.0").
-			Where(`"name" = ?`, "libnl-3-200").Exec(ctx); err != nil {
-			t.Fatal(err)
-		}
-		var buildIDs []int64
-		if err := r.DB.DB.NewSelect().TableExpr(`"build" AS "t"`).
-			ColumnExpr(`"t"."id"`).Scan(ctx, &buildIDs); err != nil {
-			t.Fatal(err)
-		}
-		for _, build := range buildIDs {
-			if _, err := triage.NewStore(r.DB.DB).Lapse(ctx, build); err != nil {
-				t.Fatal(err)
-			}
-		}
+		r.MovedTo(t, "libnl-3-200", "3.8.0")
 		if _, err := r.DB.DB.NewUpdate().Table("branch_or_tag").
 			Set(`"kind" = ?`, catalog.Tag).Where(`"name" = ?`, "master").Exec(ctx); err != nil {
 			t.Fatal(err)

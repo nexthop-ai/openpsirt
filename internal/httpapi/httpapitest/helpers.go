@@ -214,25 +214,11 @@ func (r *Reach) Decided(t *testing.T, occurrence string) int64 {
 // agreed to, commented on or withdrawn — belongs to the decision, never the row.
 func (r *Reach) DecidedAt(t *testing.T, occurrence string) (row, decision int64) {
 	t.Helper()
-	path := fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
-		"/findings/CVE-2026-9999/occurrences/%s/decision", occurrence)
-	got := AsPerson(t, r, "triager", http.MethodPost, path,
+	row, decision, _ = r.decided(t, "triager", fmt.Sprintf("/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+		"/findings/CVE-2026-9999/occurrences/%s/decision", occurrence),
 		`{"outcome":"not-applicable","justification":"vulnerable_code_not_in_execute_path",`+
 			`"reasoning":"The parser is never reached: we only call the encoder."}`)
-	if got.Code != http.StatusCreated {
-		t.Fatalf("proposing answered %d: %s", got.Code, got.Body.String())
-	}
-	var out struct {
-		ID         int64 `json:"id"`
-		DecisionID int64 `json:"decision_id"`
-	}
-	if err := json.Unmarshal(got.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode: %v (%s)", err, got.Body.String())
-	}
-	if out.DecisionID == 0 {
-		t.Fatalf("a decision came back without its identifier: %s", got.Body.String())
-	}
-	return out.ID, out.DecisionID
+	return row, decision
 }
 
 // Read makes a GET as somebody and decodes what came back.
