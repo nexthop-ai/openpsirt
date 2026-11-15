@@ -286,7 +286,7 @@ export function Branches() {
                   <td className="hint">
                     {branchOrTag.last_scan_at ? (
                       /* When it last ran is asked as "is this stale", so the
-                         relative form code findings and the exact day is on the title
+                         relative form leads and the exact day is on the title
                          rather than lost. */
                       <span title={on(branchOrTag.last_scan_at)}>
                         {since(branchOrTag.last_scan_at)}

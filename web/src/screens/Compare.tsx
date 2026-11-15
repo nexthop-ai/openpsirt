@@ -188,8 +188,8 @@ export function Compare() {
               runsIn={{ product, branch_or_tag: to, variant: toVariant }}
             />
 
-            {/* The same comparison in the form it is actually wanted in
-. Asked for rather than always shown: most visits are
+            {/* The same comparison in the form it is actually wanted in.
+                Asked for rather than always shown: most visits are
                 somebody reading the columns, and a wall of markdown above them
                 would be answering a question nobody asked yet. */}
             <div className="actions" style={{ marginTop: 14 }}>

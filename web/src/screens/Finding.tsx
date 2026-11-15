@@ -376,8 +376,8 @@ export function Finding() {
           </Link>{" "}
           › <b>{it.vulnerability}</b>
         </span>
-        {/* Where this sits in the list it was opened from, and the way on
-. Absent where it was not opened from a list, because
+        {/* Where this sits in the list it was opened from, and the way on.
+            Absent where it was not opened from a list, because
             there is then no order for it to be next in. */}
         {walk && (
           <div className="walking">

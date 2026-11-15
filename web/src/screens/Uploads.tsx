@@ -397,8 +397,8 @@ function SBOMs({ build }: { build: Build }) {
         </div>
       )}
 
-      {/* What this line would inherit from another, and which of it to take
-. Here because this is the screen somebody is on when a line
+      {/* What this line would inherit from another, and which of it to take.
+          Here because this is the screen somebody is on when a line
           has just had its first scan, which is the moment the question
           arises. */}
       <Carried at={{ product, branch_or_tag: branchOrTag, variant }} />

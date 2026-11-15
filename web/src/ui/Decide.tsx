@@ -675,8 +675,8 @@ export function Decide({
                 nothing about which is true here. */}
             <option value="">Say which…</option>
             {/* The label and what it says, because the choice made here is
-                what ships to a customer as our statement about their exposure
-. The token itself is on the title, for whoever is
+                what ships to a customer as our statement about their exposure.
+                The token itself is on the title, for whoever is
                 checking what will be exported. */}
             {reasons.map((each) => (
               <option key={each.value} value={each.value} title={each.value}>
