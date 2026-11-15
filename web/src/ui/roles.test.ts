@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { called, ROLES, wouldReachNothing } from "./roles";
+import { called, READING_ROLES, ROLES, wouldReachNothing } from "./roles";
 
 describe("the roles as somebody granting one reads them", () => {
   it("gives every role a label that is not its own token", () => {
@@ -13,6 +13,14 @@ describe("the roles as somebody granting one reads them", () => {
       expect(each.label).not.toBe(each.role);
       expect(each.means.length).toBeGreaterThan(10);
     }
+  });
+
+  it("names every reading role as one a read-only token holds", () => {
+    // A read-only token holds these, so a reading role left out reads less
+    // than its owner does.
+    const reading = ROLES.map((each) => each.role).filter((role) => role.endsWith("-read"));
+    expect(reading.length).toBeGreaterThan(0);
+    expect(READING_ROLES).toEqual(reading);
   });
 
   it("shows a role it does not know rather than nothing", () => {
