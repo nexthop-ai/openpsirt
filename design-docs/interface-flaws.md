@@ -32,7 +32,7 @@ recorded. Not from the findings list: what is recorded is what the list lacks.
 | The disclosure date an outside undisclosed report gets is stated as this deployment's embargo, the `disclosure.after` length `session/me` publishes; before that answer arrives, the option names no length | |
 | The severity has no default and may stay unset; an unrated flaw has no deadline until rated (REQ-33), and the hint says so | |
 | Builds are sets of lines and variants ticked under one product, prefilled from the scope without constraint, the count of builds stated | One flaw is one issue in every build shipping the code |
-| The component is searched against what the build holds; a name held at two versions is asked | A typed name the server refuses |
+| The component is searched against what the build holds; a name held at two versions is asked, and the versions offered and the one picked go when the component, product or builds change | A typed name the server refuses; a version offered for one component names another |
 | The score is composed as a vector in words and computed on the server, settling the severity | One formula |
 | The scheme is picked and the metrics follow: version 4 asks eleven, version 3 eight, the two they share in different words; switching keeps shared answers, and a vector seeded or pasted keeps only the values its scheme offers | A value the scheme does not offer composes a vector the scoring refuses |
 | A new assessment is composed under 3.1; choosing version 4 says it publishes no score | A published advisory has no field for a version 4 score |

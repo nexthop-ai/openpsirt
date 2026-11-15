@@ -87,14 +87,6 @@ export function RecordFlaw() {
   const [version, setVersion] = useState("");
   const [ecosystem, setEcosystem] = useState("");
   const [namespace, setNamespace] = useState("");
-  // The component and the version picked for it go together: a version picked
-  // from one refusal names a component in the builds that refusal was about.
-  function nameComponent(next: string) {
-    setComponent(next);
-    setVersion("");
-    setEcosystem("");
-    setNamespace("");
-  }
   // The button somebody pressed, and nothing until they press one. The
   // value that is read is worked out below, because what is on offer depends
   // on a right that is not known until the session is.
@@ -267,6 +259,16 @@ export function RecordFlaw() {
       navigate(onward);
     },
   });
+  // The component and the version picked for it go together: a version picked
+  // from one refusal names a component in the builds that refusal was about,
+  // and the refusal offering those versions goes with them.
+  function nameComponent(next: string) {
+    setComponent(next);
+    setVersion("");
+    setEcosystem("");
+    setNamespace("");
+    record.reset();
+  }
 
   // Filed for judging: the decision, where it came from, and what arrived with it.
   // The files go against the report, which is what exists once this is done.
