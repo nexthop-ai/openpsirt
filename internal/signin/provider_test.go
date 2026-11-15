@@ -576,8 +576,7 @@ func TestAnOrganizationIsMatchedHoweverItWasTyped(t *testing.T) {
 	// group-bound mode.
 	// Both spellings vary: what the operator typed, and what GitHub hands
 	// back. GitHub answers with the organization's canonical casing, which is
-	// whatever its owner registered — so folding the operator's input at
-	// construction is half the rule and folding at the compare is the other.
+	// whatever its owner registered, so the compare folds both sides.
 	for _, c := range []struct{ typed, canonical string }{
 		{"nexthop-ai", "nexthop-ai"},
 		{"Nexthop-AI", "nexthop-ai"},

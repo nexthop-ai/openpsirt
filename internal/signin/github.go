@@ -31,9 +31,9 @@ type GitHub struct {
 	// organization bounds whose teams count as groups. Without it every team
 	// in every organization somebody belongs to would map to roles here.
 	//
-	// Folded at construction, because GitHub's organization logins are
-	// case-insensitive to look up and canonical in what it hands back — so an
-	// operator's spelling and GitHub's need not match byte for byte.
+	// Held as the operator typed it, trimmed. GitHub's organization logins
+	// are case-insensitive to look up and canonical in what it hands back, so
+	// the compare in teams folds both sides.
 	organization string
 	// api is where the account and the teams are read from.
 	//
@@ -81,7 +81,7 @@ func NewGitHub(cfg GitHubConfig) (*GitHub, error) {
 			Endpoint: github.Endpoint, Scopes: scopes,
 		},
 		client:       outward.Guarded(gitHubAPI, gitHubAuth),
-		organization: strings.ToLower(strings.TrimSpace(cfg.Organization)),
+		organization: strings.TrimSpace(cfg.Organization),
 		api:          "https://" + gitHubAPI,
 	}, nil
 }
