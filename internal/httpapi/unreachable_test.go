@@ -79,6 +79,7 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 			{"the chains your own work sits on",
 				"/v1/products/mine/branches-and-tags/master/variants/broadcom/components/mine"},
 		} {
+			logged.lines, logged.errors = 0, 0
 			req := httptest.NewRequest(http.MethodGet, c.path, nil)
 			req.Header.Set(httpapitest.TestHeader, "reader")
 			httpapitest.FromOurOwnPage(req)
@@ -103,12 +104,11 @@ func TestADatabaseNobodyCanReachIsNotAnAnswerAboutWhatExists(t *testing.T) {
 						c.through, c.path, rec.Body.String())
 				}
 			}
-		}
-
-		// And it is reported rather than swallowed: a fault nobody logged is
-		// an outage nobody can find.
-		if logged.lines == 0 {
-			t.Error("a database nobody can reach produced no log line at all")
+			// And it is reported rather than swallowed, by each route: a
+			// fault nobody logged is an outage nobody can find.
+			if logged.errors == 0 {
+				t.Errorf("%s: a database nobody can reach logged no error for %s", c.through, c.path)
+			}
 		}
 	})
 }
@@ -166,16 +166,19 @@ func TestAFailedReadWithNoPublisherIsAFault(t *testing.T) {
 	})
 }
 
-// counting is a log handler that keeps how many lines were written and none of
-// what was in them.
+// counting is a log handler that keeps how many lines were written, and how
+// many of them were errors, and none of what was in them.
 type counting struct {
 	slog.Handler
-	lines int
+	lines, errors int
 }
 
 func (c *counting) Enabled(context.Context, slog.Level) bool { return true }
-func (c *counting) Handle(context.Context, slog.Record) error {
+func (c *counting) Handle(_ context.Context, r slog.Record) error {
 	c.lines++
+	if r.Level >= slog.LevelError {
+		c.errors++
+	}
 	return nil
 }
 func (c *counting) WithAttrs([]slog.Attr) slog.Handler { return c }
