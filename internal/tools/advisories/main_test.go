@@ -148,8 +148,11 @@ func TestAGoFindingCountsWhereSomethingCallsIt(t *testing.T) {
 }
 
 func TestGovulncheckOutputWithoutAConfigurationIsRefused(t *testing.T) {
-	if _, err := goFindings(strings.NewReader(`{"osv":{"id":"GO-2026-1"}}`)); err == nil {
-		t.Error("a stream with no configuration message read as a clean scan")
+	// An inventory is there, so the missing configuration is the one thing
+	// the stream can be refused for.
+	stream := `{"SBOM":{"modules":[{"path":"m"}]}}` + "\n" + `{"osv":{"id":"GO-2026-1"}}`
+	if _, err := goFindings(strings.NewReader(stream)); err == nil || !strings.Contains(err.Error(), "configuration") {
+		t.Errorf("a stream with no configuration message answered %v, want the refusal naming it", err)
 	}
 }
 
