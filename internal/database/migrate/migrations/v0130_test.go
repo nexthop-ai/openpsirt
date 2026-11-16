@@ -408,7 +408,7 @@ func TestAnAdvisoryTheV0130UpgradeRewritesReadsAsUnchanged(t *testing.T) {
 					"tracking": map[string]any{
 						"id": "OPSIRT-1", "status": "final", "version": "2",
 						"current_release_date": "2026-11-12T02:00:00Z",
-						"revision_history": []any{map[string]any{"number": "2"}},
+						"revision_history":     []any{map[string]any{"number": "2"}},
 					},
 					"references": []any{map[string]any{"category": "self", "url": "https://x/1.json"}},
 				},

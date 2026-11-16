@@ -22,6 +22,7 @@ type pages struct {
 // git runs git in dir and answers what it printed.
 func (p *pages) git(dir string, args ...string) string {
 	p.t.Helper()
+	//nolint:gosec // G204: a temporary repository and this file's own arguments
 	cmd := exec.Command("git", append([]string{"-C", dir,
 		"-c", "init.defaultBranch=gh-pages", "-c", "commit.gpgsign=false"}, args...)...)
 	cmd.Env = isolated()
@@ -45,7 +46,7 @@ func isolated() []string {
 func (p *pages) commit(dir string, files map[string]string) {
 	p.t.Helper()
 	for name, body := range files {
-		if err := os.MkdirAll(filepath.Join(dir, filepath.Dir(name)), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(dir, filepath.Dir(name)), 0o750); err != nil {
 			p.t.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
@@ -91,7 +92,7 @@ func (p *pages) push() (string, bool) {
 	if err != nil {
 		p.t.Fatal(err)
 	}
-	cmd := exec.Command(script, p.bundle)
+	cmd := exec.Command(script, p.bundle) //nolint:gosec // G204: this repository's own script, over a temporary bundle
 	cmd.Dir = p.pusher
 	// No identity: the script names its own committer, as a runner has none.
 	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
