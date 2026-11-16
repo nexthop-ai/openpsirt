@@ -16,7 +16,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -70,20 +69,18 @@ type Wrote struct {
 
 // Run writes the documents until the context ends.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {
-	defer p.leases.Handback(ctx, Lease, p.replica, p.logger)
-	background.Every(ctx, interval, betweenPasses, func(ctx context.Context) {
-		p.interval = interval
+	p.interval = interval
+	p.leases.RunLeased(ctx, queue.Leased{
+		Name: Lease, Holder: p.replica, Interval: interval, Fallback: betweenPasses,
+		Failing: "writing the published documents", Logger: p.logger,
+	}, func(ctx context.Context) error {
 		wrote, err := p.Once(ctx)
-		switch {
-		case err != nil:
-			if ctx.Err() == nil {
-				p.logger.Error("writing the published documents", "error", err)
-			}
-		case wrote.Revised > 0 || wrote.Withdrawn > 0 || wrote.Skipped > 0:
+		if err == nil && (wrote.Revised > 0 || wrote.Withdrawn > 0 || wrote.Skipped > 0) {
 			p.logger.Info("wrote the published documents", "products", wrote.Products,
 				"documents", wrote.Documents, "revised", wrote.Revised, "withdrawn", wrote.Withdrawn,
 				"products not worked out", wrote.Skipped)
 		}
+		return err
 	})
 }
 

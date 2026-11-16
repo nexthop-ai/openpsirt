@@ -272,6 +272,7 @@ queue.Held Not varying by reader: whether a replica holds a lease, for the patch
 queue.Leases.Await A background pass: a replica waits its turn to rewrite deadlines after a policy change.
 queue.Leases.Handback A background pass: a replica hands back a lease as a pass ends.
 queue.Leases.Release A background pass: a replica hands back a lease it holds.
+queue.Leases.RunLeased A background pass: a replica runs a pass on a timer under a lease and hands it back as the pass ends.
 queue.Leases.Take A background pass: a replica takes a lease so one of them carries a pass.
 queue.Leases.TakeLapsed A background pass: a replica takes a lease left to lapse, so its expiry records when the work is next due.
 queue.Queue.Add A background pass: it queues a job for the workers.

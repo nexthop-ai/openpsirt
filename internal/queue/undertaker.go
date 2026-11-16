@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
@@ -84,18 +83,20 @@ func (u *Undertaker) Run(ctx context.Context, interval time.Duration) {
 	}
 	// Handed back once the last pass has ended, so the next replica buries
 	// without waiting out the lease.
-	defer u.leases.Handback(ctx, BurialLease, u.replica, u.logger)
-	background.Every(ctx, interval, betweenBurials, func(ctx context.Context) {
-		// Logged and carried on, like every other background pass here: a
-		// pass that cannot run is not a reason to stop serving, and what it
-		// failed to mark is still there on the next one.
+	logger := u.logger
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+	u.leases.RunLeased(ctx, Leased{
+		Name: BurialLease, Holder: u.replica, Interval: interval, Fallback: betweenBurials,
+		Failing: "failing the jobs whose worker never came back", Logger: logger,
+	}, func(ctx context.Context) error {
 		buried, err := u.Once(ctx)
-		if err != nil && u.logger != nil {
-			u.logger.ErrorContext(ctx, "failing the jobs whose worker never came back", "error", err)
-		} else if buried > 0 && u.logger != nil {
+		if err == nil && buried > 0 {
 			// Worth a line at info: work that stopped being retried is
 			// something an operator has to know happened.
-			u.logger.InfoContext(ctx, "failed the jobs whose worker never came back", "jobs", buried)
+			logger.InfoContext(ctx, "failed the jobs whose worker never came back", "jobs", buried)
 		}
+		return err
 	})
 }

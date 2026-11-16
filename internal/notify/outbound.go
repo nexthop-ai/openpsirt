@@ -26,7 +26,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/markdown"
@@ -154,13 +153,15 @@ func NewSignal(db *bun.DB, baseURL string, logger *slog.Logger, replica string) 
 func (s *Signal) Run(ctx context.Context, interval time.Duration) {
 	// Handed back once the last cycle has ended, so the next replica carries
 	// on without waiting out the lease.
-	defer s.leases.Handback(ctx, SignalLease, s.replica, s.logger)
-	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
-		if sent, failed, err := s.Once(ctx); err != nil {
-			s.logger.Error("carrying notifications to their destinations", "error", err)
-		} else if sent > 0 || failed > 0 {
+	s.leases.RunLeased(ctx, queue.Leased{
+		Name: SignalLease, Holder: s.replica, Interval: interval, Fallback: betweenPosts,
+		Failing: "carrying notifications to their destinations", Logger: s.logger,
+	}, func(ctx context.Context) error {
+		sent, failed, err := s.Once(ctx)
+		if err == nil && (sent > 0 || failed > 0) {
 			s.logger.Info("notifications signalled", "sent", sent, "failed", failed)
 		}
+		return err
 	})
 }
 

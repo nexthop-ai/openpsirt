@@ -122,46 +122,46 @@ const betweenCycles = time.Minute
 func (r *Refresher) Run(ctx context.Context, interval time.Duration) {
 	// Handed back once the last cycle has ended, so the next replica asks
 	// without waiting out the lease.
-	defer r.leases.Handback(ctx, AskingLease, r.replica, r.logger)
-	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
+	r.leases.RunLeased(ctx, queue.Leased{
+		Name: AskingLease, Holder: r.replica, Interval: interval, Fallback: betweenCycles,
+		Failing: "asking what upstream has released", Logger: r.logger,
+	}, func(ctx context.Context) error {
 		on, err := r.enabled(ctx)
 		switch {
 		case err != nil:
-			r.logger.Error("reading whether to ask upstream", "error", err)
+			return fmt.Errorf("read whether to ask upstream: %w", err)
 		case !on:
-		default:
-			// One replica asks. These are free public services run
-			// by other people, and the politeness this pass is
-			// built around — 200 at a time, a quarter-second apart
-			// — is a rate per deployment, not a rate per replica.
-			// Three replicas each keeping to it would be three
-			// times the traffic at somebody else's expense, and
-			// would spend two thirds of it asking questions
-			// another replica had already answered.
-			//
-			// A cycle that does not get the lease does nothing and
-			// tries again next time, which is the right answer for
-			// a pass whose work is never urgent: whoever holds it
-			// is doing it.
-			r.interval = interval
-			mine, err := r.asking(ctx, interval)
-			if err != nil {
-				r.logger.Error("deciding which replica asks upstream", "error", err)
-				return
-			}
-			if !mine {
-				return
-			}
-			if asked, err := r.Once(ctx); err != nil {
-				// Logged and carried on. An index having a bad day is not a
-				// reason to stop asking about everything else, and this
-				// answer is an extra rather than something the rest depends
-				// on.
-				r.logger.Error("asking what upstream has released", "error", err)
-			} else if asked > 0 {
-				r.logger.Info("asked upstream what it has released", "components", asked)
-			}
+			return nil
 		}
+		// One replica asks. These are free public services run
+		// by other people, and the politeness this pass is
+		// built around — 200 at a time, a quarter-second apart
+		// — is a rate per deployment, not a rate per replica.
+		// Three replicas each keeping to it would be three
+		// times the traffic at somebody else's expense, and
+		// would spend two thirds of it asking questions
+		// another replica had already answered.
+		//
+		// A cycle that does not get the lease does nothing and
+		// tries again next time, which is the right answer for
+		// a pass whose work is never urgent: whoever holds it
+		// is doing it.
+		r.interval = interval
+		mine, err := r.asking(ctx, interval)
+		if err != nil {
+			return fmt.Errorf("decide which replica asks upstream: %w", err)
+		}
+		if !mine {
+			return nil
+		}
+		// A failure is logged and carried on. An index having a bad day is
+		// not a reason to stop asking about everything else, and this
+		// answer is an extra rather than something the rest depends on.
+		asked, err := r.Once(ctx)
+		if err == nil && asked > 0 {
+			r.logger.Info("asked upstream what it has released", "components", asked)
+		}
+		return err
 	})
 }
 

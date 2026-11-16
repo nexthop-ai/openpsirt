@@ -13,7 +13,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -92,17 +91,19 @@ func NewTalk(db *bun.DB, chats []Chat, baseURL string, logger *slog.Logger,
 func (t *Talk) Run(ctx context.Context, interval time.Duration) {
 	// Handed back once the last cycle has ended, so the next replica carries
 	// on without waiting out the lease.
-	defer t.leases.Handback(ctx, ChatLease, t.replica, t.logger)
-	background.Every(ctx, interval, betweenPosts, t.cycle)
+	t.leases.RunLeased(ctx, queue.Leased{
+		Name: ChatLease, Holder: t.replica, Interval: interval, Fallback: betweenPosts,
+		Failing: "carrying notifications to chat", Logger: t.logger,
+	}, t.cycle)
 }
 
 // cycle is one turn of the sweep, with what it did logged.
-func (t *Talk) cycle(ctx context.Context) {
-	if sent, failed, err := t.Once(ctx); err != nil {
-		t.logger.Error("carrying notifications to chat", "error", err)
-	} else if sent > 0 || failed > 0 {
+func (t *Talk) cycle(ctx context.Context) error {
+	sent, failed, err := t.Once(ctx)
+	if err == nil && (sent > 0 || failed > 0) {
 		t.logger.Info("notifications carried to chat", "sent", sent, "failed", failed)
 	}
+	return err
 }
 
 // Once carries one cycle's worth: every channel's note, then every person's.

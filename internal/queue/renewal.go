@@ -5,7 +5,10 @@ package queue
 
 import (
 	"context"
+	"log/slog"
 	"time"
+
+	"github.com/nexthop-ai/openpsirt/internal/background"
 )
 
 // LeaseFor is how long a pass holds its lease, given how often it runs.
@@ -55,4 +58,32 @@ func (r *Renewal) Keep(ctx context.Context) (bool, error) {
 	}
 	r.renewed = r.now()
 	return true, nil
+}
+
+// Leased is a pass every replica runs on a timer and one at a time does the
+// work of, under a lease.
+type Leased struct {
+	// Name is the lease, and Holder names this replica in it.
+	Name   string
+	Holder string
+	// Interval is how often the pass wakes; a non-positive one takes Fallback.
+	Interval time.Duration
+	Fallback time.Duration
+	// Failing names the work in the line logged when a pass fails.
+	Failing string
+	Logger  *slog.Logger
+}
+
+// RunLeased runs pass on a timer until ctx ends, then hands the lease back so
+// another replica takes the work without waiting the lease out. A failed pass
+// is logged under Failing and the next one runs on time; a failure that is
+// only ctx ending is not logged. Taking the lease and reporting what a pass did
+// are the pass's own.
+func (l *Leases) RunLeased(ctx context.Context, leased Leased, pass func(context.Context) error) {
+	defer l.Handback(ctx, leased.Name, leased.Holder, leased.Logger)
+	background.Every(ctx, leased.Interval, leased.Fallback, func(ctx context.Context) {
+		if err := pass(ctx); err != nil && ctx.Err() == nil {
+			leased.Logger.ErrorContext(ctx, leased.Failing, "error", err)
+		}
+	})
 }

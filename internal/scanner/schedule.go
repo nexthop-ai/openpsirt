@@ -13,7 +13,6 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -68,18 +67,15 @@ const betweenSchedules = 5 * time.Minute
 // different holder, and a lease left to lapse stops re-scans until it does.
 func (s *Schedule) Run(ctx context.Context, interval time.Duration) {
 	s.interval = interval
-	defer s.leases.Handback(ctx, ScheduleLease, s.replica, s.logger)
-	background.Every(ctx, interval, betweenSchedules, func(ctx context.Context) {
-		if asked, err := s.Once(ctx); err != nil {
-			// Logged and carried on, like every other background pass here. A
-			// cycle that cannot run is not a reason to stop the process, and
-			// the next one is along shortly.
-			if ctx.Err() == nil {
-				s.logger.Error("working out what needs scanning again", "error", err)
-			}
-		} else if asked > 0 {
+	s.leases.RunLeased(ctx, queue.Leased{
+		Name: ScheduleLease, Holder: s.replica, Interval: interval, Fallback: betweenSchedules,
+		Failing: "working out what needs scanning again", Logger: s.logger,
+	}, func(ctx context.Context) error {
+		asked, err := s.Once(ctx)
+		if err == nil && asked > 0 {
 			s.logger.Info("asked for builds to be scanned again", "builds", asked)
 		}
+		return err
 	})
 }
 

@@ -611,7 +611,9 @@ func TestAChannelThatRefusesIsTriedAgainAndThenLeftAlone(t *testing.T) {
 func TestTheChatSweepCarriesWhatIsOwed(t *testing.T) {
 	eachChat(t, func(t *testing.T, w *chatWorld) {
 		w.tell(t, notify.Telling{Kind: notify.Assigned, Body: "CVE-2026-1 in libfoo", Link: "/f/1"})
-		notify.TalkCycleForTest(w.talk, t.Context())
+		if err := notify.TalkCycleForTest(w.talk, t.Context()); err != nil {
+			t.Fatalf("one turn of the sweep: %v", err)
+		}
 		if got := said(w.chat.directs["U-ANA"]); !strings.Contains(got, "CVE-2026-1 in libfoo") {
 			t.Errorf("one turn of the sweep did not carry it: %q", got)
 		}

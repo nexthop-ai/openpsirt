@@ -18,7 +18,7 @@ import (
 func CycleForTest(w *Watch, ctx context.Context) { w.cycle(ctx) }
 
 // TalkCycleForTest runs one turn of the chat sweep, as Run does.
-func TalkCycleForTest(t *Talk, ctx context.Context) { t.cycle(ctx) }
+func TalkCycleForTest(t *Talk, ctx context.Context) error { return t.cycle(ctx) }
 
 // SweepBatch is how many notifications one sweep carries.
 //

@@ -13,7 +13,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -87,27 +86,22 @@ func NewPass(db *bun.DB, logger *slog.Logger, replica string, limits sbom.Limits
 // decides that a publisher should no longer be read should not have to redeploy
 // to stop it.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {
-	// Handed back once the last cycle has ended, so the next replica reads
-	// without waiting out the lease.
-	defer p.leases.Handback(ctx, FetchLease, p.replica, p.logger)
-	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
-		p.interval = interval
+	p.interval = interval
+	// A failed pass is logged and the next runs on time: a publisher having a
+	// bad day is not a reason to stop, and this answer is evidence beside a
+	// finding rather than something the rest depends on.
+	p.leases.RunLeased(ctx, queue.Leased{
+		Name: FetchLease, Holder: p.replica, Interval: interval, Fallback: betweenCycles,
+		Failing: "reading what suppliers have published", Logger: p.logger,
+	}, func(ctx context.Context) error {
 		took, err := p.Once(ctx)
-		switch {
-		case err != nil:
-			// Logged and carried on, like every other background pass here. A
-			// publisher having a bad day is not a reason to stop, and this
-			// answer is evidence beside a finding rather than something the
-			// rest depends on.
-			if ctx.Err() == nil {
-				p.logger.Error("reading what suppliers have published", "error", err)
-			}
-		case took.Documents > 0 || took.Refused > 0 || took.Mismatched > 0:
+		if err == nil && (took.Documents > 0 || took.Refused > 0 || took.Mismatched > 0) {
 			p.logger.Info("read what suppliers have published",
 				"documents", took.Documents, "checked", took.Checked, "claims", took.Recorded,
 				"refused", took.Refused, "mismatched", took.Mismatched,
 				"other_documents", took.Skipped)
 		}
+		return err
 	})
 }
 
