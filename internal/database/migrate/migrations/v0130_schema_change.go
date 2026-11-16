@@ -39,7 +39,7 @@ func schemaChangeMadeV0130(ctx context.Context, tx bun.Tx) error {
 	if err != nil {
 		return err
 	}
-	if present, err := u.hasColumn("schema_change", "id"); err != nil || present {
+	if present, err := u.hasTable("schema_change"); err != nil || present {
 		return err
 	}
 	return u.create(schemaChangeV0130(u.t), "schema_change")
