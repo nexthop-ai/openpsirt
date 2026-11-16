@@ -420,3 +420,9 @@ func BoundV0110Renames(ctx context.Context, raw *sql.Tx, engine database.Engine)
 func IdentifyingNameV0130(name, version, purl string) string {
 	return identifyingNameV0130(name, version, purl)
 }
+
+// SettledDigestV0130 is the settled digest v0.13.0's upgrade stores for an
+// advisory it rewrites, for a test holding it to the application's.
+func SettledDigestV0130(body []byte) (string, error) {
+	return settledDigestV0130(body)
+}

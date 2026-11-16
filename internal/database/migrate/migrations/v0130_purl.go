@@ -12,8 +12,6 @@ import (
 	"strings"
 
 	"github.com/uptrace/bun"
-
-	"github.com/nexthop-ai/openpsirt/internal/csaf"
 )
 
 // purlColumnsV0130 is each table and column holding a package identifier as a
@@ -544,7 +542,7 @@ func qualifierEscapedV0130(value string) string {
 func servedAnewV0130(ctx context.Context, tx bun.Tx, at servedV0130, id int64, document string) error {
 	set, args := `"`+at.column+`" = ?`, []any{document}
 	if at.settled != "" {
-		if digest, err := csaf.SettledDigest([]byte(document)); err == nil {
+		if digest, err := settledDigestV0130([]byte(document)); err == nil {
 			set += `, "` + at.settled + `" = ?`
 			args = append(args, digest)
 		}
