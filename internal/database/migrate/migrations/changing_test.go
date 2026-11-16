@@ -130,11 +130,8 @@ func TestAnUpgradeHoldsTheLeaseToChangeTheSchemaFromBeforeItsFirstStatement(t *t
 // a later version still pauses, and stays.
 func TestARecordTheVersionHasReachedPausesNobody(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		// The harness hands over the latest schema, its records emptied.
 		ctx := t.Context()
-		dbtest.Empty(t, db)
-		if err := migrate.Up(ctx, db, quiet(), 0); err != nil {
-			t.Fatal(err)
-		}
 		expected, err := migrations.Expected()
 		if err != nil {
 			t.Fatal(err)

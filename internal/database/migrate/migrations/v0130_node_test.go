@@ -9,7 +9,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
 // seedNodeV0120 seeds a v0.12.0 build holding one component, and answers its
@@ -46,37 +45,13 @@ func seedNodeV0120(t *testing.T, db *database.DB) int64 {
 // A v0.12.0 database's graph nodes gain the name and version a build stated
 // and the folds of the name and the stated source, empty on every node already held, whether the upgrade
 // ran whole or a start of it stopped after the first column or before the
-// index; the stops are ones SQLite never makes, since it changes a table in
-// one transaction.
-func TestAV0120DatabaseResumesTheV0130NodeUpgradeFromEveryStop(t *testing.T) {
-	for _, stop := range []struct {
-		name string
-		make func(t *testing.T, db *database.DB) error
-	}{
-		{"whole", nil},
-		{"after the name", func(t *testing.T, db *database.DB) error {
-			return migrations.StopV0130AfterNodeName(t.Context(), db)
-		}},
-		{"before the index", func(t *testing.T, db *database.DB) error {
-			return migrations.StopV0130BeforeNodeIndex(t.Context(), db)
-		}},
-	} {
-		t.Run(stop.name, func(t *testing.T) {
-			dbtest.Each(t, func(t *testing.T, db *database.DB) {
-				ctx := t.Context()
-				if stop.make != nil && db.Server.Engine == database.SQLite {
-					t.Skip("SQLite changes a table in one transaction, so it never stops there")
-				}
-				dbtest.Empty(t, db)
-				dbtest.MigrateTo(t, db, v0120)
-				node := seedNodeV0120(t, db)
-				if stop.make != nil {
-					if err := stop.make(t, db); err != nil {
-						t.Fatalf("make what a stopped upgrade left: %v", err)
-					}
-				}
-				dbtest.MigrateTo(t, db, v0130)
-				declarationsAreBuilt(t, ctx, db, migrations.StatementsV0130(db.Server.Engine))
+// index.
+func nodePartV0130() partV0130 {
+	return partV0130{
+		name: "ANodeHeldBeforeTheUpgradeStatesNothing",
+		seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
+			node := seedNodeV0120(t, db)
+			return func(t *testing.T) {
 				var stated struct {
 					Name    *string `bun:"name"`
 					Version *string `bun:"version"`
@@ -84,15 +59,22 @@ func TestAV0120DatabaseResumesTheV0130NodeUpgradeFromEveryStop(t *testing.T) {
 					Source  *string `bun:"source_folded"`
 				}
 				if err := db.DB.NewRaw(`SELECT "name", "version", "name_folded", "source_folded" FROM "graph_node" WHERE "id" = ?`, node).
-					Scan(ctx, &stated); err != nil {
+					Scan(t.Context(), &stated); err != nil {
 					t.Fatal(err)
 				}
 				if stated.Name != nil || stated.Version != nil || stated.Folded != nil || stated.Source != nil {
 					t.Errorf("a node held before the upgrade states %v, %v, %v and %v, want none",
 						stated.Name, stated.Version, stated.Folded, stated.Source)
 				}
-				leaveAtLatest(t, ctx, db)
-			})
-		})
+			}
+		},
+		stops: []stopV0130{
+			{"after the name", func(t *testing.T, db *database.DB) error {
+				return migrations.StopV0130AfterNodeName(t.Context(), db)
+			}},
+			{"before the index", func(t *testing.T, db *database.DB) error {
+				return migrations.StopV0130BeforeNodeIndex(t.Context(), db)
+			}},
+		},
 	}
 }

@@ -136,6 +136,8 @@ later start fails on a name already taken.
 | A collision with an object made earlier in the same run is stepped over too | The probe cannot tell the two apart; the log surfaces it |
 | An index a foreign key adopted is made once and never replaced | MySQL and MariaDB adopt an index led by the key's column and refuse to drop it while the key stands |
 | A migration stopped half way, with a table and an index made, is run again on both engines in CI, and `make check-engines` fails when either did not run it | The engines agree on what a migration does and differ only in what a stop leaves |
+| The v0.13.0 upgrade's tests share databases: one per engine holds every part's rows and upgrades whole, and on MySQL and MariaDB one more per stop number takes each part's stop of that number, in the order the upgrade reaches them, and upgrades once | Building a database to v0.12.0 is most of what such a test costs. Each part changes tables of its own, and its check reads its own rows |
+| The v0.13.0 upgrade's stops are made on MySQL and MariaDB alone, and a test holds that a start failing at its last step leaves the schema and version as v0.12.0 built them on PostgreSQL and SQLite | Both run the whole upgrade in one transaction, so a stopped start leaves nothing to resume |
 
 ## Release records
 

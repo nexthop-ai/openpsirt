@@ -9,7 +9,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
 // statementsV0120 is what seedStatementV0120 seeds: one VEX statement, and the
@@ -17,6 +16,7 @@ import (
 type statementsV0120 struct {
 	vex          int64
 	older, newer int64
+	product      int64
 }
 
 // seedStatementV0120 seeds statements a v0.12.0 deployment received.
@@ -55,7 +55,7 @@ func seedStatementV0120(t *testing.T, db *database.DB) statementsV0120 {
 			"libbaz", "", status, document+".json", "digest", person, uploaded)
 		return id(`SELECT MAX("id") FROM "received_vex_statement"`)
 	}
-	out := statementsV0120{vex: said("vex", "", "not_affected", at)}
+	out := statementsV0120{vex: said("vex", "", "not_affected", at), product: product}
 	// Two advisories from one publisher about one subject, which v0.12.0
 	// left both standing.
 	out.older = said("advisory", "ACME-1", "affected", at.Add(-time.Hour))
@@ -67,34 +67,14 @@ func seedStatementV0120(t *testing.T, db *database.DB) statementsV0120 {
 // overtook it, empty on every statement already held, and of two advisories
 // from one publisher about one subject the older is set aside by the newer,
 // whether the upgrade ran whole or a start of it stopped after the first
-// column; the stop is one SQLite never makes, since it changes a table in one
-// transaction.
-func TestAV0120DatabaseResumesTheV0130StatementUpgradeFromEveryStop(t *testing.T) {
-	for _, stop := range []struct {
-		name string
-		make func(t *testing.T, db *database.DB) error
-	}{
-		{"whole", nil},
-		{"after the time", func(t *testing.T, db *database.DB) error {
-			return migrations.StopV0130AfterStatementTime(t.Context(), db)
-		}},
-	} {
-		t.Run(stop.name, func(t *testing.T) {
-			dbtest.Each(t, func(t *testing.T, db *database.DB) {
+// column.
+func statementPartV0130() partV0130 {
+	return partV0130{
+		name: "AStatementHeldBeforeTheUpgradeIsTimedAndTheOlderSetAside",
+		seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
+			seeded := seedStatementV0120(t, db)
+			return func(t *testing.T) {
 				ctx := t.Context()
-				if stop.make != nil && db.Server.Engine == database.SQLite {
-					t.Skip("SQLite changes a table in one transaction, so it never stops there")
-				}
-				dbtest.Empty(t, db)
-				dbtest.MigrateTo(t, db, v0120)
-				seeded := seedStatementV0120(t, db)
-				if stop.make != nil {
-					if err := stop.make(t, db); err != nil {
-						t.Fatalf("make what a stopped upgrade left: %v", err)
-					}
-				}
-				dbtest.MigrateTo(t, db, v0130)
-				declarationsAreBuilt(t, ctx, db, migrations.StatementsV0130(db.Server.Engine))
 				var held struct {
 					SaidAt      *time.Time `bun:"said_at"`
 					OvertakenBy *int64     `bun:"overtaken_by"`
@@ -120,15 +100,19 @@ func TestAV0120DatabaseResumesTheV0130StatementUpgradeFromEveryStop(t *testing.T
 						older.Superseded, older.OvertakenBy, seeded.newer)
 				}
 				var standing int
-				if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "received_vex_statement" WHERE "superseded_at" IS NULL`).
-					Scan(ctx, &standing); err != nil {
+				if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "received_vex_statement"
+					WHERE "superseded_at" IS NULL AND "product_id" = ?`, seeded.product).Scan(ctx, &standing); err != nil {
 					t.Fatal(err)
 				}
 				if standing != 2 {
 					t.Errorf("%d statements stand after the upgrade, want the VEX one and the newer advisory", standing)
 				}
-				leaveAtLatest(t, ctx, db)
-			})
-		})
+			}
+		},
+		stops: []stopV0130{
+			{"after the time", func(t *testing.T, db *database.DB) error {
+				return migrations.StopV0130AfterStatementTime(t.Context(), db)
+			}},
+		},
 	}
 }
