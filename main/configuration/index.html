@@ -5576,6 +5576,10 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 <td>Clear what v0.12.0 recorded under each publisher, as <a href="#vex-statements-from-v0120">VEX statements from v0.12.0</a> says. Left alone, a revision stating an identifier replaces none of it, and what v0.12.0 recorded stays in force beside the revision</td>
 </tr>
 <tr>
+<td>A package whose name holds its own version, such as Debian's <code>linux-image-6.12.41+deb13-amd64</code> at <code>6.12.41-1</code>, is continued across an upgrade that renames it: its findings carry to the new version as superseded, the decisions on them carry as any version change carries them, and an upload's changes list it as changed. v0.12.0 read every such upgrade as one package removed and another added, closed its findings as removed, and opened them again with no decision. The upgrade re-keys every finding and decision on such a package</td>
+<td>Nothing. Where two versions of one package each had a decision standing at any version for the same issue, they now meet: an approved one stands over a proposed one, otherwise the newer, and the other lapses. A finding an earlier upgrade closed as removed stays closed as it was</td>
+</tr>
+<tr>
 <td>A build's components are shown, searched and given to the scanner by the name and version that build stated. v0.12.0 used those of whichever build described the package first, in any product</td>
 <td>Nothing. A build shows its own once its inventory is sent again; until then it keeps the names and versions v0.12.0 showed</td>
 </tr>
