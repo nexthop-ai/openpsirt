@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 )
@@ -374,6 +375,84 @@ func publishedDocumentsPartV0130() partV0130 {
 			}
 		}
 	}}
+}
+
+// An issued advisory the upgrade rewrites takes its settled digest from what
+// it says now, so it reads as unchanged since it went out.
+func TestAnAdvisoryTheV0130UpgradeRewritesReadsAsUnchanged(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0120)
+		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+		exec := func(query string, args ...any) {
+			t.Helper()
+			if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+				t.Fatalf("%v\n%s", err, query)
+			}
+		}
+		//nolint:gosec // G101: the credential this upgrade takes out
+		const (
+			raw   = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git"
+			clean = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://gitlab.example.com/x.git"
+		)
+		seeded := seedCoversV0120(t, db)
+		exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
+			"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, "identity", raw, "x", "1", "x", "fold", at)
+		// An advisory as it went out: its tracking dated and versioned, and
+		// its product tree naming the build by its root.
+		body := func(purl string) string {
+			encoded, err := json.Marshal(map[string]any{
+				"document": map[string]any{
+					"title": "A flaw",
+					"tracking": map[string]any{
+						"id": "OPSIRT-1", "status": "final", "version": "2",
+						"current_release_date": "2026-11-12T02:00:00Z",
+						"revision_history": []any{map[string]any{"number": "2"}},
+					},
+					"references": []any{map[string]any{"category": "self", "url": "https://x/1.json"}},
+				},
+				"product_tree": map[string]any{"full_product_names": []any{
+					map[string]any{"product_identification_helper": map[string]any{"purl": purl}}}},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(encoded)
+		}
+		issued, err := csaf.SettledDigest([]byte(body(raw)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		exec(`INSERT INTO "advisory_edition" ("advisory_id", "ordinal", "written_by", "written_at")
+			VALUES (?, ?, ?, ?)`, seeded.advisory, 1, seeded.person, at)
+		var edition int64
+		if err := db.DB.NewRaw(`SELECT MAX("id") FROM "advisory_edition"`).Scan(ctx, &edition); err != nil {
+			t.Fatal(err)
+		}
+		exec(`INSERT INTO "advisory_issuance" ("advisory_id", "ordinal", "edition_id", "document", "digest",
+			"issued_by", "issued_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			seeded.advisory, 1, edition, body(raw), issued, seeded.person, at)
+
+		dbtest.MigrateTo(t, db, v0130)
+
+		var got struct {
+			Document string `bun:"document"`
+			Digest   string `bun:"digest"`
+		}
+		if err := db.DB.NewRaw(`SELECT "document", "digest" FROM "advisory_issuance"`).Scan(ctx, &got); err != nil {
+			t.Fatal(err)
+		}
+		now, err := csaf.SettledDigest([]byte(body(clean)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.Document != body(clean) || got.Digest != now {
+			t.Errorf("the advisory holds %s with the digest %s after the upgrade, want %s with %s",
+				got.Document, got.Digest, body(clean), now)
+		}
+		leaveAtLatest(t, ctx, db)
+	})
 }
 
 // A start of the credential step that stopped after any of its phases leaves

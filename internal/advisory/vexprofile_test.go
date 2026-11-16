@@ -4,6 +4,8 @@
 package advisory_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"slices"
 	"strings"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	fixtures "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/triage"
@@ -562,6 +565,65 @@ func TestADecisionAgreedAfterTheAdvisoryMovesItsStatusAndTheAgreementStands(t *t
 			t.Errorf("what would go out now reads as what went out: %v %v", moved, err)
 		}
 	})
+}
+
+// The digest an issuance stores is the one its stored document gives, so a
+// document rewritten in place takes its digest from what it says now.
+func TestAnIssuancesDigestIsTheOneItsDocumentGives(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		identifier := f.recorded(t, f.master)
+		named := f.covering(t, [2]string{"sonic", identifier})
+		f.agreed(t, named)
+		if _, err := f.store.Issued(ctx, f.who, issuer, named, ""); err != nil {
+			t.Fatalf("recording that it went out: %v", err)
+		}
+		var gone []struct {
+			Document string `bun:"document"`
+			Digest   string `bun:"digest"`
+		}
+		if err := f.db.DB.NewSelect().Table("advisory_issuance").Column("document", "digest").
+			Scan(ctx, &gone); err != nil || len(gone) != 1 {
+			t.Fatalf("issuances: %v %v", gone, err)
+		}
+		got, err := csaf.SettledDigest([]byte(gone[0].Document))
+		if err != nil || got != gone[0].Digest {
+			t.Errorf("the stored document gives the digest %q (%v), want the stored %q", got, err, gone[0].Digest)
+		}
+		// A digest stored by a release that hashed the document's structure
+		// still matches, so an advisory issued then reads as unchanged.
+		if held := structDigest(t, gone[0].Document); held != gone[0].Digest {
+			t.Errorf("the document hashed by its structure gives %q, want the stored %q", held, gone[0].Digest)
+		}
+	})
+}
+
+// structDigest is an issued document hashed as v0.12.0 hashed it: decoded
+// into the document's structure, settled field by field, and written again.
+func structDigest(t *testing.T, document string) string {
+	t.Helper()
+	var doc advisory.Document
+	if err := json.Unmarshal([]byte(document), &doc); err != nil {
+		t.Fatalf("read the issued document: %v", err)
+	}
+	kept := []advisory.Reference{}
+	for _, one := range doc.Document.References {
+		if one.Category != "self" {
+			kept = append(kept, one)
+		}
+	}
+	doc.Document.References = kept
+	doc.Document.Tracking.CurrentReleaseDate = time.Time{}
+	doc.Document.Tracking.Generator = nil
+	doc.Document.Tracking.Version = ""
+	doc.Document.Tracking.Status = ""
+	doc.Document.Tracking.RevisionHistory = nil
+	body, err := json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:])
 }
 
 func TestAReleaseADecisionReachesByLookupIsFlaggedAsMadeElsewhere(t *testing.T) {

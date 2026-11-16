@@ -5,11 +5,10 @@ package advisory
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"strconv"
 	"strings"
 	"time"
@@ -259,39 +258,11 @@ func (s *Store) Issued(ctx context.Context, subject access.Subject, who publishe
 // answers whether the file a reader fetched arrived intact. The two are not
 // interchangeable and neither is a duplicate of the other.
 func settledDigest(doc *Document) (string, error) {
-	settled := *doc
-	// Where the document is published is left out with them. It is a
-	// property of where the file sits rather than of what the document says,
-	// so a deployment that starts writing a directory would otherwise report
-	// every issuance it already had as differing from what would be
-	// generated now — which reads as "re-issue all of them" and is not what
-	// the record is asking.
-	settled.Document.References = without(doc.Document.References, "self")
-	settled.Document.Tracking.CurrentReleaseDate = time.Time{}
-	settled.Document.Tracking.Generator = nil
-	settled.Document.Tracking.Version = ""
-	settled.Document.Tracking.Status = ""
-	settled.Document.Tracking.RevisionHistory = nil
-	body, err := json.Marshal(settled)
+	body, err := json.Marshal(doc)
 	if err != nil {
 		return "", fmt.Errorf("hash what went out: %w", err)
 	}
-	sum := sha256.Sum256(body)
-	return hex.EncodeToString(sum[:]), nil
-}
-
-// without is the references less the ones of a category.
-//
-// A copy, because the document it came from is the one being generated and a
-// digest may not edit it.
-func without(references []Reference, category string) []Reference {
-	out := make([]Reference, 0, len(references))
-	for _, one := range references {
-		if one.Category != category {
-			out = append(out, one)
-		}
-	}
-	return out
+	return csaf.SettledDigest(body)
 }
 
 // Issuances is what has gone out for one advisory, oldest first.
