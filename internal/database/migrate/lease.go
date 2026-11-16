@@ -62,6 +62,11 @@ var (
 	waitLogEvery = time.Minute
 )
 
+// leaseClock reads the database's clock, which every lapse is written and
+// read by. A variable only so tests can move it; nothing in the application
+// changes it.
+var leaseClock = database.ServerTimeOn
+
 // cleanupWait bounds what an upgrade does after its work, whatever happened
 // to its context: letting the lease go, and reading and clearing the record of
 // a change. A variable only so tests can shorten it.
@@ -212,7 +217,7 @@ func (l *lease) claim(ctx context.Context) (won bool, seen leaseRow, now time.Ti
 	err = database.InTransaction(ctx, l.db.DB, func(ctx context.Context, tx bun.Tx) error {
 		won, seen = false, leaseRow{}
 		var err error
-		if now, err = database.ServerTimeOn(ctx, tx, l.db.Server.Engine); err != nil {
+		if now, err = leaseClock(ctx, tx, l.db.Server.Engine); err != nil {
 			return err
 		}
 		expires := now.Add(leaseFor).UnixMicro()
@@ -261,7 +266,7 @@ func (l *lease) claim(ctx context.Context) (won bool, seen leaseRow, now time.Ti
 // and a cluster certifies it.
 func (l *lease) write(ctx context.Context, holding string) error {
 	return database.InTransaction(ctx, l.db.DB, func(ctx context.Context, tx bun.Tx) error {
-		now, err := database.ServerTimeOn(ctx, tx, l.db.Server.Engine)
+		now, err := leaseClock(ctx, tx, l.db.Server.Engine)
 		if err != nil {
 			return err
 		}

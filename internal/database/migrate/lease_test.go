@@ -62,6 +62,37 @@ func shortLease(t *testing.T) {
 	})
 }
 
+// movedClock is the database's clock as every lease reads it, run ahead by
+// an amount the test moves: a lapse is reached by moving the clock, never by
+// waiting for it.
+type movedClock struct{ ahead atomic.Int64 }
+
+// moveClock lets one test move the database's clock as the lease reads it.
+func moveClock(t *testing.T) *movedClock {
+	t.Helper()
+	c := &movedClock{}
+	was := leaseClock
+	leaseClock = func(ctx context.Context, q database.RowQuerier, engine database.Engine) (time.Time, error) {
+		now, err := was(ctx, q, engine)
+		return now.Add(time.Duration(c.ahead.Load())), err
+	}
+	t.Cleanup(func() { leaseClock = was })
+	return c
+}
+
+// move runs the clock ahead by d.
+func (c *movedClock) move(d time.Duration) { c.ahead.Add(int64(d)) }
+
+// now is the database's clock on db as the lease reads it.
+func now(t *testing.T, db *database.DB) time.Time {
+	t.Helper()
+	at, err := leaseClock(t.Context(), db, db.Server.Engine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return at
+}
+
 // freshLease makes the lease table where it is absent, empties it, and
 // empties it again when the test ends.
 func freshLease(t *testing.T, db *database.DB) {
@@ -78,13 +109,9 @@ func freshLease(t *testing.T, db *database.DB) {
 // after a time by the database's clock.
 func leftBy(t *testing.T, db *database.DB, holding string, lapsesIn time.Duration) {
 	t.Helper()
-	now, err := db.ServerTime(t.Context())
-	if err != nil {
-		t.Fatal(err)
-	}
 	if _, err := db.ExecContext(t.Context(), `INSERT INTO "`+LeaseTable+`"
 		("name", "token", "holding", "holder", "expires_at") VALUES (?, ?, ?, ?, ?)`,
-		leaseName, "dead", holding, "process 1 on a host that is gone", now.Add(lapsesIn).UnixMicro()); err != nil {
+		leaseName, "dead", holding, "process 1 on a host that is gone", now(t, db).Add(lapsesIn).UnixMicro()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -108,11 +135,22 @@ func TestOneClaimantHoldsTheLeaseAtATime(t *testing.T) {
 		if err != nil {
 			t.Fatalf("the first instance could not take the lease: %v", err)
 		}
+		// The second instance is stopped once three of its claims have found
+		// the lease held.
 		said := &lines{}
-		waiting, cancel := context.WithTimeout(WithEngine(ctx, engine, said.logger()), 1500*time.Millisecond)
-		defer cancel()
-		if again, err := acquire(waiting, second); err == nil {
-			_ = again.release(ctx)
+		waiting, stop := context.WithCancel(WithEngine(ctx, engine, said.logger()))
+		defer stop()
+		ended := make(chan error, 1)
+		go func() {
+			again, err := acquire(waiting, second)
+			if err == nil {
+				_ = again.release(ctx)
+			}
+			ended <- err
+		}()
+		saidTimes(t, said, waitingLine, 3, ended)
+		stop()
+		if err := <-ended; err == nil {
 			_ = lock.release(ctx)
 			t.Fatal("a second instance took the migration lease while it was held")
 		}
@@ -171,30 +209,40 @@ func TestOneClaimantHoldsTheLeaseAtATime(t *testing.T) {
 // holds every waiter until it lapses by the database's clock, and is taken
 // over then. The waiter names the holder and when the lease lapses while it
 // waits, and says it took the lease over.
+//
+// The lease is left lapsing an hour on, and the clock moved to the lapse once
+// three claims have found it held.
 func TestALeaseItsHolderLeftIsTakenOnlyOnceItLapses(t *testing.T) {
 	shortLease(t)
+	clock := moveClock(t)
 	everyEngine(t, func(t *testing.T, engine database.Engine, address string) {
 		ctx := t.Context()
-		db := open(t, address)
+		db, waiter := open(t, address), open(t, address)
 		freshLease(t, db)
-		leftBy(t, db, holdingChange, 2*time.Second)
-		now, err := db.ServerTime(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		lapses := now.Add(2 * time.Second)
+		const left = time.Hour
+		leftBy(t, db, holdingChange, left)
+		lapses := now(t, db).Add(left)
 
 		said := &lines{}
-		lock, err := acquire(WithEngine(ctx, engine, said.logger()), open(t, address))
-		if err != nil {
-			t.Fatalf("the waiter did not take the lease once it lapsed: %v", err)
+		var lock *held
+		ended := make(chan error, 1)
+		go func() {
+			var err error
+			lock, err = acquire(WithEngine(ctx, engine, said.logger()), waiter)
+			ended <- err
+		}()
+		saidTimes(t, said, waitingLine, 3, ended)
+		clock.move(left)
+		select {
+		case err := <-ended:
+			if err != nil {
+				t.Fatalf("the waiter did not take the lease once it lapsed: %v", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("the waiter did not take the lease within 10s of its lapse")
 		}
 		defer func() { _ = lock.release(ctx) }()
-		took, err := db.ServerTime(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if took.Before(lapses) {
+		if took := now(t, db); took.Before(lapses) {
 			t.Errorf("the lease was taken at %s, before it lapsed at %s", took, lapses)
 		}
 		for _, want := range []string{"waiting for the migration lease", "process 1 on a host that is gone",
@@ -207,8 +255,12 @@ func TestALeaseItsHolderLeftIsTakenOnlyOnceItLapses(t *testing.T) {
 }
 
 // A holder's renewals keep its lease past any one lapse it wrote.
+//
+// The clock is moved half a lapse at a time, each move followed by a renewal
+// written after it, until three lapses have passed.
 func TestRenewalKeepsTheLease(t *testing.T) {
 	shortLease(t)
+	clock := moveClock(t)
 	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
 		ctx := t.Context()
 		db, other := open(t, address), open(t, address)
@@ -217,7 +269,10 @@ func TestRenewalKeepsTheLease(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		time.Sleep(3 * leaseFor)
+		for range 6 {
+			clock.move(leaseFor / 2)
+			renewedPast(t, db, lapseOf(t, db))
+		}
 		if lost := context.Cause(lock.ctx); lost != nil {
 			t.Fatalf("a holder renewing its lease lost it: %v", lost)
 		}
@@ -229,6 +284,30 @@ func TestRenewalKeepsTheLease(t *testing.T) {
 			t.Errorf("a renewed lease was not held when let go: %v", err)
 		}
 	})
+}
+
+// lapseOf is when the lease standing in db lapses, as written.
+func lapseOf(t *testing.T, db *database.DB) int64 {
+	t.Helper()
+	var expires int64
+	if err := db.QueryRowContext(t.Context(), `SELECT "expires_at" FROM "`+LeaseTable+`" WHERE "name" = ?`,
+		leaseName).Scan(&expires); err != nil {
+		t.Fatal(err)
+	}
+	return expires
+}
+
+// renewedPast waits up to ten seconds for the lease standing in db to be
+// written lapsing later than was.
+func renewedPast(t *testing.T, db *database.DB, was int64) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for lapseOf(t, db) <= was {
+		if time.Now().After(deadline) {
+			t.Fatal("the holder did not renew its lease within 10s")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }
 
 // A holder whose lease another instance took sends no further statement:
@@ -416,9 +495,13 @@ func TestARaceUnderSnapshotIsolationIsTriedAgain(t *testing.T) {
 }
 
 // A waiter stops waiting when its context ends, between two claims, so a
-// shutdown reaches a process waiting on another's migration.
+// shutdown reaches a process waiting on another's migration. Its claims are a
+// minute apart, and its context ends once the first has found the lease held.
 func TestAWaitForTheLeaseEndsWhenItsContextDoes(t *testing.T) {
-	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
+	was := claimEvery
+	claimEvery = time.Minute
+	t.Cleanup(func() { claimEvery = was })
+	everyEngine(t, func(t *testing.T, engine database.Engine, address string) {
 		ctx := t.Context()
 		holder, waiter := open(t, address), open(t, address)
 		freshLease(t, holder)
@@ -428,15 +511,26 @@ func TestAWaitForTheLeaseEndsWhenItsContextDoes(t *testing.T) {
 		}
 		defer func() { _ = lock.release(ctx) }()
 
-		stopping, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
-		defer cancel()
-		started := time.Now()
-		if again, err := acquire(stopping, waiter); err == nil {
-			_ = again.release(ctx)
-			t.Fatal("a waiter took the lease while it was held")
-		}
-		if waited := time.Since(started); waited > 4*time.Second {
-			t.Errorf("a waiter asked to stop after 1.5s stopped after %s", waited)
+		said := &lines{}
+		stopping, stop := context.WithCancel(WithEngine(ctx, engine, said.logger()))
+		defer stop()
+		ended := make(chan error, 1)
+		go func() {
+			again, err := acquire(stopping, waiter)
+			if err == nil {
+				_ = again.release(ctx)
+			}
+			ended <- err
+		}()
+		saidTimes(t, said, waitingLine, 1, ended)
+		stop()
+		select {
+		case err := <-ended:
+			if err == nil {
+				t.Fatal("a waiter took the lease while it was held")
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("a waiter asked to stop went on waiting for its next claim")
 		}
 	})
 }
@@ -460,6 +554,27 @@ func (l *lines) String() string {
 }
 
 func (l *lines) logger() *slog.Logger { return slog.New(slog.NewTextHandler(l, nil)) }
+
+// waitingLine is what a waiter logs at each claim finding the lease held,
+// while the time between lines is nothing.
+const waitingLine = "waiting for the migration lease"
+
+// saidTimes waits until the log holds line n times, and fails the test if
+// what writes it ends first or ten seconds pass.
+func saidTimes(t *testing.T, said *lines, line string, n int, ended <-chan error) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for strings.Count(said.String(), line) < n {
+		select {
+		case err := <-ended:
+			t.Fatalf("it ended, answering %v, before it said %q %d times: %q", err, line, n, said.String())
+		case <-time.After(10 * time.Millisecond):
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("it did not say %q %d times within 10s: %q", line, n, said.String())
+		}
+	}
+}
 
 // The catalog probe answers absent for a table that is not there, present for
 // one that is, and a failure for a database it cannot reach, on every engine.

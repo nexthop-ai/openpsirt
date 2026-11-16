@@ -130,7 +130,7 @@ func (o *Observer) leasedToChange(ctx context.Context, q bun.Conn) (bool, error)
 	if holding != holdingChange {
 		return false, nil
 	}
-	now, err := database.ServerTimeOn(ctx, q, o.db.Server.Engine)
+	now, err := leaseClock(ctx, q, o.db.Server.Engine)
 	if err != nil {
 		return false, fmt.Errorf("ask whether the schema is changing: %w", err)
 	}
