@@ -142,9 +142,9 @@ func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 	numbers, rowsOf := seededNumbers(t, r)
 	// A route's document is read from the documents table alone, so a
 	// number no document holds answers as one nothing holds. Asked with the
-	// documents' identifiers, the route taking two numbers reaches every
-	// document row under every number, and is asked numbers times documents
-	// paths rather than numbers squared.
+	// documents' identifiers, a route taking a scan's number and its
+	// document's reaches every document row under every number, and is asked
+	// numbers times documents paths rather than numbers squared.
 	documents := rowsOf["scan_document"]
 	if len(documents) == 0 {
 		t.Fatal("no document is seeded, so a document route's second number never reaches a row")

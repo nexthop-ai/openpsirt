@@ -297,11 +297,14 @@ func publishedDocumentsPartV0130() partV0130 {
 		}
 		//nolint:gosec // G101: the credential this upgrade takes out
 		const (
-			raw     = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git&arch=amd64"
-			clean   = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://gitlab.example.com/x.git&arch=amd64"
-			slashed = "pkg://deb/debian/curl@8.5.0"
-			longer  = "pkg://deb/debian/curl@8.5.0-1"
+			raw     = "pkg:golang/example.com/served@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/served.git&arch=amd64"
+			clean   = "pkg:golang/example.com/served@v1?vcs_url=git%2Bhttps://gitlab.example.com/served.git&arch=amd64"
+			slashed = "pkg://deb/debian/served@8.5.0"
+			longer  = "pkg://deb/debian/served@8.5.0-1"
 		)
+		// Identifiers no other part seeds: the credential step cleans every
+		// document from one set built from every table's identifiers, so a
+		// shared one is cleaned through another part's rows.
 		seeded := seedCoversV0120(t, db)
 		product := seeded.product
 		for i, purl := range []string{raw, slashed} {
@@ -351,7 +354,7 @@ func publishedDocumentsPartV0130() partV0130 {
 		return func(t *testing.T) {
 			ctx := t.Context()
 
-			want := body(clean, "pkg:deb/debian/curl@8.5.0")
+			want := body(clean, "pkg:deb/debian/served@8.5.0")
 			for _, table := range []string{"published_document", "advisory_issuance"} {
 				var got []string
 				owner := map[string]string{"published_document": `"product_id"`, "advisory_issuance": `"advisory_id"`}[table]

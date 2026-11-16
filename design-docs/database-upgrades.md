@@ -279,15 +279,15 @@ lapses.
 |---|---|
 | A v0.12.0 database holding an issue on an advisory and one taken off | Upgraded, the table built as declared, the first marked, the second not, the second may be put back and the first may not be put on twice |
 | A v0.12.0 database holding a release marked affected and one cleared | Upgraded, the table built as declared, the first marked, the second not, the second may be marked again and the first may not be marked twice |
-| The same stopped after the column, or after the rule holding the mark, on the servers | Upgraded the same, nothing already made replaced |
+| The same stopped after the column, or after the rule holding the mark, on MySQL and MariaDB | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database holding a node | Upgraded, the table built as declared, the node holding no name or version |
-| The same stopped after the name, or after every node column and before the index, on the servers | Upgraded the same, nothing already made replaced |
+| The same stopped after the name, or after every node column and before the index, on MySQL and MariaDB | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database holding a received statement, and two advisories from one publisher about one subject | Upgraded, the table built as declared, the statement holding no time and nothing that overtook it, the older advisory's set aside as overtaken by the newer's |
-| The same stopped after the time, on the servers | Upgraded the same, nothing already made replaced |
-| A v0.12.0 database stopped after the withdrawer's column, on the servers | Upgraded the same, the key added and the column kept |
+| The same stopped after the time, on MySQL and MariaDB | Upgraded the same, nothing already made replaced |
+| A v0.12.0 database stopped after the withdrawer's column, on MySQL and MariaDB | Upgraded the same, the key added and the column kept |
 | A v0.12.0 database holding identifiers with a credential in an address, escaped and plain, a token in an address's query, slashes after the scheme, and one already clean, on a component, a node, an image version and a scan's root identifier | Each rewritten as v0.13.0 stores it, the other qualifiers kept, the clean one unchanged |
 | A v0.12.0 database holding a credentialed identifier stated in published documents and an issued advisory, whole and inside a relationship's identifier and name | Each document states the identifier as the upgrade leaves it |
-| The same stopped after each phase of the credential step | No document and no identifier holds the credential |
+| The same stopped after each phase of the credential step, on MySQL and MariaDB | No document and no identifier holds the credential |
 | A v0.12.0 database holding findings and decisions on a kernel at two versions, one under its headers, a library holding no version in its name, a package beneath each kernel, and a code finding on the kernel | Each kernel key rewritten to its identifying name, the package's beneath it included, the library's and the code finding's left, the approved dismissal standing and the proposed one at the same key lapsed, the newer of two proposals brought together standing and the older lapsed, the decision keyed on the kernel's version standing under its new key |
 | A v0.12.0 database holding a decision at a key one name made at two versions, the name holding its release at one of them or a different release at each | The decision left at its key, standing |
 | The upgrade's copy of the rule, over names, versions and identifiers of every ecosystem | Reads every name as the application does |
