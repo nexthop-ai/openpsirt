@@ -565,9 +565,9 @@ func reranking(tx bun.IDB, productID int64, rest string, args ...any) *bun.Updat
 // the listing counts from when it was seen.
 //
 // Where no fix has been released the clock is off. An issue becoming exploited
-// says how long there is; it does not say there is a version to take. An
-// upstream refusal keeps the clock, because on an exploited issue a refusal
-// leaves work only this deployment can do (Clocked).
+// says how long there is; it does not say there is a version to take. No fix
+// scheduled keeps the clock, because on an exploited issue it leaves work only
+// this deployment can do (Clocked).
 func exploitationClocked(ctx context.Context, tx bun.IDB, issue int64,
 	known, observedAt time.Time, windows Windows) (bool, error) {
 

@@ -53,6 +53,7 @@ back.
 | An act is one transaction, and an act is what a person asked for | Recording a person with their roles, a team with its members, a tag's parent with when it went out, a graph with what the build argued about its patches. Split, a refusal partway leaves half a write, and the resent request lands it twice |
 | The record of an administrative act is inside it | A failure to record fails the act |
 | Giving up does not back off first | Nothing follows the last attempt |
+| One retry loop serves the helper and the one statement retried outside a transaction, the create of the migration lease table | Two copies of a retry rule drift apart on what nothing tests |
 
 | Read inside the write | What it decides |
 |---|---|

@@ -273,7 +273,7 @@ const WORDS: { [K in ClosedParameter]: Record<Word<K>, true> } = {
     "patch-needed": true,
   },
   assigned: { me: true, somebody: true, nobody: true },
-  fix_state: { fixed: true, none: true, "wont-fix": true, unknown: true, mixed: true },
+  fix_state: { fixed: true, none: true, unscheduled: true, unknown: true, mixed: true },
   vex_status: { not_affected: true, affected: true, fixed: true, under_investigation: true },
   build_says: { not_affected: true, affected: true, under_investigation: true },
   origin: { scanner: true, manual: true },

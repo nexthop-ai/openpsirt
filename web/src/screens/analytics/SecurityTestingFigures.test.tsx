@@ -224,6 +224,24 @@ describe("time to judge and time to fix", () => {
     expect(link("4 no longer detected").searchParams.get("state")).toBe("no-longer-detected");
   });
 
+  it("draws a tier the server adds in the queue waiting now, under its own word", async () => {
+    const was = ANSWERS[JUDGE] ?? {};
+    ANSWERS[JUDGE] = {
+      ...was,
+      waiting: [{ label: "Under a week", waiting: 3, by_tier: { other: 1, "supply-chain": 2 } }],
+    };
+    try {
+      await drawn(() => <TimeToJudge />, "/analytics/time-to-judge", true);
+    } finally {
+      ANSWERS[JUDGE] = was;
+    }
+    const waiting = [...mount.host().querySelectorAll("section.panel")][1];
+    const heads = [...(waiting?.querySelectorAll("thead th") ?? [])].map((th) => th.textContent);
+    expect(heads.at(-1)).toBe("supply-chain");
+    const cells = [...(waiting?.querySelectorAll("tbody td") ?? [])].map((td) => td.textContent);
+    expect(cells.at(-1)).toBe("2");
+  });
+
   it("asks for the window picked", async () => {
     const spy = await drawn(() => <TimeToJudge />, "/analytics/time-to-judge?weeks=52", true);
     expect(asked(spy, JUDGE).at(-1)?.[1].params?.query).toMatchObject({ weeks: 52 });

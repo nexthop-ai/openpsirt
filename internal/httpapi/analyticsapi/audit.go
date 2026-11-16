@@ -34,9 +34,7 @@ type AuditedBody struct {
 	ID         int64  `json:"id"`
 	DecisionID int64  `json:"decision_id" doc:"The decision this occurrence belongs to. Every occurrence one act covered shares it"`
 	Issue      string `json:"issue" doc:"The vulnerability, under the name it is filed here"`
-	Product    string `json:"product" doc:"The product, by the name that addresses it"`
-
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	core.ProductNamesBody
 	// Component is the decision's subject. Named from a finding at the
 	// occurrence, in any state — a decision about something since fixed or removed is
 	// exactly what an audit asks for, so it is named rather than left

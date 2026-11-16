@@ -13,7 +13,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 )
 
@@ -118,27 +117,30 @@ func NewPost(db *bun.DB, channel Channel, baseURL string, logger *slog.Logger,
 func (p *Post) Run(ctx context.Context, interval time.Duration) {
 	// The lease is handed back once the last cycle has ended, so the next
 	// replica carries on without waiting it out.
-	defer p.leases.Handback(ctx, PostLease, p.replica, p.logger)
-	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
-		if sent, failed, err := p.Once(ctx); err != nil {
-			// Logged and carried on, like every other background pass here.
-			p.logger.Error("carrying notifications out of the application", "error", err)
-		} else if sent > 0 || failed > 0 {
+	p.leases.RunLeased(ctx, queue.Leased{
+		Name: PostLease, Holder: p.replica, Interval: interval, Fallback: betweenPosts,
+		Failing: "carrying notifications out of the application", Logger: p.logger,
+	}, func(ctx context.Context) error {
+		sent, failed, err := p.Once(ctx)
+		if err == nil && (sent > 0 || failed > 0) {
 			p.logger.Info("notifications sent",
 				"channel", p.channel.Name(), "sent", sent, "failed", failed)
 		}
+		return err
 	})
 }
 
 // RunDigests sends the daily digests until the context ends.
 func (p *Post) RunDigests(ctx context.Context, interval time.Duration) {
-	defer p.leases.Handback(ctx, DigestLease, p.replica, p.logger)
-	background.Every(ctx, interval, betweenPosts, func(ctx context.Context) {
-		if sent, err := p.Digests(ctx); err != nil {
-			p.logger.Error("sending digests", "error", err)
-		} else if sent > 0 {
+	p.leases.RunLeased(ctx, queue.Leased{
+		Name: DigestLease, Holder: p.replica, Interval: interval, Fallback: betweenPosts,
+		Failing: "sending digests", Logger: p.logger,
+	}, func(ctx context.Context) error {
+		sent, err := p.Digests(ctx)
+		if err == nil && sent > 0 {
 			p.logger.Info("digests sent", "channel", p.channel.Name(), "sent", sent)
 		}
+		return err
 	})
 }
 

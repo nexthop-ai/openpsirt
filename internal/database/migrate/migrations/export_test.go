@@ -246,6 +246,7 @@ func StatementsV0130(engine database.Engine) map[string][]string {
 		"component":              componentV0130(t),
 		"decision_occurrence":    decisionOccurrenceV0130(t),
 		"graph_node":             graphNodeV0130(t),
+		"person":                 personV0130(t),
 		"received_vex_statement": receivedStatementV0130(t),
 		"schema_change":          schemaChangeV0130(t),
 	}
@@ -418,4 +419,10 @@ func BoundV0110Renames(ctx context.Context, raw *sql.Tx, engine database.Engine)
 // by, for a test holding it to the name the application reads.
 func IdentifyingNameV0130(name, version, purl string) string {
 	return identifyingNameV0130(name, version, purl)
+}
+
+// SettledDigestV0130 is the settled digest v0.13.0's upgrade stores for an
+// advisory it rewrites, for a test holding it to the application's.
+func SettledDigestV0130(body []byte) (string, error) {
+	return settledDigestV0130(body)
 }

@@ -576,6 +576,60 @@ func TestAZulipServerIsReachedOverHTTPSAlone(t *testing.T) {
 	}
 }
 
+// A lookup failing for any reason but the name not existing is asked again,
+// with a growing wait, for a bounded time. One that answers within it is
+// compared; one that does not is a fault in name resolution, never a refusal
+// of the configuration.
+func TestAFailingStoreLookupIsAskedAgainThenAFault(t *testing.T) {
+	failures := 0
+	clock := time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
+	lookupHost = func(ctx context.Context, host string) ([]string, error) {
+		if host == "flaky" && failures > 0 {
+			failures--
+			// An ask that fails takes time of its own, up to its deadline.
+			took := 3 * time.Second
+			if deadline, ok := ctx.Deadline(); ok {
+				took = min(took, time.Until(deadline).Round(time.Second))
+			}
+			clock = clock.Add(took)
+			return nil, &net.DNSError{Err: "server misbehaving", Name: host, IsTemporary: true}
+		}
+		return []string{"10.0.0.5"}, nil
+	}
+	var paused []time.Duration
+	lookupPause = func(d time.Duration) { paused = append(paused, d); clock = clock.Add(d) }
+	lookupNow = func() time.Time { return clock }
+	t.Cleanup(func() {
+		lookupHost, lookupPause, lookupNow = net.DefaultResolver.LookupHost, time.Sleep, time.Now
+	})
+	t.Setenv(envPrefix+"DIRECTORY_URL", "https://psirt.example.test/csaf")
+	t.Setenv(envPrefix+"DIRECTORY_BUCKET", "psirt")
+	t.Setenv(envPrefix+"DIRECTORY_ENDPOINT", "http://flaky:9000")
+	t.Setenv(envPrefix+"ATTACHMENT_BUCKET", "psirt")
+	t.Setenv(envPrefix+"ATTACHMENT_ENDPOINT", "http://minio:9000")
+
+	failures = 2
+	if _, err := Load(os.Environ()); err == nil || !strings.Contains(err.Error(), envPrefix+"DIRECTORY_BUCKET") {
+		t.Errorf("a lookup answering on its third ask gave %v, want the shared address refused", err)
+	}
+	if !slices.Equal(paused, []time.Duration{time.Second, 2 * time.Second}) {
+		t.Errorf("the lookup waited %v between asks, want one second then two", paused)
+	}
+
+	failures, paused = 1000, nil
+	began := clock
+	_, err := Load(os.Environ())
+	if err == nil || !strings.Contains(err.Error(), "a fault in name resolution") ||
+		strings.Contains(err.Error(), envPrefix+"DIRECTORY_BUCKET:") {
+		t.Errorf("a lookup that kept failing gave %v, want a fault in name resolution", err)
+	}
+	// The asks count against the wait as well as the pauses; the last ask
+	// may take a second past it.
+	if waited := clock.Sub(began); waited < lookupWait || waited > lookupWait+time.Second {
+		t.Errorf("a lookup that kept failing was asked for %v, want about %v", waited, lookupWait)
+	}
+}
+
 // The published directory is served to anybody, so it is never the attachment
 // store, a folder holding it, or a folder inside it.
 func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
@@ -618,9 +672,6 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 		if found, ok := resolves[host]; ok {
 			return slices.Clone(found), nil
 		}
-		if host == "flaky" {
-			return nil, &net.DNSError{Err: "i/o timeout", Name: host, IsTimeout: true}
-		}
 		return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
 	}
 	t.Cleanup(func() { lookupHost = net.DefaultResolver.LookupHost })
@@ -635,10 +686,6 @@ func TestThePublishedDirectoryIsNeverTheAttachmentStore(t *testing.T) {
 		{"one bucket on two names of one server", map[string]string{
 			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "http://minio:9000",
 			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "http://minio.storage.svc.cluster.local:9000",
-		}, "DIRECTORY_BUCKET"},
-		{"one bucket on a name whose lookup failed", map[string]string{
-			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "http://flaky:9000",
-			"ATTACHMENT_BUCKET": "psirt", "ATTACHMENT_ENDPOINT": "http://minio:9000",
 		}, "DIRECTORY_BUCKET"},
 		{"one bucket on a name and its address", map[string]string{
 			"DIRECTORY_BUCKET": "psirt", "DIRECTORY_ENDPOINT": "http://127.0.0.1:9000",

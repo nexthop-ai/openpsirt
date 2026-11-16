@@ -87,29 +87,29 @@ func Enabled(ctx context.Context, db bun.IDB) (bool, error) {
 // it off takes effect without a restart.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 	p.interval = interval
-	defer p.leases.Handback(ctx, Lease, p.replica, p.logger)
-	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
+	p.leases.RunLeased(ctx, queue.Leased{
+		Name: Lease, Holder: p.replica, Interval: interval, Fallback: betweenCycles,
+		Failing: "asking OSV for issue dates", Logger: p.logger,
+	}, func(ctx context.Context) error {
 		on, err := Enabled(ctx, p.db)
 		switch {
 		case err != nil:
-			p.logger.Error("reading whether to ask for issue dates", "error", err)
-			return
+			return err
 		case !on:
-			return
+			return nil
 		}
 		mine, err := p.asking(ctx)
 		if err != nil {
-			p.logger.Error("deciding which replica asks for issue dates", "error", err)
-			return
+			return fmt.Errorf("decide which replica asks for issue dates: %w", err)
 		}
 		if !mine {
-			return
+			return nil
 		}
-		if asked, err := p.Once(ctx); err != nil {
-			p.logger.Error("asking OSV for issue dates", "error", err)
-		} else if asked > 0 {
+		asked, err := p.Once(ctx)
+		if err == nil && asked > 0 {
 			p.logger.Info("asked OSV for issue dates", "issues", asked)
 		}
+		return err
 	})
 }
 

@@ -53,7 +53,7 @@ person and their reason (REQ-20). A run finding the same things writes nothing.
 | Every index answering "is this open" carries the moment, never the run | A finding no run will close must still close |
 | The run is recorded where there is one, and counts what a run changed | |
 | One writer per build: recording a run starts by taking the build row | Two runs would both write the same difference. A test overlaps two applications and fails on all three server engines with the hold removed |
-| An open finding still moves: fix state, upstream refusal, the build's answer, each stamped when it moved | Only those parts are compared; the rest is what makes it that finding |
+| An open finding still moves: fix state, upstream scheduling no fix, the build's answer, each stamped when it moved | Only those parts are compared; the rest is what makes it that finding |
 | Findings moving to the same values are one write, grouped by every written value except the order | Each row gets what it would alone |
 | The order is chosen per finding inside the statement | Likelihood is close to unique per issue |
 | Fix, match and the build's answer are written only where one moved | |

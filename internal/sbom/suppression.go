@@ -130,6 +130,12 @@ type Target struct {
 	// it, so this is what places a statement in a build. Nil where the
 	// document named the target alone.
 	Within *Target
+	// Remediation is the category of what an affected claim says a holder of
+	// the target can do, as a CSAF remediation naming it states it, such as
+	// none_available or no_fix_planned. Empty for a claim of any other
+	// status, where no remediation names the target, and always in OpenVEX,
+	// which has no such field.
+	Remediation string
 }
 
 // VersionNamed is the version a claim's target was made about.

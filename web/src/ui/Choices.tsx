@@ -10,7 +10,7 @@ import { useMenu } from "./menu";
 // A dropdown holding one value could not ask what people ask. "Undecided
 // or waiting" is one question — everything nobody has finished with — and a
 // select offered it as two lists to look at in turn. So is "nothing released
-// or upstream declined", which is the whole population that needs a decision
+// or none scheduled", which is the whole population that needs a decision
 // rather than a version bump. Neither is expressible one word at a time.
 //
 // The ticked values sit on the control, not behind it. A closed control that

@@ -14,7 +14,6 @@ import (
 
 	"github.com/uptrace/bun"
 
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/outward"
@@ -133,16 +132,20 @@ func (p *Pass) Run(ctx context.Context, interval time.Duration) {
 	// Handed back once the last cycle has ended, between visits as well as
 	// during one, so the next replica carries on without waiting out the
 	// lease.
-	defer p.leases.Handback(ctx, Lease, p.replica, p.logger)
-	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
+	p.leases.RunLeased(ctx, queue.Leased{
+		Name: Lease, Holder: p.replica, Interval: interval, Fallback: betweenCycles,
+		Failing: "looking up the branches patches are on", Logger: p.logger,
+	}, func(ctx context.Context) error {
 		if !p.on {
-			return
+			return nil
 		}
 		p.interval = interval
 		if p.interval <= 0 {
 			p.interval = betweenCycles
 		}
+		// A visit's failure is logged inside, beside the visits before it.
 		p.cycle(ctx)
+		return nil
 	})
 }
 

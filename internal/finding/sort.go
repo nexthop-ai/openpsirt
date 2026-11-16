@@ -93,7 +93,7 @@ func scoreRank(score string) string {
 
 // order is the expression each key sorts by, whether it needs the issue and
 // the product's rating of it joined, and whether the expression is the name of a column every grouped
-// page selects. Keyed by the constant rather than by a string a caller
+// page selects, quoted where it reaches a statement. Keyed by the constant rather than by a string a caller
 // supplies: what reaches the statement is this map's value, never its lookup.
 var order = map[SortKey]struct {
 	expr   string
@@ -124,6 +124,9 @@ func orderedBy(filter Filter, fallback SortKey) string {
 	by, known := order[filter.SortBy]
 	if !known {
 		by = order[fallback]
+	}
+	if by.column {
+		by.expr = `"` + by.expr + `"`
 	}
 	return directed(by.expr, filter.SortBy == ByDeadline, filter.Ascending)
 }

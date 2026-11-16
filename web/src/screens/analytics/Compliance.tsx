@@ -188,7 +188,7 @@ export function Compliance() {
                 <b>Findings in a tag.</b> Tags are built once, so no work lands in them.
               </li>
               <li>
-                <b>Findings upstream has released no fix for, or has declined to fix.</b> There is
+                <b>Findings upstream has released no fix for, or has not scheduled one.</b> There is
                 no version that would close them, so the only thing that could stop the clock is
                 somebody recording a decision — which is the act a deadline exists to ask for.
               </li>

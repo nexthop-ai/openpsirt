@@ -126,6 +126,7 @@ A supplier's CSAF advisory arrives by upload or feed
 | A branch version is the version claimed | Dropped, one release answers for all |
 | A versioned claim prefills only at its version, and shows at every version with that version beside it | The advisory names the fixed version, not the shipped one |
 | Words naming products reach those products' claim | A remediation lists the upgraded packages as fixed |
+| An affected product keeps the category of the first remediation naming it, by identifier or group, and stores it beside its statement; a reading changing the category alone repeats the claim and rewrites the category in place; a remediation naming no product is no product's, a category CSAF does not define is not kept, and a product of any other status keeps none | The category decides the outcome offered (`design-docs/triage-evidence.md` § Statement display and filters) |
 
 A product is named as a package identifier, a package composed into a platform,
 or a bare name, each with its version; a bare name matches as a source-tree

@@ -3,7 +3,10 @@
 
 package finding
 
-import "testing"
+import (
+	"regexp"
+	"testing"
+)
 
 // Every order the list offers is one it actually sorts by.
 //
@@ -32,6 +35,41 @@ func TestEveryOfferedOrderHasAnExpression(t *testing.T) {
 	for key := range order {
 		if !offered[key] {
 			t.Errorf("%q is an order the store knows and nothing offers", key)
+		}
+	}
+}
+
+// Every name a list order writes is quoted, the names its own statement
+// invents included: an engine reserves a word only bare, and a string
+// constant is out of the reserved-word report's sight.
+func TestEveryListOrderQuotesTheNamesItWrites(t *testing.T) {
+	var orders []string
+	for _, ascending := range []bool{false, true} {
+		orders = append(orders,
+			plannedUpgradeSorted(Filter{Ascending: ascending}),
+			componentOrder(Filter{Ascending: ascending}))
+		for _, key := range PlannedUpgradeSortKeys() {
+			orders = append(orders, plannedUpgradeSorted(Filter{PlannedUpgradeSort: key, Ascending: ascending}))
+		}
+		for _, key := range SortKeys() {
+			orders = append(orders, componentOrder(Filter{SortBy: key, Ascending: ascending}))
+			for _, tieBreak := range [][]string{{"vulnerability_id", "fold"}, {"product_id", "vulnerability_id", "fold"}} {
+				expr, sorted := pagedOrder(Filter{SortBy: key, Ascending: ascending}, tieBreak...)
+				orders = append(orders, sorted)
+				if expr != "" {
+					orders = append(orders, expr)
+				}
+			}
+		}
+	}
+	if len(orders) == 0 {
+		t.Fatal("no order was built, so this checked nothing")
+	}
+	quoted := regexp.MustCompile(`"[^"]*"|'[^']*'`)
+	bare := regexp.MustCompile(`\b[a-z_][a-z0-9_]*\b`)
+	for _, sorted := range orders {
+		if name := bare.FindString(quoted.ReplaceAllString(sorted, "")); name != "" {
+			t.Errorf("%q writes %s bare", sorted, name)
 		}
 	}
 }

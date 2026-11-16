@@ -11,9 +11,8 @@ that can resolve neither fails: a page naming no version, or a default one,
 tells somebody to deploy something that is not a release.
 
 A page writes {{ scanner }} wherever it names the scanner version the image
-carries, and {{ scanner_sha256_amd64 }} and {{ scanner_sha256_arm64 }} for the
-checksums the image build verifies its download against. The build replaces
-each with what the Dockerfile pins, and fails where it cannot find the pin.
+carries. The build replaces it with what the Dockerfile pins, and fails where
+it cannot find the pin.
 
 PLACEHOLDERS is every name a page may write. The build fails on a page writing
 any other, and on a name here that nothing fills, so a placeholder is never
@@ -26,7 +25,7 @@ import subprocess
 
 from mkdocs.exceptions import PluginError
 
-PLACEHOLDERS = ("release", "scanner", "scanner_sha256_amd64", "scanner_sha256_arm64")
+PLACEHOLDERS = ("release", "scanner")
 
 # A release is vX.Y.Z, and a release candidate vX.Y.Z-rc.N. The same shapes
 # the release record accepts, so nothing git describe prints for a commit
@@ -35,13 +34,9 @@ RELEASE = re.compile(r"^v?(\d+\.\d+\.\d+(?:-rc\.\d+)?)$")
 # A name in double braces. A workflow expression, ${{ matrix.variant }}, in a
 # pipeline example is not one: it follows a dollar sign and holds a dot.
 PLACEHOLDER = re.compile(r"(?<!\$)\{\{\s*([a-z0-9_]+)\s*\}\}")
-# The one line in the Dockerfile that pins the scanner the image carries, and
-# the checksum it verifies the download against for each architecture.
-SCANNER_PIN = re.compile(r"^ARG GRYPE_VERSION=(\d+\.\d+\.\d+)\s*$", re.MULTILINE)
-SCANNER_SUM = re.compile(r"^\s*(amd64|arm64)\) expected=([0-9a-f]{64}) ;;", re.MULTILINE)
-# The stage that fetches the scanner. Another stage pins another tool's
-# checksums the same way, so the checksums are read from this one alone.
-SCANNER_STAGE = re.compile(r"^FROM \S+ AS scanner$(.*?)^FROM ", re.MULTILINE | re.DOTALL)
+# The one line in the Dockerfile that pins the scanner the image carries: the
+# scanner stage, named by tag and digest.
+SCANNER_PIN = re.compile(r"^FROM anchore/grype:v(\d+\.\d+\.\d+)@sha256:[0-9a-f]{64} AS scanner$", re.MULTILINE)
 
 _filled = {}
 
@@ -59,15 +54,7 @@ def _scanner_pins(root):
             text = f.read()
     except OSError as err:
         raise PluginError(f"cannot read the scanner version from {path}: {err}") from err
-    stage = SCANNER_STAGE.search(text)
-    if not stage:
-        raise PluginError(f"{path} has no stage named scanner")
-    text = stage.group(1)
-    pins = {"scanner": _one(path, SCANNER_PIN.findall(text), "the scanner")}
-    for arch in ("amd64", "arm64"):
-        sums = [digest for named, digest in SCANNER_SUM.findall(text) if named == arch]
-        pins["scanner_sha256_" + arch] = _one(path, sums, f"the scanner's {arch} checksum")
-    return pins
+    return {"scanner": _one(path, SCANNER_PIN.findall(text), "the scanner")}
 
 
 def _from_git(root):

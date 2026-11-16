@@ -36,7 +36,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/advisory"
 	"github.com/nexthop-ai/openpsirt/internal/attach"
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/csaf"
 	"github.com/nexthop-ai/openpsirt/internal/publisher"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -168,14 +167,18 @@ type Written struct {
 
 // Run writes the directory until the context ends.
 func (w *Writer) Run(ctx context.Context, interval time.Duration) {
-	defer w.leases.Handback(ctx, lease, w.replica, w.logger)
-	background.Every(ctx, interval, betweenWrites, func(ctx context.Context) {
+	w.leases.RunLeased(ctx, queue.Leased{
+		Name: lease, Holder: w.replica, Interval: interval, Fallback: betweenWrites,
+		Failing: "writing the published advisory directory", Logger: w.logger,
+	}, func(ctx context.Context) error {
 		w.interval = interval
-		// Logged and carried on, like every other background pass here. A
-		// store that cannot be reached is not a reason to stop serving, and
-		// what could not be written is written by the next pass.
+		// Reported here, failure included, since a pass past unreadable
+		// documents is said at error too. A store that cannot be reached is
+		// not a reason to stop serving, and what could not be written is
+		// written by the next pass.
 		written, err := w.Write(ctx)
 		w.report(ctx, written, err)
+		return nil
 	})
 }
 

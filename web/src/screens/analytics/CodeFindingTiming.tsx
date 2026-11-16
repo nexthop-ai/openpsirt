@@ -8,7 +8,7 @@ import { Empty } from "../../ui/Empty";
 import { Failed } from "../../ui/Failed";
 import { Loading } from "../../ui/Loading";
 import { Wide } from "../../ui/Wide";
-import { TIERS } from "../codeTrend";
+import { TIERS, tiersIn } from "../codeTrend";
 import { Sheet } from "./Sheet";
 import { FIRST_WEEKS, MOST_WEEKS, Segments, TREND_WEEKS, boundedAsked, weeksWords } from "./Window";
 import { Files, Gate, WaitsTable, queryOf, useFigureAsked } from "./securityTesting";
@@ -25,6 +25,8 @@ export function TimeToJudge() {
     { ...asked, weeks },
     !!product && reads && !needsBuild,
   );
+  const waiting = judged.data?.waiting ?? [];
+  const tiers = tiersIn(waiting.map((aged) => aged.by_tier));
   return (
     <Sheet
       settled={!product || !reads || needsBuild || judged.isSuccess}
@@ -69,7 +71,7 @@ export function TimeToJudge() {
             </section>
             <section className="panel">
               <h3>Waiting now</h3>
-              {(judged.data.waiting ?? []).every((aged) => aged.waiting === 0) ? (
+              {waiting.every((aged) => aged.waiting === 0) ? (
                 <Empty title="Nothing is waiting for a person." />
               ) : (
                 <Wide>
@@ -78,19 +80,19 @@ export function TimeToJudge() {
                       <tr>
                         <th>Open for</th>
                         <th className="num">Waiting</th>
-                        {Object.entries(TIERS).map(([key, label]) => (
+                        {tiers.map((key) => (
                           <th key={key} className="num">
-                            {label}
+                            {TIERS[key] ?? key}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {(judged.data.waiting ?? []).map((aged) => (
+                      {waiting.map((aged) => (
                         <tr key={aged.label}>
                           <td>{aged.label}</td>
                           <td className="num">{aged.waiting.toLocaleString()}</td>
-                          {Object.keys(TIERS).map((key) => (
+                          {tiers.map((key) => (
                             <td key={key} className="num hint">
                               {(aged.by_tier?.[key] ?? 0).toLocaleString()}
                             </td>

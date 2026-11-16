@@ -112,7 +112,7 @@ type FindingBody struct {
 	Undisclosed bool   `json:"undisclosed,omitempty" doc:"Nothing here has been announced. Anything said about it outside this deployment discloses it"`
 	DiscloseAt  string `json:"disclose_at,omitempty" doc:"The date the embargo ends. Reaching it discloses nothing by itself"`
 
-	NoDeadline core.NoDeadline `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	NoDeadline core.NoDeadline `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has scheduled none on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	// Exploited is the reason a row sits at the top. A position nobody
 	// can explain is one people stop trusting, and then they sort by something
 	// else and lose the point of the order entirely.
@@ -575,7 +575,7 @@ type EvidenceBody struct {
 	// The same words the list body declares, and the words the store emits.
 	// A consumer validating against the published document rejects a body
 	// carrying a word the enum omits, and a TypeScript one cannot narrow on it.
-	NoDeadline core.NoDeadline    `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
+	NoDeadline core.NoDeadline    `json:"no_deadline,omitempty" doc:"The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has scheduled none on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"`
 	FoundBy    *core.MeasuredBody `json:"found_by,omitempty" doc:"The provenance: the scanner, its version, and the vulnerability database it read at the time. Absent on something a person recorded, which no run found"`
 
 	// Recorded says a person entered this rather than a scanner reporting it,

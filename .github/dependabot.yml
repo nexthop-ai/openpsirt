@@ -22,11 +22,11 @@ updates:
 
   # The images the container is built from.
   #
-  # "Nothing watches the base, the scanner or the inventory tool" is written
-  # into design-docs/packaging.md's limits, next to the measurement that found all
-  # three two or more releases behind in one week. Past a base's end of life
-  # its packages receive no security backports, and pinning without watching
-  # is how that happened.
+  # The scanner and the inventory tool are their project's images on `FROM`
+  # lines, so each release arrives here. The base is a build argument, which
+  # this does not read: design-docs/packaging.md's limits say so. Past a base's
+  # end of life its packages receive no security backports, and pinning
+  # without watching is how a pin falls behind.
   #
   # The Go toolchain is here for a second reason: the build stage's golang tag
   # is the one pin of the Go patch release. Both workflows install the release

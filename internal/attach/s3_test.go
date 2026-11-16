@@ -247,6 +247,19 @@ func TestAnEndpointIsShownWithoutItsCredentials(t *testing.T) {
 	if err == nil || strings.Contains(err.Error(), "hunter2") {
 		t.Errorf("a plaintext endpoint answered %v, want a refusal without the signature", err)
 	}
+	// A password cut at "?" or at "/" before a "?" under a key drivers read
+	// parses with its start as the port, and no spill to refuse.
+	for _, endpoint := range []string{
+		"http://bot:1234?password=x@minio.example.test",
+		"http://bot:1234/abcd?password=y@minio.example.test",
+	} {
+		_, err = NewBucket(context.Background(), BucketConfig{
+			Endpoint: endpoint, Bucket: "advisories", Region: "us-east-1", Names: directoryNames,
+		})
+		if err == nil || strings.Contains(err.Error(), "1234") || strings.Contains(err.Error(), "abcd") {
+			t.Errorf("%s answered %v, want a refusal without the password", endpoint, err)
+		}
+	}
 	// A password with an unescaped "/" parses with its start as the host.
 	_, err = NewBucket(context.Background(), BucketConfig{
 		Endpoint: "http://AKIAX:123/" + "abcSecret" + "@minio.example.test:9000", Bucket: "advisories",

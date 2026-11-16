@@ -41,7 +41,7 @@ toolchain, the result run on Alpine.
 
 ## Base version
 
-Every stage but third-party toolchain images starts from one pinned build
+Every stage but third-party toolchain and tool images starts from one pinned build
 argument, because what a finding means depends on what was measured.
 
 | Rule | Reason |
@@ -55,7 +55,7 @@ The deployment runs the scan itself, so the image carries the scanner.
 
 | Rule | Reason |
 |---|---|
-| The scanner is pinned and its download checksummed | Which scanner build answered is part of a finding |
+| The scanner and the inventory tool are their project's images, named by tag and digest, and their binaries copied out | Which scanner build answered is part of a finding; Dependabot proposes each release, as for every `FROM` line |
 | Its vulnerability data is fetched at run time | Baked in, it is stale a day later |
 | The chart mounts a volume for the data, its directory one chart value both image and chart read | The root filesystem is read-only |
 | Every replica mounts the one claim, and the chart refuses at render an access mode it can see is too narrow | This is a Deployment, with no volume per pod |
@@ -204,7 +204,7 @@ value, so it is refused.
 
 | Limit | Detail |
 |---|---|
-| Nothing moves the pinned base either | Past end of life it gets no backports. Dependabot watches `FROM` lines; the scanner and inventory tool, versions and checksums in build arguments, are watched by nobody |
+| Nothing moves the pinned base | Past end of life it gets no backports. Dependabot watches `FROM` lines; the base is a build argument, which it does not read |
 | Two builds of one commit can differ | The base's packages are upgraded at build; the image's inventory records what shipped |
 | The packaging gate has one implementation, the target CI runs | |
 | Text written ahead of time names a setting by its variable | A log line, screen hint, API reference or history entry cannot know the source; the configuration page pairs variables with keys |

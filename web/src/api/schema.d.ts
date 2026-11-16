@@ -7978,6 +7978,7 @@ export interface components {
             elsewhere: boolean;
             /** @description Whether the release is marked affected whatever its decisions say */
             marked: boolean;
+            /** @description The product, by the name that addresses it */
             product: string;
             /** @description The product's display name, or its name where it has none */
             product_name?: string;
@@ -10157,6 +10158,7 @@ export interface components {
              */
             readonly $schema?: string;
             added_at: string;
+            /** @description The product, by the name that addresses it */
             product: string;
             /** @description The product's display name, or its name where it has none */
             product_name?: string;
@@ -11024,7 +11026,7 @@ export interface components {
             /** @description Somebody is known to be exploiting this */
             exploited?: boolean;
             /** @enum {string} */
-            fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
+            fix_state?: "fixed" | "none" | "unscheduled" | "unknown" | "mixed";
             /** @description The date that version became available */
             fixed_at?: string;
             /** @description The version that resolves it */
@@ -11061,7 +11063,7 @@ export interface components {
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
             /**
-             * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has scheduled none on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "not-rated" | "below-minimum-severity" | "nothing-to-take" | "out-of-support";
@@ -11183,7 +11185,7 @@ export interface components {
              * @description Upstream's answer about it
              * @enum {string}
              */
-            fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
+            fix_state?: "fixed" | "none" | "unscheduled" | "unknown" | "mixed";
             /** @description The version that resolves it, where one exists */
             fixed_in?: string;
             /** @description The row's subject: the source package at the version it was built at, in the ecosystem and distribution it came from */
@@ -11210,7 +11212,7 @@ export interface components {
             /** @description The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version */
             namespace?: string;
             /**
-             * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
+             * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has scheduled none on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
              */
             no_deadline?: "not-rated" | "below-minimum-severity" | "nothing-to-take" | "out-of-support";
@@ -11331,7 +11333,7 @@ export interface components {
             ecosystem?: string;
             exploited?: boolean;
             /** @enum {string} */
-            fix_state?: "fixed" | "none" | "wont-fix" | "unknown" | "mixed";
+            fix_state?: "fixed" | "none" | "unscheduled" | "unknown" | "mixed";
             fixed_in?: string;
             /** @description The namespace its package identifier names, where it names one */
             namespace?: string;
@@ -12860,7 +12862,7 @@ export interface components {
              */
             sent_back: number;
             since: string;
-            /** @description Each person's throughput, most first. Empty when a team is asked about by anybody but an administrator, because the rows would name its members */
+            /** @description Each person's throughput, most first */
             throughput: components["schemas"]["WorkedBody"][] | null;
             /** @description The wait for a second person, per severity */
             time_to_agree: components["schemas"]["SpreadBody"][] | null;
@@ -15382,7 +15384,7 @@ export interface components {
              * @description The outcome this offers as a prefill, where it was made about the version shipped here. Never applied by itself
              * @enum {string}
              */
-            offers?: "not-applicable" | "wont-fix" | "already-fixed";
+            offers?: "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
             publisher: string;
             /**
              * @description Which kind of document carried it
@@ -19326,8 +19328,8 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
-                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "unscheduled" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
                 /** @description Keep only groups where a decision is with its author, sent back for more */
@@ -19446,8 +19448,8 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
-                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "unscheduled" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
                 /** @description Keep only groups where a decision is with its author, sent back for more */
@@ -24460,8 +24462,8 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
-                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "unscheduled" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
                 /** @description Keep only groups where a decision is with its author, sent back for more */
@@ -24633,8 +24635,8 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
-                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "unscheduled" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
                 /** @description Keep only groups where a decision is with its author, sent back for more */
@@ -24768,8 +24770,8 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
-                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "unscheduled" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
                 /** @description Keep only groups where a decision is with its author, sent back for more */
@@ -24908,8 +24910,8 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
-                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "unscheduled" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
                 /** @description Keep only groups where a decision is with its author, sent back for more */
@@ -25046,8 +25048,8 @@ export interface operations {
                 due_within?: number;
                 /** @description Keep only what is already past its deadline */
                 overdue?: boolean;
-                /** @description Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
-                fix_state?: ("fixed" | "none" | "wont-fix" | "unknown" | "mixed")[] | null;
+                /** @description Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in */
+                fix_state?: ("fixed" | "none" | "unscheduled" | "unknown" | "mixed")[] | null;
                 /** @description Keep only issues of these kinds of flaw, by CWE identifier — CWE-79. Any of them, not all: a class of flaw is usually several identifiers */
                 weakness?: string[] | null;
                 /** @description Keep only groups where a decision is with its author, sent back for more */

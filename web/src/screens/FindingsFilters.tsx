@@ -20,8 +20,8 @@ import { BUMP_FILTERS } from "./FindingsViews";
 // in an unlabeled dropdown or a value read as a phrase is not found by
 // somebody looking straight at it.
 //
-// A label says what it asks; a value says what it is. "Upstream fix: will
-// not fix" rather than "Upstream: declined to fix". The words are the ones the
+// A label says what it asks; a value says what it is. "Upstream fix: not
+// scheduled" rather than "Upstream: has scheduled no fix". The words are the ones the
 // domain uses, because somebody scanning for theirs has to find it in a
 // second and a paraphrase that avoids naming the thing reads as a riddle.
 //
@@ -56,7 +56,7 @@ const FIX_STATES = [
   ["", "Any"],
   ["fixed", "Fixed upstream"],
   ["none", "No fix released"],
-  ["wont-fix", "Will not fix"],
+  ["unscheduled", "Not scheduled"],
   ["unknown", "Not stated"],
   ["mixed", "Differs between builds"],
 ] as const;

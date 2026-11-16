@@ -26,8 +26,15 @@ import (
 // so each is compared in the form it takes.
 func apart(directory, attachments Store) error {
 	if bucket := strings.TrimSpace(directory.Bucket); bucket != "" {
-		if other := strings.TrimSpace(attachments.Bucket); strings.EqualFold(bucket, other) &&
-			sameEndpoint(directory.Endpoint, attachments.Endpoint) {
+		other := strings.TrimSpace(attachments.Bucket)
+		if !strings.EqualFold(bucket, other) {
+			return nil
+		}
+		same, err := sameEndpoint(directory.Endpoint, attachments.Endpoint)
+		if err != nil {
+			return err
+		}
+		if same {
 			return fmt.Errorf("OPENPSIRT_DIRECTORY_BUCKET: names the attachment store's " +
 				"bucket, and everything in the directory is served to anybody: give the " +
 				"directory a bucket of its own")
@@ -67,21 +74,21 @@ func apart(directory, attachments Store) error {
 //
 // Doubt refuses: an empty endpoint is whatever the SDK resolves, from the
 // environment, a profile or the region, so it is the same as any endpoint;
-// so is an endpoint that does not parse, and a host whose lookup fails for any
-// reason but the name not existing.
-func sameEndpoint(a, b string) bool {
+// so is an endpoint that does not parse. A lookup that keeps failing for any
+// reason but the name not existing is a fault, returned as an error.
+func sameEndpoint(a, b string) (bool, error) {
 	if strings.TrimSpace(a) == "" || strings.TrimSpace(b) == "" {
-		return true
+		return true, nil
 	}
 	one, read := storeParts(a)
 	two, readToo := storeParts(b)
 	switch {
 	case !read || !readToo:
-		return true
+		return true, nil
 	case one.host == two.host && one.rest == two.rest:
-		return true
+		return true, nil
 	case one.amazon || two.amazon || one.rest != two.rest:
-		return false
+		return false, nil
 	}
 	return sharedAddress(one.host, two.host)
 }
@@ -89,39 +96,71 @@ func sameEndpoint(a, b string) bool {
 // lookupHost resolves a host name to its addresses.
 var lookupHost = net.DefaultResolver.LookupHost
 
-// sharedAddress reports whether two hosts may resolve to an address in
-// common. A name that does not exist shares nothing, since a store nobody can
-// reach serves nothing; any other failed lookup may share anything.
-func sharedAddress(one, two string) bool {
-	mine, known := addresses(one)
-	theirs, knownToo := addresses(two)
-	if !known || !knownToo {
-		return true
+// lookupWait is how long a failing lookup is asked again, and lookupPause how
+// it waits between two asks.
+var (
+	lookupWait  = time.Minute
+	lookupPause = time.Sleep
+	lookupNow   = time.Now
+)
+
+// sharedAddress reports whether two hosts resolve to an address in common. A
+// name that does not exist shares nothing, since a store nobody can reach
+// serves nothing.
+func sharedAddress(one, two string) (bool, error) {
+	// One wait for both, so a resolver that is down holds startup for
+	// lookupWait once.
+	waited := time.Duration(0)
+	mine, err := addresses(one, &waited)
+	if err != nil {
+		return false, err
 	}
-	return slices.ContainsFunc(mine, func(ip string) bool { return slices.Contains(theirs, ip) })
+	theirs, err := addresses(two, &waited)
+	if err != nil {
+		return false, err
+	}
+	return slices.ContainsFunc(mine, func(ip string) bool { return slices.Contains(theirs, ip) }), nil
 }
 
-// addresses is what a host resolves to, each address in one spelling, and
-// whether the answer is known: a name that does not exist is known to have
-// none.
-func addresses(host string) ([]string, bool) {
+// addresses is what a host resolves to, each address in one spelling. A name
+// that does not exist has none. Any other failure is asked again, waiting
+// twice as long each time, until the wait shared with the other host reaches
+// lookupWait, and is then a fault in name resolution.
+func addresses(host string, waited *time.Duration) ([]string, error) {
 	host = strings.Trim(host, "[]")
 	if ip := net.ParseIP(host); ip != nil {
-		return []string{ip.String()}, true
+		return []string{ip.String()}, nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	found, err := lookupHost(ctx, host)
-	if err != nil {
+	for pause := time.Second; ; pause *= 2 {
+		// Each ask counts against the wait as well as each pause. An ask
+		// with nothing left still takes a second, so a host asked after
+		// the other spent the wait is asked once.
+		ask := min(5*time.Second, max(lookupWait-*waited, time.Second))
+		ctx, cancel := context.WithTimeout(context.Background(), ask)
+		began := lookupNow()
+		found, err := lookupHost(ctx, host)
+		*waited += lookupNow().Sub(began)
+		cancel()
 		var dns *net.DNSError
-		return nil, errors.As(err, &dns) && dns.IsNotFound
-	}
-	for i, each := range found {
-		if ip := net.ParseIP(each); ip != nil {
-			found[i] = ip.String()
+		switch {
+		case err == nil:
+			for i, each := range found {
+				if ip := net.ParseIP(each); ip != nil {
+					found[i] = ip.String()
+				}
+			}
+			return found, nil
+		case errors.As(err, &dns) && dns.IsNotFound:
+			return nil, nil
+		case *waited >= lookupWait:
+			return nil, fmt.Errorf("looking up %q, to tell whether the directory and the attachment "+
+				"store are one object store, failed for %v: a fault in name resolution, not in the "+
+				"configuration: %w", host, *waited, err)
 		}
+		pause = min(pause, lookupWait-*waited)
+		lookupPause(pause)
+		*waited += pause
 	}
-	return found, true
 }
 
 // awsService is the service every Amazon S3 endpoint of the commercial

@@ -43,15 +43,24 @@ database format and answers differently, so findings stop being comparable
 with a deployment running the image.
 
 ```
-curl -fsSLO https://github.com/anchore/grype/releases/download/v{{ scanner }}/grype_{{ scanner }}_linux_amd64.tar.gz
-echo "{{ scanner_sha256_amd64 }}  grype_{{ scanner }}_linux_amd64.tar.gz" | sha256sum -c -
+release=https://github.com/anchore/grype/releases/download/v{{ scanner }}
+curl -fsSLO "$release/grype_{{ scanner }}_linux_amd64.tar.gz"
+curl -fsSLO "$release/grype_{{ scanner }}_checksums.txt"
+curl -fsSLO "$release/grype_{{ scanner }}_checksums.txt.sigstore.json"
+cosign verify-blob grype_{{ scanner }}_checksums.txt \
+  --bundle grype_{{ scanner }}_checksums.txt.sigstore.json \
+  --certificate-identity-regexp '^https://github\.com/anchore/grype/\.github/workflows/release\.yaml@' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sha256sum -c --ignore-missing grype_{{ scanner }}_checksums.txt
 tar -xzf grype_{{ scanner }}_linux_amd64.tar.gz grype
 sudo install -m 0755 grype /usr/local/bin/grype
 ```
 
-The checksum is the one the image build verifies its own download against. On
-arm64 the archive ends `_linux_arm64.tar.gz`, and its checksum is
-`{{ scanner_sha256_arm64 }}`.
+`cosign verify-blob` checks that Anchore's release workflow signed the
+checksums file, so a release asset replaced after the fact fails there; the
+archive is then checked against that file. It needs
+[cosign](https://docs.sigstore.dev/cosign/system_config/installation/) recent
+enough to read a Sigstore bundle. On arm64 the archive ends `_linux_arm64.tar.gz`.
 
 The process finds it on `PATH`. `scanner.path` in the configuration file names
 it anywhere else.

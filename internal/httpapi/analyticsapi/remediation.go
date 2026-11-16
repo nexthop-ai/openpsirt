@@ -57,9 +57,7 @@ type RemediationOutput struct {
 
 // RepeatBody is one occurrence that keeps being put off.
 type RepeatBody struct {
-	Product string `json:"product" doc:"The product, by the name that addresses it"`
-
-	ProductName   string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	core.ProductNamesBody
 	Vulnerability string `json:"vulnerability"`
 	Severity      string `json:"severity,omitempty"`
 	Occurrence    string `json:"occurrence" doc:"Names the occurrence rather than describing it: what it is called depends on the build, and this is not about one build"`

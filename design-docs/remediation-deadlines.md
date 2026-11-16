@@ -13,7 +13,7 @@ The escalation view, time remaining and the compliance rate are in
 - [Clock start](#clock-start)
 - [Exploitation dates](#exploitation-dates)
 - [Findings with no deadline](#findings-with-no-deadline)
-- [Exploited refusals](#exploited-refusals)
+- [Exploited issues with no fix scheduled](#exploited-issues-with-no-fix-scheduled)
 - [Recounts and rewrites](#recounts-and-rewrites)
 - [Recorded flaws](#recorded-flaws)
 - [Limits](#limits)
@@ -68,7 +68,7 @@ sees a listing does not extend the window.
 |---|---|---|
 | A flaw recorded here that nobody has rated | `not-rated` | Narrowest: what the finding lacks |
 | Below its product's minimum severity | `below-minimum-severity` | How the finding is rated |
-| Upstream released no fix, or declined to on an issue nobody exploits | `nothing-to-take` | About the finding, above the release |
+| Upstream released no fix, or scheduled none on an issue nobody exploits | `nothing-to-take` | About the finding, above the release |
 | Its release is a tag | `out-of-support` | Above end-of-life: a supported tag is as unfixable as a retired one |
 | Its release is past end-of-life (REQ-15) | `out-of-support` | |
 
@@ -76,20 +76,21 @@ sees a listing does not extend the window.
 |---|---|
 | A tag reports `out-of-support`, so five reasons share four words | A word of its own is added when somebody needs them apart |
 | There is no other reason | Everything else gets a deadline at ingest |
-| A deadline nobody can meet is not set | The only act stopping it is recording a decision, which the deadline asks for. On the demo's two SONiC images, seeded 2026-09-23, 95,497 of 335,491 open findings had no fix released (28.5%) and 14,196 more were an upstream refusal (4.2%) |
+| A deadline nobody can meet is not set | The only act stopping it is recording a decision, which the deadline asks for. On the demo's two SONiC images, seeded 2026-09-23, 95,497 of 335,491 open findings had no fix released (28.5%) and 14,196 more had no fix scheduled (4.2%) |
 | A tag carries no deadline | No work lands in it. All 26 open findings on the demo's one tag carried an unmeetable deadline before this rule, and tags accumulate |
 | An unstated fix state stays on the clock | A scanner's silence is not upstream saying no |
 | A group or finding of several occurrences has nothing to take only where none of its occurrences is in a state on the clock | Each occurrence is asked on its own: a combined state word such as mixed is no state upstream is in |
 
-## Exploited refusals
+## Exploited issues with no fix scheduled
 
-An upstream refusal of an exploited issue keeps its deadline. Exploited is
+An exploited issue upstream has scheduled no fix for keeps its deadline. Exploited is
 either signal: the feed's, or a record that this product was attacked.
 
 | Rule | Reason |
 |---|---|
-| The refusal keeps the clock | The remaining work, patching, replacing, or recording what stands in the way, is this deployment's alone and has a date |
-| A missing fix takes no exception | One may arrive, so its deadline is met only by waiting |
+| No fix scheduled keeps the clock | The remaining work, patching, replacing, or recording what stands in the way, is this deployment's alone and has a date |
+| A fix not yet released takes no exception | One may arrive, so its deadline is met only by waiting |
+| No fix scheduled is the scanner's word for a fix postponed or refused alike | A distribution's data gives one word for both, and keeps no detail telling them apart |
 
 | Writer | Where the exception is asked |
 |---|---|
@@ -97,7 +98,7 @@ either signal: the feed's, or a record that this product was attacked.
 | A scan learning exploitation, for every other build of the issue | Only a missing fix loses the clock just given |
 | A scan moving the listing day earlier, for every build | The deadline rule, over findings already carrying one |
 | A record of this product being attacked, set or cleared | The recount, with either signal |
-| An edited window | The sweep removing clocks passes over an exploited refusal; the sweep for below the minimum severity passes over either signal |
+| An edited window | The sweep removing clocks passes over an exploited issue with no fix scheduled; the sweep for below the minimum severity passes over either signal |
 
 ## Recounts and rewrites
 

@@ -22,17 +22,18 @@ import (
 
 // FixState is what upstream has done about an issue.
 //
-// The three mean different things to whoever is triaging: no fix existing yet,
-// upstream having declined to fix it, and a fix being available are separate
-// situations, and "upstream will not fix this" is a permanent condition that
-// changes the outcome somebody should reach.
+// The three mean different things to whoever is triaging: no fix released, no
+// fix scheduled, and a fix being available are separate situations. No fix
+// scheduled may be postponed or permanent, and the scanner does not say which:
+// one word in a distribution's data covers a fix put off, a fix left to a
+// later release and a fix never coming.
 type FixState string
 
 const (
 	// NoFix means no fix is available.
 	NoFix FixState = "none"
-	// WontFix means upstream declined to fix it.
-	WontFix FixState = "wont-fix"
+	// Unscheduled means upstream has scheduled no fix, for now or for good.
+	Unscheduled FixState = "unscheduled"
 	// FixedUpstream means a fixed version exists.
 	FixedUpstream FixState = "fixed"
 	// FixUnknown means the scanner did not say. It is its own answer rather
@@ -55,7 +56,7 @@ const (
 // FixStates is every word for what upstream has done, in the order the API
 // offers them.
 func FixStates() []FixState {
-	return []FixState{FixedUpstream, NoFix, WontFix, FixUnknown, FixMixed}
+	return []FixState{FixedUpstream, NoFix, Unscheduled, FixUnknown, FixMixed}
 }
 
 // agreedFixState is what a group's occurrences say upstream did, or FixMixed

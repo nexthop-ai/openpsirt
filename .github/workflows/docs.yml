@@ -8,7 +8,8 @@ on:
 # Read at the top, so a job added later starts with no write token and has to
 # ask. The documentation is built where nothing can write: mkdocs and its
 # plugins run there, from pip. The pages branch it commits leaves as a git
-# bundle, and the one job holding the write only fetches and pushes it.
+# bundle, and the one job holding the write applies it to the published branch
+# and pushes it, through push-pages.sh.
 permissions:
   contents: read
 
@@ -83,17 +84,11 @@ jobs:
         with:
           name: pages
           path: ${{ runner.temp }}/pages
-      # Only a commit on top of the published branch is pushed, so a build
-      # gone bad can add pages and never rewrite their history. The push is
-      # never forced, so the remote refuses anything else as well; the check
-      # says why.
+      # Only commits on top of the published branch are pushed, never by
+      # force, so a build gone bad can add pages and never rewrite their
+      # history. A branch another run moved has the build's commits applied
+      # again on its new head, with git alone; a conflict stops the job.
       - name: Push the pages
         env:
           BUNDLE: ${{ runner.temp }}/pages/pages.bundle
-        run: |
-          git fetch "$BUNDLE" gh-pages:refs/heads/built
-          if git rev-parse --verify -q origin/gh-pages > /dev/null; then
-            git merge-base --is-ancestor origin/gh-pages built \
-              || { echo "the published branch moved after the pages were built: re-run the workflow"; exit 1; }
-          fi
-          git push origin built:gh-pages
+        run: .github/scripts/push-pages.sh "$BUNDLE"

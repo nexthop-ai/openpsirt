@@ -66,7 +66,7 @@ var purlPhasesV0130 = []func(context.Context, bun.Tx, *purlPassV0130) error{
 	},
 	func(ctx context.Context, tx bun.Tx, pass *purlPassV0130) error {
 		for _, at := range servedDocumentsV0130 {
-			if err := servedPurlsV0130(ctx, tx, at[0], at[1], pass.cleaned, publishedBatchV0130); err != nil {
+			if err := servedPurlsV0130(ctx, tx, at, pass.cleaned, publishedBatchV0130); err != nil {
 				return err
 			}
 		}
@@ -81,10 +81,19 @@ var purlPhasesV0130 = []func(context.Context, bun.Tx, *purlPassV0130) error{
 	},
 }
 
+// servedV0130 is a table and column holding a document served to anybody, and
+// the column holding the settled digest taken from that document, where the
+// table keeps one.
+type servedV0130 struct{ table, column, settled string }
+
 // servedDocumentsV0130 is each table and column holding a document served to
 // anybody: published VEX documents, and the advisories that went out, whose
-// product tree names a build by its root.
-var servedDocumentsV0130 = [][2]string{{"published_document", "document"}, {"advisory_issuance", "document"}}
+// product tree names a build by its root. An advisory's settled digest is
+// taken again from the document rewritten, so the advisory reads as what
+// would go out now; a published document's is left for the next publishing
+// pass to write a revision.
+var servedDocumentsV0130 = []servedV0130{{"published_document", "document", ""},
+	{"advisory_issuance", "document", "digest"}}
 
 // remoteColumnsV0130 is each table and column holding a repository remote an
 // upload stated.
@@ -205,8 +214,9 @@ func purlCredentialsInBatchesV0130(ctx context.Context, tx bun.Tx, batch int, wr
 // and name are. Each string is read decoded, so one identifier beginning
 // another is never matched inside it, and only a string that changes is
 // written again. A document left unchanged is not written.
-func servedPurlsV0130(ctx context.Context, tx bun.Tx, table, column string, cleaned map[string]string,
+func servedPurlsV0130(ctx context.Context, tx bun.Tx, at servedV0130, cleaned map[string]string,
 	batch int) error {
+	table, column := at.table, at.column
 	if len(cleaned) == 0 {
 		return nil
 	}
@@ -242,9 +252,8 @@ func servedPurlsV0130(ctx context.Context, tx bun.Tx, table, column string, clea
 			return fmt.Errorf("read the documents of %s: %w", table, err)
 		}
 		for _, row := range found {
-			if _, err := tx.ExecContext(ctx, `UPDATE "`+table+`" SET "`+column+`" = ? WHERE "id" = ?`,
-				row.document, row.id); err != nil {
-				return fmt.Errorf("clean document %d of %s: %w", row.id, table, err)
+			if err := servedAnewV0130(ctx, tx, at, row.id, row.document); err != nil {
+				return err
 			}
 		}
 		if read < batch {
@@ -525,4 +534,22 @@ func qualifierEscapedV0130(value string) string {
 		}
 	}
 	return b.String()
+}
+
+// servedAnewV0130 writes one document again, and the settled digest taken from
+// it where the table keeps one. A document that cannot be read as an advisory
+// keeps the digest it had, and reads as changed since it went out.
+func servedAnewV0130(ctx context.Context, tx bun.Tx, at servedV0130, id int64, document string) error {
+	set, args := `"`+at.column+`" = ?`, []any{document}
+	if at.settled != "" {
+		if digest, err := settledDigestV0130([]byte(document)); err == nil {
+			set += `, "` + at.settled + `" = ?`
+			args = append(args, digest)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE "`+at.table+`" SET `+set+` WHERE "id" = ?`,
+		append(args, id)...); err != nil {
+		return fmt.Errorf("clean document %d of %s: %w", id, at.table, err)
+	}
+	return nil
 }

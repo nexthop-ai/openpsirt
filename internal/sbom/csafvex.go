@@ -5,6 +5,7 @@ package sbom
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -99,6 +100,9 @@ type claimed struct {
 	// as affected — so the category alone puts the one useful sentence in an
 	// advisory on a claim that does not exist. The first sentence naming a
 	// product is the one it keeps.
+	//
+	// A remediation's entry carries its category as well, and is kept for the
+	// category alone where it has no words, so each is expanded once.
 	told []scoped
 }
 
@@ -113,6 +117,9 @@ type scoped struct {
 	words  string
 	ids    []string
 	groups []string
+	// category is a remediation's category, where it is one the format
+	// defines; empty for every other entry.
+	category string
 }
 
 // names reports whether the words were scoped to any product at all. A list
@@ -651,7 +658,7 @@ func (r *csafReader) vulnerability() error {
 		case "threats":
 			return r.prose(one, NotAffected, "details")
 		case "remediations":
-			return r.prose(one, Affected, "details")
+			return r.remediations(one)
 		default:
 			return r.b.Skip()
 		}
@@ -843,6 +850,51 @@ func (r *csafReader) prose(one *claimed, to Status, field string) error {
 	})
 }
 
+// remediationCategories are the remediation categories CSAF defines. Any
+// other is not kept, so what is stored is one of these and fits its column.
+var remediationCategories = []string{"fix_planned", "mitigation", "no_fix_planned",
+	"none_available", "optional_patch", "vendor_fix", "workaround"}
+
+// remediations reads what a holder can do: the details as prose about the
+// affected products, as prose reads them, and the category with the products
+// it names. A category naming no product is about none.
+func (r *csafReader) remediations(one *claimed) error {
+	return r.b.Array(func() error {
+		var words scoped
+		category := ""
+		if err := r.b.Object(func(key string) error {
+			switch key {
+			case "details":
+				value, err := r.b.Str()
+				words.words = value
+				return err
+			case "category":
+				value, err := r.b.Str()
+				if slices.Contains(remediationCategories, value) {
+					category = value
+				}
+				return err
+			}
+			if read, err := r.scope(key, &words); read {
+				return err
+			}
+			return r.b.Skip()
+		}); err != nil {
+			return err
+		}
+		if words.names() {
+			words.category = category
+		}
+		switch {
+		case words.names() && (words.words != "" || words.category != ""):
+			one.told = append(one.told, words)
+		case words.words != "" && !words.names() && one.said[Affected] == "":
+			one.said[Affected] = words.words
+		}
+		return nil
+	})
+}
+
 // expand is every product a set of words names, with each group reference
 // replaced by what the group holds.
 //
@@ -870,14 +922,14 @@ func (r *csafReader) expand(words scoped, visit func(id string)) error {
 // identifier. A later flag wins over an earlier one and the first sentence
 // naming a product wins over the rest, which is the order the document gave
 // them in.
-func (r *csafReader) scopedWords(one *claimed) (flagged, told map[string]string, err error) {
-	flagged, told = map[string]string{}, map[string]string{}
+func (r *csafReader) scopedWords(one *claimed) (flagged, told, remedied map[string]string, err error) {
+	flagged, told, remedied = map[string]string{}, map[string]string{}, map[string]string{}
 	if one.whole != "" {
 		flagged[""] = one.whole
 	}
 	for _, flag := range one.flags {
 		if err := r.expand(flag, func(id string) { flagged[id] = flag.words }); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
 	for _, words := range one.told {
@@ -885,12 +937,17 @@ func (r *csafReader) scopedWords(one *claimed) (flagged, told map[string]string,
 			if told[id] == "" {
 				told[id] = words.words
 			}
+			// A category is a remediation's alone, and the first naming
+			// the product is its own.
+			if words.category != "" && remedied[id] == "" {
+				remedied[id] = words.category
+			}
 		})
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 	}
-	return flagged, told, nil
+	return flagged, told, remedied, nil
 }
 
 // resolve turns the collected claims into the one shape the rest of this reads,
@@ -902,7 +959,7 @@ func (r *csafReader) scopedWords(one *claimed) (flagged, told map[string]string,
 func (r *csafReader) resolve() ([]Suppression, error) {
 	out := make([]Suppression, 0, len(r.claims))
 	for _, one := range r.claims {
-		flagged, told, err := r.scopedWords(one)
+		flagged, told, remedied, err := r.scopedWords(one)
 		if err != nil {
 			return nil, err
 		}
@@ -942,6 +999,9 @@ func (r *csafReader) resolve() ([]Suppression, error) {
 				}
 			}
 			target := targetOf(at)
+			if status == Affected {
+				target.Remediation = remedied[id]
+			}
 			if context, held := r.composedInto(id); held {
 				within := targetOf(context)
 				target.Within = &within

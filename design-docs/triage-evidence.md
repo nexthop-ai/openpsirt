@@ -47,7 +47,7 @@ recorded before the product was read, closes nothing.
 | A statement naming an ecosystem's package alone closes nothing | |
 | The product is matched exactly at the stated version; a version change reopens; no version stays evidence | |
 | Matched by the statement's package identifier or the component's name, never by what it was built from; a generic identifier is matched against identifier and name, namespace compared as for a source-tree claim | A fork carries the supplier's name as its source |
-| Only `not_affected` closes, whatever the justification; "will not be fixed" stays a prefilled will-not-fix | |
+| Only `not_affected` closes, whatever the justification; an affected statement at most prefills (§ Statement display and filters) | |
 | The product must be a component of the build | A distribution's platform is in no build |
 | The build's patch and the CVE record are asked first | |
 | An occurrence somebody marked affected, by a decision standing at its versions, stays open; where the statement already closed it, the finding shows it, it can be decided, and the next run opens it again. Only the latest row at the occurrence counts: the one closed last, its identifier breaking a tie | Disagreeing with a supplier hides nothing, so needs no second person |
@@ -92,7 +92,12 @@ rejecting the absence of a fix as a signal.
 
 | Rule | Reason |
 |---|---|
-| A distribution declining to fix (Debian's `no-dsa`, Ubuntu's `ignored`, Red Hat's will-not-fix) prefills a will-not-fix, never `not-applicable`; undecided offers nothing | Each means affected and minor |
+| `not_affected` prefills not applicable with the publisher's justification, and `fixed` already fixed | |
+| `affected` prefills by the CSAF remediation category naming the product: `none_available` a deferral, `no_fix_planned` a will-not-fix | A distribution postponing a fix, such as Debian's `no-dsa`, writes the first; one refusing it, such as Red Hat's will-not-fix, the second |
+| A deferral prefills the outcome alone; the date is the person's, and one sent without it is refused | The publisher states no date |
+| `affected` with any other category, or none, offers nothing, an OpenVEX statement included; its action statement is prose and is not read for an outcome | A workaround or a fix to upgrade to says nothing about what is decided here |
+| `affected` never prefills `not-applicable`; `under_investigation` offers nothing | A dismissal would carry the publisher's name on a claim they never made |
+| An affected statement holding no remediation category offers nothing, and takes its category on the next reading of its document, the same bytes uploaded again included | |
 | Statements are resolved once into distinct pairs by `UNION`, and the list joins that | As a correlated `EXISTS` per finding the filter ran past five minutes on 281,884 findings and 1,854 statements |
 | The issue identifier is folded on write | A function on the indexed side defeats the index |
 | Only standing statements narrow; a superseded row stays readable | |

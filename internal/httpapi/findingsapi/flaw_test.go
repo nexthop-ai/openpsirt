@@ -581,6 +581,24 @@ func toldOf(t *testing.T, r *httpapitest.Reach, who, kind string) []string {
 	return out
 }
 
+// A product, branch or tag and variant with no display name is named in a
+// code finding's notice by its name.
+func TestACodeFindingNoticeNamesWhatHasNoDisplayNameByItsName(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		for _, table := range []string{"product", "branch_or_tag", "variant"} {
+			if _, err := r.DB.DB.NewUpdate().Table(table).Set(`"display_name" = ?`, "").
+				Where("1 = 1").Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		httpapitest.RecordedCodeFinding(t, r, false)
+		if got := toldOf(t, r, "security-testing-triager", "code-finding-recorded-as-flaw"); len(got) != 1 ||
+			!strings.Contains(got[0], " in mine master broadcom ") {
+			t.Errorf("the security testing triager was told %q; want the build named mine master broadcom", got)
+		}
+	})
+}
+
 func TestARecordAsFlawAndAnInclusionAreToldToTheProductsSecurityTestingTriagersWithoutTheFlawAndNotToTheirAuthor(t *testing.T) {
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		occurrence, flaw := httpapitest.RecordedCodeFinding(t, r, false)

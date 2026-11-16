@@ -234,29 +234,9 @@ func TestEveryPlaceholderIsOneTheBuildFills(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The stage that fetches the scanner, as the hook reads it: another stage
-	// pins another tool's checksums the same way.
-	stagePattern, _ := hookPattern(t, hook, "SCANNER_STAGE")
-	stage := stagePattern.FindSubmatch(dockerfile)
-	if stage == nil {
-		t.Fatal("the Dockerfile has no scanner stage, so this checked nothing")
-	}
-	dockerfile = stage[1]
 	pin, _ := hookPattern(t, hook, "SCANNER_PIN")
 	if n := len(pin.FindAll(dockerfile, -1)); n != 1 {
 		t.Errorf("the Dockerfile pins the scanner %d times, and the pages need exactly one", n)
-	}
-	sum, _ := hookPattern(t, hook, "SCANNER_SUM")
-	for _, arch := range []string{"amd64", "arm64"} {
-		n := 0
-		for _, found := range sum.FindAllSubmatch(dockerfile, -1) {
-			if string(found[1]) == arch {
-				n++
-			}
-		}
-		if n != 1 {
-			t.Errorf("the Dockerfile pins the scanner's %s checksum %d times, and the pages need exactly one", arch, n)
-		}
 	}
 }
 

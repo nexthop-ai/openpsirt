@@ -15,7 +15,6 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 	"github.com/nexthop-ai/openpsirt/internal/setting"
@@ -61,19 +60,17 @@ func NewPass(db *bun.DB, q *queue.Queue, logger *slog.Logger, replica string, li
 
 // Run reads until the context ends.
 func (p *Pass) Run(ctx context.Context, interval time.Duration) {
-	defer p.leases.Handback(ctx, ReadLease, p.replica, p.logger)
-	background.Every(ctx, interval, betweenCycles, func(ctx context.Context) {
-		p.interval = interval
+	p.interval = interval
+	p.leases.RunLeased(ctx, queue.Leased{
+		Name: ReadLease, Holder: p.replica, Interval: interval, Fallback: betweenCycles,
+		Failing: "reading what upstreams publish", Logger: p.logger,
+	}, func(ctx context.Context) error {
 		took, err := p.Once(ctx)
-		switch {
-		case err != nil:
-			if ctx.Err() == nil {
-				p.logger.Error("reading what upstreams publish", "error", err)
-			}
-		case took.Documents > 0 || took.Withdrawn > 0 || took.Refused > 0:
+		if err == nil && (took.Documents > 0 || took.Withdrawn > 0 || took.Refused > 0) {
 			p.logger.Info("read what upstreams publish", "documents", took.Documents,
 				"withdrawn", took.Withdrawn, "refused", took.Refused)
 		}
+		return err
 	})
 }
 

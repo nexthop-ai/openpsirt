@@ -277,8 +277,8 @@ type Filter struct {
 	// FixStates keeps only what upstream has done one of these things
 	// about. HasFix above is the same question asked as a flag and is kept
 	// because it is what the screen's own control sends; this
-	// answers the two it cannot — nothing released, and upstream declining
-	// to fix, which is the population that needs a decision rather than a
+	// answers the two it cannot — nothing released, and no fix
+	// scheduled, which is the population that needs a decision rather than a
 	// bump. Those two are one question asked together often enough that a
 	// single value could not ask it.
 	FixStates []FixState
@@ -975,7 +975,7 @@ func (f Filter) narrowGroups(q *bun.SelectQuery, g grain) *bun.SelectQuery {
 // covering what upstream did must not have.
 //
 // Several states asked at once are one condition holding an OR, and each keeps
-// its own meaning inside it: "nothing released or upstream declined" is the
+// its own meaning inside it: "nothing released or none scheduled" is the
 // population that needs a decision rather than a bump, and it is two words for
 // one question.
 func (f Filter) whatUpstreamDid(q *bun.SelectQuery, g grain) *bun.SelectQuery {

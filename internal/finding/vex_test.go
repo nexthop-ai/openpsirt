@@ -5,6 +5,7 @@ package finding_test
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -385,7 +386,7 @@ func TestAClaimAboutOneVersionOffersNothingAtAnother(t *testing.T) {
 	// A claim naming no version is about whatever is shipped, which is how a
 	// publisher states something about a family.
 	family := finding.Statement{Status: "not_affected", Purl: "pkg:rpm/example/libnl"}
-	named := finding.Statement{Status: "affected", Component: "wt676", About: "3.94"}
+	named := finding.Statement{Status: "fixed", Component: "wt676", About: "3.94"}
 	if _, offers := named.PrefillsFor("3.94"); !offers {
 		t.Error("a claim naming no package missed the version it was made about")
 	}
@@ -395,7 +396,7 @@ func TestAClaimAboutOneVersionOffersNothingAtAnother(t *testing.T) {
 	if _, offers := family.PrefillsFor("3.6.0-1.el9"); !offers {
 		t.Error("a claim naming no version offered nothing")
 	}
-	bare := finding.Statement{Status: "affected"}
+	bare := finding.Statement{Status: "not_affected"}
 	if _, offers := bare.PrefillsFor("3.6.0-1.el9"); !offers {
 		t.Error("a claim made against a source tree offered nothing")
 	}
@@ -774,4 +775,36 @@ func TestStatementsDatedTheSameMomentGoToTheLaterRecorded(t *testing.T) {
 			t.Errorf("of two statements dated the same day, %v stand, want the later recorded", standing)
 		}
 	})
+}
+
+func TestAStatementOffersTheOutcomeItsStatusAndRemediationName(t *testing.T) {
+	// An affected statement is never a dismissal, and only its remediation
+	// category tells a fix put off from one refused. A statement of any other
+	// status offers what its status says whatever remediation it carries.
+	for _, each := range []struct {
+		status, remediation, offers string
+	}{
+		{"not_affected", "", finding.OutcomeNotApplicable},
+		{"fixed", "", finding.OutcomeAlreadyFixed},
+		{"affected", "none_available", finding.OutcomeDeferred},
+		{"affected", "no_fix_planned", finding.OutcomeWontFix},
+		{"affected", "vendor_fix", ""},
+		{"affected", "workaround", ""},
+		{"affected", "mitigation", ""},
+		{"affected", "optional_patch", ""},
+		// OpenVEX states no category, and neither does a statement stored
+		// before categories were kept.
+		{"affected", "", ""},
+		{"under_investigation", "none_available", ""},
+	} {
+		outcome, offers := finding.Statement{Status: each.status, Remediation: each.remediation}.Prefills()
+		if outcome != each.offers || offers != (each.offers != "") {
+			t.Errorf("%s with remediation %q offers %q (%v), want %q",
+				each.status, each.remediation, outcome, offers, each.offers)
+		}
+	}
+	if got := finding.OutcomesOffered(); !slices.Equal(got, []string{finding.OutcomeNotApplicable,
+		finding.OutcomeDeferred, finding.OutcomeWontFix, finding.OutcomeAlreadyFixed}) {
+		t.Errorf("the outcomes a statement can offer are %v", got)
+	}
 }

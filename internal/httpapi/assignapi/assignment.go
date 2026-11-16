@@ -59,9 +59,7 @@ type UnassignedBody struct {
 	Component     string `json:"component"`
 	Version       string `json:"version"`
 	core.PackageKindBody
-	Product string `json:"product" doc:"The product, by the name that addresses it"`
-
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	core.ProductNamesBody
 	// Branch or tag and Variant name a build holding this, not the only one: a screen
 	// needs somewhere to link to and an action needs a finding to name. The
 	// field that says there are several is `builds`.

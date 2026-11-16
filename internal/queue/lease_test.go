@@ -4,8 +4,12 @@
 package queue_test
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -202,6 +206,45 @@ func TestALeaseLeftToLapseIsTakenAgainOnlyOnceItLapses(t *testing.T) {
 		moment = moment.Add(24 * time.Hour)
 		if mine, err := leases.TakeLapsed(ctx, "daily", "second", 24*time.Hour); err != nil || !mine {
 			t.Errorf("a lapsed lease was not taken: %v %v", mine, err)
+		}
+	})
+}
+
+func TestALeasedPassLogsAFailureAndHandsTheLeaseBackWhenItEnds(t *testing.T) {
+	// Every replica runs the pass and one does the work, so the lease handed
+	// back on the way out is what lets another replica take over at once. A
+	// failure is logged and the next pass runs; one that is only shutdown is
+	// not a fault worth a line.
+	each(t, queue.DefaultOptions(), func(t *testing.T, db *database.DB, _ *queue.Queue) {
+		leases := queue.NewLeases(db.DB)
+		var said bytes.Buffer
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		passes := 0
+		leases.RunLeased(ctx, queue.Leased{
+			Name: "asking", Holder: "holder", Interval: time.Millisecond, Fallback: time.Hour,
+			Failing: "asking somebody", Logger: slog.New(slog.NewTextHandler(&said, nil)),
+		}, func(ctx context.Context) error {
+			passes++
+			if mine, err := leases.Take(ctx, "asking", "holder", held); err != nil || !mine {
+				t.Fatalf("take: %v %v", mine, err)
+			}
+			if passes == 1 {
+				return errors.New("the first pass failed")
+			}
+			cancel()
+			return errors.New("the pass was cut short")
+		})
+
+		if passes != 2 {
+			t.Errorf("%d passes ran, want a second after the first failed", passes)
+		}
+		if got := said.String(); !strings.Contains(got, "asking somebody") ||
+			!strings.Contains(got, "the first pass failed") || strings.Contains(got, "cut short") {
+			t.Errorf("the log reads %q, want the failure and not the shutdown", got)
+		}
+		if mine, err := leases.Take(t.Context(), "asking", "next", held); err != nil || !mine {
+			t.Errorf("the lease was not handed back when the pass ended: %v %v", mine, err)
 		}
 	})
 }

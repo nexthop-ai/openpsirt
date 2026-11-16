@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-sql-driver/mysql"
+
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/engines"
 )
@@ -437,6 +439,37 @@ func TestInstancesMakingTheLeaseTableAtOnceAllFindItMade(t *testing.T) {
 			}
 			close(start)
 			wg.Wait()
+		}
+	})
+}
+
+// A create of the lease table refused as worth asking again, as MySQL refuses
+// one of two racing creates with a deadlock, is asked again and makes it. The
+// race itself lands too seldom to show this in any one run.
+func TestALeaseTableCreateRefusedAsADeadlockIsAskedAgain(t *testing.T) {
+	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
+		db := open(t, address)
+		drop := func() { _, _ = db.ExecContext(context.Background(), `DROP TABLE IF EXISTS "`+LeaseTable+`"`) }
+		drop()
+		t.Cleanup(drop)
+		was := leaseCreate
+		t.Cleanup(func() { leaseCreate = was })
+		asked := 0
+		leaseCreate = func(ctx context.Context, db *database.DB, statement string) error {
+			asked++
+			if asked < 3 {
+				return &mysql.MySQLError{Number: 1213, Message: "Deadlock found when trying to get lock"}
+			}
+			return was(ctx, db, statement)
+		}
+		if err := makeLeaseTable(t.Context(), db); err != nil {
+			t.Fatalf("a create refused twice as a deadlock answered %v", err)
+		}
+		if there, err := tableExists(t.Context(), db, LeaseTable); err != nil || !there {
+			t.Errorf("the lease table is there: %v (%v), want it made", there, err)
+		}
+		if asked != 3 {
+			t.Errorf("the create was asked %d times, want 3", asked)
 		}
 	})
 }

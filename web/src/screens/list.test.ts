@@ -103,13 +103,13 @@ describe("the filters as the server takes them", () => {
     // with — and a single value could not ask it.
     const asked = listQuery(
       new URLSearchParams(
-        "state=undecided&state=waiting&fix_state=none&fix_state=wont-fix" +
+        "state=undecided&state=waiting&fix_state=none&fix_state=unscheduled" +
           "&ecosystem=deb&ecosystem=golang&outcome=deferred",
       ),
     );
     expect(asked).toMatchObject({
       state: ["undecided", "waiting"],
-      fix_state: ["none", "wont-fix"],
+      fix_state: ["none", "unscheduled"],
       ecosystem: ["deb", "golang"],
       outcome: ["deferred"],
     });

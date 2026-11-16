@@ -565,11 +565,11 @@ var plannedUpgradeOrder = map[PlannedUpgradeSortKey]struct {
 	expr    string
 	nothing bool
 }{
-	PlannedUpgradesByUrgency:     {expr: "urgency"},
-	PlannedUpgradesBySeverity:    {expr: "worst"},
-	PlannedUpgradesByIssues:      {expr: "issues"},
-	PlannedUpgradesByOccurrences: {expr: "places"},
-	PlannedUpgradesByBuilds:      {expr: "builds"},
+	PlannedUpgradesByUrgency:     {expr: `"urgency"`},
+	PlannedUpgradesBySeverity:    {expr: `"worst"`},
+	PlannedUpgradesByIssues:      {expr: `"issues"`},
+	PlannedUpgradesByOccurrences: {expr: `"places"`},
+	PlannedUpgradesByBuilds:      {expr: `"builds"`},
 	PlannedUpgradesByDeadline:    {expr: `MIN("f"."due_at")`, nothing: true},
 }
 
@@ -590,7 +590,7 @@ func PlannedUpgradeSortKeys() []PlannedUpgradeSortKey {
 // byBump is the order an upgrade list has unless somebody asks for another, and
 // the tie-break under every other order: two rows equal on the sorted column
 // must not swap between pages.
-const byBump = "urgency DESC, issues DESC, upstream, fixed_in, fold"
+const byBump = `"urgency" DESC, "issues" DESC, "upstream", "fixed_in", "fold"`
 
 // plannedUpgradeSorted is how the planned-upgrade list is ordered.
 //
@@ -609,7 +609,7 @@ func plannedUpgradeSorted(filter Filter) string {
 // exists to answer and what it orders by unless somebody asks otherwise. It is
 // also the tie-break under every other order, so that a page boundary is a
 // boundary rather than a place rows move across.
-const byWeight = `issues DESC, places DESC, "f"."component_id"`
+const byWeight = `"issues" DESC, "places" DESC, "f"."component_id"`
 
 // componentOrder is how the by-component view is ordered.
 //

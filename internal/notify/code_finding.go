@@ -11,6 +11,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/weblink"
 )
@@ -42,7 +43,7 @@ func TellCodeFindingTriagers(ctx context.Context, db *bun.DB, act CodeFindingAct
 		return nil
 	}
 	what := fmt.Sprintf("A code finding of %s at %s in %s %s %s", codeFinding.Rule, codeFinding.Path,
-		codeFinding.Product, codeFinding.BranchOrTag, codeFinding.Variant)
+		codeFinding.ProductName, codeFinding.BranchOrTagName, codeFinding.VariantName)
 	var body string
 	switch act.Kind {
 	case CodeFindingRecordedAsFlaw:
@@ -61,7 +62,7 @@ func TellCodeFindingTriagers(ctx context.Context, db *bun.DB, act CodeFindingAct
 	if err != nil {
 		return err
 	}
-	link := weblink.CodeFinding(codeFinding.ProductName, codeFinding.BranchOrTagName, codeFinding.VariantName, act.Occurrence)
+	link := weblink.CodeFinding(codeFinding.Product, codeFinding.BranchOrTag, codeFinding.Variant, act.Occurrence)
 	productID := act.ProductID
 	var failed error
 	for personID, per := range reach {
@@ -83,12 +84,13 @@ func TellCodeFindingTriagers(ctx context.Context, db *bun.DB, act CodeFindingAct
 
 // namedCodeFinding is what a line about a code finding names.
 type namedCodeFinding struct {
-	Rule        string `bun:"rule"`
-	Path        string `bun:"path"`
+	Rule string `bun:"rule"`
+	Path string `bun:"path"`
+	// The build as an address names it.
 	Product     string `bun:"product"`
 	BranchOrTag string `bun:"branch_or_tag"`
 	Variant     string `bun:"variant"`
-	// The same three as an address names them.
+	// The same three as a screen shows them.
 	ProductName     string `bun:"product_name"`
 	BranchOrTagName string `bun:"branch_or_tag_name"`
 	VariantName     string `bun:"variant_name"`
@@ -109,12 +111,7 @@ func codeFindingNamed(ctx context.Context, db bun.IDB, productID int64, occurren
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		ColumnExpr(`"v"."identifier" AS "rule"`).
 		ColumnExpr(`"ar"."path" AS "path"`).
-		ColumnExpr(`"p"."display_name" AS "product"`).
-		ColumnExpr(`"st"."display_name" AS "branch_or_tag"`).
-		ColumnExpr(`"va"."display_name" AS "variant"`).
-		ColumnExpr(`"p"."name" AS "product_name"`).
-		ColumnExpr(`"st"."name" AS "branch_or_tag_name"`).
-		ColumnExpr(`"va"."name" AS "variant_name"`).
+		Apply(catalog.BuildNames("p", "st", "va")).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"f"."occurrence_identity" = ?`, occurrence).
 		Where(`"f"."kind" = ?`, kind.Analysis).
