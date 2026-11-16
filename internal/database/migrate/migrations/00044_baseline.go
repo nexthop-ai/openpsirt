@@ -18,19 +18,19 @@ func init() {
 	goose.AddMigrationContext(upBaseline, nil)
 }
 
-// Baseline is the migration that makes v0.9.0's schema, the version a
-// database v0.9.0 built records.
-const Baseline = 43
+// Baseline is the migration that makes v0.10.0's schema, the version a
+// database v0.10.x built records.
+const Baseline = 44
 
-// The schema v0.9.0 built, made directly on an empty database.
+// The schema v0.10.0 built, made directly on an empty database.
 //
-// Numbered as v0.9.0's last migration, so a database v0.9.0 or v0.10.x built
-// has it recorded already and applies only what follows. A database an
-// earlier release built records a version below it, and is refused before
-// anything runs (design-docs/database-migrations.md § The baseline).
+// Numbered as v0.10.0's last migration, so a database v0.10.x built has it
+// recorded already and applies only what follows. A database an earlier
+// release built records a version below it, and is refused before anything
+// runs (design-docs/database-migrations.md § The baseline).
 //
 // The baseline files beside this one hold each table's declaration, with the
-// reasoning for its shape. v0.9.0's record of the schema it built on each
+// reasoning for its shape. v0.10.0's record of the schema it built on each
 // engine is what holds them to it.
 //
 // Its statements are bounded in their wait for a lock as every migration's
@@ -175,6 +175,9 @@ var baseline = []baselineTable{
 	{"advisory_agreed_status", advisoryJudgmentBaseline},
 	{"vex_statement", vexBaseline},
 	{"vex_issuance", vexIssuanceBaseline},
+	{"published_document", publishedDocumentBaseline},
+	{"upstream", upstreamBaseline},
+	{"upstream_document", upstreamBaseline},
 
 	// Who is told, and how.
 	{"notification", notificationBaseline},

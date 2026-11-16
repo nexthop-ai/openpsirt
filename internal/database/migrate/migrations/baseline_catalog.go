@@ -48,6 +48,11 @@ func catalogBaseline(t *columnTypes) []string {
 			-- the reason the triage line does. Teams differ in size by product.
 			"pair_share"     INTEGER NULL,
 			"pair_approvers" INTEGER NULL,
+			-- Whether this product's security documents are served to anybody
+			-- who asks, without signing in, where the deployment publishes at
+			-- all. A default rather than a fill: a product publishes nothing
+			-- until an administrator turns it on, whenever it was declared.
+			"publishes"      ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			"created_at"   ` + t.timestamp + ` NOT NULL,
 			-- Out of use, the way a variant and a release are. Not eol_on
 			-- above: that says support ended and hides nothing, because an
@@ -145,4 +150,14 @@ func catalogBaseline(t *columnTypes) []string {
 
 		`CREATE INDEX "target_variant_idx" ON "target" ("variant_id")`,
 	}
+}
+
+// productV0100 is the baseline's declaration of the product table, under the
+// name v0.11.0's declaration of it reads.
+func productV0100(t *columnTypes) []string {
+	made, indexes, err := pick(catalogBaseline(t), "product")
+	if err != nil {
+		panic(err)
+	}
+	return append([]string{made}, indexes...)
 }

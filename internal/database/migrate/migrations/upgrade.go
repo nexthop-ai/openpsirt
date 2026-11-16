@@ -22,8 +22,8 @@ import (
 // shape the release declares. Each release's migration supplies the order,
 // the rows and its declarations, and calls these.
 
-// inV020 runs a release's upgrade in one transaction. Migration 44 calls it
-// by this name, and a tagged release froze that file.
+// inV020 runs a release's upgrade in one transaction. Migrations 45 and 46
+// call it by this name, and tagged releases froze those files.
 //
 // On PostgreSQL and SQLite a failure leaves the schema as it was. On MySQL and
 // MariaDB every data-definition statement commits as it runs, so a failure
@@ -577,6 +577,15 @@ func releaseUpgrade(ctx context.Context, sqldb *sql.DB, version int64,
 		}
 		return changeRecorded(ctx, tx, version)
 	})
+}
+
+// upgraderIn is the upgrader over one step's transaction.
+func upgraderIn(ctx context.Context, tx bun.Tx) (*upgrader, error) {
+	t, err := types(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &upgrader{ctx: ctx, tx: tx, raw: tx.Tx, t: t, engine: migrate.EngineFrom(ctx)}, nil
 }
 
 // changeRecorded writes, in a release's upgrade transaction, the record of

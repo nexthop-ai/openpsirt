@@ -1419,7 +1419,7 @@ deleting by surprise.
 
 A database is upgraded in place, at startup or by `openpsirt migrate up`,
 through each later release's upgrade on the way. A database built by the
-release the [oldest section below](#from-v080) names, or by an earlier one, is
+release the [oldest section below](#from-v090) names, or by an earlier one, is
 refused, and that section says how to bring it forward. A database built by a
 release candidate
 or any build between releases is recreated.
@@ -1442,35 +1442,27 @@ database a later release upgraded and serves it, failing on what changed, so
 redeploying one, `helm rollback` included, is not going back: restore the
 backup first.
 
-### From v0.8.0
-
-A database v0.8.0 or an earlier release built is refused at startup and by
-`openpsirt migrate up`, naming the version it holds. This release makes
-v0.9.0's schema in one step and carries none of the upgrades before it.
-
-1. Back the database up.
-2. Read v0.10.2's [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.10.2/configuration/#upgrading)
-   from the section for your release on, and do what they say before upgrading
-   as well as after. The upgrade from v0.8.0 rewrites every finding beneath a
-   container image and takes as long as the nightly history held, and the
-   upgrade from v0.5.0 removes group mappings that have to be carried into
-   `OPENPSIRT_GROUP_ROLES` first.
-3. For a database v0.6.0 or an earlier release built, run `openpsirt migrate up`
-   with v0.8.0 against it, and for one v0.4.0 or an earlier release built, with
-   v0.6.0 before that. v0.10.2 refuses such a database, as this release does.
-4. Run `openpsirt migrate up` with v0.10.2 against it.
-5. Deploy this release, reading the sections from v0.9.0 on.
-
-A database v0.9.0 built needs none of this, and reads the sections from v0.9.0
-on.
-
 ### From v0.9.0
 
-| Change | What to do |
-|---|---|
-| This deployment can serve its own security documents to anybody, with `OPENPSIRT_PUBLISH`. Off by default, and off for every product | Nothing, unless you want it: [Published documents](#published-documents) |
-| A decision may state whom a published statement made from it holds for: anybody shipping the component, or this build only. No decision the upgrade carries states one, and the reason decides | Nothing |
-| A path below `/.well-known/csaf/` or `/openvex/` is answered by this deployment, with a 404 where it publishes nothing. v0.9.0 answered it with the interface's page | Nothing, unless a proxy in front of the deployment serves something of its own at either path: it now reaches this deployment where the proxy passes it on |
+A database v0.9.0 or an earlier release built is refused at startup and by
+`openpsirt migrate up`, naming the version it holds and the releases that
+upgrade it. This release makes v0.10.0's schema in one step and carries none of
+the upgrades before it.
+
+1. Back the database up.
+2. Read v0.12.0's [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.12.0/configuration/#upgrading)
+   from the section for your release on, and do what they say before upgrading
+   as well as after.
+3. For a database v0.8.0 or an earlier release built, follow the steps of
+   v0.12.0's [From v0.8.0](https://nexthop-ai.github.io/openpsirt/0.12.0/configuration/#from-v080)
+   up to running `openpsirt migrate up` with v0.10.2. That leaves v0.10.0's schema, which this release upgrades. v0.12.0
+   refuses such a database, as this release does.
+4. For a database v0.9.0 built, run `openpsirt migrate up` with v0.12.0 against
+   it.
+5. Deploy this release, reading the sections from v0.10.0 on.
+
+A database v0.10.0 or a later release built needs none of this, and reads the
+sections from its release on.
 
 ### From v0.10.0
 

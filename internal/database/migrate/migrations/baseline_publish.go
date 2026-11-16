@@ -3,16 +3,59 @@
 
 package migrations
 
-import (
-	"context"
+// publishedDocumentBaseline declares the security documents served to anybody:
+// one row per document, holding the revision a reader is handed now.
+func publishedDocumentBaseline(t *columnTypes) []string {
+	return []string{
+		`CREATE TABLE "published_document" (
+			"id"           ` + t.id + `,
+			"product_id"   ` + t.ref + ` NOT NULL,
+			-- Which document this is: a CSAF VEX document about one issue, or
+			-- an OpenVEX document about one branch or tag.
+			"kind"         ` + t.kind + ` NOT NULL,
+			-- What the document is about within the product: the issue's
+			-- name, or the branch or tag's.
+			"subject"      ` + t.name + ` NOT NULL,
+			-- Where it is served, below the address documents are published
+			-- at, and a digest of that path, which is what a request is
+			-- matched on. The path itself outgrows a key every engine can
+			-- index.
+			"path"         ` + t.text + ` NOT NULL,
+			"path_digest"  ` + t.hash + ` NOT NULL,
+			-- What a feed lists it under.
+			"tracking_id"  ` + t.text + ` NOT NULL,
+			"title"        ` + t.text + ` NOT NULL,
+			-- The revision held, counting from one, and when the first and
+			-- this one were released.
+			"version"      INTEGER NOT NULL,
+			"first_at"     ` + t.timestamp + ` NOT NULL,
+			"current_at"   ` + t.timestamp + ` NOT NULL,
+			-- The statuses the deployment published when this revision was
+			-- written. A revision written under a wider setting than the one
+			-- in force is not served.
+			"statuses"     ` + t.name + ` NOT NULL,
+			-- A digest of what the document states, with its dates, version
+			-- and history left out. A new revision is written only where it
+			-- moves.
+			"settled"      ` + t.hash + ` NOT NULL,
+			-- When the product stopped having anything to say about this
+			-- subject. Not served while set.
+			"withdrawn_at" ` + t.timestamp + ` NULL,
+			-- The bytes a reader is handed.
+			"document"     ` + t.free + ` NOT NULL,
+			CONSTRAINT "published_document_once" UNIQUE ("product_id", "kind", "subject"),
+			CONSTRAINT "published_document_path" UNIQUE ("path_digest"),
+			CONSTRAINT "published_document_product_fk" FOREIGN KEY ("product_id")
+				REFERENCES "product"("id")
+		)` + t.suffix,
+	}
+}
 
-	"github.com/uptrace/bun"
-)
-
-// upstreamV0100 is v0.10.0's declaration of the upstream a product trusts: the
-// provider whose published statements a fork takes, and how far it has been
-// read.
-func upstreamV0100(t *columnTypes) []string {
+// upstreamBaseline declares the upstream a product trusts, the provider whose
+// published statements a fork takes and how far it has been read, and the
+// documents it lists: one row per document read, holding the revision last
+// recorded.
+func upstreamBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "upstream" (
 			"id"           ` + t.id + `,
@@ -47,13 +90,7 @@ func upstreamV0100(t *columnTypes) []string {
 			CONSTRAINT "upstream_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "upstream_by_fk" FOREIGN KEY ("trusted_by") REFERENCES "person"("id")
 		)` + t.suffix,
-	}
-}
 
-// upstreamDocumentV0100 is v0.10.0's declaration of the documents an upstream
-// lists: one row per document read, holding the revision last recorded.
-func upstreamDocumentV0100(t *columnTypes) []string {
-	return []string{
 		`CREATE TABLE "upstream_document" (
 			"id"           ` + t.id + `,
 			"upstream_id"  ` + t.ref + ` NOT NULL,
@@ -75,72 +112,4 @@ func upstreamDocumentV0100(t *columnTypes) []string {
 				REFERENCES "upstream"("id")
 		)` + t.suffix,
 	}
-}
-
-// vexStatementV0100 is v0.10.0's declaration of a third party's statements:
-// v0.9.0's, with who here declined one and when.
-func vexStatementV0100(t *columnTypes) []string {
-	statements := vexStatementsV090(t)
-	statements[0] = withColumn(statements[0], `"superseded_at" `+t.timestamp+` NULL,`,
-		`-- When somebody here declined the statement, and who. A declined
-			-- statement closes nothing and is offered to nobody. Null for one
-			-- nobody declined.
-			"declined_at" `+t.timestamp+` NULL,
-			"declined_by" `+t.refNull+` NULL,`)
-	return statements
-}
-
-// createUpstreamV0100 makes the two upstream tables, each stepped over where it
-// is already there.
-func createUpstreamV0100(ctx context.Context, tx bun.Tx) error {
-	u, err := upgraderIn(ctx, tx)
-	if err != nil {
-		return err
-	}
-	for _, table := range []struct {
-		name     string
-		declared func(*columnTypes) []string
-	}{
-		{"upstream", upstreamV0100},
-		{"upstream_document", upstreamDocumentV0100},
-	} {
-		present, err := u.hasColumn(table.name, "id")
-		if err != nil {
-			return err
-		}
-		if present {
-			continue
-		}
-		if err := u.create(table.declared(u.t), table.name); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// statementDeclinedV0100 adds who declined a statement. No statement v0.9.0
-// held was declined.
-//
-// Each column is added on its own and stepped over where it is already there:
-// on MySQL and MariaDB each addition commits by itself, so a start that
-// stopped between the two leaves the first and not the second.
-func statementDeclinedV0100(ctx context.Context, tx bun.Tx) error {
-	u, err := upgraderIn(ctx, tx)
-	if err != nil {
-		return err
-	}
-	for _, column := range []string{"declined_at", "declined_by"} {
-		present, err := u.hasColumn("vex_statement", column)
-		if err != nil {
-			return err
-		}
-		if present {
-			continue
-		}
-		if err := u.change(vexStatementV0100(u.t), change{table: "vex_statement",
-			add: []added{{column: column}}}); err != nil {
-			return err
-		}
-	}
-	return nil
 }

@@ -135,6 +135,10 @@ func triageBaseline(t *columnTypes) []string {
 			-- know which outcome a date belongs to.
 			"committed_to"   ` + t.date + ` NULL,
 			"upgrade_to"     ` + t.free + ` NULL,
+			-- Whom a published statement made from this claim holds for:
+			-- anybody shipping the component, or this product's own build. Null
+			-- where the claim states none, and the reason it gives decides.
+			"scope"          ` + t.kind + ` NULL,
 			-- What the current reasoning is. An approval points at one
 			-- revision rather than at the claim, so this moving is exactly
 			-- what withdraws an approval.
@@ -532,4 +536,14 @@ func statementTextBaseline(t *columnTypes) []string {
 			CONSTRAINT "statement_text_digest_unique" UNIQUE ("words_digest")
 		)` + t.suffix,
 	}
+}
+
+// claimV0100 is the baseline's declaration of the claim table, under the name
+// v0.11.0's declaration of it reads.
+func claimV0100(t *columnTypes) []string {
+	made, indexes, err := pick(triageBaseline(t), "claim")
+	if err != nil {
+		panic(err)
+	}
+	return append([]string{made}, indexes...)
 }
