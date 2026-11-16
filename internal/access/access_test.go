@@ -355,12 +355,10 @@ func TestAReportingRoleCannotBeGranted(t *testing.T) {
 }
 
 func TestAnAdministratorAdministersRatherThanHoldingEveryRole(t *testing.T) {
-	// It read the other way and nothing said so: an administrator held
-	// every role on every product, so one account proposed and approved
-	// its own work, re-rated severities and read every embargo. That
-	// defeats separation of duties silently, and it made a read-only
-	// auditor impossible — nobody could see everything without also being
-	// able to change everything.
+	// An administrator holding every role on every product would propose
+	// and approve its own work, re-rate severities and read every embargo,
+	// defeating separation of duties, and no read-only auditor could see
+	// everything without also being able to change everything.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		if _, err := f.store.Ensure(ctx, "admin", "Admin", new(true), nil); err != nil {
