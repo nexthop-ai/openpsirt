@@ -185,9 +185,10 @@ and an SPDX identifier; `make spdx-fix` writes missing ones.
 |---|---|
 | Every action is pinned to a release commit, its version in a comment | A tag can move under this repository's token |
 | `sha_pinning_required` refuses an action by tag | |
-| Dependabot moves pins weekly in groups: actions, images, the `golang` image alone, database-layer Go modules, other Go modules, Go tools, interface packages, the documentation closure | |
+| Dependabot moves pins weekly in groups: actions, images, the `golang` image alone, database-layer Go modules, other Go modules, Go tools, interface peer sets, other interface packages, the documentation closure | |
 | The database layer, the query builder, drivers and migration runner, is its own group | Its releases change interfaces every store uses: bun v1.3.0 made limits, offsets and counts int64 |
 | Interface minor and patch releases are grouped; a major release is its own pull request | |
+| Interface packages that name one another as peers, or pin one another exactly, form a group of their own that takes every update type: Stylelint and its configurations; ESLint and its plugins and configurations; the bundler, test runner, their plugins and the stylesheet compiler; React and React DOM; their type packages | A major bumped alone cannot install, because npm refuses the peer range; the standard configuration accepts one Stylelint major |
 | TypeScript majors are not offered | The linter's TypeScript support and the API client generator both refuse 7. It lifts when both accept it |
 | Updates go through the merge queue | |
 | A minor or patch update is approved and queued as it opens and after each rebase, by the `Dependabot` workflow | The queue runs the whole gate; a push dismisses an approval |

@@ -94,9 +94,19 @@ updates:
 
   # The interface's packages, moved in the lockfile the build installs from.
   #
-  # The group carries minor and patch releases. A major release arrives as a
-  # pull request of its own, because it is the kind that needs work, and one
-  # that does should hold nothing else back.
+  # The "web" group carries minor and patch releases. A major release arrives
+  # as a pull request of its own, because it is the kind that needs work, and
+  # one that does should hold nothing else back.
+  #
+  # The groups ahead of it hold packages that declare one another as peers, or
+  # pin one another exactly, and take every update type: a major bumped alone
+  # cannot install, because npm refuses the peer range. A package goes to the
+  # first group whose pattern it matches.
+  #
+  # The build group is one chain: the React plugin and the test runner name
+  # the bundler as a peer, the coverage provider names the runner's exact
+  # release, and the stylesheet plugin names the bundler as a peer and the
+  # stylesheet compiler's exact release.
   #
   # TypeScript's major releases are not offered. The linter's TypeScript
   # support and the API client generator each declare the compiler releases
@@ -107,6 +117,27 @@ updates:
     schedule:
       interval: weekly
     groups:
+      stylelint:
+        patterns: ["stylelint", "stylelint-config-*"]
+      eslint:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "eslint-plugin-*"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
+      build:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "vitest"
+          - "@vitest/*"
+          - "tailwindcss"
+          - "@tailwindcss/*"
+      react:
+        patterns: ["react", "react-dom"]
+      react-types:
+        patterns: ["@types/react", "@types/react-dom"]
       web:
         patterns: ["*"]
         update-types: ["minor", "patch"]
