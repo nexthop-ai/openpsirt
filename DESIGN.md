@@ -8,7 +8,7 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 | Document | Covers | Terms |
 |---|---|---|
 | [data-model](design-docs/data-model.md) | What a scan is filed against, and the names it is declared under | vocabulary, product, branch or tag, variant, build, release date, end of support, catalog corrections, retirement, declaration before use, names, engine differences |
-| [data-model-components](design-docs/data-model-components.md) | What a component is and how it is identified | component identity, container images, image versions, component references, package identifier prefixes, purl, upstream name, the fold, duplicate descriptions, qualifiers |
+| [data-model-components](design-docs/data-model-components.md) | What a component is and how it is identified | component identity, container images, image versions, component references, package identifier prefixes, purl, identifying name, version in the name, upstream name, the fold, duplicate descriptions, qualifiers |
 | [data-model-graph](design-docs/data-model-graph.md) | The dependency graph, its history, and occurrences | nodes and edges, root, intervals, inventory delta, comparison of two builds, occurrence identity, path traversal, recursive walks |
 | [data-model-measurements](design-docs/data-model-measurements.md) | Benchmark runs behind the graph rules | inventory delta timings, a year of nightly scans, stated-name lookup timings |
 | [findings](design-docs/findings.md) | What a finding is, the row a person reads, work across builds | fan-out, occurrence, fold, decision state on a row, partly decided, variants, spread, incomplete upgrade, total above a list |
