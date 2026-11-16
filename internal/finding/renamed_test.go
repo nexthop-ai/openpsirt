@@ -432,3 +432,32 @@ func TestAFlawOnAKernelIsWidenedOnlyWhereOneComponentInItsEcosystemContinuesIt(t
 		})
 	}
 }
+
+func TestAReleaseShippingTwoVersionsOfARenamedPackageCountsItsIssueOnce(t *testing.T) {
+	// A release ships the kernel at 6.12.41 and 6.12.94, each named after its
+	// version. The issue both carry is one issue at one component, as the
+	// calendar trend counts it.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		_, older := kernelShipped("6.12.41")
+		_, newer := kernelShipped("6.12.94")
+		release := f.anotherBuild(t, "v1.0")
+		f.shippedTo(t, release, graph.Snapshot{
+			Root:         root,
+			Components:   []graph.Described{older, newer},
+			Dependencies: []graph.Dependency{{Parent: root, Child: older}, {Parent: root, Child: newer}},
+		})
+		if _, err := f.store.Apply(ctx, release, f.runOn(t, release), []finding.Reported{
+			found("CVE-2026-1", older), found("CVE-2026-1", newer), found("CVE-2026-2", newer),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		points, err := f.store.ReleaseTrend(ctx, f.holding(t, access.PublicRead), f.wholeProduct(), 12)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(points) != 1 || points[0].Open != 2 || points[0].BySeverity["high"] != 2 {
+			t.Errorf("the release reads %+v, want two issues at the kernel, both high", points)
+		}
+	})
+}

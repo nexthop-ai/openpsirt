@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -95,10 +96,16 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		BranchOrTagName string    `bun:"branch_or_tag_name"`
 		CreatedAt       time.Time `bun:"created_at"`
 		Band            string    `bun:"band"`
-		Open            int       `bun:"open"`
+		Vulnerability   int64     `bun:"vulnerability_id"`
+		Folded          string    `bun:"name_folded"`
+		Name            string    `bun:"name"`
+		Version         string    `bun:"version"`
+		Purl            string    `bun:"purl"`
 	}
 	// The issues at components per release, then the band of each, counted
-	// after. A component is its name, so one name at two versions is one. The
+	// here. A component is its identifying name, so one name at two versions
+	// is one, and so are two versions of a package named after its version
+	// (design-docs/data-model-components.md § The identifying name). The
 	// pairs are reduced before the issue or its rating is joined: a release
 	// holds each issue at many occurrences, and joining first reads the
 	// issue's row once per occurrence only to fold the copies away. Inside one
@@ -112,6 +119,8 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		ColumnExpr(`"b"."branch_or_tag_id" AS "branch_or_tag_id"`).
 		Join(`JOIN "component" AS "rc" ON "rc"."id" = "f"."component_id"`).
 		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"rc"."name_folded" AS "name_folded", MIN("rc"."name") AS "name"`).
+		ColumnExpr(`MIN("rc"."version") AS "version", MIN(COALESCE("rc"."purl", '')) AS "purl"`).
 		Where(`"st"."kind" = ?`, catalog.Tag).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(kinds, kindArgs...).
@@ -131,26 +140,36 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		// shipped sorts after ones that came out later, and a year
 		// backfilled in an afternoon plots as a single day.
 		ColumnExpr(`COALESCE("st"."released_on", "st"."created_at") AS "created_at"`).
-		ColumnExpr(rating.BandExpr + ` AS "band"`)
+		ColumnExpr(rating.BandExpr + ` AS "band"`).
+		ColumnExpr(`"grouped"."vulnerability_id", "grouped"."name_folded", "grouped"."name"`).
+		ColumnExpr(`"grouped"."version", "grouped"."purl"`)
 
 	if err := s.db.NewSelect().
 		TableExpr(`(?) AS "per_release"`, inner).
-		ColumnExpr(`"per_release"."branch_or_tag" AS "branch_or_tag"`).
-		ColumnExpr(`"per_release"."branch_or_tag_name" AS "branch_or_tag_name"`).
-		ColumnExpr(`"per_release"."created_at" AS "created_at"`).
-		ColumnExpr(`"per_release"."band" AS "band"`).
-		ColumnExpr(`COUNT(*) AS "open"`).
-		GroupExpr(`"per_release"."branch_or_tag", "per_release"."branch_or_tag_name", "per_release"."created_at", "per_release"."band"`).
+		ColumnExpr(`"per_release"."branch_or_tag", "per_release"."branch_or_tag_name", "per_release"."created_at"`).
+		ColumnExpr(`"per_release"."band", "per_release"."vulnerability_id", "per_release"."name_folded"`).
+		ColumnExpr(`"per_release"."name", "per_release"."version", "per_release"."purl"`).
 		// Newest last, so the chart reads left to right the way time does.
-		OrderExpr(`"created_at", "branch_or_tag", "band"`).
+		OrderExpr(`"created_at", "branch_or_tag"`).
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what each release shipped with: %w", err)
 	}
 
 	// Gathered in order, so the sequence is the order they were cut.
+	type counted struct {
+		branchOrTag, component string
+		vulnerability          int64
+	}
+	seen := map[counted]bool{}
 	var out []ReleasePoint
 	at := map[string]int{}
 	for _, row := range rows {
+		one := counted{row.BranchOrTag, graph.IdentifyingFolded(row.Folded, row.Name, row.Version, row.Purl),
+			row.Vulnerability}
+		if seen[one] {
+			continue
+		}
+		seen[one] = true
 		i, held := at[row.BranchOrTag]
 		if !held {
 			out = append(out, ReleasePoint{
@@ -160,8 +179,8 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 			i = len(out) - 1
 			at[row.BranchOrTag] = i
 		}
-		out[i].Open += row.Open
-		out[i].BySeverity[row.Band] += row.Open
+		out[i].Open++
+		out[i].BySeverity[row.Band]++
 	}
 	// The most recent, where there are more than a chart can carry. Taken from
 	// the end because the releases somebody is comparing are the recent ones,
