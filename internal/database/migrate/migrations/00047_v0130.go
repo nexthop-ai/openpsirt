@@ -42,14 +42,15 @@ func upV0130(ctx context.Context, sqldb *sql.DB) error {
 //   - A package identifier holds no credential in a qualifier's address, on a
 //     component, a build's node, an image version or a scan's root identifier.
 //   - A finding's occurrence, and a decision occurrence at it, is keyed by a
-//     name holding its own version with that version taken out.
+//     name holding its own version with that version taken out, and the
+//     component stores that name folded.
 //   - An upgrade changing the schema keeps a record of it until the schema is
 //     whole.
 func upgradeV0130(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{advisoryCoverLiveV0130,
 		advisoryOverrideLiveV0130, graphNodeStatedV0130, receivedStatementTimedV0130,
 		receivedStatementNewestV0130, decisionEndedByV0130, purlCredentialsV0130,
-		occurrenceIdentifyingV0130, schemaChangeMadeV0130} {
+		componentIdentifyingV0130, occurrenceIdentifyingV0130, schemaChangeMadeV0130} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

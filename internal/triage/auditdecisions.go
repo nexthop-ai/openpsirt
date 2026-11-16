@@ -183,30 +183,17 @@ func (s *Store) AuditDecisions(ctx context.Context, subject access.Subject, f Fi
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id" AND "st"."product_id" = "de"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
-		ColumnExpr(`MIN("c"."name_folded") AS "name_folded", MIN("c"."name") AS "name"`).
-		ColumnExpr(`MIN("c"."version") AS "version", MIN(COALESCE("c"."purl", '')) AS "purl"`).
+		ColumnExpr(`COUNT(DISTINCT `+graph.IdentifyingExpr("c")+`) AS "components"`).
 		Where(`"de"."decision_id" IN (?)`, bun.List(ids)).
 		Apply(ofKinds(kind.Decisions, "f")).
-		GroupExpr(`"de"."decision_id", "c"."id"`)
+		GroupExpr(`"de"."decision_id"`)
 	components = readableFindings(components, subject, "f", `"st"."product_id"`)
-	var rows []struct {
-		DecisionID int64  `bun:"decision_id"`
-		Folded     string `bun:"name_folded"`
-		Name       string `bun:"name"`
-		Version    string `bun:"version"`
-		Purl       string `bun:"purl"`
+	var named []struct {
+		DecisionID int64 `bun:"decision_id"`
+		Components int   `bun:"components"`
 	}
-	if err := components.Scan(ctx, &rows); err != nil {
+	if err := components.Scan(ctx, &named); err != nil {
 		return nil, 0, fmt.Errorf("count the components each decision covers: %w", err)
-	}
-	// Counted by identifying name, so a package renamed by its own upgrade
-	// is one component at both versions.
-	named := map[int64]map[string]bool{}
-	for _, row := range rows {
-		if named[row.DecisionID] == nil {
-			named[row.DecisionID] = map[string]bool{}
-		}
-		named[row.DecisionID][graph.IdentifyingFolded(row.Folded, row.Name, row.Version, row.Purl)] = true
 	}
 
 	var decisions []Decision
@@ -276,9 +263,9 @@ func (s *Store) AuditDecisions(ctx context.Context, subject access.Subject, f Fi
 			entry.Standing = row.Occurrences
 		}
 	}
-	for decisionID, names := range named {
-		if entry, held := gathered[decisionID]; held {
-			entry.Components = len(names)
+	for _, row := range named {
+		if entry, held := gathered[row.DecisionID]; held {
+			entry.Components = row.Components
 		}
 	}
 

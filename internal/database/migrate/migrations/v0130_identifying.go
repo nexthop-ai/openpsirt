@@ -25,6 +25,36 @@ import (
 // step takes.
 const identifyingBatchV0130 = 5_000
 
+// componentV0130 is v0.13.0's declaration of the component table.
+//
+// The baseline's, with the identifying name folded where the name holds the
+// component's own version.
+func componentV0130(t *columnTypes) []string {
+	statements := append([]string(nil), componentBaseline(t)...)
+	statements[0] = withColumn(statements[0], `"license"            `+t.free+` NULL,`,
+		`-- The name with its own version taken out, folded, where the
+			-- name holds that version: what a count across versions groups
+			-- on. Null where the name holds no version, which reads the
+			-- folded name.
+			"identifying_folded" `+t.name+` NULL,`)
+	return statements
+}
+
+// componentIdentifyingV0130 adds the column holding a component's identifying
+// name folded. The identifying step fills it.
+func componentIdentifyingV0130(ctx context.Context, tx bun.Tx) error {
+	u, err := upgraderIn(ctx, tx)
+	if err != nil {
+		return err
+	}
+	present, err := u.hasColumn("component", "identifying_folded")
+	if err != nil || present {
+		return err
+	}
+	return u.change(componentV0130(u.t), change{table: "component",
+		add: []added{{column: "identifying_folded"}}})
+}
+
 // occurrenceIdentifyingV0130 keys every occurrence of a component whose name
 // holds its own version as v0.13.0 keys it: by the name with that version
 // taken out. A finding's occurrence is rewritten where it holds the key
@@ -43,12 +73,21 @@ const identifyingBatchV0130 = 5_000
 // which a finding still holds once the findings are rewritten, or at two
 // versions carrying different releases, which the findings left for two keys.
 //
+// Each such component stores its identifying name folded.
+//
 // The rewrite reads nothing it wrote, so a start after one that stopped finds
 // every key it rewrote already v0.13.0's and rewrites nothing twice.
 func occurrenceIdentifyingV0130(ctx context.Context, tx bun.Tx) error {
 	named, renamed, err := identifyingComponentsV0130(ctx, tx)
 	if err != nil || len(renamed) == 0 {
 		return err
+	}
+	for _, id := range renamed {
+		if _, err := tx.NewUpdate().TableExpr(`"component"`).
+			Set(`"identifying_folded" = ?`, foldedV0130(named[id].identifying)).
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
+			return fmt.Errorf("store the identifying name of component %d: %w", id, err)
+		}
 	}
 	sitting, err := occurrencesAtV0130(ctx, tx, renamed)
 	if err != nil {
@@ -439,6 +478,20 @@ func ecosystemV0130(purl string) string {
 		kind = printableV0130(decoded)
 	}
 	return strings.ToLower(strings.TrimSpace(kind))
+}
+
+// foldedV0130 is a name folded as v0.13.0 folds it: trimmed, in lower case,
+// and cut to the folded column's width in characters.
+func foldedV0130(name string) string {
+	folded := strings.ToLower(strings.TrimSpace(name))
+	kept := 0
+	for at := range folded {
+		if kept == database.NameWidth {
+			return folded[:at]
+		}
+		kept++
+	}
+	return folded
 }
 
 // printableV0130 is s without its control characters, every other byte kept,

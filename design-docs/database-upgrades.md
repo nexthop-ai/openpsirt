@@ -243,6 +243,7 @@ lapses.
 |---|---|
 | `advisory_issue` | A mark held while the issue is on the advisory: true on every row not taken off, null on the rest; and the issue unique on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § The advisory) |
 | `advisory_override` | A mark held while the release is marked affected: true on every row not cleared, null on the rest; and the release marked once on the advisory among the rows holding the mark (`design-docs/remediation-advisories.md` § Editions and agreement) |
+| `component` | The identifying name folded, null, then filled by the occurrence re-keying for each component whose name holds its own version (`design-docs/data-model-components.md` § The identifying name) |
 | `decision_occurrence` | Who withdrew the row, null on every row v0.12.0 holds, and its key to the person (`design-docs/triage-approval.md` § Approval) |
 | `graph_node` | The name and the version the build stated, the name's fold and the stated source's fold, all empty, and an index of each build's nodes by each fold (`design-docs/data-model-graph.md` § The dependency graph) |
 | `received_vex_statement` | When each statement was made and which newer statement of its publisher set it aside, both empty, so a statement held before the upgrade is ordered by its upload (`design-docs/ingest-claims.md` § Administrator-supplied VEX); the older of two standing about one subject, such as two supplier advisories, set aside as overtaken by the newer |
@@ -290,6 +291,7 @@ lapses.
 | A v0.12.0 database holding findings and decisions on a kernel at two versions, one under its headers, a library holding no version in its name, a package beneath each kernel, and a code finding on the kernel | Each kernel key rewritten to its identifying name, the package's beneath it included, the library's and the code finding's left, the approved dismissal standing and the proposed one at the same key lapsed, the newer of two proposals brought together standing and the older lapsed, the decision keyed on the kernel's version standing under its new key |
 | A v0.12.0 database holding a decision at a key one name made at two versions, the name holding its release at one of them or a different release at each | The decision left at its key, standing |
 | The upgrade's copy of the rule, over names, versions and identifiers of every ecosystem | Reads every name as the application does |
+| A v0.12.0 database holding a kernel and a library holding no version in its name | The kernel stores its identifying name as the application writes it; the library stores none |
 
 ## Limits
 

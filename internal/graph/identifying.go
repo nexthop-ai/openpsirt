@@ -66,6 +66,23 @@ func IdentifyingName(name, version, purl string) string {
 	return out.String()
 }
 
+// IdentifyingExpr is the identifying name of the component aliased alias,
+// folded, as a statement reads it: the stored column where the name holds its
+// own version, and the folded name where it holds none.
+func IdentifyingExpr(alias string) string {
+	return `COALESCE("` + alias + `"."identifying_folded", "` + alias + `"."name_folded")`
+}
+
+// StoredIdentifying is what a component row stores as its identifying
+// name folded: empty where the name holds no version of its own.
+func StoredIdentifying(name, version, purl string) string {
+	identifying := IdentifyingName(name, version, purl)
+	if identifying == strings.TrimSpace(name) {
+		return ""
+	}
+	return Folded(identifying)
+}
+
 // IdentifyingName is the component's name as IdentifyingName reads it, from
 // its row's name, version and package identifier.
 func (c Component) IdentifyingName() string {

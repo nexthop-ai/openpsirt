@@ -286,6 +286,36 @@ func TestTheV0130UpgradeKeysAnOccurrenceByTheNameWithoutItsVersion(t *testing.T)
 	})
 }
 
+func TestTheV0130UpgradeStoresTheIdentifyingNameAsTheApplicationDoes(t *testing.T) {
+	// A count across versions groups on the stored name, so a component
+	// written before the upgrade has to hold what one written after does.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		seed := seedV0120(t, db)
+		name, version, purl := kernelV0120("6.12.41")
+		kernel := seed.component(name, version, purl)
+		libssl := seed.component("libssl3", "3.5.1-1", "pkg:deb/debian/libssl3@3.5.1-1")
+
+		dbtest.MigrateTo(t, db, v0130)
+
+		stored := func(id int64) *string {
+			var got *string
+			if err := db.DB.NewSelect().TableExpr(`"component"`).ColumnExpr(`"identifying_folded"`).
+				Where(`"id" = ?`, id).Scan(ctx, &got); err != nil {
+				t.Fatal(err)
+			}
+			return got
+		}
+		if got, want := stored(kernel), graph.StoredIdentifying(name, version, purl); got == nil || *got != want {
+			t.Errorf("the kernel stores %v as its identifying name, want %q", got, want)
+		}
+		if got := stored(libssl); got != nil {
+			t.Errorf("a library holding no version in its name stores %q, want nothing", *got)
+		}
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
 func TestTheV0130UpgradeLeavesADecisionAtAKeyItSplits(t *testing.T) {
 	// One name, one consumer, so v0.12.0 made one key. The upgrade reads the
 	// name as carrying its version at one version and not at the other, so the

@@ -243,6 +243,7 @@ func StatementsV0130(engine database.Engine) map[string][]string {
 	return map[string][]string{
 		"advisory_issue":         advisoryIssueV0130(t),
 		"advisory_override":      advisoryOverrideV0130(t),
+		"component":              componentV0130(t),
 		"decision_occurrence":    decisionOccurrenceV0130(t),
 		"graph_node":             graphNodeV0130(t),
 		"received_vex_statement": receivedStatementV0130(t),
