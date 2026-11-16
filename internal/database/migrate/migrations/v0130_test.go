@@ -11,7 +11,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
 
 // v0130 is the migration v0.13.0 carries v0.12.0's schema across with.
@@ -108,52 +107,31 @@ func (c coversV0120) checkLive(t *testing.T, db *database.DB) {
 
 // A v0.12.0 database's advisory covers are marked by whether each is still on
 // the advisory, whether the upgrade ran whole or a start of it stopped after
-// the column or after the rule holding it; the second and third are stops
-// SQLite never makes, since it changes a table in one transaction.
-func TestAV0120DatabaseResumesTheV0130UpgradeFromEveryStop(t *testing.T) {
-	for _, stop := range []struct {
-		name string
-		make func(t *testing.T, db *database.DB) error
-	}{
-		{"whole", nil},
-		{"after the column", func(t *testing.T, db *database.DB) error {
-			return migrations.StopV0130AfterLiveColumn(t.Context(), db)
-		}},
-		{"after the rule", func(t *testing.T, db *database.DB) error {
-			return migrations.StopV0130AfterLiveRule(t.Context(), db)
-		}},
-	} {
-		t.Run(stop.name, func(t *testing.T) {
-			dbtest.Each(t, func(t *testing.T, db *database.DB) {
-				ctx := t.Context()
-				if stop.make != nil && db.Server.Engine == database.SQLite {
-					t.Skip("SQLite changes a table in one transaction, so it never stops there")
-				}
-				dbtest.Empty(t, db)
-				dbtest.MigrateTo(t, db, v0120)
-				covers := seedCoversV0120(t, db)
-				if stop.make != nil {
-					if err := stop.make(t, db); err != nil {
-						t.Fatalf("make what a stopped upgrade left: %v", err)
-					}
-				}
-				dbtest.MigrateTo(t, db, v0130)
-				declarationsAreBuilt(t, ctx, db, migrations.StatementsV0130(db.Server.Engine))
-				covers.checkLive(t, db)
-				leaveAtLatest(t, ctx, db)
-			})
-		})
+// the column or after the rule holding it.
+func coversPartV0130() partV0130 {
+	return partV0130{
+		name: "AnAdvisoryCoverIsMarkedByWhetherItIsStillOn",
+		seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
+			covers := seedCoversV0120(t, db)
+			return func(t *testing.T) { covers.checkLive(t, db) }
+		},
+		stops: []stopV0130{
+			{"after the column", func(t *testing.T, db *database.DB) error {
+				return migrations.StopV0130AfterLiveColumn(t.Context(), db)
+			}},
+			{"after the rule", func(t *testing.T, db *database.DB) error {
+				return migrations.StopV0130AfterLiveRule(t.Context(), db)
+			}},
+		},
 	}
 }
 
 // A v0.12.0 database's package identifiers lose the credential a qualifier's
 // address held, on the component, the node and the image version, and keep
 // every qualifier holding none.
-func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+func packageIdentifiersPartV0130() partV0130 {
+	return partV0130{name: "TheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers", seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
 		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0120)
 		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
 		exec := func(query string, args ...any) {
 			t.Helper()
@@ -277,38 +255,39 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPackageIdentifiers(t *testing.T) {
 				"status", "components", "root_identifier") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 				build, key, at, at, "test", "accepted", 1, purl)
 		}
-
-		dbtest.MigrateTo(t, db, v0130)
-
-		for _, at := range [][2]string{
-			{"component", "purl"}, {"graph_node", "purl"}, {"image_version", "purl"}, {"scan", "root_identifier"},
-		} {
-			table := at[0]
-			var got []string
-			if err := db.DB.NewRaw(`SELECT "`+at[1]+`" FROM "`+table+`" WHERE "`+at[1]+
-				`" IS NOT NULL ORDER BY "id"`).Scan(ctx, &got); err != nil {
-				t.Fatal(err)
-			}
-			if len(got) != len(cases) {
-				t.Fatalf("%s holds %d identifiers after the upgrade, want %d", table, len(got), len(cases))
-			}
-			for i, c := range cases {
-				if got[i] != c.want {
-					t.Errorf("%s holds %q after the upgrade for %q, want %q", table, got[i], c.stored, c.want)
+		return func(t *testing.T) {
+			ctx := t.Context()
+			// The rows of this part's build, each found through the build.
+			for _, at := range [][3]string{
+				{"component", "purl", `"id" IN (SELECT "component_id" FROM "graph_node" WHERE "build_id" = ?)`},
+				{"graph_node", "purl", `"build_id" = ?`},
+				{"image_version", "purl", `"node_id" IN (SELECT "id" FROM "graph_node" WHERE "build_id" = ?)`},
+				{"scan", "root_identifier", `"build_id" = ?`},
+			} {
+				table := at[0]
+				var got []string
+				if err := db.DB.NewRaw(`SELECT "`+at[1]+`" FROM "`+table+`" WHERE "`+at[1]+
+					`" IS NOT NULL AND `+at[2]+` ORDER BY "id"`, build).Scan(ctx, &got); err != nil {
+					t.Fatal(err)
+				}
+				if len(got) != len(cases) {
+					t.Fatalf("%s holds %d identifiers after the upgrade, want %d", table, len(got), len(cases))
+				}
+				for i, c := range cases {
+					if got[i] != c.want {
+						t.Errorf("%s holds %q after the upgrade for %q, want %q", table, got[i], c.stored, c.want)
+					}
 				}
 			}
 		}
-		leaveAtLatest(t, ctx, db)
-	})
+	}}
 }
 
 // A document served to anybody states each identifier as the upgrade leaves
 // it, and an identifier a cleaned one begins is left as it was.
-func TestTheV0130UpgradeTakesCredentialsOutOfPublishedDocuments(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+func publishedDocumentsPartV0130() partV0130 {
+	return partV0130{name: "TheV0130UpgradeTakesCredentialsOutOfPublishedDocuments", seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
 		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0120)
 		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
 		exec := func(query string, args ...any) {
 			t.Helper()
@@ -318,11 +297,14 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPublishedDocuments(t *testing.T) {
 		}
 		//nolint:gosec // G101: the credential this upgrade takes out
 		const (
-			raw     = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git&arch=amd64"
-			clean   = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://gitlab.example.com/x.git&arch=amd64"
-			slashed = "pkg://deb/debian/curl@8.5.0"
-			longer  = "pkg://deb/debian/curl@8.5.0-1"
+			raw     = "pkg:golang/example.com/served@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/served.git&arch=amd64"
+			clean   = "pkg:golang/example.com/served@v1?vcs_url=git%2Bhttps://gitlab.example.com/served.git&arch=amd64"
+			slashed = "pkg://deb/debian/served@8.5.0"
+			longer  = "pkg://deb/debian/served@8.5.0-1"
 		)
+		// Identifiers no other part seeds: the credential step cleans every
+		// document from one set built from every table's identifiers, so a
+		// shared one is cleaned through another part's rows.
 		seeded := seedCoversV0120(t, db)
 		product := seeded.product
 		for i, purl := range []string{raw, slashed} {
@@ -369,99 +351,105 @@ func TestTheV0130UpgradeTakesCredentialsOutOfPublishedDocuments(t *testing.T) {
 		exec(`INSERT INTO "advisory_issuance" ("advisory_id", "ordinal", "edition_id", "document", "digest",
 			"issued_by", "issued_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			seeded.advisory, 1, edition, body(raw, slashed), "digest", seeded.person, at)
+		return func(t *testing.T) {
+			ctx := t.Context()
 
-		dbtest.MigrateTo(t, db, v0130)
-
-		want := body(clean, "pkg:deb/debian/curl@8.5.0")
-		for _, table := range []string{"published_document", "advisory_issuance"} {
-			var got []string
-			if err := db.DB.NewRaw(`SELECT "document" FROM "`+table+`" ORDER BY "id"`).
-				Scan(ctx, &got); err != nil {
-				t.Fatal(err)
-			}
-			if want := map[string]int{"published_document": documents, "advisory_issuance": 1}[table]; len(got) != want {
-				t.Fatalf("%s holds %d documents after the upgrade, want %d", table, len(got), want)
-			}
-			for i, document := range got {
-				if document != want {
-					t.Errorf("%s %d holds\n%s\nafter the upgrade, want\n%s", table, i, document, want)
+			want := body(clean, "pkg:deb/debian/served@8.5.0")
+			for _, table := range []string{"published_document", "advisory_issuance"} {
+				var got []string
+				owner := map[string]string{"published_document": `"product_id"`, "advisory_issuance": `"advisory_id"`}[table]
+				of := map[string]int64{"published_document": product, "advisory_issuance": seeded.advisory}[table]
+				if err := db.DB.NewRaw(`SELECT "document" FROM "`+table+`" WHERE `+owner+` = ? ORDER BY "id"`, of).
+					Scan(ctx, &got); err != nil {
+					t.Fatal(err)
+				}
+				if want := map[string]int{"published_document": documents, "advisory_issuance": 1}[table]; len(got) != want {
+					t.Fatalf("%s holds %d documents after the upgrade, want %d", table, len(got), want)
+				}
+				for i, document := range got {
+					if document != want {
+						t.Errorf("%s %d holds\n%s\nafter the upgrade, want\n%s", table, i, document, want)
+					}
 				}
 			}
 		}
-		leaveAtLatest(t, ctx, db)
-	})
+	}}
 }
 
 // A start of the credential step that stopped after any of its phases leaves
 // the next start nothing served still holding the credential: the documents
 // are rewritten before the identifiers they are matched against are.
-func TestAStoppedCredentialStepLeavesNoDocumentHoldingACredential(t *testing.T) {
-	for phases := 1; phases < migrations.PurlPhasesV0130; phases++ {
-		t.Run(fmt.Sprintf("after %d", phases), func(t *testing.T) {
-			dbtest.Each(t, func(t *testing.T, db *database.DB) {
+func stoppedCredentialPartV0130() partV0130 {
+	part := partV0130{
+		name: "AStoppedCredentialStepLeavesNoDocumentHoldingACredential",
+		seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
+			ctx := t.Context()
+			at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+			exec := func(query string, args ...any) {
+				t.Helper()
+				if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+					t.Fatalf("%v\n%s", err, query)
+				}
+			}
+			//nolint:gosec // G101: the credential this upgrade takes out
+			const (
+				raw   = "pkg:generic/x@1?download_url=https://user:SECRET@example.com/x.bin"
+				clean = "pkg:generic/x@1?download_url=https://example.com/x.bin"
+			)
+			product := seedCoversV0120(t, db).product
+			exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
+				"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, "identity", raw, "x", "1", "x", "fold", at)
+			var component int64
+			if err := db.DB.NewRaw(`SELECT MAX("id") FROM "component"`).Scan(ctx, &component); err != nil {
+				t.Fatal(err)
+			}
+			body := func(purl string) string {
+				encoded, err := json.Marshal(map[string]string{"@id": purl})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return string(encoded)
+			}
+			exec(`INSERT INTO "published_document" ("product_id", "kind", "subject", "path", "path_digest",
+				"tracking_id", "title", "version", "first_at", "current_at", "statuses", "settled", "document")
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				product, "csaf-vex", "CVE-2026-1", "p/CVE-2026-1.json", "digest", "tracking", "title", 1,
+				at, at, "affected", "settled", body(raw))
+			return func(t *testing.T) {
 				ctx := t.Context()
-				dbtest.Empty(t, db)
-				dbtest.MigrateTo(t, db, v0120)
-				at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
-				exec := func(query string, args ...any) {
-					t.Helper()
-					if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
-						t.Fatalf("%v\n%s", err, query)
-					}
-				}
-				//nolint:gosec // G101: the credential this upgrade takes out
-				const (
-					raw   = "pkg:generic/x@1?download_url=https://user:SECRET@example.com/x.bin"
-					clean = "pkg:generic/x@1?download_url=https://example.com/x.bin"
-				)
-				product := seedCoversV0120(t, db).product
-				exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
-					"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, "identity", raw, "x", "1", "x", "fold", at)
-				body := func(purl string) string {
-					encoded, err := json.Marshal(map[string]string{"@id": purl})
-					if err != nil {
-						t.Fatal(err)
-					}
-					return string(encoded)
-				}
-				exec(`INSERT INTO "published_document" ("product_id", "kind", "subject", "path", "path_digest",
-					"tracking_id", "title", "version", "first_at", "current_at", "statuses", "settled", "document")
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-					product, "csaf-vex", "CVE-2026-1", "p/CVE-2026-1.json", "digest", "tracking", "title", 1,
-					at, at, "affected", "settled", body(raw))
-				if err := migrations.StopV0130AfterPurlPhase(ctx, db, phases); err != nil {
-					t.Fatalf("make what a stopped upgrade left: %v", err)
-				}
-
-				dbtest.MigrateTo(t, db, v0130)
-
 				var document, purl string
-				if err := db.DB.NewRaw(`SELECT "document" FROM "published_document"`).Scan(ctx, &document); err != nil {
+				if err := db.DB.NewRaw(`SELECT "document" FROM "published_document" WHERE "product_id" = ?`, product).
+					Scan(ctx, &document); err != nil {
 					t.Fatal(err)
 				}
 				if document != body(clean) {
 					t.Errorf("the published document holds %s after the upgrade, want %s", document, body(clean))
 				}
-				if err := db.DB.NewRaw(`SELECT "purl" FROM "component"`).Scan(ctx, &purl); err != nil {
+				if err := db.DB.NewRaw(`SELECT "purl" FROM "component" WHERE "id" = ?`, component).
+					Scan(ctx, &purl); err != nil {
 					t.Fatal(err)
 				}
 				if purl != clean {
 					t.Errorf("the component holds %s after the upgrade, want %s", purl, clean)
 				}
-				leaveAtLatest(t, ctx, db)
-			})
-		})
+			}
+		},
 	}
+	for phases := 1; phases < migrations.PurlPhasesV0130; phases++ {
+		part.stops = append(part.stops, stopV0130{fmt.Sprintf("after credential phase %d", phases),
+			func(t *testing.T, db *database.DB) error {
+				return migrations.StopV0130AfterPurlPhase(t.Context(), db, phases)
+			}})
+	}
+	return part
 }
 
 // A remote a node holds, written without a scheme, loses a password before its
 // host and its query, and one whose credential cannot be told apart is no
 // remote.
-func TestTheV0130UpgradeTakesCredentialsOutOfRemotes(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+func remotesPartV0130() partV0130 {
+	return partV0130{name: "TheV0130UpgradeTakesCredentialsOutOfRemotes", seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
 		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0120)
 		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
 		exec := func(query string, args ...any) {
 			t.Helper()
@@ -515,30 +503,31 @@ func TestTheV0130UpgradeTakesCredentialsOutOfRemotes(t *testing.T) {
 			exec(`INSERT INTO "graph_node" ("build_id", "component_id", "is_root", "opened_scan_id", "repository")
 				VALUES (?, ?, ?, ?, ?)`, build, component, false, scan, c.stored)
 		}
+		return func(t *testing.T) {
+			ctx := t.Context()
 
-		dbtest.MigrateTo(t, db, v0130)
-
-		// No remote reads as a word no remote is, since a scan of a null into
-		// a string reads as empty.
-		var got []string
-		if err := db.DB.NewRaw(`SELECT COALESCE("repository", '(none)') FROM "graph_node" ORDER BY "id"`).
-			Scan(ctx, &got); err != nil {
-			t.Fatal(err)
-		}
-		if len(got) != len(cases) {
-			t.Fatalf("the build holds %d nodes after the upgrade, want %d", len(got), len(cases))
-		}
-		for i, c := range cases {
-			want := "(none)"
-			if c.want != nil {
-				want = *c.want
+			// No remote reads as a word no remote is, since a scan of a null into
+			// a string reads as empty.
+			var got []string
+			if err := db.DB.NewRaw(`SELECT COALESCE("repository", '(none)') FROM "graph_node" WHERE "build_id" = ?
+				ORDER BY "id"`, build).
+				Scan(ctx, &got); err != nil {
+				t.Fatal(err)
 			}
-			if got[i] != want {
-				t.Errorf("%q is held as %q after the upgrade, want %q", c.stored, got[i], want)
+			if len(got) != len(cases) {
+				t.Fatalf("the build holds %d nodes after the upgrade, want %d", len(got), len(cases))
+			}
+			for i, c := range cases {
+				want := "(none)"
+				if c.want != nil {
+					want = *c.want
+				}
+				if got[i] != want {
+					t.Errorf("%q is held as %q after the upgrade, want %q", c.stored, got[i], want)
+				}
 			}
 		}
-		leaveAtLatest(t, ctx, db)
-	})
+	}}
 }
 
 func ptr(s string) *string { return &s }

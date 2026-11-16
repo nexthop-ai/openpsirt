@@ -10,7 +10,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
@@ -90,12 +89,10 @@ func (s *seederV0120) id(query string) int64 {
 	return out
 }
 
-// seedV0120 empties db, migrates it to v0.12.0, and writes a person, a
-// product with one build, and one issue.
-func seedV0120(t *testing.T, db *database.DB) *seederV0120 {
+// seedRowsV0120 writes a person, a product with one build, and one issue into
+// a v0.12.0 database.
+func seedRowsV0120(t *testing.T, db *database.DB) *seederV0120 {
 	t.Helper()
-	dbtest.Empty(t, db)
-	dbtest.MigrateTo(t, db, v0120)
 	s := &seederV0120{t: t, db: db, at: time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)}
 	s.exec(`INSERT INTO "party" ("kind") VALUES (?)`, "person")
 	party := s.id(`SELECT MAX("id") FROM "party"`)
@@ -184,174 +181,183 @@ func (s *seederV0120) standing(row int64) standingV0130 {
 	return out
 }
 
-func TestTheV0130UpgradeKeysAnOccurrenceByTheNameWithoutItsVersion(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		seed := seedV0120(t, db)
-		at := seed.at
-		var s identifyingSeedV0120
-		var ids [3]int64
-		s.before[0], s.before[1], s.before[2] = kernelV0120("6.12.41")
-		s.after[0], s.after[1], s.after[2] = kernelV0120("6.12.94")
-		s.headers = [3]string{"linux-headers-6.12.41+deb13-sonic-amd64", "6.12.41-1",
-			"pkg:deb/debian/linux-headers-6.12.41%2Bdeb13-sonic-amd64@6.12.41-1"}
-		ids[0] = seed.component(s.before[0], s.before[1], s.before[2])
-		ids[1] = seed.component(s.after[0], s.after[1], s.after[2])
-		ids[2] = seed.component(s.headers[0], s.headers[1], s.headers[2])
-		libssl := seed.component("libssl3", "3.5.1-1", "pkg:deb/debian/libssl3@3.5.1-1")
-		// Beneath the kernel and holding no version in its name, so only the
-		// consumer's side of its key moves.
-		initramfs := seed.component("initramfs-tools", "0.148.3", "pkg:deb/debian/initramfs-tools@0.148.3")
+func keysPartV0130() partV0130 {
+	return partV0130{
+		name: "TheV0130UpgradeKeysAnOccurrenceByTheNameWithoutItsVersion",
+		seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
+			seed := seedRowsV0120(t, db)
+			at := seed.at
+			var s identifyingSeedV0120
+			var ids [3]int64
+			s.before[0], s.before[1], s.before[2] = kernelV0120("6.12.41")
+			s.after[0], s.after[1], s.after[2] = kernelV0120("6.12.94")
+			s.headers = [3]string{"linux-headers-6.12.41+deb13-sonic-amd64", "6.12.41-1",
+				"pkg:deb/debian/linux-headers-6.12.41%2Bdeb13-sonic-amd64@6.12.41-1"}
+			ids[0] = seed.component(s.before[0], s.before[1], s.before[2])
+			ids[1] = seed.component(s.after[0], s.after[1], s.after[2])
+			ids[2] = seed.component(s.headers[0], s.headers[1], s.headers[2])
+			libssl := seed.component("libssl3", "3.5.1-1", "pkg:deb/debian/libssl3@3.5.1-1")
+			// Beneath the kernel and holding no version in its name, so only the
+			// consumer's side of its key moves.
+			initramfs := seed.component("initramfs-tools", "0.148.3", "pkg:deb/debian/initramfs-tools@0.148.3")
 
-		s.nested = seed.finding(ids[0], &ids[2], finding.OccurrenceIdentity(s.before[0], s.headers[0]), "vulnerable", true)
-		s.atRootBefore = seed.finding(ids[0], nil, finding.OccurrenceIdentity(s.before[0], ""), "vulnerable", true)
-		s.atRootAfter = seed.finding(ids[1], nil, finding.OccurrenceIdentity(s.after[0], ""), "vulnerable", false)
-		s.libssl = seed.finding(libssl, nil, finding.OccurrenceIdentity("libssl3", ""), "vulnerable", false)
-		s.code = seed.finding(ids[0], nil, strings.Repeat("c", 64), "code", false)
-		s.beneathBefore = seed.finding(initramfs, &ids[0], finding.OccurrenceIdentity("initramfs-tools", s.before[0]),
-			"vulnerable", true)
-		s.beneathAfter = seed.finding(initramfs, &ids[1], finding.OccurrenceIdentity("initramfs-tools", s.after[0]),
-			"vulnerable", false)
+			s.nested = seed.finding(ids[0], &ids[2], finding.OccurrenceIdentity(s.before[0], s.headers[0]), "vulnerable", true)
+			s.atRootBefore = seed.finding(ids[0], nil, finding.OccurrenceIdentity(s.before[0], ""), "vulnerable", true)
+			s.atRootAfter = seed.finding(ids[1], nil, finding.OccurrenceIdentity(s.after[0], ""), "vulnerable", false)
+			s.libssl = seed.finding(libssl, nil, finding.OccurrenceIdentity("libssl3", ""), "vulnerable", false)
+			s.code = seed.finding(ids[0], nil, strings.Repeat("c", 64), "code", false)
+			s.beneathBefore = seed.finding(initramfs, &ids[0], finding.OccurrenceIdentity("initramfs-tools", s.before[0]),
+				"vulnerable", true)
+			s.beneathAfter = seed.finding(initramfs, &ids[1], finding.OccurrenceIdentity("initramfs-tools", s.after[0]),
+				"vulnerable", false)
 
-		version := s.before[1]
-		s.anyBefore = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity(s.before[0], ""), "approved", nil, at)
-		s.anyAfter = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity(s.after[0], ""), "proposed", nil,
-			at.Add(time.Hour))
-		s.risk = seed.decided(finding.OutcomeNotApplicable, finding.OccurrenceIdentity(s.before[0], s.headers[0]), "approved",
-			&version, at)
-		s.unrelated = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity("libssl3", ""), "approved", nil, at)
-		// Two proposals, the newer written first, so neither the order written
-		// nor approval tells them apart.
-		s.newerBeneath = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity("initramfs-tools", s.after[0]),
-			"proposed", nil, at.Add(time.Hour))
-		s.olderBeneath = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity("initramfs-tools", s.before[0]),
-			"proposed", nil, at)
+			version := s.before[1]
+			s.anyBefore = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity(s.before[0], ""), "approved", nil, at)
+			s.anyAfter = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity(s.after[0], ""), "proposed", nil,
+				at.Add(time.Hour))
+			s.risk = seed.decided(finding.OutcomeNotApplicable, finding.OccurrenceIdentity(s.before[0], s.headers[0]), "approved",
+				&version, at)
+			s.unrelated = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity("libssl3", ""), "approved", nil, at)
+			// Two proposals, the newer written first, so neither the order written
+			// nor approval tells them apart.
+			s.newerBeneath = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity("initramfs-tools", s.after[0]),
+				"proposed", nil, at.Add(time.Hour))
+			s.olderBeneath = seed.decided(finding.OutcomeDismissed, finding.OccurrenceIdentity("initramfs-tools", s.before[0]),
+				"proposed", nil, at)
 
-		dbtest.MigrateTo(t, db, v0130)
+			return func(t *testing.T) {
+				seed.t = t
 
-		image := graph.IdentifyingName(s.before[0], s.before[1], s.before[2])
-		if image != graph.IdentifyingName(s.after[0], s.after[1], s.after[2]) {
-			t.Fatal("the two kernels are identified apart, so the upgrade has nothing to join")
-		}
-		headers := graph.IdentifyingName(s.headers[0], s.headers[1], s.headers[2])
-		atRoot, nested := finding.OccurrenceIdentity(image, ""), finding.OccurrenceIdentity(image, headers)
-		beneath := finding.OccurrenceIdentity("initramfs-tools", image)
-		for _, c := range []struct {
-			what, table string
-			row         int64
-			want        string
-		}{
-			{"the kernel under its headers", "finding", s.nested, nested},
-			{"the kernel before the upgrade", "finding", s.atRootBefore, atRoot},
-			{"the kernel after the upgrade", "finding", s.atRootAfter, atRoot},
-			{"a library carrying no version in its name", "finding", s.libssl, finding.OccurrenceIdentity("libssl3", "")},
-			{"a code finding", "finding", s.code, strings.Repeat("c", 64)},
-			{"a package beneath the kernel before the upgrade", "finding", s.beneathBefore, beneath},
-			{"a package beneath the kernel after the upgrade", "finding", s.beneathAfter, beneath},
-			{"a dismissal before the upgrade", "decision_occurrence", s.anyBefore, atRoot},
-			{"a dismissal after the upgrade", "decision_occurrence", s.anyAfter, atRoot},
-			{"a decision keyed on the kernel's version", "decision_occurrence", s.risk, nested},
-			{"a decision about the library", "decision_occurrence", s.unrelated, finding.OccurrenceIdentity("libssl3", "")},
-			{"the older proposal beneath the kernel", "decision_occurrence", s.olderBeneath, beneath},
-			{"the newer proposal beneath the kernel", "decision_occurrence", s.newerBeneath, beneath},
-		} {
-			if got := seed.occurrenceOf(c.table, c.row); got != c.want {
-				t.Errorf("%s is keyed %s after the upgrade, want %s", c.what, got, c.want)
+				image := graph.IdentifyingName(s.before[0], s.before[1], s.before[2])
+				if image != graph.IdentifyingName(s.after[0], s.after[1], s.after[2]) {
+					t.Fatal("the two kernels are identified apart, so the upgrade has nothing to join")
+				}
+				headers := graph.IdentifyingName(s.headers[0], s.headers[1], s.headers[2])
+				atRoot, nested := finding.OccurrenceIdentity(image, ""), finding.OccurrenceIdentity(image, headers)
+				beneath := finding.OccurrenceIdentity("initramfs-tools", image)
+				for _, c := range []struct {
+					what, table string
+					row         int64
+					want        string
+				}{
+					{"the kernel under its headers", "finding", s.nested, nested},
+					{"the kernel before the upgrade", "finding", s.atRootBefore, atRoot},
+					{"the kernel after the upgrade", "finding", s.atRootAfter, atRoot},
+					{"a library carrying no version in its name", "finding", s.libssl, finding.OccurrenceIdentity("libssl3", "")},
+					{"a code finding", "finding", s.code, strings.Repeat("c", 64)},
+					{"a package beneath the kernel before the upgrade", "finding", s.beneathBefore, beneath},
+					{"a package beneath the kernel after the upgrade", "finding", s.beneathAfter, beneath},
+					{"a dismissal before the upgrade", "decision_occurrence", s.anyBefore, atRoot},
+					{"a dismissal after the upgrade", "decision_occurrence", s.anyAfter, atRoot},
+					{"a decision keyed on the kernel's version", "decision_occurrence", s.risk, nested},
+					{"a decision about the library", "decision_occurrence", s.unrelated, finding.OccurrenceIdentity("libssl3", "")},
+					{"the older proposal beneath the kernel", "decision_occurrence", s.olderBeneath, beneath},
+					{"the newer proposal beneath the kernel", "decision_occurrence", s.newerBeneath, beneath},
+				} {
+					if got := seed.occurrenceOf(c.table, c.row); got != c.want {
+						t.Errorf("%s is keyed %s after the upgrade, want %s", c.what, got, c.want)
+					}
+				}
+
+				if got := seed.standing(s.anyBefore); got.State != "approved" || got.Key == nil ||
+					*got.Key != finding.LiveKey(seed.product, seed.issue, atRoot, "", "", true) {
+					t.Errorf("the approved dismissal reads %+v, want it standing under the identifying name", got)
+				}
+				if got := seed.standing(s.anyAfter); got.State != "lapsed" || got.Key != nil || got.Ended == nil {
+					t.Errorf("the proposed dismissal at the same occurrence reads %+v, want it lapsed", got)
+				}
+				if got := seed.standing(s.risk); got.State != "approved" || got.Key == nil ||
+					*got.Key != finding.LiveKey(seed.product, seed.issue, nested, version, "", false) {
+					t.Errorf("the decision keyed on the kernel's version reads %+v, want it standing under the identifying name", got)
+				}
+				if got := seed.standing(s.unrelated); got.Key == nil ||
+					*got.Key != finding.LiveKey(seed.product, seed.issue, finding.OccurrenceIdentity("libssl3", ""), "", "", true) {
+					t.Errorf("the decision about the library reads %+v, want its key untouched", got)
+				}
+				if got := seed.standing(s.newerBeneath); got.State != "proposed" || got.Key == nil ||
+					*got.Key != finding.LiveKey(seed.product, seed.issue, beneath, "", "", true) {
+					t.Errorf("the newer of two proposals brought together reads %+v, want it standing", got)
+				}
+				if got := seed.standing(s.olderBeneath); got.State != "lapsed" || got.Key != nil || got.Ended == nil {
+					t.Errorf("the older of two proposals brought together reads %+v, want it lapsed", got)
+				}
 			}
-		}
-
-		if got := seed.standing(s.anyBefore); got.State != "approved" || got.Key == nil ||
-			*got.Key != finding.LiveKey(seed.product, seed.issue, atRoot, "", "", true) {
-			t.Errorf("the approved dismissal reads %+v, want it standing under the identifying name", got)
-		}
-		if got := seed.standing(s.anyAfter); got.State != "lapsed" || got.Key != nil || got.Ended == nil {
-			t.Errorf("the proposed dismissal at the same occurrence reads %+v, want it lapsed", got)
-		}
-		if got := seed.standing(s.risk); got.State != "approved" || got.Key == nil ||
-			*got.Key != finding.LiveKey(seed.product, seed.issue, nested, version, "", false) {
-			t.Errorf("the decision keyed on the kernel's version reads %+v, want it standing under the identifying name", got)
-		}
-		if got := seed.standing(s.unrelated); got.Key == nil ||
-			*got.Key != finding.LiveKey(seed.product, seed.issue, finding.OccurrenceIdentity("libssl3", ""), "", "", true) {
-			t.Errorf("the decision about the library reads %+v, want its key untouched", got)
-		}
-		if got := seed.standing(s.newerBeneath); got.State != "proposed" || got.Key == nil ||
-			*got.Key != finding.LiveKey(seed.product, seed.issue, beneath, "", "", true) {
-			t.Errorf("the newer of two proposals brought together reads %+v, want it standing", got)
-		}
-		if got := seed.standing(s.olderBeneath); got.State != "lapsed" || got.Key != nil || got.Ended == nil {
-			t.Errorf("the older of two proposals brought together reads %+v, want it lapsed", got)
-		}
-		leaveAtLatest(t, ctx, db)
-	})
+		},
+	}
 }
 
-func TestTheV0130UpgradeStoresTheIdentifyingNameAsTheApplicationDoes(t *testing.T) {
+func storedIdentifyingPartV0130() partV0130 {
 	// A count across versions groups on the stored name, so a component
 	// written before the upgrade has to hold what one written after does.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		ctx := t.Context()
-		seed := seedV0120(t, db)
-		name, version, purl := kernelV0120("6.12.41")
-		kernel := seed.component(name, version, purl)
-		libssl := seed.component("libssl3", "3.5.1-1", "pkg:deb/debian/libssl3@3.5.1-1")
-
-		dbtest.MigrateTo(t, db, v0130)
-
-		stored := func(id int64) *string {
-			var got *string
-			if err := db.DB.NewSelect().TableExpr(`"component"`).ColumnExpr(`"identifying_folded"`).
-				Where(`"id" = ?`, id).Scan(ctx, &got); err != nil {
-				t.Fatal(err)
+	return partV0130{
+		name: "TheV0130UpgradeStoresTheIdentifyingNameAsTheApplicationDoes",
+		seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
+			seed := seedRowsV0120(t, db)
+			name, version, purl := kernelV0120("6.12.41")
+			kernel := seed.component(name, version, purl)
+			libssl := seed.component("libssl3", "3.5.1-1", "pkg:deb/debian/libssl3@3.5.1-1")
+			return func(t *testing.T) {
+				seed.t = t
+				stored := func(id int64) *string {
+					var got *string
+					if err := db.DB.NewSelect().TableExpr(`"component"`).ColumnExpr(`"identifying_folded"`).
+						Where(`"id" = ?`, id).Scan(t.Context(), &got); err != nil {
+						t.Fatal(err)
+					}
+					return got
+				}
+				if got, want := stored(kernel), graph.StoredIdentifying(name, version, purl); got == nil || *got != want {
+					t.Errorf("the kernel stores %v as its identifying name, want %q", got, want)
+				}
+				if got := stored(libssl); got != nil {
+					t.Errorf("a library holding no version in its name stores %q, want nothing", *got)
+				}
 			}
-			return got
-		}
-		if got, want := stored(kernel), graph.StoredIdentifying(name, version, purl); got == nil || *got != want {
-			t.Errorf("the kernel stores %v as its identifying name, want %q", got, want)
-		}
-		if got := stored(libssl); got != nil {
-			t.Errorf("a library holding no version in its name stores %q, want nothing", *got)
-		}
-		leaveAtLatest(t, ctx, db)
-	})
+		},
+	}
 }
 
-func TestTheV0130UpgradeLeavesADecisionAtAKeyItSplits(t *testing.T) {
-	// One name, one consumer, so v0.12.0 made one key. The upgrade reads the
-	// name as carrying its version at one version and not at the other, so the
-	// key splits in two and nothing says which the decision was about.
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		for _, c := range []struct {
-			what, name string
-			versions   [2]string
-		}{
-			// Named after its release at the first version only: the side
-			// not carrying it keeps the key.
-			{"a name holding its release at one version", "golang-1.20-go", [2]string{"1.20-1", "1.20.1-1"}},
-			// Carrying each version in a different place: both sides move,
-			// to different keys.
-			{"a name holding each of two releases", "lib-1.0-2.0", [2]string{"1.0-1", "2.0-1"}},
-		} {
-			seed := seedV0120(t, db)
-			key := finding.OccurrenceIdentity(c.name, "")
-			for i, version := range c.versions {
-				id := seed.component(c.name, version, "pkg:deb/debian/"+c.name+"@"+version)
-				seed.finding(id, nil, key, "vulnerable", i == 0)
-			}
-			decided := seed.decided(finding.OutcomeDismissed, key, "approved", nil, seed.at)
-
-			dbtest.MigrateTo(t, db, v0130)
-
-			if got := seed.occurrenceOf("decision_occurrence", decided); got != key {
-				t.Errorf("%s: the dismissal is keyed %s after the upgrade, want it left at %s", c.what, got, key)
-			}
-			if got := seed.standing(decided); got.State != "approved" || got.Key == nil ||
-				*got.Key != finding.LiveKey(seed.product, seed.issue, key, "", "", true) {
-				t.Errorf("%s: the dismissal reads %+v, want it standing at its key", c.what, got)
-			}
-		}
-		leaveAtLatest(t, t.Context(), db)
-	})
+// splitPartsV0130 holds a decision at a key the upgrade splits. One name, one
+// consumer, so v0.12.0 made one key. The upgrade reads the name as carrying its
+// version at one version and not at the other, so the key splits in two and
+// nothing says which the decision was about.
+func splitPartsV0130() []partV0130 {
+	var parts []partV0130
+	for _, c := range []struct {
+		what, name string
+		versions   [2]string
+	}{
+		// Named after its release at the first version only: the side
+		// not carrying it keeps the key.
+		{"a name holding its release at one version", "golang-1.20-go", [2]string{"1.20-1", "1.20.1-1"}},
+		// Carrying each version in a different place: both sides move,
+		// to different keys.
+		{"a name holding each of two releases", "lib-1.0-2.0", [2]string{"1.0-1", "2.0-1"}},
+	} {
+		parts = append(parts, partV0130{
+			name: "TheV0130UpgradeLeavesADecisionAtAKeyItSplits/" + c.what,
+			seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
+				seed := seedRowsV0120(t, db)
+				key := finding.OccurrenceIdentity(c.name, "")
+				for i, version := range c.versions {
+					id := seed.component(c.name, version, "pkg:deb/debian/"+c.name+"@"+version)
+					seed.finding(id, nil, key, "vulnerable", i == 0)
+				}
+				decided := seed.decided(finding.OutcomeDismissed, key, "approved", nil, seed.at)
+				return func(t *testing.T) {
+					seed.t = t
+					if got := seed.occurrenceOf("decision_occurrence", decided); got != key {
+						t.Errorf("%s: the dismissal is keyed %s after the upgrade, want it left at %s", c.what, got, key)
+					}
+					if got := seed.standing(decided); got.State != "approved" || got.Key == nil ||
+						*got.Key != finding.LiveKey(seed.product, seed.issue, key, "", "", true) {
+						t.Errorf("%s: the dismissal reads %+v, want it standing at its key", c.what, got)
+					}
+				}
+			},
+		})
+	}
+	return parts
 }
 
 func deref(s *string) string {

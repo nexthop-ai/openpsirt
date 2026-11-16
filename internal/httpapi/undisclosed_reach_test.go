@@ -19,6 +19,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	findingkind "github.com/nexthop-ai/openpsirt/internal/finding/kind"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/ingest"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
 	"github.com/nexthop-ai/openpsirt/internal/series"
 )
@@ -33,12 +34,12 @@ type undisclosedSeed struct {
 	fill map[string][]string
 }
 
-// seedUndisclosed writes a disclosed finding for a public reader to read, and
-// beside it: a recorded flaw with a note, a decision over it with a comment
-// naming the reader, a report with a message and a note, an advisory covering
-// the flaw, a file attached to it, a promise to upgrade a package whose
-// findings are undisclosed, security testing work, an analyzer upload turned
-// away, and a failed job's error.
+// seedUndisclosed writes a disclosed finding for a public reader to read, a
+// document its scan carried, and beside them: a recorded flaw with a note, a
+// decision over it with a comment naming the reader, a report with a message
+// and a note, an advisory covering the flaw, a file attached to it, a promise
+// to upgrade a package whose findings are undisclosed, security testing work,
+// an analyzer upload turned away, and a failed job's error.
 func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 	t.Helper()
 	ctx := t.Context()
@@ -127,7 +128,27 @@ func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 		t.Fatal(err)
 	}
 
-	numbers := seededNumbers(t, r)
+	// A document the last scan carried, so the route reading one by its scan
+	// reaches a row.
+	var scan int64
+	if err := r.DB.DB.NewSelect().TableExpr(`"scan"`).ColumnExpr(`MAX("id")`).Scan(ctx, &scan); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ingest.NewDocuments(r.DB.DB).Write(ctx, scan, ingest.InventoryKind, 0,
+		strings.NewReader(`{"bomFormat":"CycloneDX"}`)); err != nil {
+		t.Fatal(err)
+	}
+
+	numbers, rowsOf := seededNumbers(t, r)
+	// A route's document is read from the documents table alone, so a
+	// number no document holds answers as one nothing holds. Asked with the
+	// documents' identifiers, a route taking a scan's number and its
+	// document's reaches every document row under every number, and is asked
+	// numbers times documents paths rather than numbers squared.
+	documents := rowsOf["scan_document"]
+	if len(documents) == 0 {
+		t.Fatal("no document is seeded, so a document route's second number never reaches a row")
+	}
 
 	return undisclosedSeed{
 		marks: []string{
@@ -142,21 +163,22 @@ func seedUndisclosed(t *testing.T, r *httpapitest.Reach) undisclosedSeed {
 			"{component}": {"libnl-3-200", "libcurl4t64"}, "{occurrence}": {occurrence, codeFinding},
 			"{id}": append([]string{httpapitest.Itoa(decision)}, numbers...), "{reference}": {reference},
 			"{advisory}": {advisory}, "{identity}": {"reader"}, "{token}": {file.Token}, "{team}": {"kernel"},
-			"{run}": numbers, "{sbom}": numbers, "{document}": numbers, "{version}": numbers,
+			"{run}": numbers, "{sbom}": numbers, "{document}": documents, "{version}": numbers,
 			"{ruling}": numbers, "{note}": numbers,
 		},
 	}
 }
 
 // seededNumbers is the identifiers a route taking a number is tried with: the
-// first few rows of every table holding any. An engine's sequences go on
-// counting across the tests sharing a database, so the seeded rows are found
-// where they are rather than assumed to start at one; and only identifiers a
-// row holds are tried, because a route taking two numbers is asked every pair.
-func seededNumbers(t *testing.T, r *httpapitest.Reach) []string {
+// first few rows of every table holding any, and those rows' identifiers by
+// table. An engine's sequences go on counting across the tests sharing a
+// database, so the seeded rows are found where they are rather than assumed
+// to start at one, and each table's identifiers differ from the others'.
+func seededNumbers(t *testing.T, r *httpapitest.Reach) ([]string, map[string][]string) {
 	t.Helper()
 	ctx := t.Context()
 	seen := map[int64]bool{}
+	of := map[string][]string{}
 	for _, table := range dbtest.Tables() {
 		rows, err := r.DB.QueryContext(ctx, `SELECT * FROM "`+table+`" WHERE 1 = 0`)
 		if err != nil {
@@ -177,6 +199,7 @@ func seededNumbers(t *testing.T, r *httpapitest.Reach) []string {
 		}
 		for _, id := range ids {
 			seen[id] = true
+			of[table] = append(of[table], strconv.FormatInt(id, 10))
 		}
 	}
 	if len(seen) == 0 {
@@ -187,7 +210,7 @@ func seededNumbers(t *testing.T, r *httpapitest.Reach) []string {
 		numbers = append(numbers, strconv.FormatInt(n, 10))
 	}
 	sort.Strings(numbers)
-	return numbers
+	return numbers, of
 }
 
 // filledEvery is a templated path with each parameter tried with each of its

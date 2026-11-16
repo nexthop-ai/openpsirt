@@ -350,5 +350,7 @@ Work a test repeats in its own body, past what the harness sets up.
 | The checks beside the tests outlast the server run where it leaves too little idle | They keep the lowest priority and the cores one run had |
 | The lowest priority ranks the checks below the test binaries alone | The servers run in containers the scheduler shares time between first, so the checks still take some from them: on four cores of a workstation the server run ended 9 to 20 s later |
 | The graph, inventory reader, currency and access packages keep in-package test files | Each exposes an unexported value, bound or clock to its tests, and exporting one would be for a test alone; their test binaries still compile the packages between them and the harness twice |
+| The migration lease's tests run the database's clock ahead as the lease reads it, and reach a lapse by moving it | A lapse waited out costs its length on every engine, and a test waiting on a lapse it shortened fails under load |
+| A migration test holding a table on a server holds it before the upgrade starts; on SQLite it holds it during the notice | On SQLite a writer holding the file holds back the claim of the lease too |
 | A MySQL lock wait in an upgrade test reports the holders from the process list | The metadata locks it names elsewhere are in the performance schema, which the test server lacks |
 | MySQL and MariaDB drop a database another session is open on | The test of a refused stale drop refuses nothing there |

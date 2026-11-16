@@ -97,19 +97,22 @@ func TestAServingInstanceSeesALeaseHeldToChangeTheSchema(t *testing.T) {
 // A lease held to change the schema by a process that died pauses serving
 // instances until it lapses, and no longer: the schema it left is whole on
 // PostgreSQL and SQLite, and on MySQL and MariaDB the record keeps them paused.
+// The lease is left lapsing an hour on, and the clock moved to a minute short
+// of the lapse and then to it.
 func TestServingInstancesResumeWhenALeaseHeldToChangeTheSchemaLapses(t *testing.T) {
+	clock := moveClock(t)
 	everyEngine(t, func(t *testing.T, _ database.Engine, address string) {
 		db, serving := open(t, address), open(t, address)
 		freshLease(t, db)
 		recordTable(t, db)
 		observer := NewObserver(serving)
-		leftBy(t, db, holdingChange, 2*time.Second)
+		const left = time.Hour
+		leftBy(t, db, holdingChange, left)
 		changingWithin(t, observer, true, "before the lease lapsed")
-		lapsed := time.Now().Add(2 * time.Second)
+		clock.move(left - time.Minute)
+		changingWithin(t, observer, true, "a minute before the lease lapsed")
+		clock.move(time.Minute)
 		changingWithin(t, observer, false, "after the lease lapsed")
-		if early := time.Until(lapsed); early > 500*time.Millisecond {
-			t.Errorf("a serving instance resumed %s before the lease lapsed", early)
-		}
 	})
 }
 
@@ -256,12 +259,13 @@ func TestNoRecordIsWrittenDuringTheNotice(t *testing.T) {
 		}
 		defer func() { _ = lock.release(context.Background()) }()
 		waiting, stop := context.WithCancel(ctx)
+		said := &lines{}
 		ended := make(chan error, 1)
 		go func() {
-			_, err := beginChange(waiting, migrating, lock, slog.New(slog.DiscardHandler), 1, 2, time.Minute)
+			_, err := beginChange(waiting, migrating, lock, said.logger(), 1, 2, time.Minute)
 			ended <- err
 		}()
-		time.Sleep(500 * time.Millisecond)
+		saidTimes(t, said, "waiting for serving instances to stop before changing the schema", 1, ended)
 		var rows int
 		if err := migrating.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+ChangeTable+`"`).Scan(&rows); err != nil {
 			t.Fatal(err)

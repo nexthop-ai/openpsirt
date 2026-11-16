@@ -9,12 +9,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
-	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 )
-
-// v0130Override is the migration v0.13.0 carries v0.12.0's schema across
-// with.
-const v0130Override = 47
 
 // marksV0120 is a v0.12.0 advisory marking one release affected still, and
 // one it was cleared on.
@@ -117,40 +112,21 @@ func (m marksV0120) checkLive(t *testing.T, db *database.DB) {
 
 // A v0.12.0 database's release marks are marked by whether each still stands,
 // whether the upgrade ran whole or a start of it stopped after the column or
-// after the rule holding it; the second and third are stops SQLite never
-// makes, since it changes a table in one transaction.
-func TestAV0120DatabaseResumesTheV0130MarkUpgradeFromEveryStop(t *testing.T) {
-	for _, stop := range []struct {
-		name string
-		make func(t *testing.T, db *database.DB) error
-	}{
-		{"whole", nil},
-		{"after the column", func(t *testing.T, db *database.DB) error {
-			return migrations.StopV0130AfterOverrideLiveColumn(t.Context(), db)
-		}},
-		{"after the rule", func(t *testing.T, db *database.DB) error {
-			return migrations.StopV0130AfterOverrideLiveRule(t.Context(), db)
-		}},
-	} {
-		t.Run(stop.name, func(t *testing.T) {
-			dbtest.Each(t, func(t *testing.T, db *database.DB) {
-				ctx := t.Context()
-				if stop.make != nil && db.Server.Engine == database.SQLite {
-					t.Skip("SQLite changes a table in one transaction, so it never stops there")
-				}
-				dbtest.Empty(t, db)
-				dbtest.MigrateTo(t, db, v0120)
-				marks := seedMarksV0120(t, db)
-				if stop.make != nil {
-					if err := stop.make(t, db); err != nil {
-						t.Fatalf("make what a stopped upgrade left: %v", err)
-					}
-				}
-				dbtest.MigrateTo(t, db, v0130Override)
-				declarationsAreBuilt(t, ctx, db, migrations.StatementsV0130(db.Server.Engine))
-				marks.checkLive(t, db)
-				leaveAtLatest(t, ctx, db)
-			})
-		})
+// after the rule holding it.
+func marksPartV0130() partV0130 {
+	return partV0130{
+		name: "AReleaseMarkIsMarkedByWhetherItStillStands",
+		seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
+			marks := seedMarksV0120(t, db)
+			return func(t *testing.T) { marks.checkLive(t, db) }
+		},
+		stops: []stopV0130{
+			{"after the column", func(t *testing.T, db *database.DB) error {
+				return migrations.StopV0130AfterOverrideLiveColumn(t.Context(), db)
+			}},
+			{"after the rule", func(t *testing.T, db *database.DB) error {
+				return migrations.StopV0130AfterOverrideLiveRule(t.Context(), db)
+			}},
+		},
 	}
 }
