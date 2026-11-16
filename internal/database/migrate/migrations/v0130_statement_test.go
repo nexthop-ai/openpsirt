@@ -121,3 +121,82 @@ func statementPartV0130() partV0130 {
 		},
 	}
 }
+
+// Of a publisher's advisories about two subjects of one product and issue, each
+// subject's newest overtakes only that subject's older one, and the newest of
+// all overtakes nothing about the other subject.
+func statementSubjectsPartV0130() partV0130 {
+	return partV0130{
+		name: "TheNewestStatementOvertakesOnlyItsOwnSubject",
+		seed: func(t *testing.T, db *database.DB) func(t *testing.T) {
+			ctx := t.Context()
+			at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+			exec := func(query string, args ...any) {
+				t.Helper()
+				if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+					t.Fatalf("%v\n%s", err, query)
+				}
+			}
+			id := func(query string) int64 {
+				t.Helper()
+				var out int64
+				if err := db.DB.NewRaw(query).Scan(ctx, &out); err != nil {
+					t.Fatalf("%v\n%s", err, query)
+				}
+				return out
+			}
+			exec(`INSERT INTO "party" ("kind") VALUES (?)`, "person")
+			party := id(`SELECT MAX("id") FROM "party"`)
+			exec(`INSERT INTO "person" ("party_id", "identity", "is_admin", "is_bootstrap", "admin_derived", "audits",
+				"audits_derived", "email_source", "digest", "digest_unassigned", "created_at")
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				party, "subjects", false, false, false, false, false, "", false, false, at)
+			person := id(`SELECT MAX("id") FROM "person"`)
+			exec(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`,
+				"subjects", "Subjects", at)
+			product := id(`SELECT MAX("id") FROM "product"`)
+			said := func(component, document string, uploaded time.Time) int64 {
+				t.Helper()
+				exec(`INSERT INTO "received_vex_statement" ("product_id", "publisher", "source", "document_id",
+					"vulnerability", "component", "about", "status", "document", "digest", "uploaded_by", "uploaded_at")
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, product, "subjects-publisher", "advisory", document,
+					"cve-2026-1103", component, "", "fixed", document+".json", "digest", person, uploaded)
+				return id(`SELECT MAX("id") FROM "received_vex_statement"`)
+			}
+			// The first subject's newer advisory is the newest of all four.
+			firstOlder := said("libfirst", "SUBJ-1", at.Add(-2*time.Hour))
+			firstNewer := said("libfirst", "SUBJ-2", at.Add(time.Hour))
+			secondOlder := said("libsecond", "SUBJ-3", at.Add(-3*time.Hour))
+			secondNewer := said("libsecond", "SUBJ-4", at)
+			return func(t *testing.T) {
+				for _, c := range []struct {
+					what     string
+					row      int64
+					overtook *int64
+				}{
+					{"the first subject's older advisory", firstOlder, &firstNewer},
+					{"the first subject's newer advisory", firstNewer, nil},
+					{"the second subject's older advisory", secondOlder, &secondNewer},
+					{"the second subject's newer advisory", secondNewer, nil},
+				} {
+					var held struct {
+						Superseded  *time.Time `bun:"superseded_at"`
+						OvertakenBy *int64     `bun:"overtaken_by"`
+					}
+					if err := db.DB.NewRaw(`SELECT "superseded_at", "overtaken_by" FROM "received_vex_statement"
+						WHERE "id" = ?`, c.row).Scan(t.Context(), &held); err != nil {
+						t.Fatal(err)
+					}
+					switch {
+					case c.overtook == nil && (held.Superseded != nil || held.OvertakenBy != nil):
+						t.Errorf("%s is set aside %v by %v, want it standing", c.what, held.Superseded, held.OvertakenBy)
+					case c.overtook != nil && (held.Superseded == nil || held.OvertakenBy == nil ||
+						*held.OvertakenBy != *c.overtook):
+						t.Errorf("%s is set aside %v by %v, want by %d", c.what, held.Superseded, held.OvertakenBy,
+							*c.overtook)
+					}
+				}
+			}
+		},
+	}
+}

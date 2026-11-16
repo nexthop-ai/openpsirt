@@ -37,19 +37,23 @@ type stopV0130 struct {
 // reads and writes rows of its own, found by their identifiers or by the
 // product, build or advisory its seed made, never a whole table.
 func partsV0130() []partV0130 {
-	return append([]partV0130{
+	parts := append([]partV0130{
 		coversPartV0130(),
 		marksPartV0130(),
 		nodePartV0130(),
 		statementPartV0130(),
+		statementSubjectsPartV0130(),
 		withdrawerPartV0130(),
 		packageIdentifiersPartV0130(),
 		publishedDocumentsPartV0130(),
+		advisoryUnchangedPartV0130(),
 		stoppedCredentialPartV0130(),
 		remotesPartV0130(),
 		storedIdentifyingPartV0130(),
 		keysPartV0130(),
 	}, splitPartsV0130()...)
+	parts = append(parts, ownProductPartsV0130()...)
+	return append(parts, fixStatePartV0130())
 }
 
 // A v0.12.0 database holding every part's rows upgrades to v0.13.0's

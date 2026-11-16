@@ -379,11 +379,10 @@ func publishedDocumentsPartV0130() partV0130 {
 
 // An issued advisory the upgrade rewrites takes its settled digest from what
 // it says now, so it reads as unchanged since it went out.
-func TestAnAdvisoryTheV0130UpgradeRewritesReadsAsUnchanged(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+func advisoryUnchangedPartV0130() partV0130 {
+	return partV0130{name: "AnAdvisoryTheV0130UpgradeRewritesReadsAsUnchanged", seed: func(t *testing.T,
+		db *database.DB) func(t *testing.T) {
 		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0120)
 		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
 		exec := func(query string, args ...any) {
 			t.Helper()
@@ -391,14 +390,17 @@ func TestAnAdvisoryTheV0130UpgradeRewritesReadsAsUnchanged(t *testing.T) {
 				t.Fatalf("%v\n%s", err, query)
 			}
 		}
+		// An identifier no other part states, so the rewrite of another
+		// part's cannot stand in for this one's.
 		//nolint:gosec // G101: the credential this upgrade takes out
 		const (
-			raw   = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/x.git"
-			clean = "pkg:golang/example.com/x@v1?vcs_url=git%2Bhttps://gitlab.example.com/x.git"
+			raw   = "pkg:golang/example.com/unchanged@v1?vcs_url=git%2Bhttps://oauth2:glpat-SECRET@gitlab.example.com/unchanged.git"
+			clean = "pkg:golang/example.com/unchanged@v1?vcs_url=git%2Bhttps://gitlab.example.com/unchanged.git"
 		)
 		seeded := seedCoversV0120(t, db)
 		exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
-			"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, "identity", raw, "x", "1", "x", "fold", at)
+			"first_seen_at") VALUES (?, ?, ?, ?, ?, ?, ?)`, "unchanged", raw, "unchanged", "1", "unchanged",
+			"unchanged", at)
 		// An advisory as it went out: its tracking dated and versioned, and
 		// its product tree naming the build by its root.
 		body := func(purl string) string {
@@ -433,26 +435,25 @@ func TestAnAdvisoryTheV0130UpgradeRewritesReadsAsUnchanged(t *testing.T) {
 		exec(`INSERT INTO "advisory_issuance" ("advisory_id", "ordinal", "edition_id", "document", "digest",
 			"issued_by", "issued_at") VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			seeded.advisory, 1, edition, body(raw), issued, seeded.person, at)
-
-		dbtest.MigrateTo(t, db, v0130)
-
-		var got struct {
-			Document string `bun:"document"`
-			Digest   string `bun:"digest"`
+		return func(t *testing.T) {
+			var got struct {
+				Document string `bun:"document"`
+				Digest   string `bun:"digest"`
+			}
+			if err := db.DB.NewRaw(`SELECT "document", "digest" FROM "advisory_issuance" WHERE "advisory_id" = ?`,
+				seeded.advisory).Scan(t.Context(), &got); err != nil {
+				t.Fatal(err)
+			}
+			now, err := csaf.SettledDigest([]byte(body(clean)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Document != body(clean) || got.Digest != now {
+				t.Errorf("the advisory holds %s with the digest %s after the upgrade, want %s with %s",
+					got.Document, got.Digest, body(clean), now)
+			}
 		}
-		if err := db.DB.NewRaw(`SELECT "document", "digest" FROM "advisory_issuance"`).Scan(ctx, &got); err != nil {
-			t.Fatal(err)
-		}
-		now, err := csaf.SettledDigest([]byte(body(clean)))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got.Document != body(clean) || got.Digest != now {
-			t.Errorf("the advisory holds %s with the digest %s after the upgrade, want %s with %s",
-				got.Document, got.Digest, body(clean), now)
-		}
-		leaveAtLatest(t, ctx, db)
-	})
+	}}
 }
 
 // A start of the credential step that stopped after any of its phases leaves
@@ -614,11 +615,10 @@ func ptr(s string) *string { return &s }
 // A v0.12.0 database's findings and saved filters ask for no fix scheduled as
 // "unscheduled" after the upgrade, and keep every other fix state and
 // parameter as they were, the outcome of the old word included.
-func TestTheV0130UpgradeRenamesTheUnscheduledFixState(t *testing.T) {
-	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+func fixStatePartV0130() partV0130 {
+	return partV0130{name: "TheV0130UpgradeRenamesTheUnscheduledFixState", seed: func(t *testing.T,
+		db *database.DB) func(t *testing.T) {
 		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0120)
 		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
 		exec := func(query string, args ...any) {
 			t.Helper()
@@ -645,47 +645,46 @@ func TestTheV0130UpgradeRenamesTheUnscheduledFixState(t *testing.T) {
 			line, variant, at)
 		build := id(`SELECT MAX("id") FROM "build"`)
 		exec(`INSERT INTO "component" ("identity", "name", "version", "name_folded", "fold_key",
-			"first_seen_at") VALUES (?, ?, ?, ?, ?, ?)`, "libfoo", "libfoo", "1", "libfoo", "libfoo", at)
+			"first_seen_at") VALUES (?, ?, ?, ?, ?, ?)`, "libunscheduled", "libunscheduled", "1", "libunscheduled",
+			"libunscheduled", at)
 		component := id(`SELECT MAX("id") FROM "component"`)
 		for _, state := range []string{"wont-fix", "none"} {
 			exec(`INSERT INTO "finding" ("build_id", "kind", "visibility", "vulnerability_id", "component_id",
 				"occurrence_identity", "fix_state", "urgency", "urgency_exploited", "urgency_incident",
 				"urgency_shipped", "opened_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				build, "vulnerability", "public", covers.kept, component, "place-"+state, state, 1, false, false,
-				true, at)
+				build, "vulnerability", "public", covers.kept, component, "unscheduled-"+state, state, 1, false,
+				false, true, at)
 		}
-		saved := map[string]string{
+		for name, query := range map[string]string{
 			"asked":   "state=undecided&fix_state=none&fix_state=wont-fix",
 			"outcome": "outcome=wont-fix",
-		}
-		for name, query := range saved {
+		} {
 			exec(`INSERT INTO "saved_filter" ("person_id", "name", "query", "created_at") VALUES (?, ?, ?, ?)`,
 				covers.person, name, query, at)
 		}
-
-		dbtest.MigrateTo(t, db, v0130)
-
-		var states []string
-		if err := db.DB.NewRaw(`SELECT "fix_state" FROM "finding" ORDER BY "occurrence_identity"`).
-			Scan(ctx, &states); err != nil {
-			t.Fatal(err)
-		}
-		if want := []string{"none", "unscheduled"}; fmt.Sprint(states) != fmt.Sprint(want) {
-			t.Errorf("the findings hold the fix states %v, want %v", states, want)
-		}
-		for name, want := range map[string]string{
-			"asked":   "state=undecided&fix_state=none&fix_state=unscheduled",
-			"outcome": "outcome=wont-fix",
-		} {
-			var got string
-			if err := db.DB.NewRaw(`SELECT "query" FROM "saved_filter" WHERE "name" = ?`, name).
-				Scan(ctx, &got); err != nil {
+		return func(t *testing.T) {
+			ctx := t.Context()
+			var states []string
+			if err := db.DB.NewRaw(`SELECT "fix_state" FROM "finding" WHERE "build_id" = ?
+				ORDER BY "occurrence_identity"`, build).Scan(ctx, &states); err != nil {
 				t.Fatal(err)
 			}
-			if got != want {
-				t.Errorf("the saved filter %s asks %q, want %q", name, got, want)
+			if want := []string{"none", "unscheduled"}; fmt.Sprint(states) != fmt.Sprint(want) {
+				t.Errorf("the findings hold the fix states %v, want %v", states, want)
+			}
+			for name, want := range map[string]string{
+				"asked":   "state=undecided&fix_state=none&fix_state=unscheduled",
+				"outcome": "outcome=wont-fix",
+			} {
+				var got string
+				if err := db.DB.NewRaw(`SELECT "query" FROM "saved_filter" WHERE "person_id" = ? AND "name" = ?`,
+					covers.person, name).Scan(ctx, &got); err != nil {
+					t.Fatal(err)
+				}
+				if got != want {
+					t.Errorf("the saved filter %s asks %q, want %q", name, got, want)
+				}
 			}
 		}
-		leaveAtLatest(t, ctx, db)
-	})
+	}}
 }

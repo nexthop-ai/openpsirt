@@ -285,6 +285,7 @@ brings together, one lapses.
 | A v0.12.0 database holding a node | Upgraded, the table built as declared, the node holding no name or version |
 | The same stopped after the name, or after every node column and before the index, on MySQL and MariaDB | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database holding a received statement, and two advisories from one publisher about one subject | Upgraded, the table built as declared, the statement holding no time and nothing that overtook it, the affected advisory no remediation, the older advisory's set aside as overtaken by the newer's |
+| A v0.12.0 database holding a publisher's advisories about two subjects of one product and issue, at four times | Each subject's older advisory set aside as overtaken by that subject's newer, both newer standing, the newest of all overtaking nothing about the other subject |
 | The same stopped after the time, on MySQL and MariaDB | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database stopped after the withdrawer's column, on MySQL and MariaDB | Upgraded the same, the key added and the column kept |
 | A v0.12.0 database holding identifiers with a credential in an address, escaped and plain, a token in an address's query, slashes after the scheme, and one already clean, on a component, a node, an image version and a scan's root identifier | Each rewritten as v0.13.0 stores it, the other qualifiers kept, the clean one unchanged |
