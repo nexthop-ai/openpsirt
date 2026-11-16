@@ -96,8 +96,8 @@ func TestTheOtherNamesForAnIssueAreCarried(t *testing.T) {
 }
 
 func TestTheThreeFixStatesAreToldApart(t *testing.T) {
-	// "No fix exists yet" and "upstream will not fix this" are different
-	// situations, and the second changes the outcome somebody should reach.
+	// "No fix released" and "no fix scheduled" are different situations, and
+	// an exploited issue keeps its deadline under the second alone.
 	seen := map[finding.FixState]int{}
 	for _, r := range parse(t).Reported {
 		seen[r.FixState]++
@@ -105,7 +105,7 @@ func TestTheThreeFixStatesAreToldApart(t *testing.T) {
 			t.Errorf("%s is fixed upstream with no version to move to", r.Component.Name)
 		}
 	}
-	for _, state := range []finding.FixState{finding.FixedUpstream, finding.NoFix, finding.WontFix} {
+	for _, state := range []finding.FixState{finding.FixedUpstream, finding.NoFix, finding.Unscheduled} {
 		if seen[state] == 0 {
 			t.Errorf("no issue read as %q, and the recorded output has one", state)
 		}

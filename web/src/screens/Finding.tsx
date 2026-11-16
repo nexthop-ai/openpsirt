@@ -102,7 +102,7 @@ const NO_DEADLINE: Record<NonNullable<Body<"FindingBody">["no_deadline"]>, strin
   "below-minimum-severity":
     "below what this product triages at. Recorded and counted; nothing is late.",
   "nothing-to-take":
-    "upstream has released no fix, or has declined to, so there is no version that would close it.",
+    "upstream has released no fix, or has not scheduled one, so there is no version that would close it.",
   "out-of-support": "the release is past its end of life, so nothing here will be fixed.",
 };
 
@@ -719,8 +719,8 @@ export function Finding() {
                 Fixed upstream in <span className="id">{it.fixed_in}</span>
                 {it.fixed_at && <>, available since {on(it.fixed_at)}</>}.
               </>
-            ) : it.fix_state === "wont-fix" ? (
-              <>Upstream has declined to fix this.</>
+            ) : it.fix_state === "unscheduled" ? (
+              <>Upstream has not scheduled a fix.</>
             ) : it.fix_state === "mixed" ? (
               <>The occurrences this sits at do not agree about what upstream did.</>
             ) : (

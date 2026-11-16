@@ -157,10 +157,10 @@ func TestTheFiltersATriagerReachesFor(t *testing.T) {
 		}
 		// And the two together, which is the question somebody
 		// assembling a day's work actually asks: what needs a decision
-		// rather than a bump is "nothing released or upstream
-		// declined", and one value could not ask it.
-		if got := count(t, "fix_state=none&fix_state=wont-fix"); got != 1 {
-			t.Errorf("nothing-released or declined found %d, want the one with no fix", got)
+		// rather than a bump is "nothing released or none
+		// scheduled", and one value could not ask it.
+		if got := count(t, "fix_state=none&fix_state=unscheduled"); got != 1 {
+			t.Errorf("nothing-released or unscheduled found %d, want the one with no fix", got)
 		}
 		if got := count(t, "fix_state=fixed&fix_state=none"); got != 2 {
 			t.Errorf("both fix statuses at once found %d, want both rows", got)
@@ -394,7 +394,7 @@ func TestEveryRowIsReachableBySomeFixState(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := r.DB.DB.NewUpdate().Table("finding").
-			Set(`"fix_state" = ?`, "wont-fix").
+			Set(`"fix_state" = ?`, "unscheduled").
 			Where(`"vulnerability_id" = (SELECT "id" FROM "vulnerability" WHERE "identifier" = ?)`,
 				"CVE-2026-CURL1").
 			Where(`"build_id" = (SELECT MAX("build_id") FROM "finding")`).
@@ -413,7 +413,7 @@ func TestEveryRowIsReachableBySomeFixState(t *testing.T) {
 
 		all := count(t, "")
 		reached := 0
-		for _, state := range []string{"fixed", "none", "wont-fix", "unknown", "mixed"} {
+		for _, state := range []string{"fixed", "none", "unscheduled", "unknown", "mixed"} {
 			reached += count(t, "fix_state="+state)
 		}
 		if reached != all {

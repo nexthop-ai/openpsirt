@@ -5421,7 +5421,7 @@ components:
           enum:
             - fixed
             - none
-            - wont-fix
+            - unscheduled
             - unknown
             - mixed
           type: string
@@ -5486,7 +5486,7 @@ components:
           description: The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix
           type: string
         no_deadline:
-          description: "The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
+          description: "The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has scheduled none on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
             - not-rated
             - below-minimum-severity
@@ -5698,7 +5698,7 @@ components:
           enum:
             - fixed
             - none
-            - wont-fix
+            - unscheduled
             - unknown
             - mixed
           type: string
@@ -5736,7 +5736,7 @@ components:
           description: The namespace the package identifier names, where it names one. With the ecosystem it tells apart two components one build holds at one name and one version
           type: string
         no_deadline:
-          description: "The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has declined to on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
+          description: "The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has scheduled none on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
             - not-rated
             - below-minimum-severity
@@ -5934,7 +5934,7 @@ components:
           enum:
             - fixed
             - none
-            - wont-fix
+            - unscheduled
             - unknown
             - mixed
           type: string
@@ -19976,17 +19976,17 @@ paths:
           schema:
             description: Keep only what is already past its deadline
             type: boolean
-        - description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+        - description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
           explode: true
           in: query
           name: fix_state
           schema:
-            description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+            description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
             items:
               enum:
                 - fixed
                 - none
-                - wont-fix
+                - unscheduled
                 - unknown
                 - mixed
               type: string
@@ -20516,17 +20516,17 @@ paths:
           schema:
             description: Keep only what is already past its deadline
             type: boolean
-        - description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+        - description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
           explode: true
           in: query
           name: fix_state
           schema:
-            description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+            description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
             items:
               enum:
                 - fixed
                 - none
-                - wont-fix
+                - unscheduled
                 - unknown
                 - mixed
               type: string
@@ -29279,17 +29279,17 @@ paths:
           schema:
             description: Keep only what is already past its deadline
             type: boolean
-        - description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+        - description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
           explode: true
           in: query
           name: fix_state
           schema:
-            description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+            description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
             items:
               enum:
                 - fixed
                 - none
-                - wont-fix
+                - unscheduled
                 - unknown
                 - mixed
               type: string
@@ -29941,17 +29941,17 @@ paths:
           schema:
             description: Keep only what is already past its deadline
             type: boolean
-        - description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+        - description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
           explode: true
           in: query
           name: fix_state
           schema:
-            description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+            description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
             items:
               enum:
                 - fixed
                 - none
-                - wont-fix
+                - unscheduled
                 - unknown
                 - mixed
               type: string
@@ -30519,17 +30519,17 @@ paths:
           schema:
             description: Keep only what is already past its deadline
             type: boolean
-        - description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+        - description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
           explode: true
           in: query
           name: fix_state
           schema:
-            description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+            description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
             items:
               enum:
                 - fixed
                 - none
-                - wont-fix
+                - unscheduled
                 - unknown
                 - mixed
               type: string
@@ -31111,17 +31111,17 @@ paths:
           schema:
             description: Keep only what is already past its deadline
             type: boolean
-        - description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+        - description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
           explode: true
           in: query
           name: fix_state
           schema:
-            description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+            description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
             items:
               enum:
                 - fixed
                 - none
-                - wont-fix
+                - unscheduled
                 - unknown
                 - mixed
               type: string
@@ -31713,17 +31713,17 @@ paths:
           schema:
             description: Keep only what is already past its deadline
             type: boolean
-        - description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+        - description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
           explode: true
           in: query
           name: fix_state
           schema:
-            description: Keep only what upstream has done one of these about. 'none' and 'wont-fix' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
+            description: Keep only what upstream has done one of these about. 'none' and 'unscheduled' are the rows that need a decision rather than an upgrade, and the fixable flag cannot ask for either. 'unknown' is the scanner declining to say, which is not the same as upstream having released nothing. 'mixed' is a group whose occurrences disagree — fixed in one build and not another — which has no single answer and is the population a half-landed upgrade shows up in
             items:
               enum:
                 - fixed
                 - none
-                - wont-fix
+                - unscheduled
                 - unknown
                 - mixed
               type: string

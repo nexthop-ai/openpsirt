@@ -364,8 +364,8 @@ export function Card({
               <span>
                 fixed in <span className="id">{f.fixed_in}</span>
               </span>
-            ) : f.fix_state === "wont-fix" ? (
-              <span>upstream declined</span>
+            ) : f.fix_state === "unscheduled" ? (
+              <span>no upstream fix scheduled</span>
             ) : f.fix_state === "mixed" ? (
               <span>upstream fix differs by build</span>
             ) : null}

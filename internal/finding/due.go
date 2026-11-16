@@ -123,21 +123,21 @@ func (w Windows) For(exploited bool, severity string) time.Duration {
 
 // noVersionToTake is each state in which upstream offers no version to take.
 // A list asks it of every occurrence in SQL, so the two read one set.
-var noVersionToTake = []FixState{NoFix, WontFix}
+var noVersionToTake = []FixState{NoFix, Unscheduled}
 
 // unclocked is the condition, over a finding's own columns, under which it
 // carries no deadline: Clocked as the statements that set and clear deadlines
 // ask it, from the one set of states.
 func unclocked() (string, []any) {
 	return `("fix_state" IN (?) AND NOT ("fix_state" = ? AND ("urgency_exploited" = ? OR "urgency_incident" = ?)))`,
-		[]any{bun.List(noVersionToTake), WontFix, true, true}
+		[]any{bun.List(noVersionToTake), Unscheduled, true, true}
 }
 
 // Closable reports whether anything upstream would close a finding in this
 // state, which is what makes a deadline on it meetable.
 //
 // A deadline nobody can meet is not a deadline. Where upstream has released
-// nothing, and where upstream has declined, there is no version to take: the
+// nothing, and where upstream has scheduled no fix, there is no version to take: the
 // clock runs and the only thing that can stop it is a person recording a
 // decision, which is the one act the deadline exists to ask for and cannot be
 // the answer to. It is the statement three other rules here already make from
@@ -154,18 +154,18 @@ func Closable(state FixState) bool {
 
 // Clocked is whether a finding in this state carries a deadline at all.
 //
-// Upstream declining is the one answer exploitation overrides. A fix that has
+// No fix scheduled is the one answer exploitation overrides. A fix that has
 // not arrived may arrive tomorrow, and a deadline set against it could only be
-// met by waiting; a refusal will never be reversed, and on an issue somebody is
-// using that leaves work only this deployment can do — patching the package
-// itself, replacing it, or recording what stands in the way. A refusal on an
-// issue nobody is using stays off the clock, since otherwise it is red for
-// ever for a reason nothing here can act on.
+// met by waiting; no fix scheduled means none is on its way, and on an issue
+// somebody is using that leaves work only this deployment can do — patching
+// the package itself, replacing it, or recording what stands in the way. No
+// fix scheduled on an issue nobody is using stays off the clock, since
+// otherwise it is red for ever for a reason nothing here can act on.
 //
 // Exploited is either signal: the world's, or a record that this product was
 // attacked.
 func Clocked(state FixState, exploited bool) bool {
-	return Closable(state) || (state == WontFix && exploited)
+	return Closable(state) || (state == Unscheduled && exploited)
 }
 
 // Deadline is when a finding in this state has to be answered by, or nothing
@@ -770,8 +770,8 @@ func (s *Store) Recompute(ctx context.Context, windows Windows) (int, error) {
 		return changed + cleared + retired, err
 	}
 
-	// And from everything upstream has released no fix for, or has declined
-	// to fix.
+	// And from everything upstream has released no fix for, or has scheduled
+	// none for.
 	//
 	// A fourth pass, for the reason there are three already: each says some
 	// things are not on a clock, and each says it about something different —
@@ -805,14 +805,15 @@ func clockedIn(productID int64, at time.Time, on bool) (string, []any) {
 }
 
 // clearNothingToTake removes the deadline from open findings that carry no
-// clock: upstream has released no fix, or has declined to fix an issue nobody
-// is exploiting (Clocked).
+// clock: upstream has released no fix, or has scheduled none on an issue
+// nobody is exploiting (Clocked).
 //
 // Like a tag and unlike the line, a missing fix reaches a known-exploited
 // finding too. Being exploited says how long there is; it says nothing about
 // there being a version to take, and a deadline that no upgrade could meet is
-// not made meetable by the flaw being urgent. A refusal is the exception,
-// because on an exploited issue it leaves work only this deployment can do.
+// not made meetable by the flaw being urgent. No fix scheduled is the
+// exception, because on an exploited issue it leaves work only this
+// deployment can do.
 func (s *Store) clearNothingToTake(ctx context.Context) (int, error) {
 	kinds, kindArgs := kind.Ranking.Where(`"kind"`)
 	unclockedWhere, unclockedArgs := unclocked()

@@ -84,7 +84,7 @@ references are patches.
 |---|---|
 | Severity | Stored as a word, which ranks and sets a deadline. A number is the worst rating stating both score and vector in the newest generation of the scheme a report states, so the order a report lists ratings in decides nothing; the vector travels with it |
 | What counts as a fix | One list, named once. A closure not on it is churn or a correction |
-| Fix state | Three: no fix, upstream declined, a fixed version exists. Declined changes the outcome somebody should reach |
+| Fix state | Three: no fix released, no fix scheduled, a fixed version exists. No fix scheduled may be postponed or permanent; the scanner does not say which |
 | A group whose occurrences disagree on fix state | Says so, read from both ends of the group; the fix version is empty |
 | Weakness classification | Deduplicated and ordered, the data's root cause first. A published advisory states one |
 

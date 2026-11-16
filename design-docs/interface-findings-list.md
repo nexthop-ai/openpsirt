@@ -42,7 +42,7 @@ on the component they are 7,648.
 | A row names both ends of the way down: the part of the product it belongs to, and what directly pulls it in, with the steps between counted | The ends are what differ between sibling rows |
 | Where its occurrences are reached different ways, the row says the pair shown is one of several | |
 | Where the inventory placed the component nowhere, it says so, never naming the product itself | |
-| It says what upstream has done, so "upstream declined" and "nobody has fixed this yet" differ | |
+| It says what upstream has done, so "not scheduled" and "no fix released" differ | |
 | The age is the finding's own, "open 12d" (REQ-60), never the year in the identifier | The age a deadline relates to |
 | The deadline is on the row (REQ-33): the date while far off, days left as it nears, days over once passed. A row without one says which of the two reasons applies | A blank would mean two things |
 | A match from comparing a published identifier against an upstream range is marked "not confirmed" (REQ-13), and the filters narrow to those | |

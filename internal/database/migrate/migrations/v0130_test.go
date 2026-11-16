@@ -610,3 +610,82 @@ func remotesPartV0130() partV0130 {
 }
 
 func ptr(s string) *string { return &s }
+
+// A v0.12.0 database's findings and saved filters ask for no fix scheduled as
+// "unscheduled" after the upgrade, and keep every other fix state and
+// parameter as they were, the outcome of the old word included.
+func TestTheV0130UpgradeRenamesTheUnscheduledFixState(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0120)
+		at := time.Date(2026, 11, 12, 2, 0, 0, 0, time.UTC)
+		exec := func(query string, args ...any) {
+			t.Helper()
+			if _, err := db.DB.NewRaw(query, args...).Exec(ctx); err != nil {
+				t.Fatalf("%v\n%s", err, query)
+			}
+		}
+		id := func(query string) int64 {
+			t.Helper()
+			var out int64
+			if err := db.DB.NewRaw(query).Scan(ctx, &out); err != nil {
+				t.Fatalf("%v\n%s", err, query)
+			}
+			return out
+		}
+		covers := seedCoversV0120(t, db)
+		exec(`INSERT INTO "branch_or_tag" ("product_id", "name", "display_name", "kind", "created_at")
+			VALUES (?, ?, ?, ?, ?)`, covers.product, "main", "main", "branch", at)
+		line := id(`SELECT MAX("id") FROM "branch_or_tag"`)
+		exec(`INSERT INTO "variant" ("product_id", "name", "display_name", "customer_facing", "created_at")
+			VALUES (?, ?, ?, ?, ?)`, covers.product, "image", "Image", true, at)
+		variant := id(`SELECT MAX("id") FROM "variant"`)
+		exec(`INSERT INTO "build" ("branch_or_tag_id", "variant_id", "created_at") VALUES (?, ?, ?)`,
+			line, variant, at)
+		build := id(`SELECT MAX("id") FROM "build"`)
+		exec(`INSERT INTO "component" ("identity", "name", "version", "name_folded", "fold_key",
+			"first_seen_at") VALUES (?, ?, ?, ?, ?, ?)`, "libfoo", "libfoo", "1", "libfoo", "libfoo", at)
+		component := id(`SELECT MAX("id") FROM "component"`)
+		for _, state := range []string{"wont-fix", "none"} {
+			exec(`INSERT INTO "finding" ("build_id", "kind", "visibility", "vulnerability_id", "component_id",
+				"occurrence_identity", "fix_state", "urgency", "urgency_exploited", "urgency_incident",
+				"urgency_shipped", "opened_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				build, "vulnerability", "public", covers.kept, component, "place-"+state, state, 1, false, false,
+				true, at)
+		}
+		saved := map[string]string{
+			"asked":   "state=undecided&fix_state=none&fix_state=wont-fix",
+			"outcome": "outcome=wont-fix",
+		}
+		for name, query := range saved {
+			exec(`INSERT INTO "saved_filter" ("person_id", "name", "query", "created_at") VALUES (?, ?, ?, ?)`,
+				covers.person, name, query, at)
+		}
+
+		dbtest.MigrateTo(t, db, v0130)
+
+		var states []string
+		if err := db.DB.NewRaw(`SELECT "fix_state" FROM "finding" ORDER BY "occurrence_identity"`).
+			Scan(ctx, &states); err != nil {
+			t.Fatal(err)
+		}
+		if want := []string{"none", "unscheduled"}; fmt.Sprint(states) != fmt.Sprint(want) {
+			t.Errorf("the findings hold the fix states %v, want %v", states, want)
+		}
+		for name, want := range map[string]string{
+			"asked":   "state=undecided&fix_state=none&fix_state=unscheduled",
+			"outcome": "outcome=wont-fix",
+		} {
+			var got string
+			if err := db.DB.NewRaw(`SELECT "query" FROM "saved_filter" WHERE "name" = ?`, name).
+				Scan(ctx, &got); err != nil {
+				t.Fatal(err)
+			}
+			if got != want {
+				t.Errorf("the saved filter %s asks %q, want %q", name, got, want)
+			}
+		}
+		leaveAtLatest(t, ctx, db)
+	})
+}

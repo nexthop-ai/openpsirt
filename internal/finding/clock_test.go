@@ -178,20 +178,20 @@ func TestOnlyAnAllowedColumnReachesTheOrder(t *testing.T) {
 	})
 }
 
-func TestARefusalOnAnExploitedIssueIsNotCalledNothingToTake(t *testing.T) {
-	// Upstream declining takes the deadline off an issue nobody is using and
-	// leaves it on one somebody is. So an exploited refusal without a
+func TestNoFixScheduledOnAnExploitedIssueIsNotCalledNothingToTake(t *testing.T) {
+	// No fix scheduled takes the deadline off an issue nobody is using and
+	// leaves it on one somebody is. So an exploited one without a
 	// deadline is off the clock for another reason, and says that one.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
 		run := f.run(t)
-		refused := found("CVE-2026-USED", swss)
-		refused.FixState, refused.FixedIn = finding.WontFix, ""
-		refused.Issue.Exploited = true
+		unscheduled := found("CVE-2026-USED", swss)
+		unscheduled.FixState, unscheduled.FixedIn = finding.Unscheduled, ""
+		unscheduled.Issue.Exploited = true
 		ignored := found("CVE-2026-IDLE", teamd)
-		ignored.FixState, ignored.FixedIn = finding.WontFix, ""
+		ignored.FixState, ignored.FixedIn = finding.Unscheduled, ""
 		if _, err := f.store.Apply(t.Context(), f.build, run,
-			[]finding.Reported{refused, ignored}); err != nil {
+			[]finding.Reported{unscheduled, ignored}); err != nil {
 			t.Fatal(err)
 		}
 		who := f.holding(t, access.PublicTriage)
@@ -222,13 +222,13 @@ func TestARefusalOnAnExploitedIssueIsNotCalledNothingToTake(t *testing.T) {
 
 		rows, details := said(t)
 		if rows["CVE-2026-USED"].DueAt == nil || details["CVE-2026-USED"].DueAt == nil {
-			t.Error("an exploited issue upstream declined to fix carries no deadline")
+			t.Error("an exploited issue upstream has scheduled no fix for carries no deadline")
 		}
 		if got := rows["CVE-2026-IDLE"].NoDeadline; got != finding.NothingToTake {
-			t.Errorf("a refusal nobody is using says %q on the list, want %q", got, finding.NothingToTake)
+			t.Errorf("no fix scheduled on an issue nobody is using says %q on the list, want %q", got, finding.NothingToTake)
 		}
 		if got := details["CVE-2026-IDLE"].NoDeadline; got != finding.NothingToTake {
-			t.Errorf("a refusal nobody is using says %q in detail, want %q", got, finding.NothingToTake)
+			t.Errorf("no fix scheduled on an issue nobody is using says %q in detail, want %q", got, finding.NothingToTake)
 		}
 
 		gone := time.Now().UTC().AddDate(0, 0, -1)
@@ -241,18 +241,18 @@ func TestARefusalOnAnExploitedIssueIsNotCalledNothingToTake(t *testing.T) {
 		}
 		rows, details = said(t)
 		if got := rows["CVE-2026-USED"].NoDeadline; got != finding.OutOfSupport {
-			t.Errorf("an exploited refusal past end of life says %q on the list, want %q",
+			t.Errorf("an exploited issue with no fix scheduled past end of life says %q on the list, want %q",
 				got, finding.OutOfSupport)
 		}
 		if got := details["CVE-2026-USED"].NoDeadline; got != finding.OutOfSupport {
-			t.Errorf("an exploited refusal past end of life says %q in detail, want %q",
+			t.Errorf("an exploited issue with no fix scheduled past end of life says %q in detail, want %q",
 				got, finding.OutOfSupport)
 		}
 	})
 }
 
 func TestAClockedStateBetweenTwoUnclockedOnesIsOutOfSupportOnTheListAndInDetail(t *testing.T) {
-	// A group whose occurrences say none, unknown and wont-fix holds one
+	// A group whose occurrences say none, unknown and unscheduled holds one
 	// occurrence on the clock, so past end of life it is out of support
 	// rather than nothing to take, however the three words sort.
 	each(t, func(t *testing.T, f *fixture) {
@@ -271,7 +271,7 @@ func TestAClockedStateBetweenTwoUnclockedOnesIsOutOfSupportOnTheListAndInDetail(
 		}
 		issue, component := f.issueID(t, "CVE-2026-3S"), f.componentID(t, libnl.Name)
 		for consumer, state := range map[string]finding.FixState{
-			swss.Name: finding.NoFix, teamd.Name: finding.FixUnknown, third.Name: finding.WontFix,
+			swss.Name: finding.NoFix, teamd.Name: finding.FixUnknown, third.Name: finding.Unscheduled,
 		} {
 			if _, err := f.db.DB.NewUpdate().Model((*finding.Finding)(nil)).
 				Set(`"fix_state" = ?`, state).Set(`"fixed_in" = NULL`).

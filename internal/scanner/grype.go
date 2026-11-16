@@ -637,7 +637,8 @@ func fixState(state string) finding.FixState {
 	case "fixed":
 		return finding.FixedUpstream
 	case "wont-fix":
-		return finding.WontFix
+		// The scanner's word covers a fix postponed as well as one refused.
+		return finding.Unscheduled
 	case "not-fixed":
 		return finding.NoFix
 	default:

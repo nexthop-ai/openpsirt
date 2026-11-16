@@ -68,7 +68,7 @@ describe("what is not a ladder", () => {
         ["", "Any"],
         ["fixed", "Fixed upstream"],
         ["none", "No fix released"],
-        ["wont-fix", "Will not fix"],
+        ["unscheduled", "Not scheduled"],
         ["unknown", "Not stated"],
         ["mixed", "Differs between builds"],
       ] as const;`),

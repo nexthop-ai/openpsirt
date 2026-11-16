@@ -380,10 +380,10 @@ func TestAFindingThatMovesIsUpdated(t *testing.T) {
 	})
 }
 
-func TestUpstreamDecliningToFixIsAMovement(t *testing.T) {
+func TestUpstreamSchedulingNoFixIsAMovement(t *testing.T) {
 	// The only thing that changes is the state — there is no version to point
-	// at either before or after. It is a permanent condition that changes the
-	// outcome somebody should reach, so it must not be the one kind of
+	// at either before or after. It changes the outcome somebody should reach,
+	// so it must not be the one kind of
 	// movement that slips past because nothing else moved with it.
 	each(t, func(t *testing.T, f *fixture) {
 		f.shipped(t, twoConsumers())
@@ -395,17 +395,17 @@ func TestUpstreamDecliningToFixIsAMovement(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		declined := noFix
-		declined.FixState = finding.WontFix
-		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{declined})
+		unscheduled := noFix
+		unscheduled.FixState = finding.Unscheduled
+		applied, err := f.store.Apply(t.Context(), f.build, f.run(t), []finding.Reported{unscheduled})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if applied.Updated != 2 {
-			t.Errorf("upstream declining to fix moved %d findings, want 2", applied.Updated)
+			t.Errorf("upstream scheduling no fix moved %d findings, want 2", applied.Updated)
 		}
 		for _, row := range f.open(t) {
-			if row.FixState != finding.WontFix {
+			if row.FixState != finding.Unscheduled {
 				t.Errorf("still reports %q", row.FixState)
 			}
 		}

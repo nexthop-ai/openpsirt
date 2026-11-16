@@ -626,7 +626,7 @@ func groupFrom(row decorated, named map[int64]Vulnerability, rated map[RatedKey]
 		// that a supported release is past its end of life, on the ordinary
 		// shape where a scanner says one thing in one build and another in
 		// the next.
-		case row.ClosableAny == 0 && (row.WontFixAny == 0 || (!group.Exploited && !group.Incident)):
+		case row.ClosableAny == 0 && (row.UnscheduledAny == 0 || (!group.Exploited && !group.Incident)):
 			group.NoDeadline = NothingToTake
 		default:
 			group.NoDeadline = OutOfSupport
@@ -721,10 +721,10 @@ const (
 	// triaging . Still recorded, still counted, and off the clock.
 	BelowMinimumSeverity NoDeadline = "below-minimum-severity"
 	// NothingToTake is a finding upstream has released no fix for, or has
-	// declined to fix on an issue nobody is using. There is no version that
+	// scheduled none for on an issue nobody is using. There is no version that
 	// would close it, so a deadline on it is unmeetable by construction — the
 	// same statement the two either side of it make, from a third direction.
-	// A refusal on an exploited issue carries a deadline (Clocked).
+	// No fix scheduled on an exploited issue carries a deadline (Clocked).
 	NothingToTake NoDeadline = "nothing-to-take"
 	// OutOfSupport is a finding in a release that is past its end of life
 	// . Nothing is going to be fixed there, so nothing is late.
@@ -774,15 +774,15 @@ type decorated struct {
 	// clock.
 	Recorded     int    `bun:"recorded"`
 	FixStateMost string `bun:"fix_state_most"`
-	// ClosableAny and WontFixAny say whether any occurrence is in a state
+	// ClosableAny and UnscheduledAny say whether any occurrence is in a state
 	// with a clock, and any in the state exploitation puts back on it.
-	ClosableAny int    `bun:"closable_any"`
-	WontFixAny  int    `bun:"wont_fix_any"`
-	FixedIn     string `bun:"fixed_in"`
-	Matched     string `bun:"matched"`
-	ConsumerID  *int64 `bun:"consumer_id"`
-	Consumers   int    `bun:"consumers"`
-	Direct      int    `bun:"direct"`
+	ClosableAny    int    `bun:"closable_any"`
+	UnscheduledAny int    `bun:"unscheduled_any"`
+	FixedIn        string `bun:"fixed_in"`
+	Matched        string `bun:"matched"`
+	ConsumerID     *int64 `bun:"consumer_id"`
+	Consumers      int    `bun:"consumers"`
+	Direct         int    `bun:"direct"`
 	// Packages is how many binaries of the fold sit here and ConsumerOccurrences
 	// how many things pull them in — the two numbers a reader is shown.
 	Packages            int   `bun:"packages"`
@@ -843,7 +843,7 @@ func groupDecorations(q *bun.SelectQuery) *bun.SelectQuery {
 		// of an order the words happen to sort in.
 		ColumnExpr(`MAX(CASE WHEN "f"."fix_state" IN (?) THEN 0 ELSE 1 END) AS "closable_any"`,
 			bun.List(noVersionToTake)).
-		ColumnExpr(`MAX(CASE WHEN "f"."fix_state" = ? THEN 1 ELSE 0 END) AS "wont_fix_any"`, WontFix).
+		ColumnExpr(`MAX(CASE WHEN "f"."fix_state" = ? THEN 1 ELSE 0 END) AS "unscheduled_any"`, Unscheduled).
 		ColumnExpr(`SUM(CASE WHEN "f"."kind" = ? THEN 1 ELSE 0 END) AS "recorded"`, Entered).
 		ColumnExpr(`MAX("f"."fix_state") AS "fix_state_most"`).
 		ColumnExpr(`MIN("f"."fixed_in") AS "fixed_in"`).

@@ -104,8 +104,8 @@ function dueSays(row: { due?: string; days_left?: number; no_deadline?: string }
 function upstreamSays(state: string | undefined, fixedIn: string | undefined) {
   if (fixedIn) return { text: fixedIn, kind: "id" as const };
   switch (state) {
-    case "wont-fix":
-      return { text: "declined", kind: "note" as const };
+    case "unscheduled":
+      return { text: "not scheduled", kind: "note" as const };
     case "none":
       return { text: "none yet", kind: "note" as const };
     case "mixed":

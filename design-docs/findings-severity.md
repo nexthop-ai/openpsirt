@@ -130,7 +130,7 @@ list.
 | The scanned build's own scanner findings are left out of the rewrite | The scan has just ranked them in the same transaction. Hand-recorded findings there are rewritten, and an earlier listing day still re-clocks them |
 | One statement per product and batch of issues; the issues, products and ratings are each read once for all | 16 statements against 1,955 the day a feed moved every likelihood, over 324,508 findings and another build's 43,220 |
 | The rank follows the issue; the stored signals move only toward worse | It does not flap nightly |
-| An incident moves no deadline | It admits the finding to the minimum severity whatever its rating (and clearing it may drop it again), and puts an upstream refusal back on the clock (`design-docs/remediation-deadlines.md`). `design-docs/incidents.md` § Response windows holds the other clock |
+| An incident moves no deadline | It admits the finding to the minimum severity whatever its rating (and clearing it may drop it again), and puts an issue with no fix scheduled back on the clock (`design-docs/remediation-deadlines.md`). `design-docs/incidents.md` § Response windows holds the other clock |
 
 ## Limits
 
