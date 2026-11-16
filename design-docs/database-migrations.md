@@ -105,7 +105,7 @@ follows. A fresh install applies it and every migration after it.
 | Every statement a declaration holds is one the baseline makes | A test fails on a table or index made from anywhere else |
 | On PostgreSQL the baseline also sets the finding table's vacuum settings | They are storage settings, which no declaration holds (`design-docs/database-schema.md` § Indexes) |
 | A release's declaration may derive from a baseline declaration | Several of v0.11.0's tables are the baseline's with columns or indexes added |
-| A baseline declaration a later migration reads keeps its name, and each table a later migration picks from it keeps its statements | Migrations 45 and 46 read baseline declarations, some by the names v0.9.0 and v0.10.0 gave them, and get v0.10.0's statements byte for byte for every table they pick |
+| A baseline declaration a later migration reads keeps its name, and each table a later migration picks from it keeps its statements | Migrations 45, 46 and 47 read baseline declarations, some by the names v0.9.0 and v0.10.0 gave them, and get v0.10.0's statements byte for byte for every table they pick |
 | A database at versions 1 to 43 is refused | A release before v0.10.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.12.0 upgrades version 43, which v0.9.0 built; v0.10.2 upgrades 41 and 42 to v0.10.0's schema; v0.8.0 upgrades 39 and 40 into one v0.10.2 upgrades, and below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
 
 ## Forward only
@@ -164,7 +164,7 @@ refuses a tag whose release is not frozen, before building anything.
 `design-docs/packaging-release.md` § The release procedure says where the two sit.
 
 1. The untagged release carries one migration, numbered after the previous release's last. Its declarations are named for it by its code, the version's parts run together: `v030` for v0.3.0, `v0100` for v0.10.0. Every schema change before the tag edits these.
-2. Rehearse from every earlier release the baseline upgrades, on each engine (§ Upgrade rehearsal).
+2. Rehearse from the newest patch of every earlier release line the baseline upgrades, on each engine (§ Upgrade rehearsal).
 3. Freeze with the four engines running: the chain's schema is described on each, then every owned file is listed with its digest and the last migration.
 4. Land the record through a pull request. The digest test and the schema test hold the tree to it from then on.
 5. Run `make release-check` on the commit to be tagged, then tag. The workflow checks again before building.
@@ -197,8 +197,10 @@ refuses a tag whose release is not frozen, before building anything.
 
 `make upgrade-rehearsal FROM=<release> ENGINE=<engine>` upgrades a database an
 earlier release built and filled itself. It is step 2 of § Release records, run
-from every release from v0.10.0 on, on each engine. It builds images and scans
-the demo's inventories, so it runs locally, outside the gate.
+from the newest patch of every release line from v0.10 on, on each engine;
+v0.10.2 stands for v0.10.0 and v0.10.1, since a line's patches share its
+schema. It builds images and scans the demo's inventories, so it runs locally,
+outside the gate.
 
 | Stage | What it does |
 |---|---|

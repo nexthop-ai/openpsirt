@@ -1454,8 +1454,8 @@ the upgrades before it.
    from the section for your release on, and do what they say before upgrading
    as well as after.
 3. For a database v0.8.0 or an earlier release built, follow the steps of
-   v0.12.0's section From v0.8.0 up to running `openpsirt migrate up` with
-   v0.10.2. That leaves v0.10.0's schema, which this release upgrades. v0.12.0
+   v0.12.0's [From v0.8.0](https://nexthop-ai.github.io/openpsirt/0.12.0/configuration/#from-v080)
+   up to running `openpsirt migrate up` with v0.10.2. That leaves v0.10.0's schema, which this release upgrades. v0.12.0
    refuses such a database, as this release does.
 4. For a database v0.9.0 built, run `openpsirt migrate up` with v0.12.0 against
    it.
