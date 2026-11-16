@@ -59,8 +59,11 @@ func componentIdentifyingV0130(ctx context.Context, tx bun.Tx) error {
 // holds its own version as v0.13.0 keys it: by the name with that version
 // taken out. A finding's occurrence is rewritten where it holds the key
 // v0.12.0 made from the two names, and a decision occurrence follows the
-// occurrence its findings moved to, so a decision made before the upgrade
-// reaches the component at its next version.
+// occurrence its findings in its own product moved to, so a decision made
+// before the upgrade reaches the component at its next version. Products
+// sharing a component name are read apart: one product holding the name at a
+// version it carries and at one it does not leaves the other's decisions free
+// to move.
 //
 // Two live decisions at one product, issue and occurrence that agree on their
 // versions, or both stand at any version, become one key: the approved one
@@ -72,6 +75,8 @@ func componentIdentifyingV0130(ctx context.Context, tx bun.Tx) error {
 // they are: one name held at a version it carries and at one it does not,
 // which a finding still holds once the findings are rewritten, or at two
 // versions carrying different releases, which the findings left for two keys.
+// A product holding no finding at a key follows what every product's findings
+// did there.
 //
 // Each such component stores its identifying name folded.
 //
@@ -96,7 +101,12 @@ func occurrenceIdentifyingV0130(ctx context.Context, tx bun.Tx) error {
 	if err := namedComponentsV0130(ctx, tx, named, sitting); err != nil {
 		return err
 	}
-	moved := map[string][]string{}
+	moved := map[keyedV0130][]string{}
+	type pair struct {
+		component, consumer int64
+		occurrence          string
+	}
+	rewritten := map[pair]bool{}
 	for _, at := range sitting {
 		component := named[at.Component]
 		var consumer namedComponentV0130
@@ -111,6 +121,20 @@ func occurrenceIdentifyingV0130(ctx context.Context, tx bun.Tx) error {
 		if after == before {
 			continue
 		}
+		here := keyedV0130{at.Product, before}
+		if !slices.Contains(moved[here], after) {
+			moved[here] = append(moved[here], after)
+		}
+		// One pair of components keys alike in every product, so its findings
+		// are rewritten once.
+		p := pair{component: at.Component, occurrence: before}
+		if at.Consumer != nil {
+			p.consumer = *at.Consumer
+		}
+		if rewritten[p] {
+			continue
+		}
+		rewritten[p] = true
 		q := tx.NewUpdate().TableExpr(`"finding"`).
 			Set(`"occurrence_identity" = ?`, after).
 			Where(`"occurrence_identity" = ?`, before).
@@ -122,9 +146,6 @@ func occurrenceIdentifyingV0130(ctx context.Context, tx bun.Tx) error {
 		}
 		if _, err := q.Exec(ctx); err != nil {
 			return fmt.Errorf("key the findings of component %d by its identifying name: %w", at.Component, err)
-		}
-		if !slices.Contains(moved[before], after) {
-			moved[before] = append(moved[before], after)
 		}
 	}
 	return decisionsIdentifyingV0130(ctx, tx, moved)
@@ -166,19 +187,27 @@ func identifyingComponentsV0130(ctx context.Context, tx bun.Tx) (map[int64]named
 	}
 }
 
-// sittingV0130 is one key findings hold for a component under a consumer.
+// keyedV0130 is an occurrence key in one product.
+type keyedV0130 struct {
+	product    int64
+	occurrence string
+}
+
+// sittingV0130 is one key findings in one product hold for a component under a
+// consumer.
 type sittingV0130 struct {
+	Product    int64  `bun:"product_id"`
 	Component  int64  `bun:"component_id"`
 	Consumer   *int64 `bun:"consumer_id"`
 	Occurrence string `bun:"occurrence_identity"`
 }
 
 // occurrencesAtV0130 is every key a finding holds for these components, or
-// for anything under them.
+// for anything under them, in each product.
 func occurrencesAtV0130(ctx context.Context, tx bun.Tx, components []int64) ([]sittingV0130, error) {
 	type key struct {
-		component, consumer int64
-		occurrence          string
+		product, component, consumer int64
+		occurrence                   string
 	}
 	seen := map[key]bool{}
 	var out []sittingV0130
@@ -186,16 +215,18 @@ func occurrencesAtV0130(ctx context.Context, tx bun.Tx, components []int64) ([]s
 		for start := 0; start < len(components); start += database.BatchSize {
 			batch := components[start:min(start+database.BatchSize, len(components))]
 			var rows []sittingV0130
-			if err := tx.NewSelect().TableExpr(`"finding"`).
-				ColumnExpr(`"component_id", "consumer_id", "occurrence_identity"`).
-				Where(`? IN (?)`, bun.Ident(column), bun.List(batch)).
+			if err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
+				Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+				Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "b"."branch_or_tag_id"`).
+				ColumnExpr(`"bt"."product_id", "f"."component_id", "f"."consumer_id", "f"."occurrence_identity"`).
+				Where(`"f".? IN (?)`, bun.Ident(column), bun.List(batch)).
 				Distinct().
 				Scan(ctx, &rows); err != nil {
 				return nil, fmt.Errorf("read where the components whose names hold their versions sit: %w", err)
 			}
 			for _, row := range rows {
 				// No component is numbered zero, so it stands for none.
-				k := key{component: row.Component, occurrence: row.Occurrence}
+				k := key{product: row.Product, component: row.Component, occurrence: row.Occurrence}
 				if row.Consumer != nil {
 					k.consumer = *row.Consumer
 				}
@@ -270,21 +301,46 @@ func (d liveDecisionV0130) outranks(other liveDecisionV0130) bool {
 	return d.ID > other.ID
 }
 
-// decisionsIdentifyingV0130 moves the decision occurrences at each key findings
-// moved from to the one key they moved to, and keys the live ones anew.
-func decisionsIdentifyingV0130(ctx context.Context, tx bun.Tx, moved map[string][]string) error {
-	var from []string
-	for before, after := range moved {
-		if len(after) == 1 {
-			from = append(from, before)
+// decisionsIdentifyingV0130 moves each decision occurrence at a key findings
+// moved from to the one key its product's findings moved to, and keys the live
+// ones anew.
+func decisionsIdentifyingV0130(ctx context.Context, tx bun.Tx, moved map[keyedV0130][]string) error {
+	everywhere := map[string][]string{}
+	for at, after := range moved {
+		for _, key := range after {
+			if !slices.Contains(everywhere[at.occurrence], key) {
+				everywhere[at.occurrence] = append(everywhere[at.occurrence], key)
+			}
 		}
 	}
+	from := make([]string, 0, len(everywhere))
+	for before := range everywhere {
+		from = append(from, before)
+	}
 	slices.Sort(from)
-	// A key a finding still holds once the findings are rewritten was made
-	// from a name that does not carry its version there too, so it is split.
-	from, err := unheldV0130(ctx, tx, from)
+	// A key a finding in a product still holds once the findings are
+	// rewritten was made from a name that does not carry its version there
+	// too, so it is split in that product.
+	held, err := heldV0130(ctx, tx, from)
 	if err != nil {
 		return err
+	}
+	heldAnywhere := map[string]bool{}
+	for at := range held {
+		heldAnywhere[at.occurrence] = true
+	}
+	// to is the key a decision occurrence in a product moves to, or nothing
+	// where it stays.
+	to := func(product int64, before string) string {
+		at := keyedV0130{product, before}
+		after, found := moved[at]
+		if !found && !held[at] {
+			after, found = everywhere[before], !heldAnywhere[before]
+		}
+		if !found || held[at] || len(after) != 1 {
+			return ""
+		}
+		return after[0]
 	}
 	var decisions []liveDecisionV0130
 	for start := 0; start < len(from); start += database.BatchSize {
@@ -300,14 +356,18 @@ func decisionsIdentifyingV0130(ctx context.Context, tx bun.Tx, moved map[string]
 			Scan(ctx, &rows); err != nil {
 			return fmt.Errorf("read the decisions at occurrences keyed by a name holding its version: %w", err)
 		}
-		decisions = append(decisions, rows...)
+		for _, row := range rows {
+			if after := to(row.Product, row.Occurrence); after != "" {
+				row.Occurrence = after
+				decisions = append(decisions, row)
+			}
+		}
 	}
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	standing := map[string]liveDecisionV0130{}
 	var lapsed []int64
 	for _, d := range decisions {
-		d.Occurrence = moved[d.Occurrence][0]
 		if _, err := tx.NewUpdate().TableExpr(`"decision_occurrence"`).
 			Set(`"occurrence_identity" = ?`, d.Occurrence).
 			Where(`"id" = ?`, d.ID).Exec(ctx); err != nil {
@@ -351,28 +411,28 @@ func decisionsIdentifyingV0130(ctx context.Context, tx bun.Tx, moved map[string]
 	return nil
 }
 
-// unheldV0130 is the keys of from that no finding holds.
-func unheldV0130(ctx context.Context, tx bun.Tx, from []string) ([]string, error) {
-	held := map[string]bool{}
+// heldV0130 is each product's keys of from that a finding there holds.
+func heldV0130(ctx context.Context, tx bun.Tx, from []string) (map[keyedV0130]bool, error) {
+	held := map[keyedV0130]bool{}
 	for start := 0; start < len(from); start += database.BatchSize {
-		var rows []string
-		if err := tx.NewSelect().TableExpr(`"finding"`).ColumnExpr(`"occurrence_identity"`).
-			Where(`"occurrence_identity" IN (?)`, bun.List(from[start:min(start+database.BatchSize, len(from))])).
+		var rows []struct {
+			Product    int64  `bun:"product_id"`
+			Occurrence string `bun:"occurrence_identity"`
+		}
+		if err := tx.NewSelect().TableExpr(`"finding" AS "f"`).
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "bt" ON "bt"."id" = "b"."branch_or_tag_id"`).
+			ColumnExpr(`"bt"."product_id", "f"."occurrence_identity"`).
+			Where(`"f"."occurrence_identity" IN (?)`, bun.List(from[start:min(start+database.BatchSize, len(from))])).
 			Distinct().
 			Scan(ctx, &rows); err != nil {
 			return nil, fmt.Errorf("read which keys findings still hold under a name holding its version: %w", err)
 		}
-		for _, key := range rows {
-			held[key] = true
+		for _, row := range rows {
+			held[keyedV0130{row.Product, row.Occurrence}] = true
 		}
 	}
-	out := from[:0]
-	for _, key := range from {
-		if !held[key] {
-			out = append(out, key)
-		}
-	}
-	return out, nil
+	return held, nil
 }
 
 // liveKeyV0130 is the key a live decision occurrence holds: the product, the

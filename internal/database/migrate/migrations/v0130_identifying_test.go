@@ -120,6 +120,25 @@ func seedRowsV0120(t *testing.T, db *database.DB) *seederV0120 {
 	return s
 }
 
+// another is a second product with one build, holding the same person and
+// issue.
+func (s *seederV0120) another(name string) *seederV0120 {
+	s.t.Helper()
+	out := *s
+	out.exec(`INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, name, name, s.at)
+	out.product = out.id(`SELECT MAX("id") FROM "product"`)
+	out.exec(`INSERT INTO "branch_or_tag" ("product_id", "name", "display_name", "kind", "created_at")
+		VALUES (?, ?, ?, ?, ?)`, out.product, "main", "main", "branch", s.at)
+	line := out.id(`SELECT MAX("id") FROM "branch_or_tag"`)
+	out.exec(`INSERT INTO "variant" ("product_id", "name", "display_name", "customer_facing", "created_at")
+		VALUES (?, ?, ?, ?, ?)`, out.product, "image", "Image", true, s.at)
+	variant := out.id(`SELECT MAX("id") FROM "variant"`)
+	out.exec(`INSERT INTO "build" ("branch_or_tag_id", "variant_id", "created_at") VALUES (?, ?, ?)`,
+		line, variant, s.at)
+	out.build = out.id(`SELECT MAX("id") FROM "build"`)
+	return &out
+}
+
 func (s *seederV0120) component(name, version, purl string) int64 {
 	s.t.Helper()
 	s.exec(`INSERT INTO "component" ("identity", "purl", "name", "version", "name_folded", "fold_key",
@@ -358,6 +377,75 @@ func splitPartsV0130() []partV0130 {
 		})
 	}
 	return parts
+}
+
+func TestTheV0130UpgradeMovesADecisionWithItsOwnProductsFindings(t *testing.T) {
+	// One component name in two products. The split product's findings at
+	// the key v0.12.0 made go two ways, or one of them stays; the other
+	// product's all go one way, and its decision goes with them.
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		for _, c := range []struct {
+			what, name string
+			versions   [2]string
+		}{
+			{"a name the split product keeps at its key", "golang-1.20-go", [2]string{"1.20-1", "1.20.1-1"}},
+			{"a name the split product moves to two keys", "lib-1.0-2.0", [2]string{"1.0-1", "2.0-1"}},
+		} {
+			split := seedV0120(t, db)
+			clean := split.another("clean")
+			key := finding.OccurrenceIdentity(c.name, "")
+			var ids [2]int64
+			for i, version := range c.versions {
+				purl := "pkg:deb/debian/" + c.name + "@" + version
+				ids[i] = split.component(c.name, version, purl)
+				split.finding(ids[i], nil, key, "vulnerable", i == 0)
+			}
+			cleanFinding := clean.finding(ids[0], nil, key, "vulnerable", false)
+			splitDecided := split.decided(finding.OutcomeDismissed, key, "approved", nil, split.at)
+			cleanDecided := clean.decided(finding.OutcomeDismissed, key, "approved", nil, clean.at)
+
+			dbtest.MigrateTo(t, db, v0130)
+
+			moved := clean.occurrenceOf("finding", cleanFinding)
+			if moved == key {
+				t.Fatalf("%s: the clean product's finding stayed at its key, so nothing moved", c.what)
+			}
+			if got := clean.occurrenceOf("decision_occurrence", cleanDecided); got != moved {
+				t.Errorf("%s: the clean product's dismissal is keyed %s, want %s, where its finding moved",
+					c.what, got, moved)
+			}
+			if got := clean.standing(cleanDecided); got.State != "approved" || got.Key == nil ||
+				*got.Key != finding.LiveKey(clean.product, clean.issue, moved, "", "", true) {
+				t.Errorf("%s: the clean product's dismissal reads %+v, want it standing where its finding moved",
+					c.what, got)
+			}
+			if got := split.occurrenceOf("decision_occurrence", splitDecided); got != key {
+				t.Errorf("%s: the split product's dismissal is keyed %s, want it left at %s", c.what, got, key)
+			}
+		}
+
+		// A product holding no finding at the key follows what the others'
+		// findings did there.
+		held := seedV0120(t, db)
+		bare := held.another("bare")
+		name, version := "tool-3.1", "3.1-1"
+		key := finding.OccurrenceIdentity(name, "")
+		heldFinding := held.finding(held.component(name, version, "pkg:deb/debian/"+name+"@"+version), nil, key,
+			"vulnerable", false)
+		bareDecided := bare.decided(finding.OutcomeDismissed, key, "approved", nil, bare.at)
+
+		dbtest.MigrateTo(t, db, v0130)
+
+		moved := held.occurrenceOf("finding", heldFinding)
+		if moved == key {
+			t.Fatal("the finding stayed at its key, so nothing moved")
+		}
+		if got := bare.occurrenceOf("decision_occurrence", bareDecided); got != moved {
+			t.Errorf("a dismissal in a product holding no finding is keyed %s, want %s, where the other's moved",
+				got, moved)
+		}
+		leaveAtLatest(t, t.Context(), db)
+	})
 }
 
 func deref(s *string) string {
