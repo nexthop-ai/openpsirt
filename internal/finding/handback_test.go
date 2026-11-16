@@ -389,6 +389,56 @@ func TestAFirstSignInDerivingNoRoleHandsBackOnceAndNoMore(t *testing.T) {
 	})
 }
 
+// Somebody whose groups derive nothing at all, no role and neither
+// administration nor auditing, is judged at their first sign-in into
+// group-bound mode and not again; a later change in their groups that takes
+// something derived away hands back again.
+func TestASignInDerivingNothingHandsBackOnlyWhenWhatItDerivesChanges(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		asked := 0
+		rights := access.NewStore(f.db.DB).HandingBack(func(ctx context.Context, db bun.IDB, narrowed access.Narrowed) error {
+			asked++
+			return finding.HandBack(ctx, db, narrowed)
+		})
+		product := f.productName(t)
+		first, _ := f.modeWorld(t, rights, []access.Mapping{
+			{Group: "platform", Grants: string(access.PublicTriage), Product: product},
+		},
+			[]access.Role{access.PublicTriage, access.SecurityTestingRead},
+			[]access.Role{access.PublicTriage, access.PrivateTriage})
+		if err := rights.SwitchTo(ctx, access.GroupBound); err != nil {
+			t.Fatal(err)
+		}
+		admit := func(groups ...string) {
+			t.Helper()
+			_, _ = rights.AdmitByGroups(ctx, access.Arrival{ViaProxy: true, Username: first.Identity}, groups)
+		}
+
+		asked = 0
+		for range 3 {
+			admit("unmapped")
+		}
+		if asked != 1 {
+			t.Errorf("three sign-ins deriving nothing asked for a hand-back %d times, want once", asked)
+		}
+
+		asked = 0
+		admit("platform")
+		admit("platform")
+		if asked != 0 {
+			t.Errorf("sign-ins gaining a role asked for a hand-back %d times, want none", asked)
+		}
+		admit("unmapped")
+		if asked != 1 {
+			t.Errorf("a sign-in losing its group's role asked for a hand-back %d times, want once", asked)
+		}
+		if got := f.stillHeld(t, first.Party()); len(got) != 0 {
+			t.Errorf("signed in through a group deriving nothing, %s holds %v, want nothing", first.Identity, got)
+		}
+	})
+}
+
 // A first group-bound sign-in deriving no role hands back what somebody holds
 // even where no assigned role is left to have let them hold it.
 func TestAFirstSignInDerivingNoRoleHandsBackWorkHeldWithNoRoleAtAll(t *testing.T) {

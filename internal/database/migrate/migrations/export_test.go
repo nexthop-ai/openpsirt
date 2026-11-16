@@ -246,6 +246,7 @@ func StatementsV0130(engine database.Engine) map[string][]string {
 		"component":              componentV0130(t),
 		"decision_occurrence":    decisionOccurrenceV0130(t),
 		"graph_node":             graphNodeV0130(t),
+		"person":                 personV0130(t),
 		"received_vex_statement": receivedStatementV0130(t),
 		"schema_change":          schemaChangeV0130(t),
 	}

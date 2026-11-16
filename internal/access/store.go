@@ -54,6 +54,10 @@ type Account struct {
 	Audits          bool       `bun:"audits,notnull"`
 	AuditsDerived   bool       `bun:"audits_derived,notnull"`
 	AuditsDerivedAt *time.Time `bun:"audits_derived_at"`
+	// GroupsJudgedAt is when a sign-in in group-bound mode last judged the
+	// work this person holds against what their groups derive; nil until
+	// the first since the switch into that mode.
+	GroupsJudgedAt *time.Time `bun:"groups_judged_at"`
 	// Email is where to reach this person outside the application, and
 	// EmailDerived says a sign-in provider supplied it rather than
 	// somebody here. The pair works like the two above: a provider may

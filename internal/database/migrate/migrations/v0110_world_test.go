@@ -65,10 +65,27 @@ func declareBeforeV0110(ctx context.Context, db *database.DB) (world.Declared, e
 		return world.Declared{}, err
 	}
 	d.Build = &catalog.Build{ID: build, BranchOrTagID: d.Branch.ID, VariantID: d.Customer.ID, CreatedAt: at}
-	if d.Person, err = access.NewStore(db.DB).Ensure(ctx, world.PersonIdentity, world.PersonDisplayName,
-		new(false), nil); err != nil {
+	// Written by hand as well: the person model reads every column the
+	// current schema declares, and this schema lacks some of them.
+	if _, err := db.DB.NewRaw(`INSERT INTO "party" ("kind") VALUES (?)`, "person").Exec(ctx); err != nil {
 		return world.Declared{}, fmt.Errorf("declare %q: %w", world.PersonIdentity, err)
 	}
+	party, err := id(`SELECT MAX("id") FROM "party"`)
+	if err != nil {
+		return world.Declared{}, err
+	}
+	if _, err := db.DB.NewRaw(`INSERT INTO "person" ("party_id", "identity", "display_name", "is_admin",
+		"is_bootstrap", "admin_derived", "audits", "audits_derived", "email_source", "digest",
+		"digest_unassigned", "created_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		party, access.Folded(world.PersonIdentity), world.PersonDisplayName, false, false, false, false, false,
+		"", false, false, at).Exec(ctx); err != nil {
+		return world.Declared{}, fmt.Errorf("declare %q: %w", world.PersonIdentity, err)
+	}
+	person, err := id(`SELECT "id" FROM "person" WHERE "party_id" = ?`, party)
+	if err != nil {
+		return world.Declared{}, err
+	}
+	d.Person = &access.Account{ID: person, PartyID: party, Identity: access.Folded(world.PersonIdentity)}
 	return d, nil
 }
 

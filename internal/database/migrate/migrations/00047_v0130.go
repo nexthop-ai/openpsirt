@@ -46,11 +46,13 @@ func upV0130(ctx context.Context, sqldb *sql.DB) error {
 //     component stores that name folded.
 //   - An upgrade changing the schema keeps a record of it until the schema is
 //     whole.
+//   - A person records when a sign-in in group-bound mode last judged what
+//     they hold.
 func upgradeV0130(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{advisoryCoverLiveV0130,
 		advisoryOverrideLiveV0130, graphNodeStatedV0130, receivedStatementTimedV0130,
 		receivedStatementNewestV0130, decisionEndedByV0130, purlCredentialsV0130,
-		componentIdentifyingV0130, occurrenceIdentifyingV0130, schemaChangeMadeV0130} {
+		componentIdentifyingV0130, occurrenceIdentifyingV0130, schemaChangeMadeV0130, personJudgedV0130} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

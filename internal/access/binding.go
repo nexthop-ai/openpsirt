@@ -422,9 +422,6 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 	// Resolve reads beside it. Folded in here, configuration's grant would
 	// be written as one made here and outlive the name.
 	effective := admin.administers || (person.IsAdmin && !person.AdminDerived)
-	// Read before the flags are rewritten: a flag a group gave says an
-	// earlier sign-in in group-bound mode already judged what they hold.
-	signedInBefore := person.AdminDerived || person.AuditsDerived
 	// A group's grant is derived only where it is what made them an
 	// administrator. Written as "whatever the groups say this time", the
 	// column destroys the input the line above depends on next time:
@@ -483,7 +480,7 @@ func (s *Store) admit(ctx context.Context, who Arrival, groups []string) (*Accou
 		person.AuditsDerivedAt = auditsAt
 	}
 
-	if err := s.replaceDerived(ctx, person.ID, roles, admin.everywhere, signedInBefore); err != nil {
+	if err := s.replaceDerived(ctx, person.ID, person.GroupsJudgedAt, roles, admin.everywhere); err != nil {
 		return nil, err
 	}
 
@@ -562,10 +559,8 @@ type held struct {
 }
 
 // replaceDerived makes somebody's derived grants exactly what their groups say.
-// signedInBefore says a group gave them administration or auditing before this
-// sign-in, which only a sign-in in group-bound mode records.
-func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[int64][]Role,
-	everywhere []Role, signedInBefore bool) error {
+func (s *Store) replaceDerived(ctx context.Context, personID int64, judgedAt *time.Time,
+	roles map[int64][]Role, everywhere []Role) error {
 
 	// What they held before is read first, so a sign-in that took a role
 	// away hands back what that leaves them unable to read. Asked only when
@@ -574,9 +569,10 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 	// roles let them hold is judged here against what their groups derive:
 	// this runs on every request a proxy reports groups for.
 	//
-	// The first sign-in is told by nothing derived before it, neither a role
-	// nor administration nor auditing. That is also every sign-in of somebody
-	// whose groups derive none of those.
+	// The first sign-in is told by the person's judged mark, read with the
+	// person, which the switch clears and a judging sign-in sets. Nothing
+	// derived before is no sign of it: somebody whose groups derive nothing
+	// has nothing derived on every sign-in.
 	var before []Grant
 	if err := s.db.NewSelect().Model(&before).Column("product_id", "role").
 		Where(`"person_id" = ?`, personID).Where(`"source" = ?`, Derived).Scan(ctx); err != nil {
@@ -622,7 +618,7 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 			return fmt.Errorf("record what these groups grant across every product: %w", err)
 		}
 	}
-	taken := len(before) == 0 && len(beforeEstate) == 0 && !signedInBefore
+	taken := judgedAt == nil
 	for _, grant := range before {
 		taken = taken || !holds(roles[grant.ProductID], grant.Role)
 	}
@@ -632,7 +628,14 @@ func (s *Store) replaceDerived(ctx context.Context, personID int64, roles map[in
 	if !taken {
 		return nil
 	}
-	return s.handBackAfter(ctx, Narrowed{People: []int64{personID}})
+	if err := s.handBackAfter(ctx, Narrowed{People: []int64{personID}}); err != nil {
+		return err
+	}
+	if _, err := s.db.NewUpdate().Model((*Account)(nil)).Set(`"groups_judged_at" = ?`, now).
+		Where(`"id" = ?`, personID).Exec(ctx); err != nil {
+		return fmt.Errorf("record that a sign-in judged what they hold: %w", err)
+	}
+	return nil
 }
 
 // SwitchTo changes where roles come from, for the whole deployment.
@@ -678,6 +681,13 @@ func (s *Store) switchTo(ctx context.Context, mode Mode) error {
 			Set(`"active" = ?`, false).
 			Where(`"source" = ?`, Assigned).Exec(ctx); err != nil {
 			return fmt.Errorf("set aside the assigned roles over every product: %w", err)
+		}
+		// Each person's next sign-in judges the work their assigned roles let
+		// them hold against what their groups derive.
+		if _, err := s.db.NewUpdate().Model((*Account)(nil)).
+			Set(`"groups_judged_at" = NULL`).
+			Where(`"groups_judged_at" IS NOT NULL`).Exec(ctx); err != nil {
+			return fmt.Errorf("mark every person unjudged: %w", err)
 		}
 	case Direct:
 		if _, err := s.db.NewDelete().Model((*Grant)(nil)).
