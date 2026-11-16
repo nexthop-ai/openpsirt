@@ -307,6 +307,50 @@ func TestARevisionChangingOnlyTheRemediationChangesTheOffer(t *testing.T) {
 	})
 }
 
+func TestTheSameDocumentUploadedAgainGivesAStatementItsRemediation(t *testing.T) {
+	// A statement holding no remediation category, as one recorded before the
+	// category was read holds, takes its document's on the next upload of the
+	// same bytes, and keeps its row.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		document := httpapitest.RemediatedAdvisory("EXSA-2026:1001", "known_affected", "3.7.0", "none_available")
+		read := func() (int64, string) {
+			t.Helper()
+			var said struct {
+				Said []struct {
+					ID     int64  `json:"id"`
+					Offers string `json:"offers"`
+				} `json:"said"`
+			}
+			httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/components/libnl-3-200", &said)
+			if len(said.Said) != 1 {
+				t.Fatalf("the finding shows %+v, want one statement", said.Said)
+			}
+			return said.Said[0].ID, said.Said[0].Offers
+		}
+		if got := r.Advised(t, "admin", "exsa.json", document); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		first, _ := read()
+		if _, err := r.DB.DB.NewRaw(`UPDATE "received_vex_statement" SET "remediation" = NULL`).
+			Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if _, offers := read(); offers != "" {
+			t.Fatalf("a statement holding no category offers %q, want nothing", offers)
+		}
+		if got := r.Advised(t, "admin", "exsa.json", document); got.Code != http.StatusCreated {
+			t.Fatalf("uploading again answered %d: %s", got.Code, got.Body.String())
+		}
+		again, offers := read()
+		if offers != "deferred" || again != first {
+			t.Errorf("after the same bytes were uploaded again, statement %d offers %q, want statement %d offering %q",
+				again, offers, first, "deferred")
+		}
+	})
+}
+
 func TestADeferralStartedFromAnAdvisoryStillNeedsADate(t *testing.T) {
 	// The advisory offers the outcome and never the date, which is the
 	// person's to choose, so a deferral started from one and sent without a

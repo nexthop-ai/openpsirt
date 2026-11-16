@@ -53,6 +53,13 @@ func TestEveryListOrderQuotesTheNamesItWrites(t *testing.T) {
 		}
 		for _, key := range SortKeys() {
 			orders = append(orders, componentOrder(Filter{SortBy: key, Ascending: ascending}))
+			for _, tieBreak := range [][]string{{"vulnerability_id", "fold"}, {"product_id", "vulnerability_id", "fold"}} {
+				expr, sorted := pagedOrder(Filter{SortBy: key, Ascending: ascending}, tieBreak...)
+				orders = append(orders, sorted)
+				if expr != "" {
+					orders = append(orders, expr)
+				}
+			}
 		}
 	}
 	if len(orders) == 0 {

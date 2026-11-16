@@ -806,8 +806,8 @@ const (
 // claimOf is what a statement claims, leaving out where it places its
 // supplier's product and its remediation category. The category decides only
 // what is offered, so a reading changing it alone repeats the claim and
-// rewrites the category in place, as a statement stored before categories
-// were kept takes its own on the next reading.
+// rewrites the category in place, as a statement holding no category takes
+// its own on the next reading.
 func claimOf(one Statement) string {
 	return strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
 		one.About, one.Status, one.Justification, one.Statement}, "\x00")

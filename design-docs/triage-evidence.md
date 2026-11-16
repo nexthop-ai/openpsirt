@@ -97,7 +97,7 @@ rejecting the absence of a fix as a signal.
 | A deferral prefills the outcome alone; the date is the person's, and one sent without it is refused | The publisher states no date |
 | `affected` with any other category, or none, offers nothing, an OpenVEX statement included; its action statement is prose and is not read for an outcome | A workaround or a fix to upgrade to says nothing about what is decided here |
 | `affected` never prefills `not-applicable`; `under_investigation` offers nothing | A dismissal would carry the publisher's name on a claim they never made |
-| A statement recorded before the remediation was kept holds none, and an affected one offers nothing | |
+| An affected statement holding no remediation category offers nothing, and takes its category on the next reading of its document, the same bytes uploaded again included | |
 | Statements are resolved once into distinct pairs by `UNION`, and the list joins that | As a correlated `EXISTS` per finding the filter ran past five minutes on 281,884 findings and 1,854 statements |
 | The issue identifier is folded on write | A function on the indexed side defeats the index |
 | Only standing statements narrow; a superseded row stays readable | |

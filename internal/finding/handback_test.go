@@ -436,6 +436,20 @@ func TestASignInDerivingNothingHandsBackOnlyWhenWhatItDerivesChanges(t *testing.
 		if got := f.stillHeld(t, first.Party()); len(got) != 0 {
 			t.Errorf("signed in through a group deriving nothing, %s holds %v, want nothing", first.Identity, got)
 		}
+
+		// A switch into group-bound mode leaves everybody to be judged again,
+		// so a way out and back in judges this sign-in, deriving what the last
+		// one derived.
+		for _, mode := range []access.Mode{access.Direct, access.GroupBound} {
+			if err := rights.SwitchTo(ctx, mode); err != nil {
+				t.Fatal(err)
+			}
+		}
+		asked = 0
+		admit("unmapped")
+		if asked != 1 {
+			t.Errorf("the first sign-in after a switch back into group-bound mode asked for a hand-back %d times, want once", asked)
+		}
 	})
 }
 
