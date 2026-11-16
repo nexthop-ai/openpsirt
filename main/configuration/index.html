@@ -1053,17 +1053,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#from-v080" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From v0.8.0
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#from-v090" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1888,17 +1877,6 @@
     <span class="md-ellipsis">
       
         Every upgrade
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#from-v080" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        From v0.8.0
       
     </span>
   </a>
@@ -4674,7 +4652,7 @@ deleting by surprise.</p>
 <h2 id="upgrading">Upgrading<a class="headerlink" href="#upgrading" title="Permanent link">&para;</a></h2>
 <p>A database is upgraded in place, at startup or by <code>openpsirt migrate up</code>,
 through each later release's upgrade on the way. A database built by the
-release the <a href="#from-v080">oldest section below</a> names, or by an earlier one, is
+release the <a href="#from-v090">oldest section below</a> names, or by an earlier one, is
 refused, and that section says how to bring it forward. A database built by a
 release candidate
 or any build between releases is recreated.</p>
@@ -4712,49 +4690,26 @@ earlier release against it. Every release before this one starts against a
 database a later release upgraded and serves it, failing on what changed, so
 redeploying one, <code>helm rollback</code> included, is not going back: restore the
 backup first.</p>
-<h3 id="from-v080">From v0.8.0<a class="headerlink" href="#from-v080" title="Permanent link">&para;</a></h3>
-<p>A database v0.8.0 or an earlier release built is refused at startup and by
-<code>openpsirt migrate up</code>, naming the version it holds. This release makes
-v0.9.0's schema in one step and carries none of the upgrades before it.</p>
+<h3 id="from-v090">From v0.9.0<a class="headerlink" href="#from-v090" title="Permanent link">&para;</a></h3>
+<p>A database v0.9.0 or an earlier release built is refused at startup and by
+<code>openpsirt migrate up</code>, naming the version it holds and the releases that
+upgrade it. This release makes v0.10.0's schema in one step and carries none of
+the upgrades before it.</p>
 <ol>
 <li>Back the database up.</li>
-<li>Read v0.10.2's <a href="https://nexthop-ai.github.io/openpsirt/0.10.2/configuration/#upgrading">upgrade notes</a>
+<li>Read v0.12.0's <a href="https://nexthop-ai.github.io/openpsirt/0.12.0/configuration/#upgrading">upgrade notes</a>
    from the section for your release on, and do what they say before upgrading
-   as well as after. The upgrade from v0.8.0 rewrites every finding beneath a
-   container image and takes as long as the nightly history held, and the
-   upgrade from v0.5.0 removes group mappings that have to be carried into
-   <code>OPENPSIRT_GROUP_ROLES</code> first.</li>
-<li>For a database v0.6.0 or an earlier release built, run <code>openpsirt migrate up</code>
-   with v0.8.0 against it, and for one v0.4.0 or an earlier release built, with
-   v0.6.0 before that. v0.10.2 refuses such a database, as this release does.</li>
-<li>Run <code>openpsirt migrate up</code> with v0.10.2 against it.</li>
-<li>Deploy this release, reading the sections from v0.9.0 on.</li>
+   as well as after.</li>
+<li>For a database v0.8.0 or an earlier release built, follow the steps of
+   v0.12.0's <a href="https://nexthop-ai.github.io/openpsirt/0.12.0/configuration/#from-v080">From v0.8.0</a>
+   up to running <code>openpsirt migrate up</code> with v0.10.2. That leaves v0.10.0's schema, which this release upgrades. v0.12.0
+   refuses such a database, as this release does.</li>
+<li>For a database v0.9.0 built, run <code>openpsirt migrate up</code> with v0.12.0 against
+   it.</li>
+<li>Deploy this release, reading the sections from v0.10.0 on.</li>
 </ol>
-<p>A database v0.9.0 built needs none of this, and reads the sections from v0.9.0
-on.</p>
-<h3 id="from-v090">From v0.9.0<a class="headerlink" href="#from-v090" title="Permanent link">&para;</a></h3>
-<table>
-<thead>
-<tr>
-<th>Change</th>
-<th>What to do</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>This deployment can serve its own security documents to anybody, with <code>OPENPSIRT_PUBLISH</code>. Off by default, and off for every product</td>
-<td>Nothing, unless you want it: <a href="#published-documents">Published documents</a></td>
-</tr>
-<tr>
-<td>A decision may state whom a published statement made from it holds for: anybody shipping the component, or this build only. No decision the upgrade carries states one, and the reason decides</td>
-<td>Nothing</td>
-</tr>
-<tr>
-<td>A path below <code>/.well-known/csaf/</code> or <code>/openvex/</code> is answered by this deployment, with a 404 where it publishes nothing. v0.9.0 answered it with the interface's page</td>
-<td>Nothing, unless a proxy in front of the deployment serves something of its own at either path: it now reaches this deployment where the proxy passes it on</td>
-</tr>
-</tbody>
-</table>
+<p>A database v0.10.0 or a later release built needs none of this, and reads the
+sections from its release on.</p>
 <h3 id="from-v0100">From v0.10.0<a class="headerlink" href="#from-v0100" title="Permanent link">&para;</a></h3>
 <table>
 <thead>
