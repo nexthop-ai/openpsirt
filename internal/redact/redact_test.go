@@ -47,6 +47,27 @@ func TestNoCredentialSurvivesRedaction(t *testing.T) {
 		{"https://chat.example.com/?token=ab@cdsecret#f", "cdsecret", "xxxxx"},
 		{"https://chat.example.com/#token=abc@secretpart", "secretpart", "xxxxx"},
 		{"https://chat.example.com/?a@b=1&token=ab@cdsecret", "cdsecret", "xxxxx"},
+		// A password cut at "?" under a key drivers read, in an address with
+		// no user part and no path, with a scheme and without one. Without a
+		// scheme the same text is a secret query value holding an "@", so
+		// either side of it may be secret and nothing is shown.
+		{"bot:1234?password=x@chat.example.com", "1234", "xxxxx"},
+		{"bot:1234?password=x@chat.example.com", "password=x", "xxxxx"},
+		{"bot:1234?password=x@chat.example.com?token=t0ken", "t0ken", "xxxxx"},
+		{"db:5432?password=p@ssword", "ssword", "xxxxx"},
+		{"mysql:3306?token=ab@cd&x=1", "cd&", "xxxxx"},
+		{"localhost?password=se@cret", "cret", "xxxxx"},
+		{"user@db?password=p@ssword", "ssword", "xxxxx"},
+		{"admin:hunter2@host?password=p@ss", "@ss", "xxxxx"},
+		{"db:5432/x@y?password=p@ssword", "ssword", "xxxxx"},
+		{"db?a@b=1&password=p@ss", "@ss", "xxxxx"},
+		{"mysql:3306?user=app@corp&password=se@cret", "cret", "xxxxx"},
+		{"//u:p@host?password=se@cret", "cret", "xxxxx"},
+		{"admin:hunter2@host#frag@tail", "tail", "xxxxx"},
+		{"admin:hunter2@psirt.example.com", "hunter2", "xxxxx@psirt.example.com"},
+		{"https://bot:1234?password=x@chat.example.com", "1234", "xxxxx"},
+		{"https://bot:1234?user=x@chat.example.com", "1234", "xxxxx"},
+		{"postgres://db:5432?password=p@ss", "5432", "xxxxx"},
 	} {
 		got := redact.URL(each.raw)
 		if strings.Contains(got, each.secret) {

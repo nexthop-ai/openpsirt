@@ -64,8 +64,16 @@ func Parsed(u *url.URL) string {
 // quotes it, and a malformed escape in a password is the commonest reason it
 // fails. Text with no "//" after its scheme shows nothing up to its last "@",
 // because `admin:hunter2@psirt.example.com` parses with the scheme `admin` and
-// no user information. A user name with no password is hidden as well: a
-// configured address carries no user, so whatever stands there may be a token.
+// no user information. It shows nothing at all unless the text after that "@"
+// reads the same with credentials hidden, since otherwise the "@" may sit in
+// a hidden query value or fragment. A user name with no password is hidden as
+// well: a configured address carries no user, so whatever stands there may be
+// a token.
+//
+// An address whose authority may have ended inside a password and whose query
+// holds an "@" Stray does not count as a spill shows nothing: under a key
+// drivers read, part of a secret stands on each side of that "@" whichever
+// way it is read.
 //
 // User information that spilled past its authority (see Stray) shows nothing
 // between the "//" and the last "@". The parser reads `bot:1234` in
@@ -90,14 +98,32 @@ func URL(raw string) string {
 			u = cut
 		}
 	}
+	if u.Host != "" && !Stray(u) && endedAtPassword(u) && strings.Contains(u.RawQuery, "@") {
+		// An "@" Stray cannot place: the rest of a password cut at "?" under
+		// a key drivers read, or a query value holding one.
+		return hidden
+	}
 	if u.User != nil {
 		u.User = url.User(hidden)
 	}
 	if u.Scheme == "" || u.Opaque != "" || u.Host == "" {
 		// A scheme the parser did not separate from a host leaves the
-		// credential where nothing above looks for it.
-		redacted := Parsed(u)
-		return beforeLastAt(redacted)
+		// credential where nothing above looks for it, so the text is cut at
+		// its last "@" before any part of it is read.
+		at := strings.LastIndex(raw, "@")
+		if at < 0 {
+			return Parsed(u)
+		}
+		if !strings.HasSuffix(Parsed(u), raw[at:]) {
+			// The last "@" sits in a value or a fragment shown as hidden, so
+			// either side of it may be part of a secret.
+			return hidden
+		}
+		rest, err := url.Parse(raw[at+1:])
+		if err != nil {
+			return hidden
+		}
+		return hidden + "@" + Parsed(rest)
 	}
 	return Parsed(u)
 }
