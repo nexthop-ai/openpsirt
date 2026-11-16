@@ -30,12 +30,17 @@ var secretParams = []string{
 }
 
 // Parsed is the URL with every credential replaced: the password in the user
-// information, every secret query value, and the fragment.
+// information, every secret query value, and the fragment. An address whose
+// port may be the start of a password (see portMayStartPassword) shows
+// nothing.
 //
 // The query is read pair by pair rather than through the parser. The parser
 // drops a pair it cannot decode, so a password parameter with a malformed
 // escape is neither found nor replaced, and is printed as it was written.
 func Parsed(u *url.URL) string {
+	if portMayStartPassword(u) {
+		return hidden
+	}
 	clone := *u
 	if u.User != nil {
 		if _, set := u.User.Password(); set {
@@ -70,10 +75,8 @@ func Parsed(u *url.URL) string {
 // well: a configured address carries no user, so whatever stands there may be
 // a token.
 //
-// An address whose authority may have ended inside a password and whose query
-// holds an "@" Stray does not count as a spill shows nothing: under a key
-// drivers read, part of a secret stands on each side of that "@" whichever
-// way it is read.
+// An address whose port may be the start of a password shows nothing, as
+// Parsed says.
 //
 // User information that spilled past its authority (see Stray) shows nothing
 // between the "//" and the last "@". The parser reads `bot:1234` in
@@ -97,11 +100,6 @@ func URL(raw string) string {
 			}
 			u = cut
 		}
-	}
-	if u.Host != "" && !Stray(u) && endedAtPassword(u) && strings.Contains(u.RawQuery, "@") {
-		// An "@" Stray cannot place: the rest of a password cut at "?" under
-		// a key drivers read, or a query value holding one.
-		return hidden
 	}
 	if u.User != nil {
 		u.User = url.User(hidden)
@@ -176,6 +174,17 @@ func Stray(u *url.URL) bool {
 // password began.
 func endedAtPassword(u *url.URL) bool {
 	return u.User == nil && u.EscapedPath() == "" && (u.Port() != "" || strings.HasSuffix(u.Host, ":"))
+}
+
+// portMayStartPassword reports whether an address with no user information
+// may hold a password cut at "/" or "?" that Stray cannot place: a port or a
+// bare ":" stands where the password began, and the query holds an "@". Under
+// a key drivers read, or past a path, part of the secret stands on each side
+// of that "@" whichever way it is read, so nothing of the address is shown.
+// `https://bot:1234/abcd?password=y@host` is one.
+func portMayStartPassword(u *url.URL) bool {
+	return u.Host != "" && u.User == nil && !Stray(u) &&
+		(u.Port() != "" || strings.HasSuffix(u.Host, ":")) && strings.Contains(u.RawQuery, "@")
 }
 
 // spillEnd reports whether an address's last "@" can end spilled user

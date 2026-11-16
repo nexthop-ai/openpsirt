@@ -68,6 +68,12 @@ func TestNoCredentialSurvivesRedaction(t *testing.T) {
 		{"https://bot:1234?password=x@chat.example.com", "1234", "xxxxx"},
 		{"https://bot:1234?user=x@chat.example.com", "1234", "xxxxx"},
 		{"postgres://db:5432?password=p@ss", "5432", "xxxxx"},
+		// The same password cut at "/" before its "?".
+		{"https://bot:1234/abcd?password=y@chat.example.com", "1234", "xxxxx"},
+		{"https://bot:1234/abcd?password=y@chat.example.com", "abcd", "xxxxx"},
+		{"https://bot:1234/abcd?x=y@chat.example.com", "1234", "xxxxx"},
+		{"https://bot:1234/abcd?x=y@chat.example.com", "abcd?x=y", "xxxxx"},
+		{"https://bot:/abcd?x=y@chat.example.com", "abcd", "xxxxx"},
 	} {
 		got := redact.URL(each.raw)
 		if strings.Contains(got, each.secret) {
@@ -108,5 +114,35 @@ func TestOnlyAFragmentWithAnAtSignIsASpill(t *testing.T) {
 		if got := redact.Stray(u); got != want {
 			t.Errorf("%s: spilled = %v, want %v", raw, got, want)
 		}
+	}
+}
+
+// An address whose port may be the start of a password, and whose query holds
+// an "@", shows nothing through either rule, so a caller that parses the
+// address itself shows no more of it than one handing over the text.
+func TestAnAddressWhosePortMayStartAPasswordShowsNothingParsed(t *testing.T) {
+	examined := 0
+	for _, raw := range []string{
+		"http://bot:1234?password=x@minio.example.com",
+		"https://bot:1234/abcd?password=y@chat.example.com",
+		"https://bot:1234/abcd?x=y@chat.example.com",
+		"https://bot:?a=b@chat.example.com/x?password=y@z",
+		"postgres://db:5432?password=p@ss",
+		"postgres://db:5432/app?password=p@ss",
+	} {
+		u, err := url.Parse(raw)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if redact.Stray(u) {
+			continue
+		}
+		examined++
+		if got := redact.Parsed(u); got != "xxxxx" {
+			t.Errorf("%q shows as %q parsed, want nothing of it", raw, got)
+		}
+	}
+	if examined == 0 {
+		t.Fatal("every address was a spill, so this checked nothing")
 	}
 }
