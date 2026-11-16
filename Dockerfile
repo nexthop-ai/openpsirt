@@ -155,7 +155,7 @@ FROM anchore/grype:v0.121.3@sha256:13113eeceab017260370cf540e1d25442c59665fd07d1
 #
 # Pinned the same way the scanner is, and from the same project. Its image
 # has no shell, so the binary is run from the base.
-FROM anchore/syft:v1.57.0@sha256:3c70e6d5979364cefdc22b51617a78fd264574d3bd6b4f84a351204147025e2a AS syft
+FROM anchore/syft:v1.57.1@sha256:03215d0e98b661d0ecbc8575dbc14d65be1743b5de5df6410aecb7e80f95b060 AS syft
 
 FROM ${ALPINE_IMAGE} AS inventory-tool
 COPY --from=syft /syft /out/syft
