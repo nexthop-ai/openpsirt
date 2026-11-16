@@ -231,11 +231,13 @@ databases saves.
 ## The v0.13.0 upgrade
 
 Migration 47. One table is created, one column is filled in each of
-`advisory_issue` and `advisory_override`, and package identifiers are rewritten in place. Each piece
-is stepped over where a stopped upgrade made it already. One set of rows moves:
-of a publisher's statements standing about one subject in documents of one
-kind, the older are set aside as overtaken by the newest, by upload order, which
-a stopped upgrade run again finds done.
+`advisory_issue` and `advisory_override`, and package identifiers and occurrence
+keys are rewritten in place. Each piece is stepped over where a stopped upgrade
+made it already. Two sets of rows move, each found done by a stopped upgrade run
+again: of a publisher's statements standing about one subject in documents of
+one kind, the older are set aside as overtaken by the newest, by upload order;
+and of two live decisions an occurrence key's rewrite brings together, one
+lapses.
 
 | Table | Gains |
 |---|---|
@@ -258,6 +260,10 @@ a stopped upgrade run again finds done.
 |---|---|
 | `component`, `graph_node`, `image_version`, the scan's root identifier | A package identifier is rewritten as v0.13.0 stores it (`design-docs/data-model-components.md` § Component identity): the slashes after its scheme dropped, and a qualifier's address kept without its credential, query or fragment. Read in Go, 5,000 rows a read in order of identifier: every row holding a question mark or starting `pkg:/` in any case, with the cleaner deciding, since a filter naming the shapes a credential takes misses the next one. A row already in that form is left alone. The identifiers are read first and written last; between, each document served to anybody, in `published_document` and `advisory_issuance`, read 50 a time because a body can run to megabytes, has every identifier the step rewrites replaced wherever a JSON string states it, as the whole string or as a part split at `\|` or ` as part of `, as a CSAF relationship names one. A document left unchanged is not written. On MySQL and MariaDB the earlier steps' definitions commit on their own, so this step's writes can be cut off part way: a start stopped before the identifiers were written finds them as they were and rewrites the documents again, and one stopped after finds nothing left in a document. A published document's digest is left, so the next publishing pass, five minutes on, writes a new revision; until then a document naming two identifiers that become one, such as `pkg://deb/debian/curl` and `pkg:deb/debian/curl`, names that product twice. An issued advisory's digest is left too, so it reads as changed since it went out. A remote on a node or a series module holding an `@`, a question mark or a fragment mark, with a scheme or without one, is rewritten as `design-docs/analysis-source.md` § Source links records one: without its user, password, query or fragment. One that does not parse, or whose credential cannot be told apart, becomes none. The upgrade moves no identity; the upgrade note says which components are identified anew |
 
+| Table | Re-keyed |
+|---|---|
+| `finding`, `decision_occurrence` | An occurrence on a package whose name holds its own version is keyed by its identifying name (`design-docs/data-model-components.md` § The identifying name). Every component is read, 5,000 a read in order of identifier, and the rule applied in Go from a copy the upgrade holds; a test holds the copy to the application's. For those it renames, the findings at or under them are read, 500 components a read, and a finding is rewritten where its key is the one its two names made, so a code finding's key, minted from its series, is left. A decision occurrence moves with the key its findings moved from, where that key moved to one key alone, and a live one takes the live key the new occurrence makes. Two live rows meeting at one key keep the approved over the proposed, otherwise the later proposed, otherwise the higher identifier; the other lapses, ending at the upgrade. Every key is read before any is written and none is read twice, so a start after a stopped one finds the rewritten keys already as v0.13.0 makes them |
+
 | Upgrade note | Detail |
 |---|---|
 | Names and versions | A node from before the upgrade shows the component's name and version, and is found by the component's name, until its build's inventory is sent again; a rescan alone keeps them |
@@ -265,6 +271,7 @@ a stopped upgrade run again finds done.
 | VEX statements from v0.12.0 | Carry no document identifier, so a later revision stating an identifier replaces none of them. Those uploaded without `publisher` are filed under the file name, which names no real publisher. The document is not kept, so nothing backfills them; `docs/configuration.md` § VEX statements from v0.12.0 says how to clear them |
 | Serving during the upgrade | A v0.12.0 process does not look for a schema change and serves through this upgrade; stop every one first (`docs/configuration.md` § From v0.12.0) |
 | Withdrawals from v0.12.0 | Name nobody as the withdrawer and count toward nobody's throughput, since v0.12.0 recorded nobody; `docs/configuration.md` § From v0.12.0 |
+| Packages named after their version | A package whose name holds its own version continues across an upgrade that renames it; a finding an upgrade under v0.12.0 closed as removed stays closed as it was (`docs/configuration.md` § From v0.12.0) |
 | Identity of a reworded identifier | A component stated with slashes after its scheme, with an escaped slash or percent sign in a segment, with a percent sign starting no escape, or with an identifier stating no version, is identified anew the next time its build's inventory arrives; until then a scan of the build reaches it under the identity it holds. Decisions, labels, assignments and upgrade promises on the earlier component do not carry over and are made again |
 
 | Check, on each engine | What it holds |
@@ -280,6 +287,8 @@ a stopped upgrade run again finds done.
 | A v0.12.0 database holding identifiers with a credential in an address, escaped and plain, a token in an address's query, slashes after the scheme, and one already clean, on a component, a node, an image version and a scan's root identifier | Each rewritten as v0.13.0 stores it, the other qualifiers kept, the clean one unchanged |
 | A v0.12.0 database holding a credentialed identifier stated in published documents and an issued advisory, whole and inside a relationship's identifier and name | Each document states the identifier as the upgrade leaves it |
 | The same stopped after each phase of the credential step | No document and no identifier holds the credential |
+| A v0.12.0 database holding findings and decisions on a kernel at two versions, one under its headers, a library holding no version in its name, and a code finding on the kernel | Each kernel key rewritten to its identifying name, the library's and the code finding's left, the approved dismissal standing and the proposed one at the same key lapsed, the decision keyed on the kernel's version standing under its new key |
+| The upgrade's copy of the rule, over names, versions and identifiers of every ecosystem | Reads every name as the application does |
 
 ## Limits
 
@@ -288,3 +297,4 @@ a stopped upgrade run again finds done.
 | A database a release before v0.9.0 built is not upgraded | The baseline makes v0.9.0's schema and no migration here reads an earlier one. v0.10.2 upgrades it first (`design-docs/database-migrations.md` § The baseline) |
 | An upgraded database keeps only the last stretch v0.12.0 recorded for an issue on an advisory | v0.12.0 revived the row on putting an issue back and overwrote when it was first added, and nothing else recorded it. An issue taken off, put back and taken off again before the upgrade reads as not named by an issuance from an earlier stretch |
 | An upgraded database keeps only the last stretch v0.12.0 recorded for a release marked affected | v0.12.0 revived the row on marking a release again and overwrote who marked and cleared it before |
+| A decision at a key v0.12.0 made that v0.13.0 reads as two occurrences is left at that key | One package name held at a version its name carries and at one it does not, under one consumer, made one key; nothing says which the decision was about, so it reaches neither until made again |

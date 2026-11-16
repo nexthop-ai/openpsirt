@@ -266,7 +266,9 @@ func (s *Store) Affects(ctx context.Context, subject access.Subject,
 // ecosystem and namespace. Where the build ships it at none of those, its
 // ecosystem and namespace decide, and the name alone only for a component
 // whose identifier names no ecosystem: an npm package and a Python one of one
-// name are different software.
+// name are different software. A package named after its own version is
+// found last by its identifying name, in the same ecosystem, since the added
+// build may ship it at another version under another name.
 func likeIn(ctx context.Context, db bun.IDB, buildID int64, like *Finding) (int64, string, error) {
 	root, err := db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
@@ -316,11 +318,57 @@ func likeIn(ctx context.Context, db bun.IDB, buildID int64, like *Finding) (int6
 			break
 		}
 	}
+	if errors.Is(err, ErrNoSuchComponent) {
+		id, name, err = renamedIn(ctx, db, buildID, c.Name, c.Version, c.Purl)
+	}
 	var several *graph.Ambiguous
 	if errors.As(err, &several) {
 		return 0, "", ErrSeveralLikeIt
 	}
 	return id, name, err
+}
+
+// renamedIn resolves the one component of a build continuing a package whose
+// name holds its own version: the same identifying name, as the build stated
+// it, in the same ecosystem. A name holding no version of its own is not
+// there, as the lookups before this one found.
+func renamedIn(ctx context.Context, db bun.IDB, buildID int64, name, version, purl string) (int64, string, error) {
+	identifying := graph.IdentifyingName(name, version, purl)
+	if identifying == strings.TrimSpace(name) {
+		return 0, "", ErrNoSuchComponent
+	}
+	var nodes []struct {
+		Name    string `bun:"name"`
+		Version string `bun:"version"`
+		Purl    string `bun:"purl"`
+	}
+	if err := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
+		ColumnExpr(graph.NodeName("n", "c")+` AS "name", `+graph.NodeVersion("n", "c")+` AS "version"`).
+		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
+		Where(`"n"."build_id" = ?`, buildID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Where(`"n"."is_root" = ?`, false).
+		Scan(ctx, &nodes); err != nil {
+		return 0, "", fmt.Errorf("read what build %d holds under another version's name: %w", buildID, err)
+	}
+	ecosystem, folded := graph.EcosystemOf(purl), graph.Folded(identifying)
+	var found *Entering
+	for _, node := range nodes {
+		if graph.EcosystemOf(node.Purl) != ecosystem ||
+			graph.Folded(graph.IdentifyingName(node.Name, node.Version, node.Purl)) != folded {
+			continue
+		}
+		if found != nil && (!strings.EqualFold(found.Component, node.Name) || found.Version != node.Version) {
+			return 0, "", ErrSeveralLikeIt
+		}
+		found = &Entering{Component: node.Name, Version: node.Version, Ecosystem: ecosystem,
+			Namespace: graph.PartsOfPurl(node.Purl).Namespace}
+	}
+	if found == nil {
+		return 0, "", ErrNoSuchComponent
+	}
+	return carrying(ctx, db, buildID, *found)
 }
 
 // ErrSeveralLikeIt says a build added to a recorded flaw holds more than one

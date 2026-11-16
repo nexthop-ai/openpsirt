@@ -412,3 +412,9 @@ func BoundV0110Renames(ctx context.Context, raw *sql.Tx, engine database.Engine)
 	}
 	return restore()
 }
+
+// IdentifyingNameV0130 is the name v0.13.0's upgrade identifies a component
+// by, for a test holding it to the name the application reads.
+func IdentifyingNameV0130(name, version, purl string) string {
+	return identifyingNameV0130(name, version, purl)
+}

@@ -78,6 +78,7 @@ inputs.
 | REQ-07 | Branches, tags and variants are declared before a scan may name one. A scan naming something undeclared is rejected, saying what is missing | A misspelled branch or tag is indistinguishable from a real one |
 | REQ-08 | Identity is derived from content. Nothing a scan file supplies is trusted to be stable between builds or consistent between producers. A container image's version is one such value: an image is identified by its name, the version each build states is recorded against that build, and two images of one name in one build stay apart by version | Producers reuse, renumber and reformat their own identifiers, and restamp every image they rebuild |
 | REQ-09 | Sized and tested against the largest real input, never the average. Nightly branch scans are transient; tagged releases are retained and can be fetched back | One pipeline spans a thousandfold in input size, and storing every nightly scan in full is 200 million to a billion rows a year |
+| REQ-89 | A package whose name contains its own version is identified by its name without that version, so an upgrade that renames it continues the same component (REQ-08) | otherwise every such upgrade discards the triage of every finding still open against it |
 
 ### 3.3 Vulnerability scanning
 
