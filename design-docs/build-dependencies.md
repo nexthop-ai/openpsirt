@@ -187,8 +187,8 @@ and an SPDX identifier; `make spdx-fix` writes missing ones.
 | `sha_pinning_required` refuses an action by tag | |
 | Dependabot moves pins weekly in groups: actions, images, the `golang` image alone, database-layer Go modules, other Go modules, Go tools, interface peer sets, other interface packages, the documentation closure | |
 | The database layer, the query builder, drivers and migration runner, is its own group | Its releases change interfaces every store uses: bun v1.3.0 made limits, offsets and counts int64 |
-| Interface minor and patch releases are grouped; a major release is its own pull request | |
 | Interface packages that name one another as peers, or pin one another exactly, form a group of their own that takes every update type: Stylelint and its configurations; ESLint and its plugins and configurations; the bundler, test runner, their plugins and the stylesheet compiler; React and React DOM; their type packages | A major bumped alone cannot install, because npm refuses the peer range; the standard configuration accepts one Stylelint major |
+| Other interface packages' minor and patch releases are grouped; their major release is its own pull request | |
 | TypeScript majors are not offered | The linter's TypeScript support and the API client generator both refuse 7. It lifts when both accept it |
 | Updates go through the merge queue | |
 | A minor or patch update is approved and queued as it opens and after each rebase, by the `Dependabot` workflow | The queue runs the whole gate; a push dismisses an approval |
@@ -201,4 +201,5 @@ and an SPDX identifier; `make spdx-fix` writes missing ones.
 |---|---|
 | A new call into an affected function of an unchanged module is not introduced | The module was already reported |
 | The scanner and inventory tool pins are watched by nobody | `design-docs/packaging.md` § Limits |
+| A peer set's minor and patch releases wait in its pull request while its major release needs work | The set takes every update type, so the major arrives with them; a security update is grouped by nothing and arrives alone |
 | An update the `Dependabot` workflow queues may merge without starting `main`'s push workflows | GitHub starts no workflow for an event the job's own token causes, so the documentation publish and the caches wait for the next merge |
