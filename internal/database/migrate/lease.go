@@ -176,16 +176,28 @@ func leaseTable(ctx context.Context, db *database.DB) error {
 }
 
 // makeLeaseTable makes the lease table, and answers a refusal only where the
-// table is still not there once it is refused.
+// table is still not there once it is refused. MySQL answers one of two
+// creates racing on it as a deadlock, which is asked again, as any write is.
 func makeLeaseTable(ctx context.Context, db *database.DB) error {
-	_, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS "`+LeaseTable+`" (
-		"name"       VARCHAR(32) NOT NULL,
-		"token"      VARCHAR(64) NOT NULL,
-		"holding"    VARCHAR(16) NOT NULL,
-		"holder"     VARCHAR(191) NOT NULL,
-		"expires_at" BIGINT NOT NULL,
-		PRIMARY KEY ("name")
-	)`)
+	var err error
+	for attempt := 1; attempt <= database.Attempts; attempt++ {
+		err = leaseCreate(ctx, db, `CREATE TABLE IF NOT EXISTS "`+LeaseTable+`" (
+			"name"       VARCHAR(32) NOT NULL,
+			"token"      VARCHAR(64) NOT NULL,
+			"holding"    VARCHAR(16) NOT NULL,
+			"holder"     VARCHAR(191) NOT NULL,
+			"expires_at" BIGINT NOT NULL,
+			PRIMARY KEY ("name")
+		)`)
+		if !database.WorthRetrying(err) || attempt == database.Attempts {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(database.Backoff(attempt)):
+		}
+	}
 	if err != nil {
 		if there, again := tableExists(ctx, db, LeaseTable); again == nil && there {
 			return nil
@@ -193,6 +205,12 @@ func makeLeaseTable(ctx context.Context, db *database.DB) error {
 		return fmt.Errorf("make the migration lease table: %w", err)
 	}
 	return nil
+}
+
+// leaseCreate runs the statement making the lease table.
+var leaseCreate = func(ctx context.Context, db *database.DB, statement string) error {
+	_, err := db.ExecContext(ctx, statement)
+	return err
 }
 
 // newToken is a value no other holder has.

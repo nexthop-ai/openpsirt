@@ -72,7 +72,7 @@ func InTransaction(ctx context.Context, db *bun.DB, fn func(context.Context, bun
 		select {
 		case <-ctx.Done():
 			return err
-		case <-time.After(backoff(attempt)):
+		case <-time.After(Backoff(attempt)):
 		}
 	}
 	return fmt.Errorf("gave up after %d attempts: %w", Attempts, err)
@@ -163,13 +163,13 @@ func WorthRetrying(err error) bool {
 	return false
 }
 
-// backoff is how long to wait before trying again.
+// Backoff is how long to wait before trying again.
 //
 // Growing with each attempt, and jittered, so that two writers which collided
 // do not line up and collide again on the same schedule. The randomness is for
 // spreading load and decides nothing, which is why an ordinary generator is
 // right here — a cryptographic one would be slower and no better at it.
-func backoff(attempt int) time.Duration {
+func Backoff(attempt int) time.Duration {
 	step := time.Duration(attempt) * 10 * time.Millisecond
 	//nolint:gosec // G404: this spreads retries apart; nothing is kept secret by it.
 	return step + time.Duration(rand.N(int64(step)+1))
