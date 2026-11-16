@@ -146,6 +146,16 @@ it takes a **lease** on the work's name under the same conditional update.
 | Once a period | Asks every few minutes whether the lease has lapsed, takes it for the period and leaves it to lapse; the holder is refused until then like any other replica, so the expiry records when the work is next due. It is never handed back on shutdown, and a failed pass hands it back so the next replica asking runs it | Sweeping every ruled product (`design-docs/access-assignment.md` § The sweep) |
 | Must happen | Runs as a queued job, which waits for its turn, then applies. A failed take is a missed turn, asked again at the next poll; the wait ends only with its context, and a job ended before applying is tried again by the queue. The work runs no longer than the lease | Rewriting deadlines after a policy change, queued in the change's transaction; changes arriving while it waits are taken by it, and one arriving while it runs queues one more |
 
+Every pass taking a lease on a timer, except work run once a period, runs
+through one runner.
+
+| Rule | Reason |
+|---|---|
+| The runner hands the lease back once its loop ends, on a bounded context of its own | Another replica takes the work without waiting the lease out |
+| A failed pass is logged under the work's name, and the next one runs on time | What it failed to do is still there next time |
+| A pass ending because the process is stopping is not logged as a failure | A stop is no fault, and a failure line on every shutdown hides real ones |
+| Taking the lease and reporting what a pass did stay with each pass | Each takes and reports differently |
+
 Work that waits reads what it decides from after its turn comes, inside what
 serializes it.
 
