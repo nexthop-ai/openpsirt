@@ -138,7 +138,7 @@ counting or listing dismissals asks for all four.
 | The total counts decisions | |
 | A decision is listed where any occurrence matches the filters, period and build included | |
 | Every count on an entry is of matching occurrences the reader may read, the total included | REQ-42, REQ-43 |
-| An entry is named from its earliest matching occurrence, beside how many issues, products, component names and occurrences match | |
+| An entry is named from its earliest matching occurrence, beside how many issues, products, components by identifying name and occurrences match | |
 | An entry's state is one word, or mixed with counts per state; it stands where every matching occurrence applies now, else says how many do | |
 | An entry links to its occurrences on the findings list, narrowed to the decision and the asked states, across every release, planned or not | |
 | The file is one row per occurrence, naming occurrence and decision | |

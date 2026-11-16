@@ -262,3 +262,21 @@ func TestTheRecordCountsNamesThatMergedAsOneIssue(t *testing.T) {
 		}
 	})
 }
+
+func TestTheRecordCountsAPackageRenamedByItsUpgradeAsOneComponent(t *testing.T) {
+	// The kernel is named after its version, so a release at 6.12.41 and a
+	// branch at 6.12.94 hold it under two names at one occurrence. A
+	// decision there covers one component.
+	each(t, func(t *testing.T, f *fixture) {
+		f.finds(t, f.build(t, f.product, "release"),
+			f.component(t, "linux-image-6.12.41+deb13-amd64", "6.12.41-1"), "place-k", access.Public)
+		f.finds(t, f.build(t, f.product, "branch"),
+			f.component(t, "linux-image-6.12.94+deb13-amd64", "6.12.94-1"), "place-k", access.Public)
+		decided := f.proposes(t, f.triager, f.occurrenceIn(f.product, "place-k", access.Public))
+
+		rows, _ := f.auditedDecisions(t, f.reviewer, triage.Filter{})
+		if len(rows) != 1 || rows[0].Decision.ID != decided.DecisionID || rows[0].Components != 1 {
+			t.Errorf("the record reads %+v, want one decision covering one component", rows)
+		}
+	})
+}

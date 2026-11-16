@@ -52,7 +52,7 @@ build's first scan is a baseline rather than new work.
 
 | Rule | Reason |
 |---|---|
-| A component is its name, at any version | A version bump carrying an issue is no flow, and one fixing it is one corrected |
+| A component is its identifying name, at any version (`design-docs/data-model-components.md` § The identifying name) | A version bump carrying an issue is no flow, and one fixing it is one corrected, the kernel renamed by its bump included |
 | Present before is asked of the issue at its component | An issue fixed in one package says nothing about another |
 | A bounce is one return and no correction | A broken inventory that drops every component for a scan otherwise counts the whole estate resolved and then new |
 | A sharp upload is the one the alert about a sharply moved inventory names, with its share and floor as set when the trend is read (`design-docs/notifications-alerts.md` § An inventory that moved sharply), worked out from the inventories stored | One rule for one event; nothing new is stored, so a changed threshold re-reads past marks |
