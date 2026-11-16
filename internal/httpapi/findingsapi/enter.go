@@ -27,13 +27,11 @@ import (
 type EmbargoedBody struct {
 	Vulnerability string `json:"vulnerability"`
 	Summary       string `json:"summary,omitempty"`
-	Product       string `json:"product" doc:"The product, by the name that addresses it"`
-
-	ProductName string               `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	Components  []string             `json:"components" doc:"The components carrying the issue in the builds listed, by name"`
-	Builds      []EmbargoedBuildBody `json:"builds" doc:"The builds carrying the issue, within the scope asked for"`
-	Severity    string               `json:"severity,omitempty"`
-	DiscloseAt  string               `json:"disclose_at" doc:"The date the embargo ends. Reaching it discloses nothing"`
+	core.ProductNamesBody
+	Components []string             `json:"components" doc:"The components carrying the issue in the builds listed, by name"`
+	Builds     []EmbargoedBuildBody `json:"builds" doc:"The builds carrying the issue, within the scope asked for"`
+	Severity   string               `json:"severity,omitempty"`
+	DiscloseAt string               `json:"disclose_at" doc:"The date the embargo ends. Reaching it discloses nothing"`
 	// Passed says the date has arrived. It is a date to answer rather than a
 	// trigger, so this is a row somebody has to act on rather than a record of
 	// something that happened.

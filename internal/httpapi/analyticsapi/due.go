@@ -25,9 +25,7 @@ type LateBody struct {
 	Component     string `json:"component"`
 	Version       string `json:"version,omitempty" doc:"The version, so a link to the finding can name it — a build ships a name at more than one version often enough that a link without it cannot be resolved"`
 	core.PackageKindBody
-	Product string `json:"product" doc:"The product, by the name that addresses it"`
-
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	core.ProductNamesBody
 	core.BuildNamesBody
 	Occurrences  int    `json:"occurrences" doc:"The number of occurrences in that build this sits at"`
 	AssignedTo   string `json:"assigned_to,omitempty" doc:"The party dealing with this, by sign-in identity for a person and by name for a team. Empty means nobody, or not everywhere the same person"`

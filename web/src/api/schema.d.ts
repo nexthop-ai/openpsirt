@@ -7978,6 +7978,7 @@ export interface components {
             elsewhere: boolean;
             /** @description Whether the release is marked affected whatever its decisions say */
             marked: boolean;
+            /** @description The product, by the name that addresses it */
             product: string;
             /** @description The product's display name, or its name where it has none */
             product_name?: string;
@@ -10157,6 +10158,7 @@ export interface components {
              */
             readonly $schema?: string;
             added_at: string;
+            /** @description The product, by the name that addresses it */
             product: string;
             /** @description The product's display name, or its name where it has none */
             product_name?: string;
@@ -12860,7 +12862,7 @@ export interface components {
              */
             sent_back: number;
             since: string;
-            /** @description Each person's throughput, most first. Empty when a team is asked about by anybody but an administrator, because the rows would name its members */
+            /** @description Each person's throughput, most first */
             throughput: components["schemas"]["WorkedBody"][] | null;
             /** @description The wait for a second person, per severity */
             time_to_agree: components["schemas"]["SpreadBody"][] | null;

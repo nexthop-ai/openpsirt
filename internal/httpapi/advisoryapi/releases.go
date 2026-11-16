@@ -16,8 +16,7 @@ import (
 // AdvisoryReleaseBody is one release of one issue an advisory covers, and what the
 // document states about it.
 type AdvisoryReleaseBody struct {
-	Product       string             `json:"product"`
-	ProductName   string             `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+	core.ProductNamesBody
 	Vulnerability string             `json:"vulnerability"`
 	BranchOrTag   string             `json:"branch_or_tag"`
 	Variant       string             `json:"variant"`

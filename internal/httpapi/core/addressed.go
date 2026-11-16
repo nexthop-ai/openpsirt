@@ -32,3 +32,10 @@ type PackageKindBody struct {
 func PackageKindOf(purl string) PackageKindBody {
 	return PackageKindBody{Ecosystem: graph.EcosystemOf(purl), Namespace: graph.NamespaceOf(purl)}
 }
+
+// ProductNamesBody names a product by the name that addresses it and as it is
+// shown, embedded in the answers that name the product a row is in.
+type ProductNamesBody struct {
+	Product     string `json:"product" doc:"The product, by the name that addresses it"`
+	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
+}

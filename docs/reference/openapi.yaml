@@ -344,6 +344,7 @@ components:
           description: Whether the release is marked affected whatever its decisions say
           type: boolean
         product:
+          description: The product, by the name that addresses it
           type: string
         product_name:
           description: The product's display name, or its name where it has none
@@ -360,7 +361,6 @@ components:
         vulnerability:
           type: string
       required:
-        - product
         - vulnerability
         - branch_or_tag
         - variant
@@ -369,6 +369,7 @@ components:
         - marked
         - changed
         - elsewhere
+        - product
       type: object
     AdvisoryReleasesOutputBody:
       additionalProperties: false
@@ -1378,7 +1379,6 @@ components:
         - id
         - decision_id
         - issue
-        - product
         - component
         - outcome
         - reasoning
@@ -1388,6 +1388,7 @@ components:
         - proposed_at
         - approvals
         - two_people
+        - product
       type: object
     AuditedDecisionBody:
       additionalProperties: false
@@ -3908,6 +3909,7 @@ components:
         added_at:
           type: string
         product:
+          description: The product, by the name that addresses it
           type: string
         product_name:
           description: The product's display name, or its name where it has none
@@ -3917,9 +3919,9 @@ components:
         vulnerability:
           type: string
       required:
-        - product
         - vulnerability
         - added_at
+        - product
       type: object
     CoveredBuild:
       additionalProperties: false
@@ -5161,12 +5163,12 @@ components:
           type: string
       required:
         - vulnerability
-        - product
         - components
         - builds
         - disclose_at
         - passed
         - occurrences
+        - product
       type: object
     EmbargoedBuildBody:
       additionalProperties: false
@@ -7449,10 +7451,10 @@ components:
       required:
         - vulnerability
         - component
-        - product
         - occurrences
         - due
         - days_left
+        - product
         - branch_or_tag
         - variant
       type: object
@@ -8780,7 +8782,7 @@ components:
         since:
           type: string
         throughput:
-          description: Each person's throughput, most first. Empty when a team is asked about by anybody but an administrator, because the rows would name its members
+          description: Each person's throughput, most first
           items:
             $ref: "#/components/schemas/WorkedBody"
           type:
@@ -12120,11 +12122,11 @@ components:
         vulnerability:
           type: string
       required:
-        - product
         - vulnerability
         - occurrence
         - times
         - total_days
+        - product
       type: object
     ReportBody:
       additionalProperties: false
@@ -13685,7 +13687,6 @@ components:
           format: int64
           type: integer
       required:
-        - product
         - component
         - decisions
         - occurrences
@@ -13693,6 +13694,7 @@ components:
         - promised
         - dismissed
         - deferred
+        - product
       type: object
     Split-decisionRequest:
       additionalProperties: false
@@ -14765,11 +14767,11 @@ components:
         - vulnerability
         - component
         - version
-        - product
         - branch_or_tag
         - variant
         - occurrences
         - builds
+        - product
       type: object
     UnassignedPageBody:
       additionalProperties: false

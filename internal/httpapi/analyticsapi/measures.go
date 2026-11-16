@@ -37,7 +37,7 @@ type MeasuresBody struct {
 	Until    string       `json:"until"`
 	ToDecide []SpreadBody `json:"time_to_decide" doc:"The wait before anybody proposed anything, per severity"`
 	ToAgree  []SpreadBody `json:"time_to_agree" doc:"The wait for a second person, per severity"`
-	Worked   []WorkedBody `json:"throughput" doc:"Each person's throughput, most first. Empty when a team is asked about by anybody but an administrator, because the rows would name its members"`
+	Worked   []WorkedBody `json:"throughput" doc:"Each person's throughput, most first"`
 	SentBack int          `json:"sent_back" doc:"Decisions an approver asked more of in the window. Counted for the deployment rather than per person: the record holds that a decision was sent back and not by whom"`
 	Sampled  int          `json:"sampled" doc:"The number of observations behind the two spans"`
 	Capped   bool         `json:"capped,omitempty" doc:"The ceiling was reached, so the spans describe the most recent part of the window rather than all of it"`

@@ -17,10 +17,8 @@ import (
 
 // SpentBody is the work spent on one component in one product.
 type SpentBody struct {
-	Product string `json:"product" doc:"The product, by the name that addresses it"`
-
-	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
-	Component   string `json:"component" doc:"The subject of the decisions, by name. Empty where nothing in any build carries the occurrence any more"`
+	core.ProductNamesBody
+	Component string `json:"component" doc:"The subject of the decisions, by name. Empty where nothing in any build carries the occurrence any more"`
 	// Decisions is the unit somebody works in — one argument, however many
 	// occurrences it covers — and Occurrences how many those reached.
 	Decisions   int `json:"decisions" doc:"Arguments made about it in the period"`

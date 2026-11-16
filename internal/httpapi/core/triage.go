@@ -84,6 +84,8 @@ type DecisionOccurrenceBody struct {
 // FindingRefBody is the subject of a decision occurrence, as the findings list
 // shows it: the build to link to, the issue, the component and where it sits.
 type FindingRefBody struct {
+	// The product is written out here, since its description says what the
+	// three names together address.
 	Product     string `json:"product" doc:"The build to link to, by product, branch or tag, and variant. The product by the name that addresses it"`
 	ProductName string `json:"product_name,omitempty" doc:"The product's display name, or its name where it has none"`
 	BuildNamesBody
