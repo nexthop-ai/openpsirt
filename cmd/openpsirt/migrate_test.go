@@ -160,8 +160,8 @@ func TestASchemaAheadOfThisBuildIsRefused(t *testing.T) {
 	})
 }
 
-// A database a release before v0.9.0 built records a version from 1 to 42,
-// below the migration that makes v0.9.0's schema at once. Serving or
+// A database a release before v0.10.0 built records a version from 1 to 43,
+// below the migration that makes v0.10.0's schema at once. Serving or
 // migrating it is refused before anything runs, naming the version and the
 // releases that upgrade it. The baseline's own version is not refused.
 func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
@@ -180,9 +180,9 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 				`INSERT INTO "`+migrate.VersionTable+`" ("version_id", "is_applied") VALUES (?, ?)`, to, true)
 			return err
 		}
-		// v0.10.2 upgrades a database from its own baseline, 41, on, and
-		// refuses one below it, which v0.8.0 upgrades from 39 on and v0.6.0
-		// below that.
+		// v0.12.0 upgrades a database from its own baseline, 43. v0.10.2
+		// upgrades one from its own, 41, to v0.10.0's schema, and refuses one
+		// below it, which v0.8.0 upgrades from 39 on and v0.6.0 below that.
 		for _, c := range []struct {
 			earlier int64
 			with    string
@@ -192,7 +192,8 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 			{39, "with v0.8.0 and then v0.10.2,"},
 			{40, "with v0.8.0 and then v0.10.2,"},
 			{41, "with v0.10.2,"},
-			{migrations.Baseline - 1, "with v0.10.2,"},
+			{42, "with v0.10.2,"},
+			{migrations.Baseline - 1, "with v0.12.0,"},
 		} {
 			earlier := c.earlier
 			if err := record(ctx, migrations.Baseline, earlier); err != nil {
@@ -206,7 +207,7 @@ func TestASchemaFromBeforeTheBaselineIsRefused(t *testing.T) {
 					t.Errorf("%s a schema at version %d was allowed", what, earlier)
 					continue
 				}
-				for _, want := range []string{"version " + strconv.FormatInt(earlier, 10) + ",", "v0.9.0", c.with} {
+				for _, want := range []string{"version " + strconv.FormatInt(earlier, 10) + ",", "v0.10.0", c.with} {
 					if !strings.Contains(err.Error(), want) {
 						t.Errorf("%s: the refusal does not say %q: %v", what, want, err)
 					}
@@ -233,6 +234,7 @@ func TestMigrateStatusSaysWhereASchemaStands(t *testing.T) {
 	thrice := "before the baseline: upgrade it with v0.6.0, v0.8.0 and then v0.10.2 first"
 	twice := "before the baseline: upgrade it with v0.8.0 and then v0.10.2 first"
 	once := "before the baseline: upgrade it with v0.10.2 first"
+	last := "before the baseline: upgrade it with v0.12.0 first"
 	for _, c := range []struct {
 		applied int64
 		want    string
@@ -243,7 +245,8 @@ func TestMigrateStatusSaysWhereASchemaStands(t *testing.T) {
 		{39, twice},
 		{40, twice},
 		{41, once},
-		{migrations.Baseline - 1, once},
+		{42, once},
+		{migrations.Baseline - 1, last},
 		{migrations.Baseline, "behind by " + strconv.FormatInt(wanted-migrations.Baseline, 10)},
 		{wanted, "the version this build expects"},
 		{wanted + 1, "ahead of this build"},

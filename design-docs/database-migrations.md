@@ -75,8 +75,7 @@ The chain is the baseline, then one migration per release.
 
 | Migration | What it is |
 |---|---|
-| 43 | The baseline: v0.9.0's schema, made at once on an empty database (§ The baseline) |
-| 44 | v0.9.0's schema into v0.10.0's |
+| 44 | The baseline: v0.10.0's schema, made at once on an empty database (§ The baseline) |
 | 45 | v0.10.0's schema into v0.11.0's |
 | 46 | v0.11.0's schema into v0.12.0's |
 | 47 | v0.12.0's schema into v0.13.0's |
@@ -95,19 +94,19 @@ first.
 
 ## The baseline
 
-Migration 43 makes v0.9.0's schema directly. It is numbered as v0.9.0's last
-migration, so a database v0.9.0 or v0.10.x built has it recorded and applies
-only what follows. A fresh install applies it and every migration after it.
+Migration 44 makes v0.10.0's schema directly. It is numbered as v0.10.0's last
+migration, so a database v0.10.x built has it recorded and applies only what
+follows. A fresh install applies it and every migration after it.
 
 | Rule | Reason |
 |---|---|
 | Each table is made by one declaration, beside the migration, grouped by area with the reasoning for its shape | The migration names every table after every table it points at |
-| v0.9.0's record of its schema holds the baseline | On each engine it builds exactly v0.9.0's columns, constraints and indexes, and the schema test fails on any line either side lacks |
+| v0.10.0's record of its schema holds the baseline | On each engine it builds exactly v0.10.0's columns, constraints and indexes, and the schema test fails on any line either side lacks |
 | Every statement a declaration holds is one the baseline makes | A test fails on a table or index made from anywhere else |
 | On PostgreSQL the baseline also sets the finding table's vacuum settings | They are storage settings, which no declaration holds (`design-docs/database-schema.md` § Indexes) |
-| A release's declaration may derive from a baseline declaration | v0.10.0's finding and supplier statement tables, and several of v0.11.0's, are the baseline's with columns or indexes added |
-| A baseline declaration a later migration reads keeps its name, and each table a later migration picks from it keeps its statements | Migrations 44 and 45 read declarations by the names v0.9.0 gave them, and get v0.9.0's statements byte for byte for every table they pick |
-| A database at versions 1 to 42 is refused | A release before v0.9.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.10.2 upgrades from version 41; v0.8.0 upgrades 39 and 40 into one v0.10.2 upgrades, and below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
+| A release's declaration may derive from a baseline declaration | Several of v0.11.0's tables are the baseline's with columns or indexes added |
+| A baseline declaration a later migration reads keeps its name, and each table a later migration picks from it keeps its statements | Migrations 45 and 46 read baseline declarations, some by the names v0.9.0 and v0.10.0 gave them, and get v0.10.0's statements byte for byte for every table they pick |
+| A database at versions 1 to 43 is refused | A release before v0.10.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.12.0 upgrades version 43, which v0.9.0 built; v0.10.2 upgrades 41 and 42 to v0.10.0's schema; v0.8.0 upgrades 39 and 40 into one v0.10.2 upgrades, and below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
 
 ## Forward only
 
@@ -150,8 +149,8 @@ schema they build on each of the four engines, captured from the tag.
 | Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | An edit changes a schema deployments hold without changing their version |
 | The migrations up to a release's last build, on every engine, the schema the tag built | The files read column spellings and widths from helpers a later change may edit. On SQLite the description includes whether each key is `AUTOINCREMENT` and each index partial, which its listings omit |
 | The migration library's bookkeeping table is left out of the compared schema, and a record listing it is compared without it | The library chooses its column types, and its releases change them |
-| A release the baseline replaced lists no file | Its files are gone. v0.9.0's schema on each engine holds the baseline |
-| One database per engine climbs the releases, checked at each; it also holds the unstopped v0.9.0 to v0.10.0 and v0.11.0 to v0.12.0 upgrades to their declarations | It reaches both schemas on its way. The v0.10.0 check is followed by a rung, which fails on a scratch table it leaves behind |
+| A release the baseline replaced lists no file | Its files are gone. v0.10.0's schema on each engine holds the baseline |
+| One database per engine climbs the releases, checked at each; it also holds the unstopped v0.11.0 to v0.12.0 upgrade to its declarations | It reaches that schema on its way. The check follows the last rung, so its own clean-up alone removes the scratch tables it builds |
 
 A file a release owns is a migration numbered after the previous release's last
 up to its own, or a declaration named for it. Only a Go file that is not a test
@@ -198,7 +197,7 @@ refuses a tag whose release is not frozen, before building anything.
 
 `make upgrade-rehearsal FROM=<release> ENGINE=<engine>` upgrades a database an
 earlier release built and filled itself. It is step 2 of § Release records, run
-from every release from v0.9.0 on, on each engine. It builds images and scans
+from every release from v0.10.0 on, on each engine. It builds images and scans
 the demo's inventories, so it runs locally, outside the gate.
 
 | Stage | What it does |

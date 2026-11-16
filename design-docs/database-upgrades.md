@@ -9,7 +9,6 @@ Satisfies REQ-72.
 ## Contents
 
 - [Release upgrades](#release-upgrades)
-- [The v0.10.0 upgrade](#the-v0100-upgrade)
 - [The v0.11.0 upgrade](#the-v0110-upgrade)
 - [The v0.12.0 upgrade](#the-v0120-upgrade)
 - [The v0.13.0 upgrade](#the-v0130-upgrade)
@@ -17,7 +16,7 @@ Satisfies REQ-72.
 
 ## Release upgrades
 
-Each release after v0.9.0 that changes the schema carries one migration that
+Each release after v0.10.0 that changes the schema carries one migration that
 changes the previous release's schema into its own and moves the rows with it,
 forward only (REQ-72). A database applies the ones after its own release; a
 fresh install makes the baseline and applies every one. They are shaped as
@@ -35,31 +34,6 @@ every migration after 1.0 will be.
 | A column added is last in its table on the three servers | A rebuilt SQLite table has it where declared. No query reads a column by position |
 | Changing a table is spelled per engine | PostgreSQL drops a uniqueness rule or a foreign key as a constraint; MySQL and MariaDB drop the index or the foreign key, name the table an index is dropped from, and refuse to drop a column a foreign key names |
 | On MySQL and MariaDB a failure part way is recovered from a backup | Each statement commits as it runs and no version is recorded. The operator page says to take one first |
-
-## The v0.10.0 upgrade
-
-Migration 44. No row moves. `design-docs/database-schema.md` § Indexes says
-what each index serves, `design-docs/publishing.md` what a published document
-is, and `design-docs/upstream.md` what an upstream is. Each addition is stepped
-over where a stopped upgrade made it already.
-
-| Table | Gains |
-|---|---|
-| `finding` | An index on the run that opened a finding and one on the run that closed it, made where the table stands. One held under the name is replaced |
-| `product` | Whether its security documents are published, false for every product |
-| `claim`, v0.11.0's `decision` | Whom a statement published from it holds for, empty |
-| `published_document` | New: one row per published document, holding the revision a reader is handed |
-| `upstream` | New: the upstream a product trusts, the key it confirmed, and how reading it went |
-| `upstream_document` | New: one row per document an upstream lists, at the revision last recorded |
-| `vex_statement`, v0.11.0's `received_vex_statement` | Who here declined a statement and when, empty |
-
-| Check, on each engine | What it holds |
-|---|---|
-| A v0.9.0 database, on the way up the release records (`design-docs/database-migrations.md` § Release records) | Upgraded, each changed or new table's declaration describing the built table |
-| A v0.9.0 database holding a new index in another shape | Upgraded the same, the index in the release's shape |
-
-Each index builds in 0.7 s on PostgreSQL over 1,159,943 findings, at 21 to
-29 MB beside a 306 MB table.
 
 ## The v0.11.0 upgrade
 
@@ -297,7 +271,7 @@ lapses.
 
 | Limit | Detail |
 |---|---|
-| A database a release before v0.9.0 built is not upgraded | The baseline makes v0.9.0's schema and no migration here reads an earlier one. v0.10.2 upgrades it first (`design-docs/database-migrations.md` § The baseline) |
+| A database a release before v0.10.0 built is not upgraded | The baseline makes v0.10.0's schema and no migration here reads an earlier one. v0.12.0 upgrades one v0.9.0 built first, and v0.10.2 an earlier one (`design-docs/database-migrations.md` § The baseline) |
 | An upgraded database keeps only the last stretch v0.12.0 recorded for an issue on an advisory | v0.12.0 revived the row on putting an issue back and overwrote when it was first added, and nothing else recorded it. An issue taken off, put back and taken off again before the upgrade reads as not named by an issuance from an earlier stretch |
 | An upgraded database keeps only the last stretch v0.12.0 recorded for a release marked affected | v0.12.0 revived the row on marking a release again and overwrote who marked and cleared it before |
 | A decision at a key v0.12.0 made that v0.13.0 reads as two occurrences is left at that key | One package name held at a version its name carries and at one it does not, or carrying a different release at each, under one consumer, made one key; nothing says which the decision was about, so it reaches the side whose name does not carry its version, where there is one, and the other only once made again |

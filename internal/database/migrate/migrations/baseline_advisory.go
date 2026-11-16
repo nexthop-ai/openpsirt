@@ -494,6 +494,11 @@ func vexBaseline(t *columnTypes) []string {
 			-- same reason a withdrawn decision is a state rather than a
 			-- delete.
 			"superseded_at" ` + t.timestamp + ` NULL,
+			-- When somebody here declined the statement, and who. A declined
+			-- statement closes nothing and is offered to nobody. Null for one
+			-- nobody declined.
+			"declined_at" ` + t.timestamp + ` NULL,
+			"declined_by" ` + t.refNull + ` NULL,
 			CONSTRAINT "vex_statement_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "vex_statement_by_fk" FOREIGN KEY ("uploaded_by") REFERENCES "person"("id")
 		)` + t.suffix,
@@ -516,9 +521,9 @@ func vexBaseline(t *columnTypes) []string {
 	}
 }
 
-// vexStatementsV090 is the baseline's declaration of a supplier's statements,
-// under the name v0.10.0's declaration of the table reads.
-func vexStatementsV090(t *columnTypes) []string {
+// vexStatementV0100 is the baseline's declaration of a supplier's statements,
+// under the name v0.11.0's declaration of the table reads.
+func vexStatementV0100(t *columnTypes) []string {
 	return vexBaseline(t)
 }
 

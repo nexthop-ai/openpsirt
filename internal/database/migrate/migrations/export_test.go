@@ -17,20 +17,6 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 )
 
-// StatementsV0100 is v0.10.0's declaration of each table it changes.
-func StatementsV0100(engine database.Engine) map[string][]string {
-	t := typesFor(engine)
-	return map[string][]string{
-		"finding":            findingV0100(t),
-		"product":            productV0100(t),
-		"claim":              claimV0100(t),
-		"published_document": publishedDocumentV0100(t),
-		"upstream":           upstreamV0100(t),
-		"upstream_document":  upstreamDocumentV0100(t),
-		"vex_statement":      vexStatementV0100(t),
-	}
-}
-
 // StatementsV0110 is v0.11.0's declaration of each table it changes.
 func StatementsV0110(engine database.Engine) map[string][]string {
 	t := typesFor(engine)

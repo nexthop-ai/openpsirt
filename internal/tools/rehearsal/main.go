@@ -4,7 +4,7 @@
 // Command rehearsal carries a database a tagged release built through an
 // upgrade to this tree, and checks what arrives.
 //
-//	rehearsal -from v0.9.0 -engine postgres -dir .demo/rehearsal
+//	rehearsal -from v0.10.2 -engine postgres -dir .demo/rehearsal
 //
 // A server engine's URL is read from OPENPSIRT_TEST_<ENGINE>_URL, the variable
 // the test suite reads, so the password is never on the command line.
@@ -100,7 +100,7 @@ func main() {
 	r := run{client: proxyClient()}
 	var dir string
 	var keep bool
-	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.9.0")
+	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.10.2")
 	flag.StringVar(&r.engine, "engine", "", "sqlite, postgres, mysql or mariadb")
 	flag.StringVar(&dir, "dir", ".demo/rehearsal", "where the run keeps what it makes")
 	flag.StringVar(&r.grype, "grype", "", "the scanner's database directory, shared between runs")
