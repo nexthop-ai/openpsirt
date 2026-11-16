@@ -593,7 +593,7 @@ var (
 )
 
 // carrying resolves what in the build holds the flaw, defaulting to the build
-// itself.
+// itself, with the identifying name its occurrence is keyed on.
 func carrying(ctx context.Context, db bun.IDB, buildID int64, in Entering) (int64, string, error) {
 	name := strings.TrimSpace(in.Component)
 	if name != "" {
@@ -624,15 +624,15 @@ func carrying(ctx context.Context, db bun.IDB, buildID int64, in Entering) (int6
 		if root {
 			return id, "", nil
 		}
-		// Keyed on the component row's name, as a scan keys it, whatever
-		// name or capitals were typed: a build's stated name keys nothing, or
-		// one flaw recorded and scanned is two findings.
-		var keyed string
-		if err := db.NewSelect().TableExpr(`"component" AS "c"`).ColumnExpr(`"c"."name"`).
-			Where(`"c"."id" = ?`, id).Scan(ctx, &keyed); err != nil {
+		// Keyed on the component row's identifying name, as a scan keys it,
+		// whatever name or capitals were typed: a build's stated name keys
+		// nothing, or one flaw recorded and scanned is two findings.
+		var keyed graph.Component
+		if err := db.NewSelect().Model(&keyed).Column("name", "version", "purl").
+			Where(`"c"."id" = ?`, id).Scan(ctx); err != nil {
 			return 0, "", fmt.Errorf("read what component %d is keyed on: %w", id, err)
 		}
-		return id, keyed, nil
+		return id, keyed.IdentifyingName(), nil
 	}
 
 	// The build itself. A flaw in how the pieces fit together belongs on the

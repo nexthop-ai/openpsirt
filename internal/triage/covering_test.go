@@ -59,7 +59,8 @@ func (f *fixture) component(t *testing.T, name, version string) int64 {
 	t.Helper()
 	row := &graph.Component{
 		Identity: name + "@" + version, Name: name, NameFolded: graph.Folded(name), Version: version,
-		FirstSeenAt: time.Now().Truncate(time.Microsecond),
+		IdentifyingFolded: graph.StoredIdentifying(name, version, ""),
+		FirstSeenAt:       time.Now().Truncate(time.Microsecond),
 	}
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
 		t.Fatal(err)

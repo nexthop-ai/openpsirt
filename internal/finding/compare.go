@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -22,12 +23,16 @@ import (
 type Changed struct {
 	Vulnerability string `bun:"vulnerability"`
 	// Component is the name the build stated, which is what a reader sees.
-	// Named is the component row's name, which the two builds are paired on:
-	// each build states its own, so pairing on what either stated splits one
-	// component into a fix and a new arrival.
-	Component string `bun:"component"`
-	Named     string `bun:"named" json:"-"`
-	Severity  string `bun:"severity"`
+	// Named is the component row's name, which with its version and package
+	// identifier gives the identifying name the two builds are paired on:
+	// each build states its own name, so pairing on what either stated splits
+	// one component into a fix and a new arrival, and so does pairing on a
+	// name its upgrade renamed.
+	Component    string `bun:"component"`
+	Named        string `bun:"named" json:"-"`
+	NamedVersion string `bun:"named_version" json:"-"`
+	NamedPurl    string `bun:"named_purl" json:"-"`
+	Severity     string `bun:"severity"`
 	// Because says why it went, for something that is no longer there. The
 	// four explanations are different sentences to whoever reads a release
 	// note: upgraded, patched, the component removed, and superseded — which
@@ -163,6 +168,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 			Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
 			ColumnExpr(`"c"."name" AS "named"`).
+			ColumnExpr(`MIN("c"."version") AS "named_version", MIN(COALESCE("c"."purl", '')) AS "named_purl"`).
 			ColumnExpr(`MIN(`+graph.NodeName("sn", "c")+`) AS "component"`).
 			ColumnExpr(rating.EffectiveExpr+` AS "severity"`).
 			ColumnExpr(`COALESCE("f"."closed_because", '') AS "because"`).
@@ -190,7 +196,7 @@ func (s *Store) Compare(ctx context.Context, subject access.Subject, fromBuild, 
 		return nil, fmt.Errorf("read what the later build has: %w", err)
 	}
 
-	key := func(c Changed) string { return pairKey(c.Vulnerability, c.Named) }
+	key := Changed.paired
 	here := map[string]Changed{}
 	for _, c := range now {
 		here[key(c)] = c
@@ -302,6 +308,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 			Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 			ColumnExpr(`"c"."name" AS "named"`).
+			ColumnExpr(`MIN("c"."version") AS "named_version", MIN(COALESCE("c"."purl", '')) AS "named_purl"`).
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" = ?`, access.Private).
 			Where(`"f"."closed_at" IS NULL`).
@@ -319,11 +326,11 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 	}
 	here := make(map[string]bool, len(now))
 	for _, c := range now {
-		here[pairKey(c.Vulnerability, c.Named)] = true
+		here[c.paired()] = true
 	}
 	gone := make([]Changed, 0, len(was))
 	for _, c := range was {
-		if !here[pairKey(c.Vulnerability, c.Named)] {
+		if !here[c.paired()] {
 			gone = append(gone, c)
 		}
 	}
@@ -348,7 +355,7 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 		return 0, err
 	}
 	for i := range gone {
-		gone[i].Because = why[pairKey(gone[i].Vulnerability, gone[i].Named)].Because
+		gone[i].Because = why[gone[i].paired()].Because
 	}
 	return len(onlyFixes(gone)), nil
 }
@@ -362,7 +369,9 @@ func (s *Store) OmittedFixes(ctx context.Context, subject access.Subject,
 // statement asks for the issues and the components separately, which is a
 // superset, and the pairing is done on the way back. The superset is the
 // entries that share an issue *and* a component with something fixed without
-// being that pair, which on a release note is a handful.
+// being that pair, which on a release note is a handful. A batch holding a
+// component whose name holds its version is narrowed by the issues alone,
+// since a row closed at another version of it carries another name.
 //
 // A pair the later build never carried at all is absent from the answer, and
 // the caller reads that as unexplained. That is the ordinary case when a fix
@@ -382,8 +391,8 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Vis
 	}
 	wanted := make(map[string]bool, len(fixed))
 	for _, c := range fixed {
-		wanted[pairKey(c.Vulnerability, c.Named)] = true
-		why[pairKey(c.Vulnerability, c.Named)] = Gone{Because: Unexplained}
+		wanted[c.paired()] = true
+		why[c.paired()] = Gone{Because: Unexplained}
 	}
 
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
@@ -393,7 +402,9 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Vis
 		issues := make([]string, 0, len(batch))
 		components := make([]string, 0, len(batch))
 		seenIssue, seenComponent := map[string]bool{}, map[string]bool{}
+		renamed := false
 		for _, c := range batch {
+			renamed = renamed || c.identifying() != strings.TrimSpace(c.Named)
 			if !seenIssue[c.Vulnerability] {
 				seenIssue[c.Vulnerability] = true
 				issues = append(issues, c.Vulnerability)
@@ -407,17 +418,20 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Vis
 		var rows []struct {
 			Vulnerability string `bun:"vulnerability"`
 			Component     string `bun:"component"`
+			Version       string `bun:"version"`
+			Purl          string `bun:"purl"`
 			Because       string `bun:"because"`
 			FromVersion   string `bun:"from_version"`
 			MovedTo       string `bun:"moved_to"`
 			ClosedRun     int64  `bun:"closed_run"`
 		}
-		err := s.db.NewSelect().
+		q := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 			Join(`JOIN "component" AS "cp" ON "cp"."id" = "f"."component_id"`).
 			ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 			ColumnExpr(`"cp"."name" AS "component"`).
+			ColumnExpr(`"cp"."version" AS "version", COALESCE("cp"."purl", '') AS "purl"`).
 			ColumnExpr(`COALESCE("f"."closed_because", '') AS "because"`).
 			// The version it went from is the closed row's own component:
 			// what closed is the finding against the version that carried the
@@ -431,17 +445,18 @@ func (s *Store) whyGone(ctx context.Context, buildID int64, visible []access.Vis
 			Where(`"f"."build_id" = ?`, buildID).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(`"f"."closed_at" IS NOT NULL`).
-			Where(`"v"."identifier" IN (?)`, bun.List(issues)).
-			Where(`"cp"."name" IN (?)`, bun.List(components)).
-			// Ascending, so the last row read for a pair is its latest, in the
-			// order Later gives: by closing, then by identifier.
-			OrderExpr(`"f"."closed_at" ASC, "f"."id" ASC`).
-			Scan(ctx, &rows)
+			Where(`"v"."identifier" IN (?)`, bun.List(issues))
+		if !renamed {
+			q = q.Where(`"cp"."name" IN (?)`, bun.List(components))
+		}
+		// Ascending, so the last row read for a pair is its latest, in the
+		// order Later gives: by closing, then by identifier.
+		err := q.OrderExpr(`"f"."closed_at" ASC, "f"."id" ASC`).Scan(ctx, &rows)
 		if err != nil {
 			return nil, fmt.Errorf("read why these went: %w", err)
 		}
 		for _, row := range rows {
-			at := pairKey(row.Vulnerability, row.Component)
+			at := pairKey(row.Vulnerability, graph.IdentifyingName(row.Component, row.Version, row.Purl))
 			if !wanted[at] || row.Because == "" {
 				continue
 			}
@@ -466,9 +481,10 @@ type Gone struct {
 	ClosedRun int64
 }
 
-// pairKey identifies an issue at a component by the component row's name,
-// which is what a comparison is drawn in: one line per issue in a component, whatever versions
-// either side is at.
+// pairKey identifies an issue at a component by the component row's
+// identifying name (design-docs/data-model-components.md § The identifying
+// name), which is what a comparison is drawn in: one line per issue in a
+// component, whatever versions either side is at.
 //
 // One spelling, because the entries and the explanations for them are matched
 // against each other and two spellings of a key that agree today are two that
@@ -476,6 +492,14 @@ type Gone struct {
 func pairKey(vulnerability, component string) string {
 	return vulnerability + "\x00" + component
 }
+
+// identifying is the identifying name of the entry's component row.
+func (c Changed) identifying() string {
+	return graph.IdentifyingName(c.Named, c.NamedVersion, c.NamedPurl)
+}
+
+// paired is the key an entry is paired on.
+func (c Changed) paired() string { return pairKey(c.Vulnerability, c.identifying()) }
 
 // Stands is what a build has decided about one issue at one component.
 type Stands struct {
@@ -504,6 +528,8 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 	var counted []struct {
 		Vulnerability string     `bun:"vulnerability"`
 		Component     string     `bun:"component"`
+		Version       string     `bun:"version"`
+		Purl          string     `bun:"purl"`
 		Occurrences   int        `bun:"places"`
 		Waiting       int        `bun:"waiting_here"`
 		Approved      int        `bun:"approved_here"`
@@ -516,7 +542,9 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-		ColumnExpr(`"c"."name" AS "component"`).
+		// Per component row, folded below by identifying name.
+		ColumnExpr(`MIN("c"."name") AS "component", MIN("c"."version") AS "version"`).
+		ColumnExpr(`MIN(COALESCE("c"."purl", '')) AS "purl"`).
 		ColumnExpr(`COUNT(*) AS "places"`).
 		// The soonest of them, which is the date a coordinator reads against.
 		ColumnExpr(`MIN("f"."due_at") AS "due_at"`)
@@ -529,17 +557,34 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"v"."identifier", "c"."name"`)
+		GroupExpr(`"v"."identifier", "c"."id"`)
 	if err := q.Scan(ctx, &counted); err != nil {
 		return nil, fmt.Errorf("read how far this build has decided what it still has: %w", err)
 	}
 
-	out := make(map[string]Stands, len(counted))
+	type tally struct {
+		places, waiting, approved, lapsed int
+		due                               *time.Time
+	}
+	tallies := make(map[string]*tally, len(counted))
 	for _, row := range counted {
-		out[pairKey(row.Vulnerability, row.Component)] = Stands{
-			State: stateWord(row.Occurrences, row.Waiting, row.Approved, row.Lapsed),
-			Due:   row.Due,
+		at := pairKey(row.Vulnerability, graph.IdentifyingName(row.Component, row.Version, row.Purl))
+		t := tallies[at]
+		if t == nil {
+			t = &tally{}
+			tallies[at] = t
 		}
+		t.places += row.Occurrences
+		t.waiting += row.Waiting
+		t.approved += row.Approved
+		t.lapsed += row.Lapsed
+		if row.Due != nil && (t.due == nil || row.Due.Before(*t.due)) {
+			t.due = row.Due
+		}
+	}
+	out := make(map[string]Stands, len(tallies))
+	for at, t := range tallies {
+		out[at] = Stands{State: stateWord(t.places, t.waiting, t.approved, t.lapsed), Due: t.due}
 	}
 
 	// And what was decided, where something stands. One row per decision, so a
@@ -555,6 +600,8 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 	var said []struct {
 		Vulnerability string `bun:"vulnerability"`
 		Component     string `bun:"component"`
+		Version       string `bun:"version"`
+		Purl          string `bun:"purl"`
 		Decision      int64  `bun:"claim"`
 		Outcome       string `bun:"outcome"`
 		Justification string `bun:"justification"`
@@ -581,7 +628,8 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
 		Where(KeyMatches).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
-		ColumnExpr(`"c"."name" AS "component"`).
+		ColumnExpr(`MIN("c"."name") AS "component", MIN("c"."version") AS "version"`).
+		ColumnExpr(`MIN(COALESCE("c"."purl", '')) AS "purl"`).
 		ColumnExpr(`"cl"."id" AS "claim"`).
 		ColumnExpr(`"cl"."outcome" AS "outcome"`).
 		// One value per group, because the group is one decision: which bytes an
@@ -591,7 +639,7 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 		Where(`"f"."build_id" = ?`, buildID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
-		GroupExpr(`"v"."identifier", "c"."name", "cl"."id", "cl"."outcome"`).
+		GroupExpr(`"v"."identifier", "c"."id", "cl"."id", "cl"."outcome"`).
 		Scan(ctx, &said)
 	if err != nil {
 		return nil, fmt.Errorf("read what this build decided about what it still has: %w", err)
@@ -603,23 +651,23 @@ func (s *Store) whatStands(ctx context.Context, productID, buildID int64,
 	// outcome in different words are not that: they agree, and what the row
 	// cannot state is which wording, so it states the outcome and no reason.
 	outcomes := map[string]map[string]bool{}
-	decisions := map[string]int{}
+	decisions := map[string]map[int64]bool{}
 	for _, row := range said {
-		at := pairKey(row.Vulnerability, row.Component)
+		at := pairKey(row.Vulnerability, graph.IdentifyingName(row.Component, row.Version, row.Purl))
 		if outcomes[at] == nil {
-			outcomes[at] = map[string]bool{}
+			outcomes[at], decisions[at] = map[string]bool{}, map[int64]bool{}
 		}
 		outcomes[at][row.Outcome] = true
-		decisions[at]++
+		decisions[at][row.Decision] = true
 	}
 	for _, row := range said {
-		at := pairKey(row.Vulnerability, row.Component)
+		at := pairKey(row.Vulnerability, graph.IdentifyingName(row.Component, row.Version, row.Purl))
 		if len(outcomes[at]) != 1 {
 			continue
 		}
 		held := out[at]
 		held.Outcome = row.Outcome
-		if decisions[at] == 1 {
+		if len(decisions[at]) == 1 {
 			held.Justification = row.Justification
 		}
 		out[at] = held

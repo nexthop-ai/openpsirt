@@ -374,7 +374,7 @@ func (d *disclaiming) answering(issue Named, vulnerabilityID int64, component gr
 	// Zero is the build's root, which no supplier's product holds; an
 	// upstream speaks for the component wherever it sits, the root included.
 	consumer := d.inv.byID[consumerID]
-	here := affectedAt{vulnerabilityID, OccurrenceIdentity(component.Name, consumer.Name),
+	here := affectedAt{vulnerabilityID, OccurrenceIdentity(component.IdentifyingName(), consumer.IdentifyingName()),
 		upstreamOf(component), upstreamOf(consumer)}
 	if d.affected[here] {
 		return nil, answersNone

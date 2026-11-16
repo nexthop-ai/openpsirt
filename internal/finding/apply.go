@@ -396,7 +396,7 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 				VulnerabilityID:    vulnerabilityID,
 				ComponentID:        component.ID,
 				ConsumerID:         optional(consumerID),
-				OccurrenceIdentity: OccurrenceIdentity(component.Name, run.present.nameOf(consumerID)),
+				OccurrenceIdentity: OccurrenceIdentity(component.IdentifyingName(), run.present.nameOf(consumerID)),
 				FixState:           r.FixState, FixedIn: r.FixedIn, FixedAt: r.FixedAt,
 				Matched: r.Matched, MatchedFrom: r.MatchedFrom,
 				MatchedIn: r.MatchedIn, MatchedRange: r.MatchedRange,

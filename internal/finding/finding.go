@@ -501,10 +501,12 @@ type Applied struct {
 	Displaced []Displaced
 }
 
-// OccurrenceIdentity keys a component under the thing that pulled it in.
+// OccurrenceIdentity keys a component under the thing that pulled it in, each
+// named by its identifying name (graph.IdentifyingName).
 //
 // Names only, never versions: a version in the key would lapse every decision
-// the next time anything was rebuilt. Where a component sits directly under
+// the next time anything was rebuilt, and a name holding its own version has
+// it taken out for the same reason. Where a component sits directly under
 // the product, its name stands alone, because the product's name differs per
 // variant and including it would stop the same occurrence being recognized across
 // them.

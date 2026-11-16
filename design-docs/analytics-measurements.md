@@ -10,6 +10,7 @@ Benchmark runs behind the analytics rules.
 - [Daily trend](#daily-trend)
 - [Burndown and component groups](#burndown-and-component-groups)
 - [Export snapshots](#export-snapshots)
+- [Counts by identifying name](#counts-by-identifying-name)
 
 ## Early grouping
 
@@ -21,7 +22,7 @@ The rule is in `design-docs/analytics.md` § Computed on demand. Measured on
 | Backlog trend | Issue, component, product, opening run, and the moments it opened and closed | Grouped on issue, product and the moments: 15,053 rows sent against 367,577; 0.25 s against 1.58 s |
 | What each release holds | Build, issue and component | 0.17 s against 1.38 s |
 | Release readiness, what a build holds | Issue and component | 0.09 s against 0.33 s |
-| Release over release | Release, issue and component name | 24 tags, 453,336 open findings: 0.46 to 0.57 s on PostgreSQL and 0.85 to 0.92 s on MySQL 8.4, against 0.24 to 0.28 s and 0.20 to 0.31 s grouped on release and issue; grouping on the component's identifier first measured no faster |
+| Release over release | Release, issue and component's identifying name | 24 tags, 453,336 open findings: 0.46 to 0.57 s on PostgreSQL and 0.85 to 0.92 s on MySQL 8.4, against 0.24 to 0.28 s and 0.20 to 0.31 s grouped on release and issue; grouping on the component's identifier first measured no faster |
 | Aging buckets | Issue and product, then issue, with a flag per bucket | One statement, 0.9 s, against three per bucket taking 2.1 s together, with 133,000 decision occurrences |
 
 ## Planned upgrades page cost
@@ -363,3 +364,20 @@ file's seed does not fit beside other tests in the shared server's 1 GB.
 | MariaDB 11.4 | 37.0 s | 37.0 s | 913 ms |
 
 The slowest engine reads the file in under a tenth of the ten-minute ceiling.
+
+## Counts by identifying name
+
+Justifies the stored identifying name in `design-docs/data-model-components.md`
+§ The identifying name. Five reads after a warm one, PostgreSQL 16 and MySQL 8.4
+on throwaway servers on the shared development machine, one engine at a time.
+`TestMeasureTheReleaseChartOverAReleaseLine` and
+`TestMeasureAPageOfTheDecisionRecord` run them.
+
+| Read | Data | Counted by the folded name | Pairs folded in Go | Counted by the stored identifying name |
+|---|---|---|---|---|
+| Release chart | 24 tags of the full-size image, every package under the root once with one issue and the kernel 4,942, a twenty-fourth of the packages moved each tag and the kernel renamed every fourth: 282,000 open findings, each one pair | 0.32 to 0.38 s on PostgreSQL, 1.23 to 1.26 s on MySQL | 1.25 to 1.30 s and 3.75 to 4.00 s | 0.25 to 0.27 s and 1.28 to 1.45 s |
+| Decision record, a page of 200 | 200 promises, each on one package at a new version on each of 24 release lines, three issues under four containers: 57,600 findings, 43,800 decision occurrences | 0.53 to 1.53 s on PostgreSQL, 2.75 to 3.03 s on MySQL, over three runs | 1.25 to 1.30 s and 2.73 to 2.88 s, one run | 0.76 to 0.93 s and 1.60 to 3.24 s, over three runs |
+
+The release chart sends every issue at a component to be folded, so folding in
+Go scales with the open findings of every tag. The decision record's spread
+between runs of the same code exceeds any difference between the three.

@@ -107,17 +107,23 @@ type Point struct {
 // trendRow is one reduced moment: an issue at a component in one product,
 // opened and closed at one moment each, by one run.
 type trendRow struct {
-	VulnerabilityID int64      `bun:"vulnerability_id"`
-	Component       string     `bun:"component"`
-	Purl            string     `bun:"purl"`
-	ProductID       int64      `bun:"product_id"`
-	BuildID         int64      `bun:"build_id"`
-	ComponentID     int64      `bun:"component_id"`
-	Severity        string     `bun:"severity"`
-	OpenedAt        time.Time  `bun:"opened_at"`
-	OpenedRunID     *int64     `bun:"opened_run_id"`
-	ClosedAt        *time.Time `bun:"closed_at"`
-	ClosedBecause   string     `bun:"closed_because"`
+	VulnerabilityID int64  `bun:"vulnerability_id"`
+	Component       string `bun:"component"`
+	Name            string `bun:"name"`
+	Version         string `bun:"version"`
+	Purl            string `bun:"purl"`
+	// Identifying is the component's identifying name, folded: what the
+	// trend counts an issue at, so a version renamed by its own upgrade is
+	// the component it replaced.
+	Identifying   string     `bun:"-"`
+	ProductID     int64      `bun:"product_id"`
+	BuildID       int64      `bun:"build_id"`
+	ComponentID   int64      `bun:"component_id"`
+	Severity      string     `bun:"severity"`
+	OpenedAt      time.Time  `bun:"opened_at"`
+	OpenedRunID   *int64     `bun:"opened_run_id"`
+	ClosedAt      *time.Time `bun:"closed_at"`
+	ClosedBecause string     `bun:"closed_because"`
 	// Findings is how many findings the moment reduces: the occurrences an
 	// issue opened at, at one moment, by one run. A dismissal answers one
 	// occurrence, so the burndown asks whether every one is answered.
@@ -467,7 +473,8 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within 
 		Join(`JOIN "component" AS "c" ON "c"."id" = "grouped"."component_id"`).
 		ColumnExpr(`"grouped"."vulnerability_id" AS "vulnerability_id"`).
 		ColumnExpr(`"c"."name_folded" AS "component"`).
-		ColumnExpr(`"c"."purl" AS "purl"`).
+		ColumnExpr(`"c"."name" AS "name", "c"."version" AS "version"`).
+		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
 		ColumnExpr(`"grouped"."product_id" AS "product_id"`).
 		ColumnExpr(`"grouped"."build_id" AS "build_id"`).
 		ColumnExpr(`"grouped"."component_id" AS "component_id"`).
@@ -480,7 +487,16 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within 
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what changed over time: %w", err)
 	}
+	identify(rows)
 	return chosen(rows, within), nil
+}
+
+// identify sets each row's identifying name.
+func identify(rows []trendRow) {
+	for i := range rows {
+		r := &rows[i]
+		r.Identifying = graph.IdentifyingFolded(r.Component, r.Name, r.Version, r.Purl)
+	}
 }
 
 // chosen is the rows on components the narrowing chooses by identifier.
@@ -544,7 +560,8 @@ func (s *Store) firstScans(ctx context.Context, rows []trendRow, since time.Time
 }
 
 // trendKey is what a trend counts: an issue at a component, by the component's
-// name, so one version replacing another is the same component.
+// identifying name, so one version replacing another is the same component
+// (design-docs/data-model-components.md § The identifying name).
 type trendKey struct {
 	vulnerability int64
 	component     string
@@ -558,7 +575,7 @@ func (k trendKey) less(o trendKey) bool {
 }
 
 func (r trendRow) key() trendKey {
-	return trendKey{vulnerability: r.VulnerabilityID, component: r.Component}
+	return trendKey{vulnerability: r.VulnerabilityID, component: r.Identifying}
 }
 
 // presentBefore is which of these issues at components had a finding in the
@@ -589,7 +606,8 @@ func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, within
 			Join(`JOIN "component" AS "pc" ON "pc"."id" = "f"."component_id"`).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 			ColumnExpr(`"pc"."name_folded" AS "component"`).
-			ColumnExpr(`"pc"."purl" AS "purl"`).
+			ColumnExpr(`"pc"."name" AS "name", "pc"."version" AS "version"`).
+			ColumnExpr(`COALESCE("pc"."purl", '') AS "purl"`).
 			// The last closure of each, because a return after a removal is
 			// told by what removed it.
 			ColumnExpr(`"f"."build_id" AS "build_id"`).
@@ -597,7 +615,7 @@ func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, within
 			ColumnExpr(`"f"."closed_at" AS "closed_at"`).
 			ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
 			Where(`"f"."vulnerability_id" IN (?)`, bun.List(chunk)).
-			GroupExpr(`"f"."vulnerability_id", "pc"."name_folded", "pc"."purl", "f"."build_id", "f"."component_id", "f"."closed_at", "f"."closed_because"`)
+			GroupExpr(`"f"."vulnerability_id", "pc"."name_folded", "pc"."name", "pc"."version", "pc"."purl", "f"."build_id", "f"."component_id", "f"."closed_at", "f"."closed_because"`)
 		q, err := narrow(ctx, q, `"f"."closed_at" <= ?`, since)
 		if err != nil {
 			return nil, err
@@ -606,6 +624,7 @@ func (s *Store) presentBefore(ctx context.Context, narrow trendNarrowing, within
 		if err := q.Scan(ctx, &read); err != nil {
 			return nil, fmt.Errorf("read which issues were present before the trend's window: %w", err)
 		}
+		identify(read)
 		read = chosen(read, within)
 		for i := range read {
 			r := &read[i]

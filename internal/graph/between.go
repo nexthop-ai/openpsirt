@@ -36,8 +36,8 @@ func (s *Store) shipsTo(ctx context.Context, subject access.Subject, buildID int
 // added and one only the first holds is removed.
 //
 // The listing of one upload is the same fold over different sides, so a name
-// is compared the same way whichever question asked it: by its folded name,
-// with every version on each side, removals first.
+// is compared the same way whichever question asked it: by its identifying
+// name folded, with every version on each side, removals first.
 func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toID int64,
 	only ChangeKind, limit, offset int) ([]Change, int, error) {
 
@@ -60,6 +60,7 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 		Name      string `bun:"nm"`
 		Display   string `bun:"dsp"`
 		Version   string `bun:"ver"`
+		Purl      string `bun:"purl"`
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "n"`).
@@ -71,6 +72,7 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 		ColumnExpr(NodeFolded("n", "c")+` AS "nm"`).
 		ColumnExpr(NodeName("n", "c")+` AS "dsp"`).
 		ColumnExpr(NodeVersion("n", "c")+` AS "ver"`).
+		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
 		Where(`"n"."build_id" IN (?)`, bun.List([]int64{fromID, toID})).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Scan(ctx, &nodes)
@@ -105,7 +107,8 @@ func (s *Store) Between(ctx context.Context, subject access.Subject, fromID, toI
 		if other, ok := statedAs[node.Component]; ok && !node.Stated {
 			node.Name, node.Display, node.Version = other.name, other.display, other.version
 		}
-		row := fold.add(0, node.Name, node.Display, node.Version)
+		name := IdentifyingFolded(node.Name, node.Display, node.Version, node.Purl)
+		row := fold.add(0, name, node.Display, node.Version)
 		// One build compared with itself stands on both sides of every row,
 		// which is no change anywhere.
 		if node.Build == fromID {

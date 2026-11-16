@@ -19,18 +19,22 @@ import (
 )
 
 // inventory is what a build currently contains, as far as findings care.
+//
+// byName is keyed on each component's identifying name, so a package that
+// carries its version in its name is found under one name at every version.
 type inventory struct {
 	byID       map[int64]graph.Component
 	byIdentity map[string]graph.Component
 	byName     map[string][]graph.Component
 }
 
-// nameOf names a consumer, or nothing where the consumer is the product.
+// nameOf is the identifying name of a consumer, or nothing where the consumer
+// is the product.
 func (i inventory) nameOf(consumerID int64) string {
 	if consumerID == 0 {
 		return ""
 	}
-	return i.byID[consumerID].Name
+	return i.byID[consumerID].IdentifyingName()
 }
 
 // why explains a finding that is no longer reported, and says what it moved to
@@ -51,7 +55,7 @@ func (i inventory) why(gone graph.Component) (Closure, string) {
 	if _, present := i.byID[gone.ID]; present {
 		return Unexplained, ""
 	}
-	for _, now := range i.byName[gone.Name] {
+	for _, now := range i.byName[gone.IdentifyingName()] {
 		switch {
 		case upstreamOf(now) != upstreamOf(gone):
 			return Upgraded, upstreamOf(now)
@@ -62,7 +66,7 @@ func (i inventory) why(gone graph.Component) (Closure, string) {
 	// Something of that name is still here, unchanged in both the version that
 	// ships and the version vulnerabilities are matched against. Nothing about
 	// the component explains the finding going away, so it is not explained.
-	if len(i.byName[gone.Name]) > 0 {
+	if len(i.byName[gone.IdentifyingName()]) > 0 {
 		return Unexplained, ""
 	}
 	return Removed, ""
@@ -172,7 +176,8 @@ func openComponents(ctx context.Context, db bun.IDB, buildID int64, at graph.Mom
 	for _, row := range rows {
 		held.byID[row.ID] = row
 		held.byIdentity[row.Identity] = row
-		held.byName[row.Name] = append(held.byName[row.Name], row)
+		name := row.IdentifyingName()
+		held.byName[name] = append(held.byName[name], row)
 	}
 	// A report names a component by what the scanner was given, hashed as
 	// identity is read now. A component stored before then holds an identity
@@ -214,16 +219,16 @@ func openOccurrences(ctx context.Context, db bun.IDB, buildID int64, at graph.Mo
 }
 
 // sits is one occurrence of a component occupies: what pulls it in, by
-// identifier and by name. A component sitting directly under the build is
-// pulled in by nothing and its consumer has no name, for the reason
+// identifier and by identifying name. A component sitting directly under the
+// build is pulled in by nothing and its consumer has no name, for the reason
 // OccurrenceIdentity gives.
 type sits struct {
 	consumerID int64
 	consumer   string
 }
 
-// sittingsOf reads where one component sits, with the name of each thing
-// that pulls it in.
+// sittingsOf reads where one component sits, with the identifying name of each
+// thing that pulls it in.
 //
 // For a finding somebody records by hand: a person names a component and the
 // occurrences are derived from the build's own graph, exactly as a scan's are.
@@ -247,8 +252,8 @@ func sittingsOf(ctx context.Context, db bun.IDB, buildID, componentID int64) ([]
 	return occurrences, nil
 }
 
-// componentNames names components by identifier, leaving out the one that is
-// no component at all.
+// componentNames is the identifying name of each component by identifier,
+// leaving out the one that is no component at all.
 func componentNames(ctx context.Context, db bun.IDB, ids []int64) (map[int64]string, error) {
 	wanted := make([]int64, 0, len(ids))
 	for _, id := range ids {
@@ -260,20 +265,15 @@ func componentNames(ctx context.Context, db bun.IDB, ids []int64) (map[int64]str
 	if len(wanted) == 0 {
 		return names, nil
 	}
-	var rows []struct {
-		ID   int64  `bun:"id"`
-		Name string `bun:"name"`
-	}
-	if err := db.NewSelect().
-		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`"c"."id" AS "id"`).
-		ColumnExpr(`"c"."name" AS "name"`).
+	var rows []graph.Component
+	if err := db.NewSelect().Model(&rows).
+		Column("id", "name", "version", "purl").
 		Where(`"c"."id" IN (?)`, bun.List(wanted)).
-		Scan(ctx, &rows); err != nil {
+		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read what pulls it in: %w", err)
 	}
 	for _, row := range rows {
-		names[row.ID] = row.Name
+		names[row.ID] = row.IdentifyingName()
 	}
 	return names, nil
 }

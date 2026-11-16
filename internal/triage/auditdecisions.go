@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // SeveralStates is the word for a decision whose matching rows are not all in one
@@ -48,8 +49,8 @@ type AuditedDecision struct {
 	// distinct issues, occurrences and products among them. An issue is counted as
 	// the issue its rows are read as, so rows filed under two names that were
 	// merged are one issue. Components is the
-	// distinct component names at those occurrences, counted through the findings
-	// the reader may read.
+	// distinct identifying names of the components at those occurrences,
+	// counted through the findings the reader may read.
 	Rows, Issues, Occurrences, Products, Components int
 	// States is the matching rows by state.
 	States map[State]int
@@ -182,7 +183,7 @@ func (s *Store) AuditDecisions(ctx context.Context, subject access.Subject, f Fi
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id" AND "st"."product_id" = "de"."product_id"`).
 		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
 		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
-		ColumnExpr(`COUNT(DISTINCT "c"."name_folded") AS "components"`).
+		ColumnExpr(`COUNT(DISTINCT `+graph.IdentifyingExpr("c")+`) AS "components"`).
 		Where(`"de"."decision_id" IN (?)`, bun.List(ids)).
 		Apply(ofKinds(kind.Decisions, "f")).
 		GroupExpr(`"de"."decision_id"`)

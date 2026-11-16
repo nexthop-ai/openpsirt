@@ -28,7 +28,7 @@ open count that barely moves while its critical share rises is getting worse.
 The unit is an issue at a component, the unit of `design-docs/analytics.md`
 § The counting unit, as Home's open figure counts: one issue in three packages
 is three, each counted once however many products, builds and occurrences hold
-it. A component is its name, at any version.
+it. A component is its identifying name, at any version.
 
 | Viewing | Axis | Reason |
 |---|---|---|
@@ -52,7 +52,7 @@ build's first scan is a baseline rather than new work.
 
 | Rule | Reason |
 |---|---|
-| A component is its name, at any version | A version bump carrying an issue is no flow, and one fixing it is one corrected |
+| A component is its identifying name, at any version (`design-docs/data-model-components.md` § The identifying name) | A version bump carrying an issue is no flow, and one fixing it is one corrected, the kernel renamed by its bump included |
 | Present before is asked of the issue at its component | An issue fixed in one package says nothing about another |
 | A bounce is one return and no correction | A broken inventory that drops every component for a scan otherwise counts the whole estate resolved and then new |
 | A sharp upload is the one the alert about a sharply moved inventory names, with its share and floor as set when the trend is read (`design-docs/notifications-alerts.md` § An inventory that moved sharply), worked out from the inventories stored | One rule for one event; nothing new is stored, so a changed threshold re-reads past marks |
@@ -87,7 +87,7 @@ build's first scan is a baseline rather than new work.
 | Rates stay on calendar | Between releases they measure how far apart they were cut |
 | Release over release names a product and needs two releases | Tags across products interleave; one bar reads as broken |
 | A release with nothing open is still a point | Counts attach to the list of every scanned build; absent says never scanned |
-| Release over release counts each issue at a component open against the release, a component by its name | The unit of the calendar trend and of Home's open figure beside it |
+| Release over release counts each issue at a component open against the release, a component by its identifying name | The unit of the calendar trend and of Home's open figure beside it |
 | A corrected issue counts at the severity it held while open, at the end of the step before | |
 
 ## Subtree trends

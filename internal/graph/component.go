@@ -60,6 +60,12 @@ type Component struct {
 	// which wrapping the column in a function did not.
 	NameFolded     string `bun:"name_folded"`
 	UpstreamFolded string `bun:"upstream_folded"`
+	// IdentifyingFolded is the identifying name folded, where the name holds
+	// the component's own version, and empty where it holds none, which reads
+	// as NameFolded. Stored so a count across versions folds in a statement:
+	// worked out per row, the release chart read 1.3 s where it had read
+	// 0.33 s (design-docs/analytics-measurements.md § Counts by identifying name).
+	IdentifyingFolded string `bun:"identifying_folded,nullzero"`
 	// FoldKey groups the binary packages one source package was built at one
 	// version into the thing a person acts on. It groups; it does not
 	// identify — Identity above is what a finding, a decision and a node hang
@@ -616,8 +622,9 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		}
 		missing = append(missing, Component{
 			Identity: identity, Purl: d.Purl, CPE: d.CPE, Name: d.Name, Version: d.Version,
-			NameFolded:   Folded(d.Name),
-			UpstreamName: d.UpstreamName, UpstreamVersion: d.UpstreamVersion,
+			NameFolded:        Folded(d.Name),
+			IdentifyingFolded: StoredIdentifying(d.Name, d.Version, d.Purl),
+			UpstreamName:      d.UpstreamName, UpstreamVersion: d.UpstreamVersion,
 			UpstreamFolded: Folded(d.UpstreamName),
 			FoldKey:        d.FoldKey(),
 			Supplier:       d.Supplier,

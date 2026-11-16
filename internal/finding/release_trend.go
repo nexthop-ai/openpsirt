@@ -12,6 +12,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding/kind"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -98,7 +99,9 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		Open            int       `bun:"open"`
 	}
 	// The issues at components per release, then the band of each, counted
-	// after. A component is its name, so one name at two versions is one. The
+	// after. A component is its identifying name, so one name at two versions
+	// is one, and so are two versions of a package named after its version
+	// (design-docs/data-model-components.md § The identifying name). The
 	// pairs are reduced before the issue or its rating is joined: a release
 	// holds each issue at many occurrences, and joining first reads the
 	// issue's row once per occurrence only to fold the copies away. Inside one
@@ -115,7 +118,7 @@ func (s *Store) ReleaseTrend(ctx context.Context, subject access.Subject, scope 
 		Where(`"st"."kind" = ?`, catalog.Tag).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(kinds, kindArgs...).
-		GroupExpr(`"b"."branch_or_tag_id", "f"."vulnerability_id", "rc"."name_folded"`)
+		GroupExpr(`"b"."branch_or_tag_id", "f"."vulnerability_id", ` + graph.IdentifyingExpr("rc"))
 	issues = scope.Narrow(onlyReadable(issues, subject, products, all))
 
 	inner := s.db.NewSelect().

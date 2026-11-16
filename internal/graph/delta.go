@@ -21,7 +21,9 @@ import (
 // Counted by name rather than by component. A name is what somebody reading a
 // build acts on, and an inventory that carries one name at two versions at
 // once — which a vendored tree does routinely — has not gained and lost a
-// dependency every time one of the two moves.
+// dependency every time one of the two moves. The name is the identifying one
+// (IdentifyingName), so a package renamed by its own upgrade has moved
+// version rather than left and arrived.
 type Delta struct {
 	// Added is names the inventory did not hold before this scan.
 	Added int
@@ -139,15 +141,27 @@ func (s *Store) comparable(ctx context.Context, buildID int64, scanIDs []int64) 
 // movedRow is one name at one of its versions, and whether that version stood
 // on each side of one scan.
 //
-// Name is the folded name, which is what two versions of one dependency have
-// in common, and Display is that name as a producer wrote it, for a reader.
+// Name is the identifying name folded, which is what two versions of one
+// dependency have in common, and Display is the name as a producer wrote it
+// at that version, for a reader.
 type movedRow struct {
-	At      int64  `bun:"at"`
-	Name    string `bun:"nm"`
-	Display string `bun:"dsp"`
-	Version string `bun:"ver"`
-	Had     int    `bun:"had"`
-	Has     int    `bun:"has"`
+	At      int64
+	Name    string
+	Display string
+	Version string
+	Had     int
+	Has     int
+}
+
+// IdentifyingFolded is the key a name is compared under across versions: the
+// name a build stated with its own version taken out, folded. A name holding
+// no version of its own keeps the fold read with it.
+func IdentifyingFolded(folded, display, version, purl string) string {
+	identifying := IdentifyingName(display, version, purl)
+	if identifying == strings.TrimSpace(display) {
+		return folded
+	}
+	return Folded(identifying)
 }
 
 // folder gathers rows into one per name, version and scan, in the order each
@@ -215,9 +229,12 @@ func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64,
 
 	// The names each scan opened or closed a row of.
 	var ends []struct {
-		Opened int64  `bun:"opened"`
-		Closed *int64 `bun:"closed"`
-		Name   string `bun:"nm"`
+		Opened  int64  `bun:"opened"`
+		Closed  *int64 `bun:"closed"`
+		Name    string `bun:"nm"`
+		Display string `bun:"dsp"`
+		Version string `bun:"ver"`
+		Purl    string `bun:"purl"`
 	}
 	err := s.db.NewSelect().
 		TableExpr(`"graph_node" AS "tn"`).
@@ -225,6 +242,9 @@ func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64,
 		ColumnExpr(`"tn"."opened_scan_id" AS "opened"`).
 		ColumnExpr(`"tn"."closed_scan_id" AS "closed"`).
 		ColumnExpr(NodeFolded("tn", "tc")+` AS "nm"`).
+		ColumnExpr(NodeName("tn", "tc")+` AS "dsp"`).
+		ColumnExpr(NodeVersion("tn", "tc")+` AS "ver"`).
+		ColumnExpr(`COALESCE("tc"."purl", '') AS "purl"`).
 		Where(`"tn"."build_id" = ?`, buildID).
 		Where(`"tn"."is_root" = ?`, false).
 		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
@@ -242,9 +262,10 @@ func (s *Store) moved(ctx context.Context, buildID int64, scanIDs []int64,
 		}
 	}
 	for _, end := range ends {
-		touch(end.Name, end.Opened)
+		name := IdentifyingFolded(end.Name, end.Display, end.Version, end.Purl)
+		touch(name, end.Opened)
 		if end.Closed != nil {
-			touch(end.Name, *end.Closed)
+			touch(name, *end.Closed)
 		}
 	}
 	if len(touched) == 0 {
@@ -294,12 +315,14 @@ func (s *Store) standingOnce(ctx context.Context, buildID int64, scanIDs []int64
 }
 
 // standingNode is one row of a build's inventory and the scans bounding it.
+// Name is the identifying name folded, once standing has read it.
 type standingNode struct {
 	Opened  int64  `bun:"opened"`
 	Closed  *int64 `bun:"closed"`
 	Name    string `bun:"nm"`
 	Display string `bun:"dsp"`
 	Version string `bun:"ver"`
+	Purl    string `bun:"purl"`
 }
 
 // standing reads every row of a build's inventory that stood on either side
@@ -329,6 +352,7 @@ func (s *Store) standing(ctx context.Context, buildID int64, scanIDs []int64) ([
 		// here, and either spelling names the same thing on a screen.
 		ColumnExpr(NodeName("n", "c")+` AS "dsp"`).
 		ColumnExpr(NodeVersion("n", "c")+` AS "ver"`).
+		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
 		Where(`"n"."build_id" = ?`, buildID).
 		Where(`"n"."is_root" = ?`, false).
 		Where(`"n"."opened_scan_id" <= ?`, latest).
@@ -337,6 +361,9 @@ func (s *Store) standing(ctx context.Context, buildID int64, scanIDs []int64) ([
 				WhereOr(`"n"."closed_scan_id" >= ?`, earliest)
 		}).
 		Scan(ctx, &nodes)
+	for i, node := range nodes {
+		nodes[i].Name = IdentifyingFolded(node.Name, node.Display, node.Version, node.Purl)
+	}
 	return nodes, err
 }
 
@@ -450,8 +477,11 @@ func paged(changes []Change, only ChangeKind, limit, offset int) ([]Change, int,
 // the same versions on both sides of one of them, or on neither, is no change
 // of that scan's.
 func changed(rows []movedRow) map[int64][]Change {
+	// display is the smallest spelling standing after the scan, and shown is
+	// whether one did; a name gone from the build shows the smallest it had.
 	type sides struct {
 		display       string
+		shown         bool
 		before, after []string
 	}
 	names := map[int64]map[string]*sides{}
@@ -464,17 +494,19 @@ func changed(rows []movedRow) map[int64][]Change {
 		}
 		seen, ok := at[row.Name]
 		if !ok {
-			seen = &sides{display: row.Display}
+			seen = &sides{display: row.Display, shown: row.Has == 1}
 			at[row.Name] = seen
 			order[row.At] = append(order[row.At], row.Name)
-		} else if row.Display < seen.display {
-			// The smallest of the spellings rather than whichever row came
-			// back first. One name at two versions is two rows, a producer
-			// that changed how it capitalizes a dependency gives them
-			// different spellings, and nothing orders the rows — so taken
-			// from the first, the same request answers differently twice and
-			// the link a screen builds from it lands on nothing.
-			seen.display = row.Display
+		} else if (row.Has == 1 && !seen.shown) || (row.Has == 1) == seen.shown && row.Display < seen.display {
+			// The build's own spelling where it still holds the name: a
+			// package renamed by its upgrade is shown by its new name. Among
+			// the spellings on one side, the smallest rather than whichever
+			// row came back first. One name at two versions is two rows, a
+			// producer that changed how it capitalizes a dependency gives
+			// them different spellings, and nothing orders the rows — so
+			// taken from the first, the same request answers differently
+			// twice and the link a screen builds from it lands on nothing.
+			seen.display, seen.shown = row.Display, row.Has == 1
 		}
 		if row.Had == 1 {
 			seen.before = append(seen.before, row.Version)

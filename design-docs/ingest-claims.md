@@ -49,6 +49,7 @@ What each claim does to a finding is `design-docs/findings-closure.md`
 | A tree is a bare name or a generic package identifier, matched alike; the generic one names its package by its last segment, comparing namespace only against a generic component carrying one | A distribution's namespace names the distribution |
 | A tree named with a version is matched on it, against the component's version and what it was built from | |
 | A claim is matched at every occurrence of its component in the product it names | |
+| A name or identifier holding its own release is matched as written, never by its identifying name | A statement about one release says nothing of the next (`design-docs/data-model-components.md` § The identifying name) |
 | A name typed to narrow a build's carried patches is folded and compared exactly | § Name folding |
 
 | The claim's product is | It applies |

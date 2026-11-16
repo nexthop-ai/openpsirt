@@ -3,11 +3,12 @@
 What a component is, how its identity is derived, how a request names one, and
 what is kept when a build describes it twice.
 
-Satisfies REQ-08, REQ-17, REQ-18, REQ-25.
+Satisfies REQ-08, REQ-17, REQ-18, REQ-25, REQ-89.
 
 ## Contents
 
 - [Component identity](#component-identity)
+- [The identifying name](#the-identifying-name)
 - [Upstream name and version](#upstream-name-and-version)
 - [The fold](#the-fold)
 - [Duplicate descriptions](#duplicate-descriptions)
@@ -114,6 +115,38 @@ or `pkg:golang/github.com/sonic-net/`.
 | A prefix with no `pkg:` scheme, or nothing past the type, is refused | |
 | A bare name chooses by name, at any version, in every ecosystem | The answer names each ecosystem the name matched |
 
+## The identifying name
+
+A package whose name holds its own version is continued from one version to the
+next under its name with that version taken out (REQ-89). Debian's kernel is
+`linux-image-6.12.41+deb13-sonic-amd64-unsigned` at `6.12.41-1`, then
+`linux-image-6.12.94+deb13-sonic-amd64-unsigned` at `6.12.94-1`: one package
+moving. The component row's identity is unchanged; it holds the version, so
+each version is a row of its own, and the identifying name is what joins them.
+
+| Rule | Reason |
+|---|---|
+| The version taken out is the release: the version without what its distribution adds, by the ecosystem the package identifier names | The kernel's name holds `6.12.41`, never the revision `-1` |
+| A name with no package identifier, or one naming an ecosystem with no rule below, has its release read as Debian and RPM shape one | SONiC states the common kernel headers at `6.12.41-1` under a `github` identifier naming a commit |
+| Taken out only as a whole token: the end of the name, or a character that is neither a letter nor a digit, on each side | `libssl3` at `3.5.1` and `python3.11` at `3.11.2` hold an interface number, never their version |
+| A dot with a digit past it is no boundary | `libsaibcm_dnx_15.2.0.0.0.0.16.2_amd64.deb` at `0.0.0` holds a placeholder inside another version, and `openssl-1.1.1` at `1.1` part of its own |
+| Taken out only where the release stands exactly, at every place it does | `openjdk-17-jre` at `17.0.12` holds part of it |
+| A name that is the release and nothing more is left as it stands | Nothing else would tell two such packages apart |
+| Where the release stood, a mark no producer writes stands | `linux-image-+deb13-amd64` is another package |
+| Another package's version in a name is left as it stands | `kernel-mft-dkms-modules-6.12.41+deb13-sonic-amd64` at `4.36.0` names the kernel it is built for, and is renamed by it |
+| Read wherever two versions of one package are joined: an occurrence's key, an inventory's changes, a comparison of two builds with its explanations and decisions, a version a build moved off paired with the one it moved to, a finding superseded by the same issue at the new version, a recorded flaw widened to a build shipping another version, the trend, burndown and release chart's issue at a component, a grouped list's open and fixed counts, and the components a decision covers in the audit | `design-docs/data-model-graph.md` § Occurrence identity |
+| Stored on the component row, folded, where the name holds its own release, and empty where it holds none, which reads the folded name. The release chart and the components a decision covers count by it in one statement; every other reader works it out from the row's name, version and package identifier | Worked out per row, those two counts send every issue at a component to be folded, and read several times as long (`design-docs/analytics-measurements.md` § Counts by identifying name) |
+| The name shown is the one the build states, the later where two differ | |
+| A claim matches a name as written, its release included | A statement that one release is unaffected says nothing of the next, which REQ-25 asks again |
+| A typed name, an assignment rule and the fold read the name as stated | They find what a person typed, and are not identity |
+
+| Ecosystem | Release |
+|---|---|
+| Debian, RPM, and any without a rule here | The epoch before `:` and the revision after the last `-` taken off, where the version opens on a digit |
+| Alpine | The revision `-r` and its digits taken off |
+| Python | The local label from `+` taken off |
+| Go, npm, Cargo, Maven, NuGet | The whole version: a hyphen there starts a pre-release, which is part of the release |
+
 ## Upstream name and version
 
 Carried beside identity (REQ-18): a fork's vulnerability lives on the upstream
@@ -188,3 +221,6 @@ product.
 | Two artifacts distinguished only by a qualifier are one component | |
 | An image's version is shown on the component screen alone | |
 | Where an issue sits, and the disclosure queue, link to a finding by name and version alone | Two components of that name and version land on the choice |
+| A package renamed by another package's version is not continued | `kernel-mft-dkms-modules-6.12.41+deb13-sonic-amd64` at `4.36.0` reads as one package removed and another added when the kernel moves; its own version is not in its name, and nothing in the inventory says which version it holds |
+| A release written differently in the name and the version is not taken out | `foo-1_2` at `1.2` keeps its name |
+| A name equal to its release at one version and not the next is renamed by that upgrade | `golang-1.20-go` at `1.20-1` reads `golang-` and a mark and `-go`, and at `1.20.1-1` reads as written, so the move closes its findings as removed and lists a removal and an arrival. One row cannot tell it from a kernel at `6.13-1` that becomes `linux-image-6.13.1+deb14-amd64`, and taking out a release's leading part as well joins `openjdk-17-jre` and `openjdk-21-jre`, which ship side by side |

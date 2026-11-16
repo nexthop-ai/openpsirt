@@ -1349,6 +1349,31 @@ func TestACodeFindingOnAVersionMovedOffPairsByTheNameTheBuildStated(t *testing.T
 	})
 }
 
+func TestACodeFindingOnAVersionMovedOffPairsWithThePackageItsUpgradeRenamed(t *testing.T) {
+	// FRR named after its own version renames itself as it moves: the version
+	// left is replaced by the renamed package, as the inventory's changes
+	// read the move.
+	eachWorld(t, func(t *testing.T, w *world) {
+		w.inventoryWith(t, w.Build.ID, graph.Described{Purl: "pkg:github/frrouting/frr@10.2", Name: "frr-10.2",
+			Version: "10.2"})
+		if _, status := w.send(t, w.Build.ID, time.Now().UTC().Add(-time.Hour),
+			document([]sent{inFRR}, 10)); status != series.Applied {
+			t.Fatalf("status %s; want applied", status)
+		}
+		left := w.frr
+		w.inventoryAt(t, w.Build.ID, "inventory-frr-renamed", time.Now().UTC().Add(-30*time.Minute),
+			graph.Described{Purl: "pkg:generic/sonic@1.0", Name: "sonic", Version: "1.0"},
+			graph.Described{Purl: "pkg:github/frrouting/frr@10.3", Name: "frr-10.3", Version: "10.3"})
+		replaced, err := replacedIn(t.Context(), w.DB.DB, w.Build.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if live := replaced[left]; len(live) != 1 || live[0] != w.frr {
+			t.Errorf("the version the build moved off is replaced by %v, want frr-10.3 (%d)", live, w.frr)
+		}
+	})
+}
+
 func TestACodeFindingOnAVersionMovedOffIsNotCountedAtAnotherEcosystemsPackage(t *testing.T) {
 	// The build stops shipping FRR from GitHub and ships a Python package of
 	// the same name: different software, so nothing replaces the version left.

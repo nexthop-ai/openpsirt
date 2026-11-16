@@ -8,7 +8,7 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 | Document | Covers | Terms |
 |---|---|---|
 | [data-model](design-docs/data-model.md) | What a scan is filed against, and the names it is declared under | vocabulary, product, branch or tag, variant, build, release date, end of support, catalog corrections, retirement, declaration before use, names, engine differences |
-| [data-model-components](design-docs/data-model-components.md) | What a component is and how it is identified | component identity, container images, image versions, component references, package identifier prefixes, purl, upstream name, the fold, duplicate descriptions, qualifiers |
+| [data-model-components](design-docs/data-model-components.md) | What a component is and how it is identified | component identity, container images, image versions, component references, package identifier prefixes, purl, identifying name, version in the name, upstream name, the fold, duplicate descriptions, qualifiers |
 | [data-model-graph](design-docs/data-model-graph.md) | The dependency graph, its history, and occurrences | nodes and edges, root, intervals, inventory delta, comparison of two builds, occurrence identity, path traversal, recursive walks |
 | [data-model-measurements](design-docs/data-model-measurements.md) | Benchmark runs behind the graph rules | inventory delta timings, a year of nightly scans, stated-name lookup timings |
 | [findings](design-docs/findings.md) | What a finding is, the row a person reads, work across builds | fan-out, occurrence, fold, decision state on a row, partly decided, variants, spread, incomplete upgrade, total above a list |
@@ -98,7 +98,7 @@ names. Each document lists the decisions it satisfies; `REQUIREMENTS.md` says wh
 | [analytics-releases](design-docs/analytics-releases.md) | What changed between builds, and readiness to release | build comparison, release note, release readiness, known issues at release, inheritance preview, one issue across the estate |
 | [analytics-controls](design-docs/analytics-controls.md) | What an auditor reads | disposition register, exception report, standing corrections, approval quality, dismissals, audit log, last uploads |
 | [analytics-exports](design-docs/analytics-exports.md) | Files and what each states | CSV, JSON, streaming, incomplete marker, stated facts, code findings in a file |
-| [analytics-measurements](design-docs/analytics-measurements.md) | Benchmark runs behind the analytics rules | early grouping, grouping before the join, planned upgrades page cost |
+| [analytics-measurements](design-docs/analytics-measurements.md) | Benchmark runs behind the analytics rules | early grouping, grouping before the join, planned upgrades page cost, counts by identifying name, release chart, decision record |
 | [notifications](design-docs/notifications.md) | What a notification is, its triggers, and who may read it | events, conditions, triggers, in-application area, links, mentions, dates, notification list, ownership |
 | [notifications-alerts](design-docs/notifications-alerts.md) | Operational alerts about the deployment and its data | new criticals, sharp inventory move, analyzer alerts, reports that must come back empty, approval pairs, stale data, absent holders |
 | [notifications-work](design-docs/notifications-work.md) | Notices about work | decision outcomes, lapse message, merge message, code finding notices, staleness, report audience, digest, embargo notices, response windows |

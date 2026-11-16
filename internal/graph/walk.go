@@ -135,11 +135,11 @@ const unplacedSeeds = `"rn"."build_id" = ? AND "rn"."closed_scan_id" IS NULL AND
 			  AND ` + orphaned
 
 // Replaced is the components a build held and holds no longer, each with the
-// live components of the build carrying its name in its ecosystem, as the build
-// stated each. A finding keeps the component it opened on, so a rescan at a new
-// version replaces the component and not the finding, and what was found on the
-// old version is counted wherever the present one sits. A component no live one
-// names is left out.
+// live components of the build carrying its identifying name in its
+// ecosystem, as the build stated each. A finding keeps the component it opened
+// on, so a rescan at a new version replaces the component and not the
+// finding, and what was found on the old version is counted wherever the
+// present one sits. A component no live one names is left out.
 //
 // The ecosystem is the type its package identifier names: an npm package and a
 // Python one of one name are different software. Where either side names no
@@ -154,6 +154,8 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 	type named struct {
 		Component int64  `bun:"component_id"`
 		Name      string `bun:"name_folded"`
+		Display   string `bun:"name"`
+		Version   string `bun:"version"`
 		Opened    int64  `bun:"opened_scan_id"`
 		Node      int64  `bun:"id"`
 		Purl      string `bun:"purl"`
@@ -163,6 +165,7 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 		q := db.NewSelect().TableExpr(`"graph_node" AS "n"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "n"."component_id"`).
 			ColumnExpr(`"n"."component_id", `+NodeFolded("n", "c")+` AS "name_folded", "c"."purl"`).
+			ColumnExpr(NodeName("n", "c")+` AS "name", `+NodeVersion("n", "c")+` AS "version"`).
 			Where(`"n"."build_id" = ?`, buildID).
 			Distinct()
 		if live {
@@ -177,6 +180,9 @@ func Replaced(ctx context.Context, db bun.IDB, buildID int64) (map[int64][]int64
 		}
 		if err := q.Scan(ctx, &rows); err != nil {
 			return nil, err
+		}
+		for i, row := range rows {
+			rows[i].Name = IdentifyingFolded(row.Name, row.Display, row.Version, row.Purl)
 		}
 		return rows, nil
 	}

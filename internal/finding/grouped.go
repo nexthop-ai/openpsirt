@@ -218,6 +218,9 @@ func (s *Store) Grouped(ctx context.Context, subject access.Subject, buildID int
 		ComponentID     int64  `bun:"component_id"`
 		VulnerabilityID int64  `bun:"vulnerability_id"`
 		Name            string `bun:"name_folded"`
+		Display         string `bun:"name"`
+		Version         string `bun:"version"`
+		Purl            string `bun:"purl"`
 		Open            int    `bun:"open"`
 		Resolved        int    `bun:"resolved"`
 		Band            string `bun:"band"`
@@ -244,12 +247,17 @@ func (s *Store) Grouped(ctx context.Context, subject access.Subject, buildID int
 			Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "g"."vulnerability_id"`).
 			Join(`JOIN "component" AS "c" ON "c"."id" = "g"."component_id"`).
 			Join(rating.Here, productID).
-			ColumnExpr(`"g"."component_id", "g"."vulnerability_id", "c"."name_folded", "g"."open", "g"."resolved"`).
+			ColumnExpr(`"g"."component_id", "g"."vulnerability_id", "c"."name_folded", "c"."name", "c"."version"`).
+			ColumnExpr(`COALESCE("c"."purl", '') AS "purl", "g"."open", "g"."resolved"`).
 			ColumnExpr(rating.BandExpr+` AS "band"`).
 			Scan(ctx, &read); err != nil {
 			return nil, fmt.Errorf("read what is open and fixed in each group: %w", err)
 		}
 		for _, r := range read {
+			// By the identifying name, so a version the build moved off and
+			// the one it moved to are one package even where the move
+			// renamed it.
+			r.Name = graph.IdentifyingFolded(r.Name, r.Display, r.Version, r.Purl)
 			on[r.ComponentID] = append(on[r.ComponentID], r)
 		}
 	}
