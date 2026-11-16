@@ -36,14 +36,12 @@ func servingBeside(t *testing.T, db *database.DB) *database.DB {
 // one it served, and the version moved once it is let go. An upgrade with
 // nothing to apply never holds it to change the schema.
 //
-// Until the upgrade holds the lease, a look at the v0.12.0 schema fails,
-// since the record of schema changes is not there yet; a serving instance of
-// this build never looks at it.
+// The upgrade is the latest release's, run again over the schema it made
+// with its version unrecorded, as a process ended between the two leaves it.
 func TestAnUpgradeHoldsTheLeaseToChangeTheSchemaFromBeforeItsFirstStatement(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
-		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0120)
+		unrecordLatest(t, db)
 		observer := migrate.NewObserver(servingBeside(t, db))
 		expected, err := migrations.Expected()
 		if err != nil {
@@ -122,6 +120,24 @@ func TestAnUpgradeHoldsTheLeaseToChangeTheSchemaFromBeforeItsFirstStatement(t *t
 			time.Sleep(20 * time.Millisecond)
 		}
 	})
+}
+
+// unrecordLatest takes away the record of the latest version applied to the
+// latest schema the harness hands over, so the latest release's upgrade is
+// outstanding over the schema it made.
+func unrecordLatest(t *testing.T, db *database.DB) {
+	t.Helper()
+	expected, err := migrations.Expected()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(t.Context(), `DELETE FROM "`+migrate.VersionTable+`" WHERE "version_id" = ?`,
+		expected); err != nil {
+		t.Fatal(err)
+	}
+	if applied, err := migrate.Version(t.Context(), db); err != nil || applied != expected-1 {
+		t.Fatalf("with the latest version's record taken away the schema is at %d (%v), not %d", applied, err, expected-1)
+	}
 }
 
 // A record of an upgrade whose version the schema has reached pauses nobody,

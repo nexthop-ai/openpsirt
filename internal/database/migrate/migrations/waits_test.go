@@ -28,8 +28,11 @@ const waiting = "a migration is waiting for a table something else holds"
 // table waits at most one attempt while it does. On SQLite the holder is a writer, the busy
 // timeout bounds each attempt, and a reader goes through beside the writer.
 //
-// The holder takes the table during the notice, once the migration holds its
-// lease: on SQLite a writer holding the file holds the claim back too.
+// On a server the holder takes the table before the upgrade starts, as a
+// paged export running at the time holds it. On SQLite a writer holding the
+// file holds back the claim of the lease too, so there the holder takes the
+// table once the upgrade holds its lease, during a notice long enough to take
+// it.
 func TestAMigrationWaitsOutAHolderWithoutStallingOtherSessions(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
@@ -43,17 +46,28 @@ func TestAMigrationWaitsOutAHolderWithoutStallingOtherSessions(t *testing.T) {
 			shortBusy(t, db)
 		}
 
+		sqlite := db.Server.Engine == database.SQLite
+		var holder *sql.Tx
+		var requests *sql.DB
+		var holderID string
+		var notice time.Duration
+		if sqlite {
+			notice = 3 * time.Second
+		} else {
+			holder, requests, holderID = holdTable(t, db)
+		}
 		log := &lockedBuffer{}
 		migrating := migrations.ShortLockWaits(ctx)
 		done, finished := make(chan error, 1), make(chan struct{})
 		go func() {
 			defer close(finished)
-			done <- migrate.UpTo(migrating, db, slog.New(slog.NewTextHandler(log, nil)), v0130, 3*time.Second)
+			done <- migrate.UpTo(migrating, db, slog.New(slog.NewTextHandler(log, nil)), v0130, notice)
 		}()
 		t.Cleanup(func() { <-finished })
-		heldToChange(t, db)
-
-		holder, requests, holderID := holdTable(t, db)
+		if sqlite {
+			heldToChange(t, db)
+			holder, requests, holderID = holdTable(t, db)
+		}
 		// A test that fails part way lets the holder go before it waits for
 		// the migration to end.
 		t.Cleanup(func() { _ = holder.Rollback() })
