@@ -47,9 +47,20 @@ const Attempts = 5
 // transaction was rolled back. Code that guards each statement and trusts the
 // commit sees none of this: the statements all succeeded.
 func InTransaction(ctx context.Context, db *bun.DB, fn func(context.Context, bun.Tx) error) error {
+	return Retry(ctx, func() error { return db.RunInTx(ctx, nil, fn) })
+}
+
+// Retry runs fn and runs it again, up to Attempts times in all, while it
+// fails for a reason that going again can fix. A failure of any other kind,
+// or the context ending, is answered at once with what fn returned.
+//
+// The one retry loop: a transaction goes through it by InTransaction, and a
+// statement that cannot run inside one, such as a table definition MySQL
+// commits on its own, calls it directly.
+func Retry(ctx context.Context, fn func() error) error {
 	var err error
 	for attempt := 1; attempt <= Attempts; attempt++ {
-		err = db.RunInTx(ctx, nil, fn)
+		err = fn()
 		if err == nil {
 			return nil
 		}
@@ -60,19 +71,16 @@ func InTransaction(ctx context.Context, db *bun.DB, fn func(context.Context, bun
 			return err
 		}
 		// Nothing follows the last attempt, so there is nothing to back off
-		// before. Sleeping here held the handler goroutine and its pooled
-		// connection for a further backoff interval before returning an error
-		// already decided — under exactly the sustained contention this path
-		// exists to report.
+		// before: a sleep there holds the caller and its pooled connection
+		// for an interval before an error already decided, under exactly the
+		// sustained contention this path exists to report.
 		if attempt == Attempts {
 			break
 		}
-		// Backing off with a little randomness, so two writers that collided
-		// do not line up and collide again on the same schedule.
 		select {
 		case <-ctx.Done():
 			return err
-		case <-time.After(Backoff(attempt)):
+		case <-time.After(backoff(attempt)):
 		}
 	}
 	return fmt.Errorf("gave up after %d attempts: %w", Attempts, err)
@@ -163,13 +171,13 @@ func WorthRetrying(err error) bool {
 	return false
 }
 
-// Backoff is how long to wait before trying again.
+// backoff is how long to wait before trying again.
 //
 // Growing with each attempt, and jittered, so that two writers which collided
 // do not line up and collide again on the same schedule. The randomness is for
 // spreading load and decides nothing, which is why an ordinary generator is
 // right here — a cryptographic one would be slower and no better at it.
-func Backoff(attempt int) time.Duration {
+func backoff(attempt int) time.Duration {
 	step := time.Duration(attempt) * 10 * time.Millisecond
 	//nolint:gosec // G404: this spreads retries apart; nothing is kept secret by it.
 	return step + time.Duration(rand.N(int64(step)+1))

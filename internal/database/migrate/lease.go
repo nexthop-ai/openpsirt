@@ -179,9 +179,8 @@ func leaseTable(ctx context.Context, db *database.DB) error {
 // table is still not there once it is refused. MySQL answers one of two
 // creates racing on it as a deadlock, which is asked again, as any write is.
 func makeLeaseTable(ctx context.Context, db *database.DB) error {
-	var err error
-	for attempt := 1; attempt <= database.Attempts; attempt++ {
-		err = leaseCreate(ctx, db, `CREATE TABLE IF NOT EXISTS "`+LeaseTable+`" (
+	err := database.Retry(ctx, func() error {
+		return leaseCreate(ctx, db, `CREATE TABLE IF NOT EXISTS "`+LeaseTable+`" (
 			"name"       VARCHAR(32) NOT NULL,
 			"token"      VARCHAR(64) NOT NULL,
 			"holding"    VARCHAR(16) NOT NULL,
@@ -189,15 +188,7 @@ func makeLeaseTable(ctx context.Context, db *database.DB) error {
 			"expires_at" BIGINT NOT NULL,
 			PRIMARY KEY ("name")
 		)`)
-		if !database.WorthRetrying(err) || attempt == database.Attempts {
-			break
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(database.Backoff(attempt)):
-		}
-	}
+	})
 	if err != nil {
 		if there, again := tableExists(ctx, db, LeaseTable); again == nil && there {
 			return nil

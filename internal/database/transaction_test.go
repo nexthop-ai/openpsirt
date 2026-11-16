@@ -200,6 +200,46 @@ func TestContentionThatNeverClearsIsReportedRatherThanRetriedForever(t *testing.
 	})
 }
 
+// A statement retried outside a transaction goes again by the same rule a
+// transaction does: contention until it clears, a mistake once, and
+// contention that never clears reported after every attempt with what it
+// gave up on.
+func TestAStatementOutsideATransactionGoesAgainByTheTransactionRule(t *testing.T) {
+	deadlock := &mysql.MySQLError{Number: 1213, Message: "Deadlock found when trying to get lock"}
+	mistake := errors.New("a column that does not exist")
+	for _, each := range []struct {
+		name     string
+		fails    int
+		with     error
+		attempts int
+		wants    error
+	}{
+		{"contention that clears", 2, deadlock, 3, nil},
+		{"a mistake", 1, mistake, 1, mistake},
+		{"contention that never clears", database.Attempts, deadlock, database.Attempts, deadlock},
+	} {
+		t.Run(each.name, func(t *testing.T) {
+			attempts := 0
+			err := database.Retry(t.Context(), func() error {
+				attempts++
+				if attempts <= each.fails {
+					return each.with
+				}
+				return nil
+			})
+			if attempts != each.attempts {
+				t.Errorf("ran %d times, want %d", attempts, each.attempts)
+			}
+			if each.wants == nil && err != nil || each.wants != nil && !errors.Is(err, each.wants) {
+				t.Errorf("answered %v, want %v", err, each.wants)
+			}
+			if each.attempts == database.Attempts && !strings.Contains(fmt.Sprint(err), "gave up after") {
+				t.Errorf("answered %v, which does not say it gave up", err)
+			}
+		})
+	}
+}
+
 func TestGivingUpDoesNotWaitToBackOffBeforeNothing(t *testing.T) {
 	// A transaction that has run out of attempts returns at once. Sleeping a
 	// final interval first holds the handler goroutine and its pooled
