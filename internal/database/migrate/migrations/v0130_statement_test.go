@@ -63,11 +63,11 @@ func seedStatementV0120(t *testing.T, db *database.DB) statementsV0120 {
 	return out
 }
 
-// A v0.12.0 database's received statements gain when each was made and what
-// overtook it, empty on every statement already held, and of two advisories
-// from one publisher about one subject the older is set aside by the newer,
-// whether the upgrade ran whole or a start of it stopped after the first
-// column.
+// A v0.12.0 database's received statements gain when each was made, what
+// overtook it and the remediation category, empty on every statement already
+// held, and of two advisories from one publisher about one subject the older
+// is set aside by the newer, whether the upgrade ran whole or a start of it
+// stopped after the first column.
 func statementPartV0130() partV0130 {
 	return partV0130{
 		name: "AStatementHeldBeforeTheUpgradeIsTimedAndTheOlderSetAside",
@@ -90,14 +90,19 @@ func statementPartV0130() partV0130 {
 				var older struct {
 					Superseded  *time.Time `bun:"superseded_at"`
 					OvertakenBy *int64     `bun:"overtaken_by"`
+					Remediation *string    `bun:"remediation"`
 				}
-				if err := db.DB.NewRaw(`SELECT "superseded_at", "overtaken_by" FROM "received_vex_statement"
+				if err := db.DB.NewRaw(`SELECT "superseded_at", "overtaken_by", "remediation" FROM "received_vex_statement"
 					WHERE "id" = ?`, seeded.older).Scan(ctx, &older); err != nil {
 					t.Fatal(err)
 				}
 				if older.Superseded == nil || older.OvertakenBy == nil || *older.OvertakenBy != seeded.newer {
 					t.Errorf("the older of two advisories about one subject is set aside %v by %v, want by the newer %d",
 						older.Superseded, older.OvertakenBy, seeded.newer)
+				}
+				if older.Remediation != nil {
+					t.Errorf("an affected statement held before the upgrade states remediation %q, want none",
+						*older.Remediation)
 				}
 				var standing int
 				if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "received_vex_statement"

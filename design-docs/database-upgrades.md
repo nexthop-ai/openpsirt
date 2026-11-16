@@ -247,7 +247,7 @@ brings together, one lapses.
 | `decision_occurrence` | Who withdrew the row, null on every row v0.12.0 holds, and its key to the person (`design-docs/triage-approval.md` § Approval) |
 | `graph_node` | The name and the version the build stated, the name's fold and the stated source's fold, all empty, and an index of each build's nodes by each fold (`design-docs/data-model-graph.md` § The dependency graph) |
 | `person` | When a sign-in in group-bound mode last judged what the person holds, empty, so each person's next such sign-in judges it once (`design-docs/access-assignment.md`) |
-| `received_vex_statement` | When each statement was made and which newer statement of its publisher set it aside, both empty, so a statement held before the upgrade is ordered by its upload (`design-docs/ingest-claims.md` § Administrator-supplied VEX); the older of two standing about one subject, such as two supplier advisories, set aside as overtaken by the newer |
+| `received_vex_statement` | When each statement was made, which newer statement of its publisher set it aside, and its remediation category, all empty, so a statement held before the upgrade is ordered by its upload (`design-docs/ingest-claims.md` § Administrator-supplied VEX) and offers no outcome where it says affected (`design-docs/triage-evidence.md` § Statement display and filters); the older of two standing about one subject, such as two supplier advisories, set aside as overtaken by the newer |
 
 | Table | Created |
 |---|---|
@@ -284,7 +284,7 @@ brings together, one lapses.
 | The same stopped after the column, or after the rule holding the mark, on MySQL and MariaDB | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database holding a node | Upgraded, the table built as declared, the node holding no name or version |
 | The same stopped after the name, or after every node column and before the index, on MySQL and MariaDB | Upgraded the same, nothing already made replaced |
-| A v0.12.0 database holding a received statement, and two advisories from one publisher about one subject | Upgraded, the table built as declared, the statement holding no time and nothing that overtook it, the older advisory's set aside as overtaken by the newer's |
+| A v0.12.0 database holding a received statement, and two advisories from one publisher about one subject | Upgraded, the table built as declared, the statement holding no time and nothing that overtook it, the affected advisory no remediation, the older advisory's set aside as overtaken by the newer's |
 | The same stopped after the time, on MySQL and MariaDB | Upgraded the same, nothing already made replaced |
 | A v0.12.0 database stopped after the withdrawer's column, on MySQL and MariaDB | Upgraded the same, the key added and the column kept |
 | A v0.12.0 database holding identifiers with a credential in an address, escaped and plain, a token in an address's query, slashes after the scheme, and one already clean, on a component, a node, an image version and a scan's root identifier | Each rewritten as v0.13.0 stores it, the other qualifiers kept, the clean one unchanged |

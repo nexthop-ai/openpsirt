@@ -234,6 +234,116 @@ func TestAnAdvisorysPrefillIsSomethingAPersonStillHasToRecord(t *testing.T) {
 	})
 }
 
+func TestAnAdvisoryOffersTheOutcomeItsRemediationNames(t *testing.T) {
+	// Only the remediation category tells a fix put off from one refused:
+	// none_available offers a deferral and no_fix_planned a will-not-fix, and
+	// a remediation saying what a holder can do, or none, offers nothing.
+	for _, each := range []struct{ category, offers string }{
+		{"none_available", "deferred"},
+		{"no_fix_planned", "wont-fix"},
+		{"vendor_fix", ""},
+		{"workaround", ""},
+		{"mitigation", ""},
+		{"", ""},
+	} {
+		name := each.category
+		if name == "" {
+			name = "none"
+		}
+		t.Run(name, func(t *testing.T) {
+			httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+				r.Scanned(t)
+				if got := r.Advised(t, "admin", "exsa.json", httpapitest.RemediatedAdvisory(
+					"EXSA-2026:1001", "known_affected", "3.7.0", each.category)); got.Code != http.StatusCreated {
+					t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+				}
+				said := r.WhatPublishersSay(t).Said
+				if len(said) != 1 {
+					t.Fatalf("the finding shows %d statements", len(said))
+				}
+				if said[0].Offers != each.offers {
+					t.Errorf("remediation %q offers %q, want %q", each.category, said[0].Offers, each.offers)
+				}
+			})
+		})
+	}
+}
+
+func TestARevisionChangingOnlyTheRemediationChangesTheOffer(t *testing.T) {
+	// The category decides only what is offered, so a revision changing it
+	// alone repeats the statement: the same row offers the new outcome, and
+	// nothing citing it reads as withdrawn.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		var first int64
+		for _, each := range []struct{ category, offers string }{
+			{"none_available", "deferred"},
+			{"no_fix_planned", "wont-fix"},
+			{"vendor_fix", ""},
+		} {
+			if got := r.Advised(t, "admin", "exsa.json", httpapitest.RemediatedAdvisory(
+				"EXSA-2026:1001", "known_affected", "3.7.0", each.category)); got.Code != http.StatusCreated {
+				t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+			}
+			var said struct {
+				Said []struct {
+					ID     int64  `json:"id"`
+					Offers string `json:"offers"`
+				} `json:"said"`
+			}
+			httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+				"/findings/CVE-2026-9999/components/libnl-3-200", &said)
+			if len(said.Said) != 1 || said.Said[0].Offers != each.offers {
+				t.Fatalf("after the revision with remediation %q the finding shows %+v, want one offering %q",
+					each.category, said.Said, each.offers)
+			}
+			if first == 0 {
+				first = said.Said[0].ID
+			} else if said.Said[0].ID != first {
+				t.Errorf("the revision with remediation %q replaced statement %d with %d",
+					each.category, first, said.Said[0].ID)
+			}
+		}
+	})
+}
+
+func TestADeferralStartedFromAnAdvisoryStillNeedsADate(t *testing.T) {
+	// The advisory offers the outcome and never the date, which is the
+	// person's to choose, so a deferral started from one and sent without a
+	// date is refused like any other.
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		occurrence := r.Scanned(t)
+		if got := r.Advised(t, "admin", "exsa.json", httpapitest.RemediatedAdvisory(
+			"EXSA-2026:1001", "known_affected", "3.7.0", "none_available")); got.Code != http.StatusCreated {
+			t.Fatalf("uploading answered %d: %s", got.Code, got.Body.String())
+		}
+		var said struct {
+			Said []struct {
+				ID     int64  `json:"id"`
+				Offers string `json:"offers"`
+			} `json:"said"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/branches-and-tags/master/variants/broadcom"+
+			"/findings/CVE-2026-9999/components/libnl-3-200", &said)
+		if len(said.Said) != 1 || said.Said[0].Offers != "deferred" {
+			t.Fatalf("the finding offers %+v", said.Said)
+		}
+		path := "/v1/products/mine/branches-and-tags/master/variants/broadcom" +
+			"/findings/CVE-2026-9999/occurrences/" + occurrence + "/decision"
+		cited := `"reasoning":"The supplier has no fix yet.","from_statement":` +
+			httpapitest.Itoa(said.Said[0].ID)
+		undated := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
+			`{"outcome":"deferred",`+cited+`}`)
+		httpapitest.RefusedWith(t, undated, http.StatusUnprocessableEntity)
+		until := time.Now().UTC().AddDate(0, 0, 7).Format(time.DateOnly)
+		dated := httpapitest.AsPerson(t, r, "triager", http.MethodPost, path,
+			`{"outcome":"deferred","deferred_until":"`+until+`",`+cited+`}`)
+		if dated.Code != http.StatusCreated {
+			t.Errorf("a dated deferral answered %d: %s", dated.Code, dated.Body.String())
+		}
+	})
+}
+
 func TestANameLongerThanTheRecordIsRefusedRatherThanShortened(t *testing.T) {
 	// Both names are part of the key a later upload replaces on, and both are
 	// stored in a column of a fixed width. Shortened, two advisories agreeing

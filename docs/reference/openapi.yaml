@@ -13049,6 +13049,7 @@ components:
           description: The outcome this offers as a prefill, where it was made about the version shipped here. Never applied by itself
           enum:
             - not-applicable
+            - deferred
             - wont-fix
             - already-fixed
           type: string

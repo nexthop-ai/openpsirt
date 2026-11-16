@@ -94,18 +94,17 @@ func TestAVexStatementIsEvidenceAndNeverADecision(t *testing.T) {
 	})
 }
 
-func TestWillNotFixNeverOffersADismissal(t *testing.T) {
-	// Debian's no-dsa, Ubuntu's ignored and Red Hat's will-not-fix all
-	// mean *affected, and judged minor*. Prefilling a dismissal from one
-	// would record a claim the publisher never made, with their name on
-	// it.
+func TestAnOpenVEXStatementOffersWhatItsStatusSays(t *testing.T) {
+	// OpenVEX names no remediation category, so an affected statement offers
+	// nothing: its action statement is prose, and a dismissal from one would
+	// record a claim the publisher never made, with their name on it.
 	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
 		for _, each := range []struct {
 			status string
 			offers string
 		}{
-			{"affected", "wont-fix"},
+			{"affected", ""},
 			{"not_affected", "not-applicable"},
 			{"fixed", "already-fixed"},
 			{"under_investigation", ""},

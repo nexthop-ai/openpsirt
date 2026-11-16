@@ -77,6 +77,12 @@ type Statement struct {
 	Justification string `bun:"justification"`
 	StatementID   *int64 `bun:"statement_id"`
 	Statement     string `bun:"statement,scanonly"`
+	// Remediation is the CSAF remediation category the statement gave the
+	// affected products it names, such as none_available or no_fix_planned:
+	// what decides the outcome an affected statement offers. Empty where the
+	// document gave none, in every OpenVEX statement, and in every statement
+	// v0.12.0 stored.
+	Remediation string `bun:"remediation,nullzero"`
 	// Source is which kind of document carried it and Identifier the name the
 	// publisher gave that document, where it carries one. Together they are
 	// what a later upload supersedes on, and Identifier is what a reader
@@ -126,6 +132,7 @@ func StatementOf(claim sbom.Suppression, at sbom.Target) Statement {
 		Justification: claim.Justification,
 		Statement:     claim.Statement,
 		SaidAt:        claim.SaidAt,
+		Remediation:   at.Remediation,
 	}
 	switch {
 	case at.Within != nil:
@@ -234,28 +241,49 @@ func BuildSayings() []string {
 
 // OutcomesOffered are the outcomes a publisher's statement can prefill.
 //
-// Derived from the mapping rather than listed beside it: a status that starts
+// Derived from the mapping rather than listed beside it, over every status
+// and every remediation category the mapping reads: a statement that starts
 // offering something, or stops, changes this without anybody remembering to
 // edit a second list.
 func OutcomesOffered() []string {
 	var offered []string
 	for _, status := range VexStatuses() {
-		if outcome, offers := (Statement{Status: status}).Prefills(); offers {
-			offered = append(offered, outcome)
+		for _, remediation := range append([]remediationOffer{{}}, affectedOffers...) {
+			outcome, offers := (Statement{Status: status, Remediation: remediation.category}).Prefills()
+			if offers && !slices.Contains(offered, outcome) {
+				offered = append(offered, outcome)
+			}
 		}
 	}
 	return offered
 }
 
+// remediationOffer is the outcome an affected statement offers where a CSAF
+// remediation category names its product.
+type remediationOffer struct{ category, outcome string }
+
+// affectedOffers are the categories an affected statement offers an outcome
+// for, in the order the outcomes are listed.
+var affectedOffers = []remediationOffer{
+	{"none_available", OutcomeDeferred},
+	{"no_fix_planned", OutcomeWontFix},
+}
+
 // Prefills is the outcome a statement offers, and whether it offers one.
 //
-// A distribution saying it will not fix something is not the distribution
-// saying it is not affected. Debian's `no-dsa`, Ubuntu's `ignored`
-// and Red Hat's will-not-fix all mean *affected, and judged minor* — so they
-// offer a will-not-fix, never a dismissal. Prefilling `not-applicable` from one
-// would record a claim the publisher never made, with their name on it, which
-// is the one way a third party's evidence turns into a lie rather than into
-// help.
+// | Statement | Offers |
+// |---|---|
+// | Not affected | Not applicable, with the publisher's justification |
+// | Fixed | Already fixed |
+// | Affected, remediation none_available | Deferred, with no date: the date is the person's |
+// | Affected, remediation no_fix_planned | Will not fix |
+// | Affected, any other remediation or none, OpenVEX's included | Nothing |
+// | Under investigation | Nothing |
+//
+// An affected statement is never a dismissal: prefilling not applicable from
+// one would record a claim the publisher never made, with their name on it.
+// Only the remediation category tells a fix put off from one refused, and
+// prose such as an OpenVEX action statement is not read for it.
 func (s Statement) Prefills() (outcome string, offers bool) {
 	switch s.Status {
 	case string(sbom.NotAffected):
@@ -264,9 +292,12 @@ func (s Statement) Prefills() (outcome string, offers bool) {
 		// ours uses.
 		return OutcomeNotApplicable, true
 	case string(sbom.Affected):
-		// They say it applies and they are not fixing it here, which is a
-		// will-not-fix in our vocabulary and never a dismissal.
-		return OutcomeWontFix, true
+		for _, each := range affectedOffers {
+			if each.category == s.Remediation && s.Remediation != "" {
+				return each.outcome, true
+			}
+		}
+		return "", false
 	case string(sbom.AlreadyFixed):
 		return OutcomeAlreadyFixed, true
 	}
@@ -416,7 +447,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		var standing []Statement
 		err := tx.NewSelect().Model(&standing).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "placement", "status", "justification", "said_at").
+				"within_about", "placement", "status", "justification", "remediation", "said_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
@@ -448,7 +479,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		var held []Statement
 		heldBy := tx.NewSelect().Model(&held).
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
-				"within_about", "placement", "status", "justification", "said_at", "superseded_at").
+				"within_about", "placement", "status", "justification", "remediation", "said_at", "superseded_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
@@ -487,6 +518,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 					Set(`"within" = ?`, nullable(placed.Within)).
 					Set(`"within_about" = ?`, nullable(placed.WithinAbout)).
 					Set(`"placement" = ?`, nullable(placed.Placement)).
+					Set(`"remediation" = ?`, nullable(placed.remediation)).
 					Set(`"said_at" = ?`, placed.SaidAt()).
 					Set(`"document" = ?`, from.Document).
 					Set(`"digest" = ?`, from.Digest).
@@ -772,7 +804,10 @@ const (
 )
 
 // claimOf is what a statement claims, leaving out where it places its
-// supplier's product.
+// supplier's product and its remediation category. The category decides only
+// what is offered, so a reading changing it alone repeats the claim and
+// rewrites the category in place, as a statement stored before categories
+// were kept takes its own on the next reading.
 func claimOf(one Statement) string {
 	return strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
 		one.About, one.Status, one.Justification, one.Statement}, "\x00")
@@ -787,6 +822,8 @@ func placementOf(one Statement) string {
 // repeated claim takes from the document repeating it.
 type placed struct {
 	WithinPurl, Within, WithinAbout, Placement string
+	// remediation is the category the repeating document gives the claim.
+	remediation string
 	// saidAt is when the document says the claim was made, in microseconds
 	// since the epoch, where stated says it does: values, so the claims of
 	// one moment share one write.
@@ -835,7 +872,7 @@ func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statem
 
 	repeated := map[placed][]int64{}
 	keep := func(one Statement, row Statement) {
-		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement, 0, false}
+		at := placed{one.WithinPurl, one.Within, one.WithinAbout, one.Placement, one.Remediation, 0, false}
 		if one.SaidAt != nil {
 			at.saidAt, at.stated = one.SaidAt.UnixMicro(), true
 		}
@@ -898,7 +935,7 @@ func sameReading(held, said []Statement) bool {
 			}
 			out[i] = strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
 				one.About, one.WithinPurl, one.Within, one.WithinAbout, one.Placement, one.Status,
-				one.Justification, one.Statement, said}, "\x00")
+				one.Justification, one.Remediation, one.Statement, said}, "\x00")
 		}
 		slices.Sort(out)
 		return out

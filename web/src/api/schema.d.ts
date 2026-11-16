@@ -15384,7 +15384,7 @@ export interface components {
              * @description The outcome this offers as a prefill, where it was made about the version shipped here. Never applied by itself
              * @enum {string}
              */
-            offers?: "not-applicable" | "wont-fix" | "already-fixed";
+            offers?: "not-applicable" | "deferred" | "wont-fix" | "already-fixed";
             publisher: string;
             /**
              * @description Which kind of document carried it

@@ -557,3 +557,42 @@ func TestTheClaimBoundCountsTheClaimsACSAFDocumentReturns(t *testing.T) {
 		})
 	}
 }
+
+func TestEachAffectedProductKeepsTheRemediationNamingIt(t *testing.T) {
+	// The category decides the outcome an affected claim offers, so it is kept
+	// per product: the first remediation naming a product, by identifier or by
+	// group, is its own, a remediation naming no product is nobody's, and a
+	// category the format does not define is not kept.
+	tree, _ := csafProducts(5, `[{"group_id": "G", "product_ids": ["P3"]}]`)
+	got, err := sbom.ReadSuppressions(strings.NewReader(csafDocument("csaf_vex", tree,
+		`[{"cve": "CVE-2026-1",
+		   "product_status": {"known_affected": ["P0", "P1", "P2", "P3"], "known_not_affected": ["P4"]},
+		   "flags": [{"label": "component_not_present", "product_ids": ["P4"]}],
+		   "remediations": [
+		     {"category": "none_available", "details": "Postponed.", "product_ids": ["P0", "P4"]},
+		     {"category": "no_fix_planned", "details": "Out of scope.", "product_ids": ["P1", "P0"]},
+		     {"category": "no_fix_planned", "group_ids": ["G"]},
+		     {"category": "none_available", "details": "Nothing yet."},
+		     {"category": "`+strings.Repeat("x", 300)+`", "product_ids": ["P2"]}]}]`)), sbom.Limits{})
+	if err != nil {
+		t.Fatalf("reading: %v", err)
+	}
+	remedied := map[string]string{}
+	for _, claim := range got {
+		for _, target := range claim.Targets {
+			remedied[target.Purl] = target.Remediation
+		}
+	}
+	for purl, want := range map[string]string{
+		"pkg:deb/debian/p0@1.0": "none_available",
+		"pkg:deb/debian/p1@1.0": "no_fix_planned",
+		"pkg:deb/debian/p2@1.0": "",
+		"pkg:deb/debian/p3@1.0": "no_fix_planned",
+		// Not affected, so no remediation is its own.
+		"pkg:deb/debian/p4@1.0": "",
+	} {
+		if remedied[purl] != want {
+			t.Errorf("%s keeps remediation %q, want %q", purl, remedied[purl], want)
+		}
+	}
+}

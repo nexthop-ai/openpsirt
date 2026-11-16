@@ -57,6 +57,19 @@ func (r *Reach) Advised(t *testing.T, who, filename, document string) *httptest.
 // branch, the platform in another, and the claim pointing at the composite the
 // relationship between them makes.
 func SupplierAdvisory(identifier, status, version string) string {
+	return RemediatedAdvisory(identifier, status, version, "vendor_fix")
+}
+
+// RemediatedAdvisory is SupplierAdvisory with the remediation of the category
+// given, and with none where the category is empty.
+func RemediatedAdvisory(identifier, status, version, category string) string {
+	remediations := ""
+	if category != "" {
+		remediations = `,
+	    "remediations": [{"category": "` + category + `",
+	      "details": "Upgrade to libnl-3-200 ` + version + `.",
+	      "product_ids": ["PLATFORM:PKG"]}]`
+	}
 	return `{
 	  "document": {
 	    "category": "csaf_security_advisory", "csaf_version": "2.0",
@@ -84,10 +97,7 @@ func SupplierAdvisory(identifier, status, version string) string {
 	      "product_reference": "PKG", "relates_to_product_reference": "PLATFORM"}]
 	  },
 	  "vulnerabilities": [{"cve": "CVE-2026-9999",
-	    "product_status": {"` + status + `": ["PLATFORM:PKG"]},
-	    "remediations": [{"category": "vendor_fix",
-	      "details": "Upgrade to libnl-3-200 ` + version + `.",
-	      "product_ids": ["PLATFORM:PKG"]}]}]
+	    "product_status": {"` + status + `": ["PLATFORM:PKG"]}` + remediations + `}]
 	}`
 }
 
