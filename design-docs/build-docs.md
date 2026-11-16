@@ -82,15 +82,14 @@ fills.
 | Placeholder | Filled with |
 |---|---|
 | `{{ scanner }}` | The scanner version the image carries |
-| `{{ scanner_sha256_amd64 }}`, `{{ scanner_sha256_arm64 }}` | The checksum the image verifies each download against, so a host checks the same pin |
 
 | Rule | Reason |
 |---|---|
 | The hook declares every placeholder; the build fails on an undeclared one and an unfilled declared one | |
-| Each pin is read from the Dockerfile's scanner stage, exactly once | Other stages pin checksums the same way |
+| The pin is read from the Dockerfile's scanner stage, the scanner's image by tag and digest, exactly once | A host installing the scanner verifies the release workflow's signature on the checksums file, then the archive against that file |
 | A written-out scanner version is reported | It is release-shaped |
 | `${{ … }}` in a pipeline example is not a placeholder | It follows a dollar sign and holds a dot |
-| A test fails on an undeclared placeholder, a declared one no page writes, and a pin the stage holds other than once | |
+| A test fails on an undeclared placeholder, a declared one no page writes, and a scanner pinned other than once | |
 
 ## The settings reference
 

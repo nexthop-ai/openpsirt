@@ -143,52 +143,22 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # whatever a producer's pipeline happened to install, so an image without one
 # takes in inventories it can never answer a question about.
 #
-# Pinned and checksummed. Which scanner build answered is part of what a
-# finding means — counts are only comparable between products measured the same
-# way — so "whatever was latest at build time" is not good enough.
-FROM ${ALPINE_IMAGE} AS scanner
-ARG GRYPE_VERSION=0.121.0
-# Redeclared without a value, which is how a stage receives the architecture
-# the build is for. Given a default it takes the default: measured, a build
-# for linux/arm64 ran `case "amd64"`, fetched the amd64 archive, verified it
-# against the amd64 checksum and put an amd64 binary in an arm64 image. The
-# refusal below cannot fire while a default answers for every platform.
-ARG TARGETARCH
-RUN apk add --no-cache curl ca-certificates \
- && case "${TARGETARCH}" in \
-      amd64) expected=64e07133d3486115de647a66581461dccf5c732748a0a3119077395565f15519 ;; \
-      arm64) expected=86f570f75ca947ea3dd6486309232bcff6d78e44ba081ae75ab14eab72be3dae ;; \
-      *) echo "no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
-    esac \
- && curl -fsSL -o /tmp/grype.tar.gz \
-      "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_${TARGETARCH}.tar.gz" \
- && echo "${expected}  /tmp/grype.tar.gz" | sha256sum -c - \
- && mkdir -p /out \
- && tar -xzf /tmp/grype.tar.gz -C /out grype \
- && chmod 0755 /out/grype
+# Pinned by digest, as every image here is. Which scanner build answered is
+# part of what a finding means — counts are only comparable between products
+# measured the same way — so "whatever was latest at build time" is not good
+# enough. Taken from the project's own image, so Dependabot proposes each
+# release; the image is the binary alone, and is copied out of.
+FROM anchore/grype:v0.121.3@sha256:13113eeceab017260370cf540e1d25442c59665fd07d1b09b66d63bb0c282887 AS scanner
 
 # The generator for the image inventory, and for the interface's part of the
 # binary's.
 #
-# Pinned by version and checksum, the same way the scanner is, and from the
-# same project — a build that fetches an unpinned tool over the network is a
-# build whose output depends on a day.
+# Pinned the same way the scanner is, and from the same project. Its image
+# has no shell, so the binary is run from the base.
+FROM anchore/syft:v1.57.0@sha256:3c70e6d5979364cefdc22b51617a78fd264574d3bd6b4f84a351204147025e2a AS syft
+
 FROM ${ALPINE_IMAGE} AS inventory-tool
-ARG SYFT_VERSION=1.51.1
-# Without a value, for the reason the scanner stage above states.
-ARG TARGETARCH
-RUN apk add --no-cache curl ca-certificates \
- && case "${TARGETARCH}" in \
-      amd64) expected=8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3 ;; \
-      arm64) expected=a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f ;; \
-      *) echo "no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
-    esac \
- && curl -fsSL -o /tmp/syft.tar.gz \
-      "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${TARGETARCH}.tar.gz" \
- && echo "${expected}  /tmp/syft.tar.gz" | sha256sum -c - \
- && mkdir -p /out \
- && tar -xzf /tmp/syft.tar.gz -C /out syft \
- && chmod 0755 /out/syft
+COPY --from=syft /syft /out/syft
 
 # The interface's packages, read from its lock file.
 #
@@ -254,7 +224,7 @@ RUN addgroup -g 65532 -S openpsirt \
 
 COPY --from=build /out/openpsirt /usr/local/bin/openpsirt
 COPY --from=binary-inventory /out/openpsirt.cdx.json /usr/share/openpsirt/openpsirt.cdx.json
-COPY --from=scanner /out/grype /usr/local/bin/grype
+COPY --from=scanner /grype /usr/local/bin/grype
 
 # Where the scanner keeps its vulnerability data. The scanner itself is on the
 # image's PATH, which is where the process looks for it when nothing names it,
