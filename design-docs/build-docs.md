@@ -31,7 +31,11 @@ Built with mkdocs-material, published to GitHub Pages, sets versioned by `mike`
 | Every push to `main` resets the default | A default another run moved is put back |
 | A set is built in a job holding a read of the repository alone, and its pages branch pushed by a job that runs none of the build tools, only as commits on top of the published branch | The build tools come from pip; with the write beside them they could rewrite branches and tags |
 | A repository with no pages branch has its first set pushed as the whole branch | A fork or a new installation has published nothing |
-| The pushes of every set are fast-forwards of the branch its build started from, and a release's jobs share no concurrency group with the merge workflow | Two `mike` runs racing on one branch leave a version directory with no entry in the switcher; a newer run queued in a group cancels the one waiting there |
+| The pushes of every set are fast-forwards, never forced, and a release's jobs share no concurrency group with the merge workflow | A newer run queued in a group cancels the one waiting there |
+| A branch another run moved after the build started has the build's own commits applied again on its new head, with git and no build tool, and pushed again, up to four pushes | Two sets published close together both land, with no re-run |
+| A set that does not apply cleanly on the moved branch, or whose version list the other run changed too, stops the push for a re-run | Two `mike` runs merged by guess leave a version directory with no entry in the switcher |
+| A branch that already holds the build's commits counts as published | A push can land and still report a failure |
+| A test runs the push step against a local remote: a build on the published branch, one the branch moved under, one conflicting with it, and one already published | |
 
 ## Link check
 
