@@ -207,8 +207,8 @@ is the shape 1.0 will have, and promises nothing.
 - A schema change edits the declaration in the untagged release's own migration, never a new migration beside it, and a development database is recreated.
 - What a tagged release shipped never changes; each release's declarations sit beside its upgrade migration (`design-docs/database-migrations.md` § Migrations).
 - Migration 44 is the baseline, v0.10.0's schema at once. An older database is refused, naming v0.12.0 to upgrade one v0.9.0 built with first, and v0.10.2 an earlier one.
-- Migrations 45 and 46 upgrade databases v0.10.x and v0.11.0 built.
-- The next schema change is migration 47, edited until a tag ships it.
+- Migrations 45, 46 and 47 upgrade databases v0.10.x, v0.11.0 and v0.12.0 built.
+- The next schema change is migration 48, edited until a tag ships it.
 - At 1.0 the baseline becomes 1.0's schema, beside one migration from the last 0.x release, which `TODO.md` records.
 
 ## Evidence beside a decision
