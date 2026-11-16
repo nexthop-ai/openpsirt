@@ -1031,17 +1031,26 @@ openpsirt -version
 that tag. <code>--ignore-missing</code> checks the files you downloaded and skips the rest.</p>
 <h2 id="the-scanner">The scanner<a class="headerlink" href="#the-scanner" title="Permanent link">&para;</a></h2>
 <p>The deployment runs the scan itself, with the scanner the image carries:
-Grype 0.121.0. Install that version. A different one reads a different
+Grype 0.121.3. Install that version. A different one reads a different
 database format and answers differently, so findings stop being comparable
 with a deployment running the image.</p>
-<pre><code>curl -fsSLO https://github.com/anchore/grype/releases/download/v0.121.0/grype_0.121.0_linux_amd64.tar.gz
-echo &quot;64e07133d3486115de647a66581461dccf5c732748a0a3119077395565f15519  grype_0.121.0_linux_amd64.tar.gz&quot; | sha256sum -c -
-tar -xzf grype_0.121.0_linux_amd64.tar.gz grype
+<pre><code>release=https://github.com/anchore/grype/releases/download/v0.121.3
+curl -fsSLO &quot;$release/grype_0.121.3_linux_amd64.tar.gz&quot;
+curl -fsSLO &quot;$release/grype_0.121.3_checksums.txt&quot;
+curl -fsSLO &quot;$release/grype_0.121.3_checksums.txt.sigstore.json&quot;
+cosign verify-blob grype_0.121.3_checksums.txt \
+  --bundle grype_0.121.3_checksums.txt.sigstore.json \
+  --certificate-identity-regexp '^https://github\.com/anchore/grype/\.github/workflows/release\.yaml@' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sha256sum -c --ignore-missing grype_0.121.3_checksums.txt
+tar -xzf grype_0.121.3_linux_amd64.tar.gz grype
 sudo install -m 0755 grype /usr/local/bin/grype
 </code></pre>
-<p>The checksum is the one the image build verifies its own download against. On
-arm64 the archive ends <code>_linux_arm64.tar.gz</code>, and its checksum is
-<code>86f570f75ca947ea3dd6486309232bcff6d78e44ba081ae75ab14eab72be3dae</code>.</p>
+<p><code>cosign verify-blob</code> checks that Anchore's release workflow signed the
+checksums file, so a release asset replaced after the fact fails there; the
+archive is then checked against that file. It needs
+<a href="https://docs.sigstore.dev/cosign/system_config/installation/">cosign</a> recent
+enough to read a Sigstore bundle. On arm64 the archive ends <code>_linux_arm64.tar.gz</code>.</p>
 <p>The process finds it on <code>PATH</code>. <code>scanner.path</code> in the configuration file names
 it anywhere else.</p>
 <h3 id="vulnerability-data">Vulnerability data<a class="headerlink" href="#vulnerability-data" title="Permanent link">&para;</a></h3>
