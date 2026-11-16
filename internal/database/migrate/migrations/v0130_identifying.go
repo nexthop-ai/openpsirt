@@ -38,8 +38,10 @@ const identifyingBatchV0130 = 5_000
 //
 // A row whose stored key is not the one its names make is left alone: a code
 // finding's occurrence is minted from its series. A key v0.12.0 made that
-// v0.13.0 reads as two occurrences, one name held at a version it carries and
-// at one it does not, leaves the decision occurrences at it as they are.
+// v0.13.0 reads as two occurrences leaves the decision occurrences at it as
+// they are: one name held at a version it carries and at one it does not,
+// which a finding still holds once the findings are rewritten, or at two
+// versions carrying different releases, which the findings left for two keys.
 //
 // The rewrite reads nothing it wrote, so a start after one that stopped finds
 // every key it rewrote already v0.13.0's and rewrites nothing twice.
@@ -239,6 +241,12 @@ func decisionsIdentifyingV0130(ctx context.Context, tx bun.Tx, moved map[string]
 		}
 	}
 	slices.Sort(from)
+	// A key a finding still holds once the findings are rewritten was made
+	// from a name that does not carry its version there too, so it is split.
+	from, err := unheldV0130(ctx, tx, from)
+	if err != nil {
+		return err
+	}
 	var decisions []liveDecisionV0130
 	for start := 0; start < len(from); start += database.BatchSize {
 		var rows []liveDecisionV0130
@@ -302,6 +310,30 @@ func decisionsIdentifyingV0130(ctx context.Context, tx bun.Tx, moved map[string]
 		}
 	}
 	return nil
+}
+
+// unheldV0130 is the keys of from that no finding holds.
+func unheldV0130(ctx context.Context, tx bun.Tx, from []string) ([]string, error) {
+	held := map[string]bool{}
+	for start := 0; start < len(from); start += database.BatchSize {
+		var rows []string
+		if err := tx.NewSelect().TableExpr(`"finding"`).ColumnExpr(`"occurrence_identity"`).
+			Where(`"occurrence_identity" IN (?)`, bun.List(from[start:min(start+database.BatchSize, len(from))])).
+			Distinct().
+			Scan(ctx, &rows); err != nil {
+			return nil, fmt.Errorf("read which keys findings still hold under a name holding its version: %w", err)
+		}
+		for _, key := range rows {
+			held[key] = true
+		}
+	}
+	out := from[:0]
+	for _, key := range from {
+		if !held[key] {
+			out = append(out, key)
+		}
+	}
+	return out, nil
 }
 
 // liveKeyV0130 is the key a live decision occurrence holds: the product, the
@@ -392,8 +424,9 @@ func tokenV0130(before, after string) bool {
 	return true
 }
 
-// ecosystemV0130 is the type a package identifier names, lowercased, or
-// nothing where it names none.
+// ecosystemV0130 is the type a package identifier names, unescaped, without
+// control characters or surrounding space, lowercased, or nothing where it
+// names none.
 func ecosystemV0130(purl string) string {
 	body, _, _ := strings.Cut(strings.TrimSpace(purl), "#")
 	body, _, _ = strings.Cut(body, "?")
@@ -403,9 +436,23 @@ func ecosystemV0130(purl string) string {
 	}
 	kind, _, _ := strings.Cut(strings.Trim(rest, "/"), "/")
 	if decoded, err := url.PathUnescape(kind); err == nil {
-		kind = decoded
+		kind = printableV0130(decoded)
 	}
-	return strings.ToLower(kind)
+	return strings.ToLower(strings.TrimSpace(kind))
+}
+
+// printableV0130 is s without its control characters, every other byte kept,
+// a malformed sequence included.
+func printableV0130(s string) string {
+	var b strings.Builder
+	for rest := s; rest != ""; {
+		r, size := utf8.DecodeRuneInString(rest)
+		if (r == utf8.RuneError && size == 1) || !unicode.IsControl(r) {
+			b.WriteString(rest[:size])
+		}
+		rest = rest[size:]
+	}
+	return b.String()
 }
 
 // releaseV0130 is a version without what its ecosystem's distribution adds:
