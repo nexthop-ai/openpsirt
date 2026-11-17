@@ -66,6 +66,7 @@ then the grain is one row per product per day, the grain access is granted at.
 | A count over findings groups the occurrences on their own columns first, then joins the issue, its rating and the catalog's names | One issue sits at many occurrences: the backlog trend answers in 0.25 s against 1.58 s (`design-docs/analytics-measurements.md` § Early grouping) |
 | Every narrowing applies before the grouping | Visibility, the selection and the minimum severity are conditions on an occurrence |
 | A DISTINCT over joined rows is not the reduction | The join still runs per occurrence, slower on PostgreSQL |
+| The trend and the burndown group each build's occurrences on their own, and join the reductions once | A moment is one build's, since a run is; one build's occurrences are a range of an index holding every column grouped on, so the engine reads the index alone and groups in memory. Fifteen builds, 3.6 million occurrences: 0.4 s against 3.0 s grouped at once (`design-docs/analytics-measurements.md` § Many builds) |
 
 ## The period a report covers
 

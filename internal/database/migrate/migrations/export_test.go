@@ -238,6 +238,14 @@ func StatementsV0130(engine database.Engine) map[string][]string {
 	}
 }
 
+// StatementsV0140 is v0.14.0's declaration of each table it changes.
+func StatementsV0140(engine database.Engine) map[string][]string {
+	t := typesFor(engine)
+	return map[string][]string{
+		"finding": findingV0140(t),
+	}
+}
+
 // StopV0130AfterLiveColumn adds the column marking an issue on an advisory
 // and nothing else: a start of the v0.13.0 upgrade on MySQL or MariaDB that
 // stopped after the column committed.

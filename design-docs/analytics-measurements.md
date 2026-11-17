@@ -11,6 +11,7 @@ Benchmark runs behind the analytics rules.
 - [Burndown and component groups](#burndown-and-component-groups)
 - [Export snapshots](#export-snapshots)
 - [Counts by identifying name](#counts-by-identifying-name)
+- [Many builds](#many-builds)
 
 ## Early grouping
 
@@ -381,3 +382,28 @@ on throwaway servers on the shared development machine, one engine at a time.
 The release chart sends every issue at a component to be folded, so folding in
 Go scales with the open findings of every tag. The decision record's spread
 between runs of the same code exceeds any difference between the three.
+
+## Many builds
+
+Justifies `design-docs/analytics.md` § Computed on demand, the rule grouping
+each build on its own. A deployment of 15 builds of one product, each the
+full-size switch image from one of its two vendors, scanned once and then
+three nights each moving 40 packages: 3,678,051 findings, 3,594,873 open.
+PostgreSQL 16, warm, every read of the trend's moments over a 30-day window.
+
+| Read | Rows grouped | Time |
+|---|--:|--:|
+| Every build at once, as one grouping | 3,594,873 | 2.8 to 3.1 s |
+| Every build at once, with the index | 3,594,873 | 1.36 to 1.40 s |
+| Each build on its own, joined once | 3,594,873 | 1.5 s |
+| Each build on its own, joined once, with the index | 3,594,873 | 0.40 to 0.44 s; 0.92 s with no parallel workers |
+
+| Reading | Detail |
+|---|---|
+| Grouping every build at once sorts on disk | 198,198 moments from 3.6 million rows: a 232 MB external sort, 2.3 s of the 5.0 s a cold read took, after 2.1 s reading the table |
+| One build fits in memory | 13,204 moments from 364,493 rows of one build: an in-memory hash of 2.3 MB, 155 ms |
+| The index is read alone | Every column grouped on and filtered by is in it, so no table row is fetched; it is 42 MB beside a 1,257 MB table |
+| A deployment's builds cost in proportion | The moments are one build's each; a read with no selection costs every build's |
+
+The deployment it models measured 8 to 10 s for the trend and the burndown over
+all 15 builds, 2.3 to 3.5 s over one, and 0.2 s over one component.

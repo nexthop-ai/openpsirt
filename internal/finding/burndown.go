@@ -124,7 +124,7 @@ func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scop
 		out.Since = until.Add(-24 * time.Hour)
 		return out, nil
 	}
-	narrow, err := s.trendNarrowing(ctx, subject, products, all, scope, within)
+	narrow, builds, err := s.trendNarrowing(ctx, subject, products, all, scope, within)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,8 @@ func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scop
 	days := int(until.Sub(since) / (24 * time.Hour))
 	out.Since = since
 
-	rows, err := s.trendMoments(ctx, narrow, within, `("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
+	rows, err := s.trendMoments(ctx, narrow, within, builds,
+		`("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
 	if err != nil {
 		return nil, err
 	}
