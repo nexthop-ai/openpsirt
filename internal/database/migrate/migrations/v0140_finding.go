@@ -19,7 +19,7 @@ import (
 //
 //   - The group index holds the run that opened a finding, last, so it holds
 //     every column the trend and the burndown reduce one build's findings to
-//     moments by: the moments in 0.46 s against 1.7 s without it.
+//     moments by: the moments in 0.46 s against 1.5 s without it.
 //   - The opened-run and closed-run indexes hold why a finding closed, which
 //     tells a check's match apart from a record taken back, so what each
 //     upload on a page changed is counted from them: 0.13 s against 0.40 s for

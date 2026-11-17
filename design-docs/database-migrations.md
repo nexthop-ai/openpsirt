@@ -106,7 +106,7 @@ follows. A fresh install applies it and every migration after it.
 | Every statement a declaration holds is one the baseline makes | A test fails on a table or index made from anywhere else |
 | On PostgreSQL the baseline also sets the finding table's vacuum settings | They are storage settings, which no declaration holds (`design-docs/database-schema.md` § Indexes) |
 | A release's declaration may derive from a baseline declaration | Several of v0.11.0's tables are the baseline's with columns or indexes added |
-| A baseline declaration a later migration reads keeps its name, and each table a later migration picks from it keeps its statements | Migrations 45, 46 and 47 read baseline declarations, some by the names v0.9.0 and v0.10.0 gave them, and get v0.10.0's statements byte for byte for every table they pick |
+| A baseline declaration a later migration reads keeps its name, and each table a later migration picks from it keeps its statements | Migrations from 45 on read baseline declarations, some by the names v0.9.0 and v0.10.0 gave them, and get v0.10.0's statements byte for byte for every table they pick |
 | A database at versions 1 to 43 is refused | A release before v0.10.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.12.0 upgrades version 43, which v0.9.0 built; v0.10.2 upgrades 41 and 42 to v0.10.0's schema; v0.8.0 upgrades 39 and 40 into one v0.10.2 upgrades, and below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
 
 ## Forward only
