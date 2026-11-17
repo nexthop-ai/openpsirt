@@ -149,8 +149,7 @@ func (s *Store) Burndown(ctx context.Context, subject access.Subject, scope Scop
 	days := int(until.Sub(since) / (24 * time.Hour))
 	out.Since = since
 
-	rows, err := s.trendMoments(ctx, narrow, within, builds,
-		`("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
+	rows, err := s.trendMoments(ctx, narrow, within, builds, since)
 	if err != nil {
 		return nil, err
 	}

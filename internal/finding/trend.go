@@ -164,8 +164,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	// the last step says an issue closed inside the window came back, which
 	// decides whether that closure is corrected. Every caller's window ends
 	// now, so cost follows its start.
-	rows, err := s.trendMoments(ctx, narrow, within, builds,
-		`("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
+	rows, err := s.trendMoments(ctx, narrow, within, builds, since)
 	if err != nil {
 		return nil, err
 	}
@@ -435,25 +434,38 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 // joined rows reaches the same answer and is slower on PostgreSQL, because the
 // join runs before it.
 //
-// Each build is reduced on its own, and the reductions are joined once. A run
-// is one build's, so a moment never spans two builds unless it has no run, and
-// those are merged after. One build's rows are a range of the group index,
-// which holds every column read, so the engine reads the index alone and
-// groups a build's rows in memory. Reduced across builds at once, 15 builds of
-// a real image grouped 3.6 million rows through a 232 MB sort on disk: 3.0 s
-// against 0.46 s on PostgreSQL (design-docs/analytics-measurements.md § Many
-// builds).
+// The builds are reduced in chunks (chunked), one branch of one statement
+// each, and the reductions are read once. A run is one build's, so a moment
+// never spans two builds unless it has no run, and those are merged after.
+// The group index holds every column read, so the engine reads the index
+// alone and groups a chunk in memory. Reduced across builds at once, 15 builds
+// of a real image grouped 3.6 million rows through a 232 MB sort on disk: 3.0
+// s against 0.46 s on PostgreSQL (design-docs/analytics-measurements.md § Many
+// builds). Only builds holding a finding open now or closed after the start
+// are read.
 func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within Within, builds []int64,
-	when string, args ...any) ([]trendRow, error) {
-	narrowed := make(map[int64]*bun.SelectQuery, len(builds))
-	for _, build := range builds {
-		one, err := narrow(ctx, s.buildMoments(build), when, args...)
+	since time.Time) ([]trendRow, error) {
+	chunks, err := s.chunks(ctx, builds, `("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
+	if err != nil {
+		return nil, err
+	}
+	narrowed := make([]*bun.SelectQuery, 0, len(chunks))
+	for _, chunk := range chunks {
+		one, err := narrow(ctx, s.buildMoments(chunk),
+			`("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
 		if err != nil {
 			return nil, err
 		}
-		narrowed[build] = one
+		narrowed = append(narrowed, one)
 	}
-	moments := perBuild(s.db, builds, func(build int64) *bun.SelectQuery { return narrowed[build] })
+	var moments *bun.SelectQuery
+	for _, one := range narrowed {
+		if moments == nil {
+			moments = one
+		} else {
+			moments = moments.UnionAll(one)
+		}
+	}
 	if moments == nil {
 		return nil, nil
 	}
@@ -486,10 +498,10 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within 
 	return chosen(rows, within), nil
 }
 
-// buildMoments is one build's findings reduced to moments, before the
+// buildMoments is these builds' findings reduced to moments, before the
 // narrowing applies: an issue at a component in one product, opened and
 // closed at one moment each, by one run.
-func (s *Store) buildMoments(build int64) *bun.SelectQuery {
+func (s *Store) buildMoments(builds []int64) *bun.SelectQuery {
 	return s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
@@ -514,7 +526,7 @@ func (s *Store) buildMoments(build int64) *bun.SelectQuery {
 		// The build, because a removal is an upload to one build.
 		ColumnExpr(`MIN("f"."build_id") AS "build_id"`).
 		ColumnExpr(`COUNT(*) AS "findings"`).
-		Where(`"f"."build_id" = ?`, build).
+		Where(`"f"."build_id" IN (?)`, bun.List(builds)).
 		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "f"."opened_at", "f"."opened_run_id", "f"."closed_at", "f"."closed_because", "st"."product_id"`)
 }
 

@@ -91,11 +91,12 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// and the decided occurrences are sums, the deadline a minimum and the
 	// exploitation flag a maximum.
 	//
-	// Counted one build at a time (perBuild), and the decided occurrences
+	// Counted in chunks of builds (chunked), and the decided occurrences
 	// counted apart and added after. Joined to every open occurrence and
 	// grouped over the product at once, 3.6 million occurrences in 15 builds
 	// spilled 147 MB to disk on PostgreSQL, 2.4 s; the decided occurrences are
-	// the few a decision reaches, read from the decision side.
+	// the few a decision reaches, read from the decision side. Only builds
+	// holding an open finding are read.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
 	var inProduct []int64
 	if err := s.db.NewSelect().
@@ -106,6 +107,10 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		OrderExpr(`"b"."id"`).
 		Scan(ctx, &inProduct); err != nil {
 		return nil, whole, fmt.Errorf("read this product's builds: %w", err)
+	}
+	chunks, err := s.chunks(ctx, inProduct, `"f"."closed_at" IS NULL`)
+	if err != nil {
+		return nil, whole, err
 	}
 	type group struct {
 		BuildID         int64      `bun:"build_id"`
@@ -118,7 +123,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		Approved        int        `bun:"approved_here"`
 	}
 	var groups []group
-	if counted := perBuild(s.db, inProduct, func(build int64) *bun.SelectQuery {
+	if counted := perChunk(chunks, func(builds []int64) *bun.SelectQuery {
 		return s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			ColumnExpr(`"f"."build_id" AS "build_id"`).
@@ -131,7 +136,7 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 			// world, and a product recorded as attacked here is a different
 			// fact that would be counted under the wrong name.
 			ColumnExpr(exploitedAcross+` AS "exploited"`).
-			Where(`"f"."build_id" = ?`, build).
+			Where(`"f"."build_id" IN (?)`, bun.List(builds)).
 			Where(`"f"."closed_at" IS NULL`).
 			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 			Where(kinds, kindArgs...).

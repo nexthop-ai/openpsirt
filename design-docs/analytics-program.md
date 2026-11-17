@@ -271,11 +271,11 @@ decision.
 | A rating naming no band ranks below every band | |
 | The time difference is one engine-specific expression returning a fraction of a day | No portable spelling; a whole number scanned on none of the four |
 
-The buckets are one pass over what is open:
+The buckets are counted in three steps:
 
-1. Each occurrence is matched once against the decision occurrences in force, built from the decision side and joined on the finding.
-2. Each issue gets, per bucket, a flag for an occurrence there, a flag for an unanswered one, and the strictest rating among them.
-3. Issues are counted by flags and ratings, a handful of rows.
+1. Each issue's open occurrences are counted per bucket, chunk by chunk of builds (`design-docs/analytics.md` § Computed on demand), from the group index alone.
+2. The answered occurrences are counted per bucket apart: the decision occurrences in force, built from the decision side and joined on the finding.
+3. An issue is open in a bucket holding an occurrence, and undecided there where its occurrences outnumber its answered ones; issues are then counted by bucket and strictest rating, a handful of rows.
 
 ## Holder workload
 

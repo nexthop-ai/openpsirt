@@ -85,9 +85,17 @@ component and grouped again by fold.
 | A lookup per occurrence | A page's groups | A few hundred occurrences |
 | One row per decided occurrence, built once and joined on the finding | The product page's totals and build rows | 367,000 lookups otherwise: 4.6 s against 1.2 s |
 
-The product page reads its build rows and totals from one statement, one row per
-build, issue and component, folded again for the totals; every column folds
-exactly (sums, a minimum deadline, a maximum exploitation flag).
+The product page reads its build rows and totals in two statements, each one
+row per build, issue and component, and adds them together:
+
+1. The open occurrences, counted chunk by chunk of builds (`design-docs/analytics.md` § Computed on demand), with the earliest deadline and whether any is exploited.
+2. The decided occurrences, read from the decision side and joined on the finding.
+
+The rows are folded again for the totals. Every column folds exactly: sums, a
+minimum deadline, a maximum exploitation flag. Joined to every open occurrence
+and grouped over the product at once, 15 builds of a real image spilled 147 MB
+to disk, 2.4 s against 1.07 s (`design-docs/analytics-measurements.md` § Many
+builds).
 
 ## Across products
 

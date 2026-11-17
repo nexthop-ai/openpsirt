@@ -12,13 +12,13 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 )
 
-// One issue open in more builds than one statement joins, so the reads that
-// group each build on its own nest their branches: every one of them still
-// counts it once, across every build.
-func TestWorkInMoreBuildsThanOneStatementJoinsIsCountedOnce(t *testing.T) {
+// One issue open in builds spread over many chunks: every read that groups a
+// chunk on its own counts it once, across every build.
+func TestWorkSpreadOverChunksOfBuildsIsCountedOnce(t *testing.T) {
 	const builds = 55
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
+		f.store.ChunkRows(1)
 		f.shipped(t, twoConsumers())
 		if _, err := f.store.Apply(ctx, f.build, f.run(t),
 			[]finding.Reported{found("CVE-2026-1", libnl)}); err != nil {
@@ -67,6 +67,50 @@ func TestWorkInMoreBuildsThanOneStatementJoinsIsCountedOnce(t *testing.T) {
 		}
 		if open != 1 {
 			t.Errorf("the aging buckets hold %d issues, want 1: %+v", open, read.Aging)
+		}
+	})
+}
+
+// One issue dismissed in two builds, each its own chunk, and one left open in
+// both: a chunk reads only its own builds, so neither is counted twice.
+func TestAChunkReadsOnlyItsOwnBuilds(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		f.store.ChunkRows(1)
+		reported := []finding.Reported{found("CVE-2026-1", libnl), found("CVE-2026-2", teamd)}
+		f.scannedAt(t, twoConsumers(), ago(10), reported...)
+		other := f.anotherVariant(t, "variant-01")
+		f.shippedTo(t, other, twoConsumers())
+		if _, err := f.store.Apply(ctx, other, f.runOn(t, other), reported); err != nil {
+			t.Fatal(err)
+		}
+		agreed := ago(2)
+		f.dismissed(t, dismissal{issue: "CVE-2026-2", proposed: ago(3), agreed: &agreed})
+
+		if got := burnedOver(f.burndown(t, "", finding.Within{})); got.left != 1 {
+			t.Errorf("the burndown leaves %d, want the one issue nobody answered: %+v", got.left, got)
+		}
+
+		now := time.Now().UTC()
+		read, err := f.store.Remediation(ctx, f.holding(t, access.PublicRead), finding.Scope{},
+			now.Add(-90*24*time.Hour), now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// One build's findings are ten days old and the other's new, so two
+		// buckets each hold both issues, one of them answered.
+		held := 0
+		for _, bucket := range read.Aging {
+			if bucket.Open == 0 {
+				continue
+			}
+			held++
+			if bucket.Open != 2 || bucket.Undecided != 1 {
+				t.Errorf("%s holds %d open and %d undecided, want 2 and 1", bucket.Label, bucket.Open, bucket.Undecided)
+			}
+		}
+		if held != 2 {
+			t.Errorf("%d buckets hold anything, want 2: %+v", held, read.Aging)
 		}
 	})
 }

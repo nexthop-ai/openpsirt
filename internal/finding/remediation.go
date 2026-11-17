@@ -364,12 +364,16 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 	//
 	// Each bucket's occurrences are counted, and the answered ones among them
 	// counted apart: an issue is undecided in a bucket where the bucket holds
-	// more of its occurrences than answered ones. Counted one build at a time
-	// (perBuild), so each build's occurrences are a range of the group index
+	// more of its occurrences than answered ones. Counted in chunks of
+	// builds (chunked), so a chunk's occurrences are a range of the group index
 	// and no table is read; joined to the answered occurrences, every open
-	// occurrence was read from the table, a scan of 1.2 GB for 15 builds of a
-	// real image.
+	// occurrence was read from the table, a scan of 1,327 MB for 15 builds of
+	// a real image. Only builds holding an open finding are read.
 	builds, err := s.readableBuilds(ctx, scope, products, all)
+	if err != nil {
+		return nil, err
+	}
+	chunks, err := s.chunks(ctx, builds, `"f"."closed_at" IS NULL`)
 	if err != nil {
 		return nil, err
 	}
@@ -390,8 +394,8 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		}
 		return scope.Narrow(onlyReadable(q, subject, products, all))
 	}
-	every := perBuild(s.db, builds, func(build int64) *bun.SelectQuery {
-		return inBuckets(s.db.NewSelect().TableExpr(`"finding" AS "f"`).Where(`"f"."build_id" = ?`, build))
+	every := perChunk(chunks, func(builds []int64) *bun.SelectQuery {
+		return inBuckets(s.db.NewSelect().TableExpr(`"finding" AS "f"`).Where(`"f"."build_id" IN (?)`, bun.List(builds)))
 	})
 	if every == nil {
 		return agingOf(nil)

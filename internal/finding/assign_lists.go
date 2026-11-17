@@ -394,25 +394,35 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 		Undisclosed     bool      `bun:"undisclosed"`
 		OpenedAt        time.Time `bun:"opened_at"`
 	}
-	// Each build grouped on its own first, then the partial groups grouped
-	// across builds: one grouping over every build's occurrences sorts them
-	// all, and on 15 builds of one image that spilled 573 MB to disk
-	// (perBuild). Every column folds exactly: a count is a sum of counts, a
-	// least or most the least or most of the partial ones, and the builds a
-	// piece of work is in are its partial groups, one per build.
+	// Each chunk of builds grouped on its own first (chunked), then the
+	// partial groups grouped across chunks: one grouping over every build's
+	// occurrences sorts them all, and on 15 builds of one image that spilled
+	// 573 MB to disk. Every column folds exactly: a count is a sum of counts,
+	// a least or most the least or most of the partial ones, and the builds a
+	// piece of work is in are its partial groups, since a chunk groups each of
+	// its builds apart.
 	inScope, err := s.Builds(ctx, scope)
 	if err != nil {
 		return nil, 0, err
 	}
+	// Only builds holding open work of the list's: nobody's, or the holders'.
+	held, heldArgs := `"f"."closed_at" IS NULL AND "f"."assigned_to" IS NULL`, []any(nil)
+	if len(holders) > 0 {
+		held, heldArgs = `"f"."closed_at" IS NULL AND "f"."assigned_to" IN (?)`, []any{bun.List(holders)}
+	}
+	chunks, err := s.chunks(ctx, inScope, held, heldArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
 	privateCount, privateArg := access.PrivateCountAs(access.FindingVisibility(), "private_places")
-	// Each build in two branches. A dependency finding is its component's
+	// Each chunk in two branches. A dependency finding is its component's
 	// piece of work and is never a flaw, since a flaw records a code finding's
 	// occurrence, so its branch reads only what the group index holds and
 	// reads no table. A code finding is its occurrence's piece of work, and
 	// its branch reads the occurrence and asks after the flaw.
-	part := func(build int64, code bool) *bun.SelectQuery {
+	part := func(builds []int64, code bool) *bun.SelectQuery {
 		q := narrow(s.db.NewSelect()).
-			Where(`"f"."build_id" = ?`, build).
+			Where(`"f"."build_id" IN (?)`, bun.List(builds)).
 			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
 			ColumnExpr(`"st"."product_id" AS "product_id"`)
 		if code {
@@ -420,16 +430,16 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 				Where(notRecordedAsFlaw).
 				ColumnExpr(`0 AS "piece_component"`).
 				ColumnExpr(`"f"."occurrence_identity" AS "place"`).
-				GroupExpr(`"f"."vulnerability_id", "st"."product_id", "f"."occurrence_identity"`)
+				GroupExpr(`"f"."build_id", "f"."vulnerability_id", "st"."product_id", "f"."occurrence_identity"`)
 		} else {
 			q = q.Where(`"f"."kind" <> ?`, kind.Analysis).
 				ColumnExpr(`"f"."component_id" AS "piece_component"`).
 				ColumnExpr(`'' AS "place"`).
-				GroupExpr(`"f"."vulnerability_id", "st"."product_id", "f"."component_id"`)
+				GroupExpr(`"f"."build_id", "f"."vulnerability_id", "st"."product_id", "f"."component_id"`)
 		}
 		return q.
 			ColumnExpr(`MIN("f"."component_id") AS "component_least"`).
-			ColumnExpr(`MIN("f"."build_id") AS "build_id"`).
+			ColumnExpr(`"f"."build_id" AS "build_id"`).
 			ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
 			ColumnExpr(exploitedAcross+` AS "exploited"`).
 			ColumnExpr(incidentAcross+` AS "incident"`).
@@ -437,9 +447,9 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 			ColumnExpr(privateCount, privateArg).
 			ColumnExpr(`COUNT(*) AS "places"`)
 	}
-	parts := perBuild(s.db, inScope,
-		func(build int64) *bun.SelectQuery { return part(build, false) },
-		func(build int64) *bun.SelectQuery { return part(build, true) })
+	parts := perChunk(chunks,
+		func(builds []int64) *bun.SelectQuery { return part(builds, false) },
+		func(builds []int64) *bun.SelectQuery { return part(builds, true) })
 	if parts == nil {
 		return nil, 0, nil
 	}
