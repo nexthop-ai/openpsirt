@@ -277,11 +277,15 @@ brings together, one lapses.
 
 ## The v0.14.0 upgrade
 
-Migration 48. One index is made.
+Migration 48. Three indexes are made again, each holding one more column.
 
 | Table | Gains |
 |---|---|
-| `finding` | An index of each build's findings by issue, component, the moments it opened and closed, the run that opened it, the reason it closed, its kind and its visibility: the columns the trend and the burndown group one build by (`design-docs/analytics.md` § Computed on demand). An index a stopped upgrade made is dropped and made again |
+| `finding` | The group index holds the run that opened a finding, last, so it holds every column the trend and the burndown group one build by (`design-docs/analytics.md` § Computed on demand) |
+| `finding` | The opened-run and closed-run indexes hold why a finding closed, last, so what each upload changed is counted from them alone |
+
+Each index is dropped and made again, so an upgrade stopped between the two
+makes it.
 
 | Check, on each engine | What it holds |
 |---|---|

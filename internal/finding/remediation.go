@@ -361,26 +361,66 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 	// One row per issue and product, with the flags. Every narrowing is a
 	// condition on an occurrence, so each applies here, before the occurrences
 	// are reduced.
-	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
-	occurrences := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
-		Join(`LEFT JOIN (?) AS "answered" ON "answered"."finding_id" = "f"."id"`, answered).
-		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"st"."product_id" AS "product_id"`).
-		Where(`"f"."closed_at" IS NULL`).
-		Where(`"f"."opened_at" <= ?`, now).
-		Where(kinds, kindArgs...).
-		GroupExpr(`"f"."vulnerability_id", "st"."product_id"`)
-	for i, bucket := range agingBuckets {
-		in, args := bucket.holds(now)
-		occurrences = occurrences.
-			ColumnExpr(`MAX(CASE WHEN `+in+` THEN 1 ELSE 0 END) AS "open_`+bucketName(i)+`"`, args...).
-			ColumnExpr(`MAX(CASE WHEN `+in+` AND "answered"."finding_id" IS NULL THEN 1 ELSE 0 END)`+
-				` AS "undecided_`+bucketName(i)+`"`, args...)
+	//
+	// Each bucket's occurrences are counted, and the answered ones among them
+	// counted apart: an issue is undecided in a bucket where the bucket holds
+	// more of its occurrences than answered ones. Counted one build at a time
+	// (perBuild), so each build's occurrences are a range of the group index
+	// and no table is read; joined to the answered occurrences, every open
+	// occurrence was read from the table, a scan of 1.2 GB for 15 builds of a
+	// real image.
+	builds, err := s.readableBuilds(ctx, scope, products, all)
+	if err != nil {
+		return nil, err
 	}
-	occurrences = scope.Narrow(onlyReadable(occurrences, subject, products, all))
+	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
+	inBuckets := func(q *bun.SelectQuery) *bun.SelectQuery {
+		q = q.
+			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+			ColumnExpr(`"st"."product_id" AS "product_id"`).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."opened_at" <= ?`, now).
+			Where(kinds, kindArgs...).
+			GroupExpr(`"f"."vulnerability_id", "st"."product_id"`)
+		for i, bucket := range agingBuckets {
+			in, args := bucket.holds(now)
+			q = q.ColumnExpr(`SUM(CASE WHEN `+in+` THEN 1 ELSE 0 END) AS "in_`+bucketName(i)+`"`, args...)
+		}
+		return scope.Narrow(onlyReadable(q, subject, products, all))
+	}
+	every := perBuild(s.db, builds, func(build int64) *bun.SelectQuery {
+		return inBuckets(s.db.NewSelect().TableExpr(`"finding" AS "f"`).Where(`"f"."build_id" = ?`, build))
+	})
+	if every == nil {
+		return agingOf(nil)
+	}
+	answeredHere := inBuckets(s.db.NewSelect().
+		TableExpr(`(?) AS "answered"`, answered).
+		Join(`JOIN "finding" AS "f" ON "f"."id" = "answered"."finding_id"`))
+	summed := s.db.NewSelect().
+		TableExpr(`(?) AS "every"`, every).
+		ColumnExpr(`"every"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"every"."product_id" AS "product_id"`).
+		GroupExpr(`"every"."vulnerability_id", "every"."product_id"`)
+	for i := range agingBuckets {
+		name := bucketName(i)
+		summed = summed.ColumnExpr(`SUM("every"."in_` + name + `") AS "in_` + name + `"`)
+	}
+	occurrences := s.db.NewSelect().
+		TableExpr(`(?) AS "o"`, summed).
+		Join(`LEFT JOIN (?) AS "a" ON "a"."vulnerability_id" = "o"."vulnerability_id" AND "a"."product_id" = "o"."product_id"`,
+			answeredHere).
+		ColumnExpr(`"o"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"o"."product_id" AS "product_id"`)
+	for i := range agingBuckets {
+		name := bucketName(i)
+		occurrences = occurrences.
+			ColumnExpr(`CASE WHEN "o"."in_` + name + `" > 0 THEN 1 ELSE 0 END AS "open_` + name + `"`).
+			ColumnExpr(`CASE WHEN "o"."in_` + name + `" > COALESCE("a"."in_` + name + `", 0) THEN 1 ELSE 0 END` +
+				` AS "undecided_` + name + `"`)
+	}
 
 	// One row per issue. The rating is joined to the reduced rows, each
 	// product's own where it has stated one, and an issue's rating in a
@@ -417,10 +457,19 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 		return nil, fmt.Errorf("count what is aging: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
+	return agingOf(rows)
+}
+
+// agingOf is the buckets, counted from the rows of flags the aging statement
+// returns; every bucket empty where there are none.
+func agingOf(rows *sql.Rows) ([]Bucket, error) {
 	out := make([]Bucket, len(agingBuckets))
 	for i, bucket := range agingBuckets {
 		out[i] = Bucket{Label: bucket.label, Days: bucket.from, Until: bucket.to,
 			BySeverity: map[string]int{}}
+	}
+	if rows == nil {
+		return out, nil
 	}
 	for rows.Next() {
 		var (

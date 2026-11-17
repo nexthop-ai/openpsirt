@@ -66,7 +66,11 @@ then the grain is one row per product per day, the grain access is granted at.
 | A count over findings groups the occurrences on their own columns first, then joins the issue, its rating and the catalog's names | One issue sits at many occurrences: the backlog trend answers in 0.25 s against 1.58 s (`design-docs/analytics-measurements.md` § Early grouping) |
 | Every narrowing applies before the grouping | Visibility, the selection and the minimum severity are conditions on an occurrence |
 | A DISTINCT over joined rows is not the reduction | The join still runs per occurrence, slower on PostgreSQL |
-| The trend and the burndown group each build's occurrences on their own, and join the reductions once | A moment is one build's, since a run is; one build's occurrences are a range of an index holding every column grouped on, so the engine reads the index alone and groups in memory. Fifteen builds, 3.6 million occurrences: 0.4 s against 3.0 s grouped at once (`design-docs/analytics-measurements.md` § Many builds) |
+| The trend, the burndown, the work nobody holds, the product overview and the aging buckets group each build's occurrences on their own, and group the reductions once | One build's occurrences are a range of the group index, which holds every column these read, so the engine reads the index alone and groups in memory. Fifteen builds, 3.6 million occurrences: the trend's moments 0.46 s against 3.0 s grouped at once (`design-docs/analytics-measurements.md` § Many builds) |
+| A moment of the trend is one build's | A run is one build's; moments with no run are merged across builds after |
+| The decided occurrences of the overview and the answered occurrences of the aging buckets are counted apart and added to each group after | A decision reaches few occurrences; joined to every open one, each was read from the table |
+| A dependency finding in the work nobody holds is never asked whether it is a flaw | A flaw records a code finding's occurrence; asked of every finding, the occurrence was read from the table for each |
+| The trend and the burndown name each component once, after reducing | 198,198 moments over 7,137 components; named per moment, the names were 1.2 s of a 1.9 s trend |
 
 ## The period a report covers
 

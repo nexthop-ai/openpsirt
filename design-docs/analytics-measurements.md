@@ -396,14 +396,33 @@ PostgreSQL 16, warm, every read of the trend's moments over a 30-day window.
 | Every build at once, as one grouping | 3,594,873 | 2.8 to 3.1 s |
 | Every build at once, with the index | 3,594,873 | 1.36 to 1.40 s |
 | Each build on its own, joined once | 3,594,873 | 1.5 s |
-| Each build on its own, joined once, with the index | 3,594,873 | 0.40 to 0.44 s; 0.92 s with no parallel workers |
+| Each build on its own, joined once, with the index | 3,594,873 | 0.40 to 0.46 s; 0.92 s with no parallel workers |
+
+The index is the group index holding the run that opened a finding, last; it
+is 66 MB beside a 1,327 MB table.
 
 | Reading | Detail |
 |---|---|
 | Grouping every build at once sorts on disk | 198,198 moments from 3.6 million rows: a 232 MB external sort, 2.3 s of the 5.0 s a cold read took, after 2.1 s reading the table |
 | One build fits in memory | 13,204 moments from 364,493 rows of one build: an in-memory hash of 2.3 MB, 155 ms |
-| The index is read alone | Every column grouped on and filtered by is in it, so no table row is fetched; it is 42 MB beside a 1,257 MB table |
+| The index is read alone | Every column grouped on and filtered by is in it, so no table row is fetched |
 | A deployment's builds cost in proportion | The moments are one build's each; a read with no selection costs every build's |
+| The work nobody holds sorted 573 MB on disk | Every open occurrence grouped by piece of work at once: 5.1 s. Each build's on its own, dependency findings from the index alone: 1.1 s for the request |
+| The overview spilled 147 MB | Every open occurrence joined to the decided ones and grouped at once: 2.4 s. Each build's on its own, decided occurrences apart: 0.9 s for the request |
+| What each upload changed read every finding it opened from the table | Telling a check's match apart from a record taken back reads why a finding closed. The page holding a build's first upload, which opened 379,136 findings: 0.40 s, and 0.13 s with that column in the run indexes |
+| A second index leading with the build changes other plans | SQLite reached decided occurrences through an index ordered for the trend's grouping rather than by their identity, so the run is added to the group index |
+
+Each request, served, median of three, warm:
+
+| Request | Before | After |
+|---|--:|--:|
+| Trend, every build | 2.04 s | 1.43 s |
+| Trend, one build | 0.46 s | 0.11 s |
+| Burndown, every build | 2.60 s | 1.82 s |
+| Burndown, one build | 0.46 s | 0.12 s |
+| Work nobody holds | 5.19 s | 1.12 s |
+| Product overview | 2.56 s | 0.92 s |
+| Remediation | 1.41 s | 1.00 s |
 
 The deployment it models measured 8 to 10 s for the trend and the burndown over
 all 15 builds, 2.3 to 3.5 s over one, and 0.2 s over one component.

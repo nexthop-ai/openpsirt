@@ -27,10 +27,11 @@ func upV0140(ctx context.Context, sqldb *sql.DB) error {
 // The v0140 files beside this one hold v0.14.0's declaration of every table
 // this changes.
 //
-//   - A finding is indexed by its build and every column a trend reduces one
-//     build's findings to moments by.
+//   - A finding's group index holds the run that opened it, and its run
+//     indexes why it closed, so the trend and what each upload changed read
+//     no table row.
 func upgradeV0140(ctx context.Context, tx bun.Tx) error {
-	for _, step := range []func(context.Context, bun.Tx) error{findingMomentV0140} {
+	for _, step := range []func(context.Context, bun.Tx) error{findingIndexesV0140} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}
