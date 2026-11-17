@@ -416,13 +416,14 @@ Each request, served, median of three, warm:
 
 | Request | Before | After |
 |---|--:|--:|
-| Trend, every build | 2.04 s | 1.43 s |
-| Trend, one build | 0.46 s | 0.11 s |
-| Burndown, every build | 2.60 s | 1.82 s |
+| Trend, every build | 2.04 s | 1.48 s |
+| Trend, one build | 0.46 s | 0.12 s |
+| Burndown, every build | 2.60 s | 1.81 s |
 | Burndown, one build | 0.46 s | 0.12 s |
-| Work nobody holds | 5.19 s | 1.12 s |
-| Product overview | 2.56 s | 0.92 s |
-| Remediation | 1.41 s | 1.00 s |
+| Work nobody holds | 5.19 s | 1.11 s |
+| Product overview | 2.56 s | 0.90 s |
+| Remediation | 1.41 s | 1.03 s |
+| Uploads of one build, page holding its first | 0.43 s | 0.10 s |
 
 The deployment it models measured 8 to 10 s for the trend and the burndown over
 all 15 builds, 2.3 to 3.5 s over one, and 0.2 s over one component.
