@@ -30,6 +30,7 @@ type heldFinding struct {
 	MatchedFrom        string     `bun:"matched_from"`
 	MatchedIn          string     `bun:"matched_in"`
 	MatchedRange       string     `bun:"matched_range"`
+	MatchedThrough     string     `bun:"matched_through"`
 	SuppressedBy       *int64     `bun:"suppressed_by"`
 	StatedBy           *int64     `bun:"stated_by"`
 	ClaimedBy          *int64     `bun:"claimed_by"`
@@ -77,6 +78,7 @@ type changeKey struct {
 	fixedAt                              string
 	matched                              Matched
 	matchedFrom, matchedIn, matchedRange string
+	matchedThrough                       string
 	suppressedBy, statedBy, claimedBy    reference
 	described                            bool
 	moved                                bool
@@ -120,7 +122,7 @@ func (m moving) key() changeKey {
 	if m.described {
 		k.fixState, k.fixedIn, k.fixedAt = m.f.FixState, m.f.FixedIn, instantOf(m.f.FixedAt)
 		k.matched, k.matchedFrom, k.matchedIn = m.f.Matched, m.f.MatchedFrom, m.f.MatchedIn
-		k.matchedRange = m.f.MatchedRange
+		k.matchedRange, k.matchedThrough = m.f.MatchedRange, m.f.MatchedThrough
 		k.suppressedBy, k.statedBy = referenceOf(m.f.SuppressedBy), referenceOf(m.f.StatedBy)
 		k.claimedBy = referenceOf(m.f.ClaimedBy)
 	}
@@ -163,6 +165,7 @@ func (m moving) update(tx bun.IDB, first, last int) *bun.UpdateQuery {
 			Set(`"matched_from" = ?`, f.MatchedFrom).
 			Set(`"matched_in" = ?`, f.MatchedIn).
 			Set(`"matched_range" = ?`, f.MatchedRange).
+			Set(`"matched_through" = ?`, absentIfEmpty(f.MatchedThrough)).
 			Set(`"suppressed_by" = ?`, f.SuppressedBy).
 			Set(`"stated_by" = ?`, f.StatedBy).
 			Set(`"claimed_by" = ?`, f.ClaimedBy)
@@ -187,4 +190,12 @@ func (m moving) update(tx bun.IDB, first, last int) *bun.UpdateQuery {
 		update = update.Set(`"due_at" = ?`, f.DueAt)
 	}
 	return update.Where(`"id" IN (?)`, bun.List(m.ids[first:last]))
+}
+
+// absentIfEmpty is a name that may be absent, written as a null where it is.
+func absentIfEmpty(name string) *string {
+	if name == "" {
+		return nil
+	}
+	return &name
 }

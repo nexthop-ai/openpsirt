@@ -6228,6 +6228,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/products/{product}/source-corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose a correction by source paths
+         * @description Records that a package is not the rest of the source it is built from: a wrong match answering every issue the package is matched through that source for, where the issue's CVE record lists the files it is in and every one of them lies outside the paths the package is built from. linux-perf, matched through linux and built from tools/perf, tools/lib and tools/include, is the case.
+         *
+         *     It answers in this product only, at every version, and keeps answering issues published later as scans report them. It never answers an issue whose record lists no files or any file under the paths, a finding matched on the package's own name or a CPE, an undisclosed finding, or an issue this product records an incident through; those stay for a person.
+         *
+         *     The reason is one of the two saying something is not there, and the reasoning is required. A second person agrees, always; until then it answers nothing, and an issue answered after the reasoning changes waits for agreement again. It ends only when withdrawn, and is published as not affected with its reason.
+         *
+         *     Refused where nothing open in the product is answered by it now. Each answer records the files that justified it, read back as `answered_on` on the decision's occurrences.
+         *
+         *     Requires: public-triage or private-triage or security-testing-triage on the product
+         */
+        post: operations["correct-by-source-paths"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/products/{product}/supplier-advisories": {
         parameters: {
             query?: never;
@@ -10163,6 +10191,45 @@ export interface components {
              */
             waiting: number;
         };
+        "Correct-by-source-pathsRequest": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Correct-by-source-pathsRequest.json
+             */
+            readonly $schema?: string;
+            /**
+             * @description Why the issues are not there
+             * @enum {string}
+             */
+            justification: "component_not_present" | "vulnerable_code_not_present";
+            /** @description The package answered, by the name it is identified by, such as linux-perf */
+            package: string;
+            /** @description The paths within the source the package is built from, such as tools/perf, each at most 1,024 bytes. A file under any of them is one the package may hold */
+            paths: string[] | null;
+            /** @description The reasoning, in markdown, holding for every issue it answers */
+            reasoning: string;
+            /** @description The source package it is matched through, such as linux */
+            source: string;
+        };
+        "Correct-by-source-pathsResponse": {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/Correct-by-source-pathsResponse.json
+             */
+            readonly $schema?: string;
+            /**
+             * Format: int64
+             * @description The occurrences it answers now, each waiting for a second person
+             */
+            answered: number;
+            /**
+             * Format: int64
+             * @description The decision recorded, which is what the review queue lists and what is approved
+             */
+            decision_id: number;
+        };
         "Count-code-findings-by-releaseResponse": {
             /**
              * Format: uri
@@ -10413,7 +10480,7 @@ export interface components {
              * @description The sort of action: one decision about a finding, one about many issues at a component, an approved decision carried to a new issue, or occurrences set aside from a larger decision — by an approver agreeing to the rest, or by the author holding them back
              * @enum {string}
              */
-            kind: "finding" | "bulk" | "extension" | "returned";
+            kind: "finding" | "bulk" | "extension" | "returned" | "source";
             /** @description The moment the action was taken */
             proposed_at: string;
             /** @description The person who took it, by sign-in identity */
@@ -10500,6 +10567,8 @@ export interface components {
             rows: number;
             /** @description At least one occurrence it covers is about security testing material, a static analysis code finding. Agreeing to it takes the approver capability */
             security_testing?: boolean;
+            /** @description What a correction by source paths names. Absent for any other decision */
+            source?: components["schemas"]["SourceRuleBody"];
             /** @description At least one occurrence it covers is about a finding nobody has announced */
             undisclosed?: boolean;
             /** @description The moment it became that. Absent while it is waiting: nothing has happened to it */
@@ -10598,6 +10667,8 @@ export interface components {
              * @description The age of the decision. An old decision should look like one
              */
             age_days: number;
+            /** @description The files the issue's CVE record listed when a correction by source paths answered this occurrence, every one outside the paths the package is built from. Absent for any other decision */
+            answered_on?: string[] | null;
             decision_occurrence: components["schemas"]["DecisionOccurrenceBody"];
             /** @description The decision's subject — build, issue, component, where it sits — read from the open finding at its occurrence. Absent where none is open there */
             finding?: components["schemas"]["FindingRefBody"];
@@ -10610,6 +10681,15 @@ export interface components {
             proposed_by_name?: string;
             /** @description The justification as it currently stands, in markdown. Empty where you may read only some of the occurrences the decision covers */
             reasoning: string;
+            /** @description Whether this answer of a correction by source paths was withdrawn. The row has lapsed and the finding is open for a person */
+            recanted?: boolean;
+            /**
+             * @description What withdrew the answer: a later CVE record listing a file under the paths or no files, a scan matching the issue other than through the source package, or an incident recorded through the issue
+             * @enum {string}
+             */
+            recanted_by?: "record" | "match" | "incident";
+            /** @description The files the CVE record listed when it withdrew the answer. Absent where it listed none */
+            recanted_on?: string[] | null;
         };
         DecisionOccurrencesOutputBody: {
             /**
@@ -11152,6 +11232,8 @@ export interface components {
             matched_in?: string;
             /** @description The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix */
             matched_range?: string;
+            /** @description The source package the scanner matched this through, where every detail of the match was through it. Absent where the match was on the package's own name or a CPE */
+            matched_through?: string;
             /**
              * @description The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has scheduled none on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported
              * @enum {string}
@@ -11166,6 +11248,8 @@ export interface components {
             previous: components["schemas"]["EarlierBody"][] | null;
             /** @description Every published rating of the issue, one per generation of the scoring system, newest first */
             ratings?: components["schemas"]["RatingBody"][] | null;
+            /** @description The source files the issue's CVE record says it is in, as the last scan reading the record had them */
+            record_files?: string[] | null;
             /** @description Somebody recorded this here rather than a scanner reporting it. Only such a finding can be closed as fixed by hand */
             recorded?: boolean;
             references?: components["schemas"]["ReferenceBody"][] | null;
@@ -15811,6 +15895,14 @@ export interface components {
             state: "proposed" | "approved" | "withdrawn" | "lapsed";
             vulnerability: string;
         };
+        SourceRuleBody: {
+            /** @description The package it answers, by the name it is identified by, in lower case */
+            package: string;
+            /** @description The paths within the source the package is built from, in byte order */
+            paths: string[] | null;
+            /** @description The source package that package is matched through, in lower case */
+            source: string;
+        };
         SpentBody: {
             /** @description The subject of the decisions, by name. Empty where nothing in any build carries the occurrence any more */
             component: string;
@@ -15930,7 +16022,7 @@ export interface components {
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            kind: "finding" | "bulk" | "extension" | "returned";
+            kind: "finding" | "bulk" | "extension" | "returned" | "source";
             needs_approval?: boolean;
             /**
              * Format: int64
@@ -16260,6 +16352,11 @@ export interface components {
              * @description The number of its occurrences that lapsed, counting one occurrence at two versions twice
              */
             rows: number;
+            /**
+             * @description What withdrew an answer of a correction by source paths among the rows: the issue's record listing a file under the paths or no files, a scan matching the issue other than through the source package, or an incident recorded through the issue
+             * @enum {string}
+             */
+            source_withdrawn?: "record" | "match" | "incident";
             /** @description How bad that issue was judged to be when the decision was made, or the representative issue where none was rated worse. Absent where it was unrated */
             was?: string;
         };
@@ -16769,6 +16866,8 @@ export interface components {
              * @description The number of occurrences it covers, counted once for each issue
              */
             rows: number;
+            /** @description What a correction by source paths names. Absent for any other decision */
+            source?: components["schemas"]["SourceRuleBody"];
         };
         WasSaidBody: {
             /** @description Its text, in markdown */
@@ -27155,6 +27254,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "correct-by-source-paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Correct-by-source-pathsRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Correct-by-source-pathsResponse"];
+                };
             };
             /** @description Error */
             default: {

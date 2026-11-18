@@ -181,7 +181,7 @@ const (
 
 // DecisionKinds is every sort of action a decision can be.
 func DecisionKinds() []DecisionKind {
-	return []DecisionKind{FindingDecision, BulkDecision, ExtensionDecision, ReturnedDecision}
+	return []DecisionKind{FindingDecision, BulkDecision, ExtensionDecision, ReturnedDecision, SourceDecision}
 }
 
 // newDecision records an action and what it argues, inside whatever transaction is

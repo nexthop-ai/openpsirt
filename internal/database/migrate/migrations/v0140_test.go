@@ -47,3 +47,36 @@ func TestTheV0140UpgradeFinishesAStartThatStoppedAfterTheClaimNotes(t *testing.T
 		leaveAtLatest(t, ctx, db)
 	})
 }
+
+// A start that stopped after the correction table was made and before its
+// index, which MySQL and MariaDB keep since they commit each schema
+// statement, is finished by the next start.
+func TestTheV0140UpgradeMakesAnIndexAStoppedStartLeftUnmade(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0130)
+		dbtest.MigrateTo(t, db, v0140)
+		// MySQL and MariaDB keep an index under every foreign key: a table
+		// made with no index of its own holds one named after the key, which
+		// a later index able to serve the key replaces.
+		drops := []string{`DROP INDEX "source_correction_product_idx"`}
+		if db.Server.Engine == database.MySQL || db.Server.Engine == database.MariaDB {
+			drops = []string{
+				`ALTER TABLE "source_correction" DROP FOREIGN KEY "source_correction_product_fk"`,
+				`DROP INDEX "source_correction_product_idx" ON "source_correction"`,
+				`ALTER TABLE "source_correction" ADD CONSTRAINT "source_correction_product_fk" ` +
+					`FOREIGN KEY ("product_id") REFERENCES "product"("id")`,
+			}
+		}
+		for _, drop := range drops {
+			if _, err := db.ExecContext(ctx, drop); err != nil {
+				t.Fatal(err)
+			}
+		}
+		unrecordLatest(t, db)
+		dbtest.MigrateTo(t, db, v0140)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0140(db.Server.Engine))
+		leaveAtLatest(t, ctx, db)
+	})
+}

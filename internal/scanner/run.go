@@ -309,6 +309,19 @@ func (r *Runner) assess(ctx context.Context, buildID, runID int64, components []
 		r.superseded(ctx, applied.Displaced)
 	}
 
+	// Answer what a correction by source paths covers, an issue published
+	// since it was agreed to among them. A failure is reported and not fatal:
+	// what was found is recorded, and the findings wait for a person, or for
+	// the next scan to answer them.
+	bySource, err := triage.NewStore(r.db.DB).AnswerBySource(ctx, buildID)
+	if err != nil {
+		r.logger.Error("could not answer by the corrections by source paths",
+			"build", buildID, "error", err)
+	}
+	if r.told != nil && len(bySource.Withdrawn.Told) > 0 {
+		r.told(ctx, bySource.Withdrawn.Told)
+	}
+
 	// Now that the versions have moved, mark the decision occurrences they moved out from
 	// under. A decision is matched on the versions it was made about, so one
 	// whose versions changed already stops applying — what this adds is that
@@ -341,7 +354,7 @@ func (r *Runner) assess(ctx context.Context, buildID, runID int64, components []
 	if r.told != nil && len(worse.Told) > 0 {
 		r.told(ctx, worse.Told)
 	}
-	lapsed.Rows += worse.Rows
+	lapsed.Rows += worse.Rows + bySource.Withdrawn.Rows
 
 	// A scan is the write that moves the tables furthest, so it is where the
 	// planner's statistics fall behind. Not fatal: what was found is recorded,

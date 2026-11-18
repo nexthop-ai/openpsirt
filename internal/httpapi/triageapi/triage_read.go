@@ -31,6 +31,7 @@ type DecisionDetail struct {
 	// its subject, so the page has somewhere to link to.
 	Occurrence core.OccurrenceBody  `json:"occurrence"`
 	Finding    *core.FindingRefBody `json:"finding,omitempty" doc:"A representative occurrence's subject — build, issue, component, where it sits. Absent where no open finding sits at that occurrence"`
+	Source     *SourceRuleBody      `json:"source,omitempty" doc:"What a correction by source paths names. Absent for any other decision"`
 	AgeDays    int                  `json:"age_days" doc:"The age of the decision. An old decision should look like one"`
 	// Happened is the decision's fate, read from its rows.
 	Happened     core.Happened `json:"happened" doc:"The decision's outcome. mixed is a decision whose occurrences did not all end the same way"`
@@ -287,6 +288,9 @@ func registerTriageReading(api huma.API, in core.Deps) {
 		}
 		if whole.Outliers != nil {
 			body.Outliers = outliersBody(*whole.Outliers)
+		}
+		if body.Source, err = sourceRule(ctx, store, input.ID); err != nil {
+			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)
 		}
 		if body.Reaffirmable, err = store.Reaffirmable(ctx, subject, input.ID); err != nil {
 			return nil, core.WentWrong(in.Logger, "that decision could not be read", err)

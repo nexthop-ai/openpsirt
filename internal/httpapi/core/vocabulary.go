@@ -81,6 +81,23 @@ type Justification string
 // Schema answers with the reasons the exchange format defines.
 func (Justification) Schema(huma.Registry) *huma.Schema { return words(triage.Justifications()) }
 
+// CorrectionReason is a reason a decision that the match is wrong states:
+// that something is not there.
+type CorrectionReason string
+
+// Schema answers with the two reasons saying something is not there.
+func (CorrectionReason) Schema(huma.Registry) *huma.Schema {
+	return words(triage.JustificationsCorrecting())
+}
+
+// SourceWithdrawal is what withdrew an answer of a correction by source paths.
+type SourceWithdrawal string
+
+// Schema answers with every reason an answer is withdrawn.
+func (SourceWithdrawal) Schema(huma.Registry) *huma.Schema {
+	return words(triage.SourceWithdrawals())
+}
+
 // CodeFindingOutcome is what a decision about a code finding says it is.
 type CodeFindingOutcome string
 

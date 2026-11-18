@@ -29,6 +29,7 @@ func Register(api huma.API, in core.Deps) {
 	registerReaffirmDecision(api, in)
 	registerReaffirmMany(api, in)
 	registerProposing(api, in)
+	registerSourceCorrection(api, in)
 	registerCodeFindingDecisions(api, in)
 	registerCodeFindingFixed(api, in)
 	registerSuppressionRules(api, in)

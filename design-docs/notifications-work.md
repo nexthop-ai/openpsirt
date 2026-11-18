@@ -44,7 +44,7 @@ are separate.
 |---|---|
 | One per person per sweep, counting their rows, gathered over every bounded batch | One a decision is a channel nobody reads |
 | A sweep failing part way still tells | Earlier batches are committed |
-| Says why: the code moved, or the issue was rated worse | They ask different things (`design-docs/triage-lapse.md` § Lapse marking) |
+| Says why: the code moved, the issue was rated worse, or an answer of a correction by source paths was withdrawn by the issue's record, a match on the package itself or an incident | They ask different things (`design-docs/triage-lapse.md` § Lapse marking) |
 | Links to the review queue's To reaffirm tab | The work is every lapsed decision |
 | Sent by the scan's sweep and by a rating put in or out of force here | |
 

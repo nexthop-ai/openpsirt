@@ -157,6 +157,7 @@ finding.MergesInto Not varying by reader: the merges into one issue. The issue r
 finding.MinimumSeverityFor Not varying by reader: the minimum severity a product states, or the deployment's.
 finding.OneFoldNamed A helper over a narrowed read: the writing form of FoldsNamed, over builds the assignment and occurrence writes resolved with a subject.
 finding.PatchLinks A background pass: the OSV pass adds a record's fix links to the issue it asked about.
+finding.ProgramFiles Not varying by reader: the files a published CVE record lists, the same for everybody. Its callers read them for a finding or occurrence already resolved for the caller, or inside a scan.
 finding.RatingIn A helper over a narrowed read: what one product rates one issue, for the finding detail after it authorized the finding.
 finding.RatingsIn A helper over a narrowed read: what products rate issues, for rows the caller already read with a subject.
 finding.ReachedByName A helper over a narrowed read: which builds reach a component name, over builds its callers already resolved for a subject or a queued scope.
@@ -333,6 +334,7 @@ trail.Store.RecordByMerge A background pass: it records what merging two issues 
 triage.LapseCodeFindings A background pass: an analyzer run lapses the decisions on code findings it paired, inside the transaction recording the pairing.
 triage.Restamp A helper over a narrowed read: it moves the stamp of a decision the caller's write already authorized, inside its transaction.
 triage.Store.AgreedSince A background pass: the health report counts agreements for the deployment.
+triage.Store.AnswerBySource A background pass: a scan answers by the corrections by source paths standing in its build's product, after applying the build's findings.
 triage.Store.Applying Not varying by reader: whether a decision stands at a place. Its route resolves the place for the caller first.
 triage.Store.HiddenWithNobodyAgreeing A background pass: the health report finds dismissals standing with nobody agreeing.
 triage.Store.Lapse A background pass: it lapses decisions whose versions moved.
@@ -340,6 +342,8 @@ triage.Store.LapseRatedWorse A background pass: it lapses claims whose issue was
 triage.Store.NeedsApproval A helper over a narrowed read: the second-person rule asks it of a proposal the write already authorized.
 triage.Store.NoteVisibility Not varying by reader: how disclosed a note is, which the caller then asks of its own reader.
 triage.Store.PeopleNamed Not varying by reader: who an identifier is, for a record already read under its own authorization.
+triage.Store.SourceAnswers A helper over a narrowed read: what decision occurrences a correction by source paths answered rest on, for rows its caller already read for the reader.
+triage.Store.SourceOf A helper over a narrowed read: what a correction by source paths names, for a decision its route already read for the caller.
 triage.Store.Undecided A helper over a narrowed read: it keeps the places a caller already resolved that nothing stands at.
 triage.TrailAbout A helper over a narrowed read: it names an exploitation record for the trail, inside a write that authorized the product.
 upstream.Again A background pass: it queues a product's builds to be scanned again, from the upstream pass and inside upstream changes only an administrator makes.

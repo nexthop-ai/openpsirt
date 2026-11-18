@@ -49,6 +49,7 @@ func TestFindingsShareAnUpdateOnlyWhereEveryValueWrittenIsTheSame(t *testing.T) 
 		{"matched_from", "described", func(m *moving) { m.f.MatchedFrom = "c" }},
 		{"matched_in", "described", func(m *moving) { m.f.MatchedIn = "d" }},
 		{"matched_range", "described", func(m *moving) { m.f.MatchedRange = "< 2.0" }},
+		{"matched_through", "described", func(m *moving) { m.f.MatchedThrough = "linux" }},
 		{"suppressed_by", "described", func(m *moving) { m.f.SuppressedBy = &two }},
 		{"suppressed_by", "described", func(m *moving) { m.f.SuppressedBy = nil }},
 		{"stated_by", "described", func(m *moving) { m.f.StatedBy = &two }},

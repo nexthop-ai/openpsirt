@@ -142,6 +142,8 @@ func statedVocabularies() map[string][]string {
 		"outcomes that hide risk":             words(triage.OutcomesThatHideRisk()),
 		"outcomes a statement offers":         finding.OutcomesOffered(),
 		"justifications":                      words(triage.Justifications()),
+		"reasons something is not there":      words(triage.JustificationsCorrecting()),
+		"what withdrew a source answer":       words(triage.SourceWithdrawals()),
 		"outcomes about a code finding":       words(triage.CodeFindingOutcomes()),
 		"outcomes about a vulnerability":      words(triage.VulnerabilityOutcomes()),
 		"reasons a code finding is dismissed": words(triage.CodeFindingReasons()),

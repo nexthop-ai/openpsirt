@@ -173,6 +173,7 @@ The decisions easiest to violate by accident and costliest to unpick.
 - A cap follows reversibility: what nothing re-checks is capped.
 - Every bulk decision has a cap, and the cap is a setting (REQ-27). Nothing re-checks a dismissal, so one answering many findings stays a size a reviewer can follow, and an unbounded write is a denial of service somebody triggers by accident.
 - A bulk promise to upgrade takes no cap: the next scan re-checks every row it names, and narrowing it makes the record false. Its transaction size was measured and needs no chunking (`design-docs/triage-promises.md`).
+- A correction by source paths takes no cap: the reviewer reads one rule, and each scan re-checks every answer it holds against the issue's record and match. Its write was measured and needs no chunking (`design-docs/triage-source-paths.md` § Agreement and ending).
 - A cap bounds what is written, never what was asked for, because one named issue expands into many occurrences (REQ-27).
 
 ## Source file size

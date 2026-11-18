@@ -86,6 +86,28 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, decisionID i
 	if err != nil {
 		return Revised{}, err
 	}
+	// A correction by source paths ends at its withdrawal, and an answer of
+	// one ends where something withdrew it: revising brings back neither,
+	// because no pass re-checks them afterwards.
+	var recanted map[int64]SourceAnswer
+	if decision.Kind == SourceDecision {
+		ended, err := s.db.NewSelect().Model((*SourceCorrection)(nil)).
+			Where(`"sc"."decision_id" = ?`, decisionID).
+			Where(`"sc"."withdrawn_at" IS NOT NULL`).Exists(ctx)
+		if err != nil {
+			return Revised{}, fmt.Errorf("read whether the correction was withdrawn: %w", err)
+		}
+		if ended {
+			return Revised{}, ErrSourceWithdrawn
+		}
+		ids := make([]int64, 0, len(rows))
+		for _, row := range rows {
+			ids = append(ids, row.ID)
+		}
+		if recanted, err = s.SourceAnswers(ctx, ids); err != nil {
+			return Revised{}, err
+		}
+	}
 
 	var latest int64
 	if err := s.db.NewSelect().Model((*Revision)(nil)).
@@ -159,6 +181,9 @@ func (s *Store) revise(ctx context.Context, subject access.Subject, decisionID i
 		})
 	}
 	for i, row := range rows {
+		if recanted[row.ID].Withdrawn {
+			continue
+		}
 		// Retaken, because revising a withdrawn or lapsed decision brings it back
 		// to life and the key is what the uniqueness rule is enforced through.
 		// Without it the row is live and holds nothing, the unique index
@@ -233,6 +258,14 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, decisionID
 			Where(`"withdrawn_at" IS NULL`).Exec(ctx); err != nil {
 			return fmt.Errorf("withdraw a decision: %w", err)
 		}
+		// A correction by source paths answers nothing more, its rows a later
+		// record withdrew included.
+		if _, err := tx.NewUpdate().Model((*SourceCorrection)(nil)).
+			Set(`"withdrawn_at" = ?`, now).
+			Where(`"sc"."decision_id" = ?`, decisionID).
+			Where(`"sc"."withdrawn_at" IS NULL`).Exec(ctx); err != nil {
+			return fmt.Errorf("withdraw a decision: %w", err)
+		}
 		if _, err := tx.NewUpdate().Model((*DecisionOccurrence)(nil)).
 			Set(`"state" = ?`, Withdrawn).
 			Set(`"ended_at" = ?`, now).
@@ -294,6 +327,9 @@ type Undone struct {
 	Rows int64
 	// Told is who to tell, once each.
 	Told []ForPerson
+	// Lapsed is who to tell that answers of theirs stopped applying, rather
+	// than returned to waiting.
+	Lapsed []ForPerson
 }
 
 // ForPerson is somebody with something to hear, and enough to say it with: a
@@ -325,6 +361,9 @@ type ForPerson struct {
 	// RatedWorse says the rows lapsed because the issue was rated worse,
 	// rather than because the code moved.
 	RatedWorse bool
+	// SourceWithdrawn says the rows were answers of a correction by source
+	// paths, and what withdrew them.
+	SourceWithdrawn SourceWithdrawal
 }
 
 func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch string) (Undone, error) {

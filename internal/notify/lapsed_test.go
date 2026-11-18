@@ -22,3 +22,11 @@ func TestALapseCountsTheOccurrencesItReachedAsOccurrences(t *testing.T) {
 		t.Errorf("a lapse at one occurrence says %q; want one decision", one)
 	}
 }
+
+// An answer a later CVE record withdrew says the record moved, not the code.
+func TestAWithdrawnSourceAnswerSaysTheRecordMoved(t *testing.T) {
+	got := Lapse(triage.ForPerson{PersonID: 1, Rows: 1, SourceWithdrawn: triage.WithdrawnByRecord}).Body
+	if !strings.Contains(got, "the issue's record no longer puts every file outside the paths") {
+		t.Errorf("a withdrawn answer says %q", got)
+	}
+}

@@ -81,6 +81,8 @@ var tables = []string{
 	// Before decision_occurrence and vulnerability_merge, both of which it
 	// points at.
 	"decision_occurrence_superseded",
+	// Before decision_occurrence, which it points at.
+	"source_answer",
 	"decision_occurrence",
 	// After the rows that point at it, and before the decision it hangs off.
 	"decision_revision",
@@ -88,6 +90,8 @@ var tables = []string{
 	"decision_build",
 	// Before decision, which it points at.
 	"decision_stamp",
+	// Before decision and product, both of which it points at.
+	"source_correction",
 	// Before person, which it points at, and after everything above, which
 	// points at it.
 	"decision",

@@ -53,6 +53,8 @@ export type Decision = {
   // The decision's subject, for the approver's card: the issue, the component
   // and version, how bad, where it sits, and where to open it.
   finding: FindingRef | null;
+  // What a correction by source paths names, which its approver agrees to.
+  source: QueueRow["source"] | null;
 };
 
 export function decisionOf(row: QueueRow): Decision {
@@ -88,6 +90,7 @@ export function decisionOf(row: QueueRow): Decision {
     outliers: row.outliers ?? null,
     counter: row.counter ?? null,
     finding: row.finding ?? null,
+    source: row.source ?? null,
   };
 }
 

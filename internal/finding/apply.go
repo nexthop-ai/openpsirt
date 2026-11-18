@@ -73,6 +73,9 @@ func (s *Store) Apply(ctx context.Context, buildID, runID int64, reported []Repo
 		if err != nil {
 			return err
 		}
+		if err := recordFiles(ctx, tx, run.vulnerabilities, reported); err != nil {
+			return err
+		}
 		want, err := run.wanted(reported)
 		if err != nil {
 			return err
@@ -400,11 +403,12 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 				FixState:           r.FixState, FixedIn: r.FixedIn, FixedAt: r.FixedAt,
 				Matched: r.Matched, MatchedFrom: r.MatchedFrom,
 				MatchedIn: r.MatchedIn, MatchedRange: r.MatchedRange,
-				SuppressedBy: covering,
-				StatedBy:     answeredBy,
-				ClaimedBy:    claimedBy,
-				OpenedAt:     run.startedAt,
-				OpenedRunID:  &run.runID,
+				MatchedThrough: r.MatchedThrough,
+				SuppressedBy:   covering,
+				StatedBy:       answeredBy,
+				ClaimedBy:      claimedBy,
+				OpenedAt:       run.startedAt,
+				OpenedRunID:    &run.runID,
 			}
 			rated := run.ratings[vulnerabilityID]
 			ranked := Ranked{
@@ -1009,6 +1013,7 @@ func same(held heldFinding, found Finding) bool {
 		held.MatchedFrom == found.MatchedFrom &&
 		held.MatchedIn == found.MatchedIn &&
 		held.MatchedRange == found.MatchedRange &&
+		held.MatchedThrough == found.MatchedThrough &&
 		equalRef(held.SuppressedBy, found.SuppressedBy) &&
 		equalRef(held.StatedBy, found.StatedBy) &&
 		equalRef(held.ClaimedBy, found.ClaimedBy)

@@ -108,3 +108,33 @@ func TestNoSnapshotLeavesEveryReportAsTheScannerMadeIt(t *testing.T) {
 		t.Errorf("with no snapshot, the report became %+v", reported[0])
 	}
 }
+
+func TestEachReportCarriesTheFilesItsRecordLists(t *testing.T) {
+	listing := cverecord.Record{ID: "CVE-2024-26600", Affected: []cverecord.Entry{
+		{Vendor: "Linux", Product: "Linux", ProgramFiles: []string{"drivers/phy/ti/phy-omap-usb2.c"}},
+	}}
+	inventory := []graph.Described{upstreamKernel("6.12.41")}
+	reported := []finding.Reported{reportOf(inventory[0]), reportOf(inventory[0])}
+	reported[0].Issue = finding.Named{Identifier: "DSA-1", Aliases: []string{"CVE-2024-26600"}}
+	if err := narrow(snapshotHolding(t, listing), inventory, reported); err != nil {
+		t.Fatal(err)
+	}
+	if !reported[0].RecordRead || len(reported[0].RecordFiles) != 1 ||
+		reported[0].RecordFiles[0] != "drivers/phy/ti/phy-omap-usb2.c" {
+		t.Errorf("the report reads %v, %v, want the file its record lists", reported[0].RecordRead, reported[0].RecordFiles)
+	}
+	// An issue the snapshot holds no record of lists no files, and says the
+	// snapshot was read.
+	if !reported[1].RecordRead || len(reported[1].RecordFiles) != 0 {
+		t.Errorf("an issue with no record reads %v, %v", reported[1].RecordRead, reported[1].RecordFiles)
+	}
+
+	// With no snapshot nothing is said about any issue's files.
+	unread := []finding.Reported{reportOf(inventory[0])}
+	if err := narrow(nil, inventory, unread); err != nil {
+		t.Fatal(err)
+	}
+	if unread[0].RecordRead {
+		t.Error("no snapshot reads as one that was asked")
+	}
+}

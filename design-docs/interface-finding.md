@@ -43,6 +43,8 @@ The finding is the working screen before a decision and after it.
 | It says when it runs out and who holds it | |
 | It says how many of its occurrences are decided (REQ-57); the count the build argued away in its own VEX does not stand in | That reasoning is not ours |
 | It states how the match was made and where it came from (REQ-13), and nothing where the scanner said nothing | Unknown is not unconfirmed |
+| A match through a source package names the source and the files the issue's record lists, or says it lists none; a triager is offered Correct by source paths there, filled with the package and source, taking the paths one a line (REQ-90) | The paths are the one thing the finding cannot say |
+| A row a correction by source paths answered shows the files it was answered on and, where it was withdrawn, why: the files a later record listed or that it lists none, a match other than through the source, or an incident | |
 | Where to read about it is derived from the identifiers on the server at read time (REQ-18): the issue's record, each alias's, the packaging distribution's answer, the package's page; apart from the scanner's links, empty where a name resolves to no known scheme, fetched from nowhere | A machine client gets the same list |
 | Where it sits shows the chain | One parent is reached by several routes |
 | Where upstream currency is on (REQ-69), it says what upstream released and when; where an issue was named a full year after the last release and is unfixed, that is why there is no fix, never a claim the project is abandoned. Off, the panel is absent | Two year-numbers make five weeks look like five years |
@@ -56,7 +58,7 @@ The finding is the working screen before a decision and after it.
 | The rating form offers the four bands; a published "negligible" or "none" opens it on medium | Nothing it offers is milder than either |
 | A recorded flaw is closed from its own finding screen, the only kind offered the control; the panel says nothing else closes it and nothing reopens it | A scanner's finding is resolved by scans |
 | Starting an advisory mints one name, kept once it exists, and names the flaw once; a failed later step retries from where it stopped | A retry spends no second number |
-| What belongs to one finding is reset on walking to the next: the confirmation, the decision being extended, the rating form, the incident forms | The screen is not remounted on an address change |
+| What belongs to one finding is reset on walking to the next: the confirmation, the decision being extended, the rating form, the incident forms, the correction by source paths | The screen is not remounted on an address change |
 
 ### Build statements
 

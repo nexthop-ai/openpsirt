@@ -33,6 +33,7 @@ person agrees to, and the queue, approval, sending back and undoing work on it.
 | together | A bulk decision: many issues at one component |
 | extension | An approved decision carried to a new issue at the same component and consumer, with the same justification |
 | returned | The rows an approver set aside from a decision they agreed the rest of |
+| source | A correction by source paths, answering an issue on each scan reporting one it covers (`design-docs/triage-source-paths.md`) |
 
 A decision records its action, who took it and when, how a bulk set was
 narrowed, and, for an extension or a returned decision, its source.

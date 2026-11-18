@@ -19,9 +19,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/background"
 	"github.com/nexthop-ai/openpsirt/internal/bound"
+	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
@@ -208,6 +210,14 @@ type matchDetail struct {
 	Found struct {
 		VersionConstraint string `json:"versionConstraint"`
 	} `json:"found"`
+	// SearchedBy is what the match was looked up under. For a match through
+	// the source package a distribution's binary is built from, the package
+	// named is the source.
+	SearchedBy struct {
+		Package struct {
+			Name string `json:"name"`
+		} `json:"package"`
+	} `json:"searchedBy"`
 }
 
 // grypeMatch is one thing the scanner matched.
@@ -479,9 +489,10 @@ func reported(match grypeMatch, limits Limits) (*finding.Reported, error) {
 		// The source of *this* match, which is not always where the
 		// issue is written up. One issue reached through two ecosystems
 		// has two answers, and the issue can only hold one.
-		MatchedFrom:  strings.TrimSpace(match.Vulnerability.DataSource),
-		MatchedIn:    strings.TrimSpace(match.Vulnerability.Namespace),
-		MatchedRange: matchedRange(match.MatchDetails),
+		MatchedFrom:    strings.TrimSpace(match.Vulnerability.DataSource),
+		MatchedIn:      strings.TrimSpace(match.Vulnerability.Namespace),
+		MatchedRange:   matchedRange(match.MatchDetails),
+		MatchedThrough: matchedThrough(match.MatchDetails, match.Artifact.Name),
 	}, nil
 }
 
@@ -981,4 +992,32 @@ func deciding(details []matchDetail) (finding.Matched, *matchDetail) {
 		}
 	}
 	return finding.ByIdentifier, nil
+}
+
+// matchedThrough is the source package a match was made through, folded to
+// lower case, or empty where the match was not made through one alone.
+//
+// A distribution files an issue against the source package, and a scanner
+// matches every binary built from it through that name. Every detail has to be
+// such a match and name the same source: a detail matching the binary's own
+// name, or a CPE, is a match on the binary itself, and the source is then not
+// the whole of why it matched.
+func matchedThrough(details []matchDetail, artifact string) string {
+	through := ""
+	for _, detail := range details {
+		if !strings.EqualFold(strings.TrimSpace(detail.Type), "exact-indirect-match") {
+			return ""
+		}
+		name := strings.ToLower(strings.TrimSpace(detail.SearchedBy.Package.Name))
+		// A name past what a package name is stored in is read as none, so
+		// the match is answered by nothing rather than refused.
+		if name == "" || (through != "" && name != through) || utf8.RuneCountInString(name) > database.NameWidth {
+			return ""
+		}
+		through = name
+	}
+	if strings.EqualFold(through, strings.TrimSpace(artifact)) {
+		return ""
+	}
+	return through
 }

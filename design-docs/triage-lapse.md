@@ -59,6 +59,14 @@ one occurrence lapses, in the transaction applying the report, the merge naming
 its replacement (`design-docs/findings-issues.md` § Merged issues;
 `design-docs/notifications-work.md` § Decision outcomes).
 
+### A source answer withdrawn
+
+An answer of a correction by source paths lapses when it is withdrawn: the
+issue's record no longer bears it out, a scan matches the issue on the package
+itself, or an incident is recorded through the issue
+(`design-docs/triage-source-paths.md` § Withdrawn answers). The proposer is
+told which.
+
 ### Stopped standing
 
 | Where | Answer |
@@ -75,6 +83,7 @@ reason and no second approver.
 |---|---|
 | Nobody agreed to the previous decision | Asked of its agreements, never its state, since a proposed decision lapses too |
 | A severity risen since, on a decision it bears on | The agreement was about the lower risk |
+| An answer of a correction by source paths that was withdrawn | The agreement was not given over what withdrew it |
 
 | Decision | A risen severity bears on it | Reason |
 |---|---|---|
@@ -127,8 +136,8 @@ was made at.
 
 Lapsed decisions are reached by the findings list's `lapsed` state and the
 queue's To reaffirm tab, the reader's own. Neither lists nor offers a decision
-with a withdrawn row, nor a row at a code finding past its end of life, nor a
-decision with no other row (`design-docs/analysis-triage.md` § End of life).
+with a withdrawn row, nor a correction by source paths that was withdrawn, nor a
+row at a code finding past its end of life, nor a decision with no other row (`design-docs/analysis-triage.md` § End of life).
 
 ## Re-affirmation across decisions
 

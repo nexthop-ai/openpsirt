@@ -81,6 +81,9 @@ type WaitingBody struct {
 	// over many issues it describes the component and the build, with the
 	// representative issue.
 	Finding *core.FindingRefBody `json:"finding,omitempty" doc:"The representative decision occurrence's subject — build, issue, component, where it sits — so the card can be judged without opening it. Absent where no open finding sits at that occurrence"`
+	// Source is the rule a correction by source paths is, which is what its
+	// approver agrees to: every issue it answers, now and later.
+	Source *SourceRuleBody `json:"source,omitempty" doc:"What a correction by source paths names. Absent for any other decision"`
 }
 
 // CounterBody is what would make an approver disagree.
@@ -263,6 +266,11 @@ func registerTriage(api huma.API, in core.Deps) {
 				}
 			}
 			entry.Finding = named[i].Finding
+			if row.Decision.Kind == triage.SourceDecision {
+				if entry.Source, err = sourceRule(ctx, store, row.Decision.ID); err != nil {
+					return nil, core.WentWrong(in.Logger, "the review queue could not be read", err)
+				}
+			}
 			out.Body.Items = append(out.Body.Items, entry)
 		}
 		out.Body.Total = total

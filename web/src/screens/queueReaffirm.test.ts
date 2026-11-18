@@ -20,18 +20,39 @@ describe("whyLapsed", () => {
     expect(whyLapsed({ code_moved: true, rated_worse: false })).toEqual(["Code moved"]);
   });
   it("names the band a rise went between", () => {
-    expect(whyLapsed({ code_moved: false, rated_worse: true, was: "medium", now: "high" })).toEqual(
-      ["Rated worse: medium → high"],
-    );
+    expect(
+      whyLapsed({
+        code_moved: false,
+        rated_worse: true,
+        was: "medium",
+        now: "high",
+      }),
+    ).toEqual(["Rated worse: medium → high"]);
   });
   it("calls a decision made about an unrated issue unrated", () => {
     expect(whyLapsed({ code_moved: false, rated_worse: true, now: "critical" })).toEqual([
       "Rated worse: unrated → critical",
     ]);
   });
+  it("names what withdrew an answer of a correction by source paths", () => {
+    expect(
+      whyLapsed({ code_moved: false, rated_worse: false, source_withdrawn: "record" }),
+    ).toEqual(["Record no longer bears out the paths"]);
+    expect(whyLapsed({ code_moved: false, rated_worse: false, source_withdrawn: "match" })).toEqual(
+      ["Matched other than through the source"],
+    );
+    expect(
+      whyLapsed({ code_moved: false, rated_worse: false, source_withdrawn: "incident" }),
+    ).toEqual(["Incident recorded"]);
+  });
   it("names both where both hold", () => {
     expect(
-      whyLapsed({ code_moved: true, rated_worse: true, was: "low", now: "high" }),
+      whyLapsed({
+        code_moved: true,
+        rated_worse: true,
+        was: "low",
+        now: "high",
+      }),
     ).toHaveLength(2);
   });
 });
