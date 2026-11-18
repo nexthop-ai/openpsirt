@@ -156,11 +156,11 @@ func TestACorrectionBySourcePathsAnswersOnlyIssuesWhoseFilesLieOutside(t *testin
 		}
 
 		// Each answer records the files that justified it.
-		files, err := f.store.AnsweredOn(t.Context(), ids)
+		files, err := f.store.SourceAnswers(t.Context(), ids)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := files[answered[w.outside].ID]; !slices.Equal(got, []string{"drivers/phy/ti/phy-omap-usb2.c"}) {
+		if got := files[answered[w.outside].ID].AnsweredOn; !slices.Equal(got, []string{"drivers/phy/ti/phy-omap-usb2.c"}) {
 			t.Errorf("the answer to CVE-2024-26600 records %v", got)
 		}
 
@@ -228,11 +228,11 @@ func TestAnIssuePublishedLaterIsAnsweredByTheAgreedCorrection(t *testing.T) {
 		// The earlier issue sits in this build too, already answered.
 		f.throughSource(t, later, w.outside, w.perf, "place-of-linux-perf", "linux", access.Public)
 
-		n, err := f.store.AnswerBySource(t.Context(), later.build)
+		pass, err := f.store.AnswerBySource(t.Context(), later.build)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if n != 1 {
+		if n := pass.Answered; n != 1 {
 			t.Errorf("the scan answered %d occurrences, want the one new driver issue", n)
 		}
 		answered, _ := f.answeredIssues(t, proposed.DecisionID)
@@ -244,8 +244,8 @@ func TestAnIssuePublishedLaterIsAnsweredByTheAgreedCorrection(t *testing.T) {
 		}
 
 		// Answering again finds nothing new.
-		if n, err := f.store.AnswerBySource(t.Context(), later.build); err != nil || n != 0 {
-			t.Errorf("a second pass answered %d (%v), want none", n, err)
+		if again, err := f.store.AnswerBySource(t.Context(), later.build); err != nil || again.Answered != 0 {
+			t.Errorf("a second pass answered %d (%v), want none", again.Answered, err)
 		}
 	})
 }
@@ -288,12 +288,150 @@ func TestAWithdrawnCorrectionAnswersNothingMore(t *testing.T) {
 		}
 		later := f.kernelIssue(t, "CVE-2026-90300", "sound/core/pcm.c")
 		f.throughSource(t, w.in, later, w.perf, "place-of-linux-perf", "linux", access.Public)
-		n, err := f.store.AnswerBySource(t.Context(), w.in.build)
+		pass, err := f.store.AnswerBySource(t.Context(), w.in.build)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if n != 0 {
-			t.Errorf("a withdrawn correction answered %d occurrences", n)
+		if pass.Answered != 0 {
+			t.Errorf("a withdrawn correction answered %d occurrences", pass.Answered)
+		}
+	})
+}
+
+// setFiles puts what an issue's record now lists, or none.
+func (f *fixture) setFiles(t *testing.T, issue int64, files ...string) {
+	t.Helper()
+	var value any
+	if len(files) > 0 {
+		value = finding.JoinFiles(files)
+	}
+	if _, err := f.db.DB.NewUpdate().Table("vulnerability").
+		Set(`"program_files" = ?`, value).
+		Where(`"id" = ?`, issue).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// An answer a later record no longer bears out is withdrawn on the next
+// scan: the row lapses, the proposer is told, and the answer keeps the files
+// it was answered on beside the files the record lists now. An answer whose
+// record still puts every file outside stands, whatever else moved.
+func TestAnAnswerALaterRecordContradictsIsWithdrawn(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		w := f.perfWorld(t)
+		third := f.kernelIssue(t, "CVE-2026-90400", "net/ipv4/tcp.c")
+		f.throughSource(t, w.in, third, w.perf, "place-of-linux-perf", "linux", access.Public)
+		proposed, err := f.store.ProposeBySource(t.Context(), f.triager, f.perfCorrection())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := agreeTo(t.Context(), f.store, f.reviewer, proposed.DecisionID, ""); err != nil {
+			t.Fatal(err)
+		}
+		before, _ := f.answeredIssues(t, proposed.DecisionID)
+		if len(before) != 3 {
+			t.Fatalf("the correction answers %d issues, want three", len(before))
+		}
+
+		// The records move: one now names a file in perf, one names no
+		// files, one names another file outside the paths.
+		f.setFiles(t, w.outside, "drivers/phy/ti/phy-omap-usb2.c", "tools/perf/util/evsel.c")
+		f.setFiles(t, w.alsoOutside)
+		f.setFiles(t, third, "net/ipv4/tcp_input.c")
+
+		pass, err := f.store.AnswerBySource(t.Context(), w.in.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pass.Withdrawn.Rows != 2 {
+			t.Errorf("the scan withdrew %d answers, want the two the records no longer bear out", pass.Withdrawn.Rows)
+		}
+		if len(pass.Withdrawn.Told) != 1 || pass.Withdrawn.Told[0].PersonID != f.triager.ID ||
+			!pass.Withdrawn.Told[0].SourceFiles {
+			t.Errorf("who is told reads %+v, want the proposer, for the record", pass.Withdrawn.Told)
+		}
+		after, _ := f.answeredIssues(t, proposed.DecisionID)
+		for issue, why := range map[int64]string{
+			w.outside:     "an answer whose record now names a file under the paths",
+			w.alsoOutside: "an answer whose record now names no files",
+		} {
+			if _, ok := after[issue]; ok {
+				t.Errorf("%s still stands", why)
+			}
+			row := before[issue]
+			var state triage.State
+			if err := f.db.DB.NewSelect().Model((*triage.DecisionOccurrence)(nil)).Column("state").
+				Where(`"de"."id" = ?`, row.ID).Scan(t.Context(), &state); err != nil {
+				t.Fatal(err)
+			}
+			if state != triage.LapsedState {
+				t.Errorf("%s is %q, want lapsed so the finding is open for a person", why, state)
+			}
+		}
+		if _, ok := after[third]; !ok {
+			t.Error("an answer whose record still names only files outside was withdrawn")
+		}
+
+		answers, err := f.store.SourceAnswers(t.Context(),
+			[]int64{before[w.outside].ID, before[w.alsoOutside].ID, before[third].ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := answers[before[w.outside].ID]; !got.Withdrawn ||
+			!slices.Equal(got.AnsweredOn, []string{"drivers/phy/ti/phy-omap-usb2.c"}) ||
+			!slices.Equal(got.WithdrawnOn, []string{"drivers/phy/ti/phy-omap-usb2.c", "tools/perf/util/evsel.c"}) {
+			t.Errorf("the answer the perf file withdrew reads %+v", got)
+		}
+		if got := answers[before[w.alsoOutside].ID]; !got.Withdrawn || len(got.WithdrawnOn) != 0 ||
+			!slices.Equal(got.AnsweredOn, []string{"fs/jfs/jfs_dtree.c"}) {
+			t.Errorf("the answer an empty record withdrew reads %+v", got)
+		}
+		if got := answers[before[third].ID]; got.Withdrawn {
+			t.Errorf("the answer still borne out reads %+v", got)
+		}
+
+		// A second pass withdraws nothing more and answers nothing back.
+		again, err := f.store.AnswerBySource(t.Context(), w.in.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if again.Withdrawn.Rows != 0 || again.Answered != 0 {
+			t.Errorf("a second pass withdrew %d and answered %d, want neither", again.Withdrawn.Rows, again.Answered)
+		}
+	})
+}
+
+// A correction every answer of which a later record withdrew still stands, and
+// answers an issue published after; withdrawing it ends it.
+func TestACorrectionWhoseAnswersWereAllWithdrawnStillAnswers(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		w := f.perfWorld(t)
+		proposed, err := f.store.ProposeBySource(t.Context(), f.triager, f.perfCorrection())
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.setFiles(t, w.outside)
+		f.setFiles(t, w.alsoOutside)
+		if pass, err := f.store.AnswerBySource(t.Context(), w.in.build); err != nil || pass.Withdrawn.Rows != 2 {
+			t.Fatalf("the scan withdrew %d (%v), want both answers", pass.Withdrawn.Rows, err)
+		}
+
+		later := f.kernelIssue(t, "CVE-2026-90500", "mm/slub.c")
+		f.throughSource(t, w.in, later, w.perf, "place-of-linux-perf", "linux", access.Public)
+		pass, err := f.store.AnswerBySource(t.Context(), w.in.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pass.Answered != 1 {
+			t.Errorf("a correction whose answers were all withdrawn answered %d later issues, want one", pass.Answered)
+		}
+
+		if _, err := f.store.Withdraw(t.Context(), f.triager, proposed.DecisionID); err != nil {
+			t.Fatal(err)
+		}
+		f.setFiles(t, w.outside, "drivers/phy/ti/phy-omap-usb2.c")
+		if pass, err := f.store.AnswerBySource(t.Context(), w.in.build); err != nil || pass.Answered != 0 {
+			t.Errorf("a withdrawn correction answered %d (%v)", pass.Answered, err)
 		}
 	})
 }

@@ -210,6 +210,17 @@ export function Standing({
             <span className="v mono" title="Files the CVE record listed, all outside the paths">
               {(decision.answered_on ?? []).join(", ")}
             </span>
+            {decision.recanted && (
+              <span
+                className="hint"
+                title="A later CVE record listed a file under the paths, or none"
+              >
+                withdrawn:{" "}
+                {(decision.recanted_on ?? []).length > 0
+                  ? (decision.recanted_on ?? []).join(", ")
+                  : "the record lists no files"}
+              </span>
+            )}
           </div>
         )}
         {/* The evidence for a decision that the fix is already here, on the

@@ -13,6 +13,7 @@ const mount = mounted();
 const lapsed = (id: number) => ({
   code_moved: true,
   rated_worse: false,
+  source_files: false,
   decision: { id, kind: "finding", proposed_at: "2026-09-01T00:00:00Z", proposed_by: "ana" },
   decision_occurrence: {
     id: id * 10,

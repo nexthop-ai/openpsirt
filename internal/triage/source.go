@@ -56,6 +56,9 @@ type SourceCorrection struct {
 	// Paths is the paths within the source the package is built from, one a
 	// line in byte order.
 	Paths string `bun:"source_paths,notnull"`
+	// WithdrawnAt is when the decision was withdrawn, after which it answers
+	// nothing more.
+	WithdrawnAt *time.Time `bun:"withdrawn_at"`
 }
 
 // PathList is the paths a correction names.
@@ -71,6 +74,26 @@ type sourceAnswer struct {
 	ID                   int64  `bun:"id,pk,autoincrement"`
 	DecisionOccurrenceID int64  `bun:"decision_occurrence_id,notnull"`
 	Files                string `bun:"files,notnull"`
+	// WithdrawnAt and WithdrawnOn are when a later record withdrew the
+	// answer and the files that record listed, empty where it listed none.
+	WithdrawnAt *time.Time `bun:"withdrawn_at"`
+	WithdrawnOn *string    `bun:"withdrawn_on"`
+}
+
+// SourceAnswer is what one occurrence a correction by source paths answered
+// rests on: the files the record listed when it was answered and, where a
+// later record withdrew the answer, the files that record listed.
+type SourceAnswer struct {
+	AnsweredOn  []string
+	Withdrawn   bool
+	WithdrawnOn []string
+}
+
+// BySource is what one pass of the corrections by source paths over a build
+// did: the occurrences it answered, and the answers it withdrew.
+type BySource struct {
+	Answered  int
+	Withdrawn Lapsed
 }
 
 // SourceProposal is somebody proposing a correction by source paths.
@@ -208,16 +231,17 @@ func (s *Store) ProposeBySource(ctx context.Context, subject access.Subject,
 	return proposed, nil
 }
 
-// AnswerBySource answers, by each correction by source paths standing in the
-// build's product, every open finding of the build it covers that nothing
-// answers yet. A scan runs it once the findings are written, which is how an
-// issue published later is answered.
-//
-// It reports how many occurrences it answered.
-func (s *Store) AnswerBySource(ctx context.Context, buildID int64) (int, error) {
-	var answered int
+// AnswerBySource re-examines what the corrections by source paths standing in
+// the build's product have answered, then answers, by each, every open finding
+// of the build it covers that nothing answers yet. A scan runs it once the
+// findings and the records' files are written, which is how an issue
+// published later is answered and how an answer a later record contradicts is
+// withdrawn.
+func (s *Store) AnswerBySource(ctx context.Context, buildID int64) (BySource, error) {
+	var out BySource
+	var withdrawn []int64
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		answered = 0
+		out, withdrawn = BySource{}, nil
 		var productID int64
 		if err := tx.NewSelect().TableExpr(`"build" AS "b"`).
 			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
@@ -230,6 +254,13 @@ func (s *Store) AnswerBySource(ctx context.Context, buildID int64) (int, error) 
 			return err
 		}
 		for _, rule := range rules {
+			ids, err := within.recheckBy(ctx, rule)
+			if err != nil {
+				return err
+			}
+			withdrawn = append(withdrawn, ids...)
+		}
+		for _, rule := range rules {
 			decision := new(Decision)
 			if err := tx.NewSelect().Model(decision).Where(`"id" = ?`, rule.DecisionID).Scan(ctx); err != nil {
 				return fmt.Errorf("read correction %d: %w", rule.DecisionID, err)
@@ -238,21 +269,117 @@ func (s *Store) AnswerBySource(ctx context.Context, buildID int64) (int, error) 
 			if err != nil {
 				return err
 			}
-			answered += n
+			out.Answered += n
 		}
 		return nil
 	})
-	return answered, err
+	if err != nil || len(withdrawn) == 0 {
+		return out, err
+	}
+	// Committed, so what was withdrawn is reported even when reading who to
+	// tell fails part way.
+	out.Withdrawn.Rows = int64(len(withdrawn))
+	told, err := s.proposersOfAll(ctx, withdrawn, database.InBulk.Most)
+	for i := range told {
+		told[i].SourceFiles = true
+	}
+	out.Withdrawn.Told = told
+	return out, err
+}
+
+// recheckBy withdraws every live answer of a correction whose issue's record
+// no longer puts every file outside the paths: it now lists a file under one,
+// or lists none. The row lapses, which opens the finding for a person and
+// tells the proposer, and its answer keeps the files it was answered on beside
+// the moment and the files the record lists now.
+//
+// Every live answer in the product is examined, not only the scanned build's:
+// a record is one per issue, and the build that last reported it need not be
+// the one scanned next.
+func (s *Store) recheckBy(ctx context.Context, rule SourceCorrection) ([]int64, error) {
+	var live []struct {
+		ID              int64 `bun:"id"`
+		VulnerabilityID int64 `bun:"vulnerability_id"`
+	}
+	if err := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
+		Join(`JOIN "source_answer" AS "sa" ON "sa"."decision_occurrence_id" = "de"."id"`).
+		ColumnExpr(`"de"."id", "de"."vulnerability_id"`).
+		Where(`"de"."decision_id" = ?`, rule.DecisionID).
+		Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
+		Where(`"sa"."withdrawn_at" IS NULL`).
+		OrderExpr(`"de"."id"`).
+		Scan(ctx, &live); err != nil {
+		return nil, fmt.Errorf("read what correction %d answers: %w", rule.DecisionID, err)
+	}
+	if len(live) == 0 {
+		return nil, nil
+	}
+	issues := make([]int64, 0, len(live))
+	seen := map[int64]bool{}
+	for _, row := range live {
+		if !seen[row.VulnerabilityID] {
+			seen[row.VulnerabilityID] = true
+			issues = append(issues, row.VulnerabilityID)
+		}
+	}
+	files, err := finding.ProgramFiles(ctx, s.db, issues)
+	if err != nil {
+		return nil, err
+	}
+	paths := rule.PathList()
+	byFiles := map[string][]int64{}
+	var order []string
+	for _, row := range live {
+		listed := files[row.VulnerabilityID]
+		if outsideAll(listed, paths) {
+			continue
+		}
+		on := strings.Join(listed, "\n")
+		if _, ok := byFiles[on]; !ok {
+			order = append(order, on)
+		}
+		byFiles[on] = append(byFiles[on], row.ID)
+	}
+	if len(order) == 0 {
+		return nil, nil
+	}
+	moment := s.now().Truncate(time.Microsecond)
+	var withdrawn []int64
+	for _, on := range order {
+		ids := byFiles[on]
+		for start := 0; start < len(ids); start += database.BatchSize {
+			chunk := ids[start:min(start+database.BatchSize, len(ids))]
+			changed, err := markLapsed(ctx, s.db, chunk, moment)
+			if err != nil {
+				return nil, fmt.Errorf("withdraw what correction %d answered: %w", rule.DecisionID, err)
+			}
+			if changed != int64(len(chunk)) {
+				return nil, database.ErrGoAgain
+			}
+			if _, err := s.db.NewUpdate().Model((*sourceAnswer)(nil)).
+				Set(`"withdrawn_at" = ?`, moment).
+				Set(`"withdrawn_on" = ?`, on).
+				Where(`"sa"."decision_occurrence_id" IN (?)`, bun.List(chunk)).
+				Exec(ctx); err != nil {
+				return nil, fmt.Errorf("record why correction %d stopped answering: %w", rule.DecisionID, err)
+			}
+			withdrawn = append(withdrawn, chunk...)
+		}
+	}
+	return withdrawn, nil
 }
 
 // standingBySource is the corrections by source paths in a product that still
-// answer: those with a row neither withdrawn nor set aside.
+// answer: those not withdrawn, holding a live row or a row a later record
+// withdrew. A correction whose rows were all set aside answers nothing.
 func (s *Store) standingBySource(ctx context.Context, productID int64) ([]SourceCorrection, error) {
 	var rules []SourceCorrection
 	if err := s.db.NewSelect().Model(&rules).
 		Where(`"sc"."product_id" = ?`, productID).
+		Where(`"sc"."withdrawn_at" IS NULL`).
 		Where(`EXISTS (SELECT 1 FROM "decision_occurrence" AS "lv" WHERE "lv"."decision_id" = "sc"."decision_id" ` +
-			`AND "lv"."live_key" IS NOT NULL)`).
+			`AND ("lv"."live_key" IS NOT NULL OR EXISTS (SELECT 1 FROM "source_answer" AS "lsa" ` +
+			`WHERE "lsa"."decision_occurrence_id" = "lv"."id" AND "lsa"."withdrawn_at" IS NOT NULL)))`).
 		Order("sc.id").
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("read the corrections by source paths standing here: %w", err)
@@ -275,11 +402,11 @@ func (s *Store) SourceOf(ctx context.Context, decisionID int64) (*SourceCorrecti
 	return &rules[0], nil
 }
 
-// AnsweredOn is the files that justified each of these decision occurrences,
-// for those a correction by source paths wrote. The rows' own reading rights
-// are the caller's to have asked.
-func (s *Store) AnsweredOn(ctx context.Context, occurrenceIDs []int64) (map[int64][]string, error) {
-	out := map[int64][]string{}
+// SourceAnswers is what each of these decision occurrences rests on, for
+// those a correction by source paths wrote. The rows' own reading rights are
+// the caller's to have asked.
+func (s *Store) SourceAnswers(ctx context.Context, occurrenceIDs []int64) (map[int64]SourceAnswer, error) {
+	out := map[int64]SourceAnswer{}
 	for start := 0; start < len(occurrenceIDs); start += database.BatchSize {
 		end := min(start+database.BatchSize, len(occurrenceIDs))
 		var answers []sourceAnswer
@@ -289,7 +416,11 @@ func (s *Store) AnsweredOn(ctx context.Context, occurrenceIDs []int64) (map[int6
 			return nil, fmt.Errorf("read the files a correction answered on: %w", err)
 		}
 		for _, answer := range answers {
-			out[answer.DecisionOccurrenceID] = strings.Split(answer.Files, "\n")
+			one := SourceAnswer{AnsweredOn: strings.Split(answer.Files, "\n"), Withdrawn: answer.WithdrawnAt != nil}
+			if answer.WithdrawnOn != nil && *answer.WithdrawnOn != "" {
+				one.WithdrawnOn = strings.Split(*answer.WithdrawnOn, "\n")
+			}
+			out[answer.DecisionOccurrenceID] = one
 		}
 	}
 	return out, nil

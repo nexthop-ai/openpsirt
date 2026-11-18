@@ -39,6 +39,9 @@ func sourceCorrectionV0140(t *columnTypes) []string {
 			"package_name" ` + t.name + ` NOT NULL,
 			"source_name"  ` + t.name + ` NOT NULL,
 			"source_paths" ` + t.text + ` NOT NULL,
+			-- When the decision was withdrawn, after which the correction
+			-- answers nothing more. Null while it stands.
+			"withdrawn_at" ` + t.timestamp + ` NULL,
 			CONSTRAINT "source_correction_decision_unique" UNIQUE ("decision_id"),
 			CONSTRAINT "source_correction_decision_fk" FOREIGN KEY ("decision_id") REFERENCES "decision"("id"),
 			CONSTRAINT "source_correction_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id")
@@ -54,11 +57,16 @@ func sourceAnswerV0140(t *columnTypes) []string {
 	return []string{
 		// The files the issue's record listed when the row was written, one
 		// a line in byte order. Kept, because the record can change after
-		// and the row is answered on what it said then.
+		// and the row is answered on what it said then. Withdrawn when a
+		// later record no longer puts every file outside the paths: the
+		// moment, and the files that record listed, empty where it lists
+		// none.
 		`CREATE TABLE "source_answer" (
 			"id"                     ` + t.id + `,
 			"decision_occurrence_id" ` + t.ref + ` NOT NULL,
 			"files"                  ` + t.text + ` NOT NULL,
+			"withdrawn_at"           ` + t.timestamp + ` NULL,
+			"withdrawn_on"           ` + t.text + ` NULL,
 			CONSTRAINT "source_answer_occurrence_unique" UNIQUE ("decision_occurrence_id"),
 			CONSTRAINT "source_answer_occurrence_fk" FOREIGN KEY ("decision_occurrence_id") REFERENCES "decision_occurrence"("id")
 		)` + t.suffix,

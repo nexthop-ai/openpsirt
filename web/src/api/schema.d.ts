@@ -10681,6 +10681,10 @@ export interface components {
             proposed_by_name?: string;
             /** @description The justification as it currently stands, in markdown. Empty where you may read only some of the occurrences the decision covers */
             reasoning: string;
+            /** @description Whether a later CVE record withdrew this answer of a correction by source paths, by listing a file under the paths or no files at all. The row has lapsed and the finding is open for a person */
+            recanted?: boolean;
+            /** @description The files the CVE record listed when it withdrew the answer. Absent where it listed none */
+            recanted_on?: string[] | null;
         };
         DecisionOccurrencesOutputBody: {
             /**
@@ -16343,6 +16347,8 @@ export interface components {
              * @description The number of its occurrences that lapsed, counting one occurrence at two versions twice
              */
             rows: number;
+            /** @description Whether a later CVE record withdrew an answer of a correction by source paths, by listing a file under the paths or no files at all */
+            source_files: boolean;
             /** @description How bad that issue was judged to be when the decision was made, or the representative issue where none was rated worse. Absent where it was unrated */
             was?: string;
         };

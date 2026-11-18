@@ -44,7 +44,7 @@ The finding is the working screen before a decision and after it.
 | It says how many of its occurrences are decided (REQ-57); the count the build argued away in its own VEX does not stand in | That reasoning is not ours |
 | It states how the match was made and where it came from (REQ-13), and nothing where the scanner said nothing | Unknown is not unconfirmed |
 | A match through a source package names the source and the files the issue's record lists, or says it lists none; a triager is offered Correct by source paths there, filled with the package and source, taking the paths one a line (REQ-90) | The paths are the one thing the finding cannot say |
-| A row a correction by source paths answered shows the files it was answered on | |
+| A row a correction by source paths answered shows the files it was answered on and, where a later record withdrew it, the files that record listed, or that it lists none | |
 | Where to read about it is derived from the identifiers on the server at read time (REQ-18): the issue's record, each alias's, the packaging distribution's answer, the package's page; apart from the scanner's links, empty where a name resolves to no known scheme, fetched from nowhere | A machine client gets the same list |
 | Where it sits shows the chain | One parent is reached by several routes |
 | Where upstream currency is on (REQ-69), it says what upstream released and when; where an issue was named a full year after the last release and is unfixed, that is why there is no fix, never a claim the project is abandoned. Off, the panel is absent | Two year-numbers make five weeks look like five years |

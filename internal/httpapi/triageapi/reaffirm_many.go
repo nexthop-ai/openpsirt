@@ -27,6 +27,7 @@ type ToReaffirmBody struct {
 	Finding            *core.FindingRefBody        `json:"finding,omitempty" doc:"The finding at the representative occurrence. Absent where no open finding sits there"`
 	LapsedAt           string                      `json:"lapsed_at,omitempty" doc:"When it lapsed"`
 	CodeMoved          bool                        `json:"code_moved" doc:"Whether a version moved under it"`
+	SourceFiles        bool                        `json:"source_files" doc:"Whether a later CVE record withdrew an answer of a correction by source paths, by listing a file under the paths or no files at all"`
 	// Was and Now are about the first issue rated worse, where one was.
 	RatedWorse bool   `json:"rated_worse" doc:"Whether an issue the decision covers now sits in a higher band than when the decision was made, on a decision a severity bears on"`
 	Was        string `json:"was,omitempty" doc:"How bad that issue was judged to be when the decision was made, or the representative issue where none was rated worse. Absent where it was unrated"`
@@ -96,8 +97,8 @@ func registerReaffirmMany(api huma.API, in core.Deps) {
 				Occurrence:         named[i].Occurrence,
 				Reasoning:          row.Reasoning,
 				Rows:               row.Rows, Issues: row.Issues, Occurrences: row.Occurrences,
-				Finding:    named[i].Finding,
-				CodeMoved:  row.CodeMoved,
+				Finding:   named[i].Finding,
+				CodeMoved: row.CodeMoved, SourceFiles: row.SourceFiles,
 				RatedWorse: row.RatedWorse,
 				Was:        finding.SeverityWord(row.Was),
 				Now:        finding.SeverityWord(row.Now),

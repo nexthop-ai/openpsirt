@@ -59,6 +59,12 @@ one occurrence lapses, in the transaction applying the report, the merge naming
 its replacement (`design-docs/findings-issues.md` § Merged issues;
 `design-docs/notifications-work.md` § Decision outcomes).
 
+### A record moved
+
+An answer of a correction by source paths lapses when the issue's record no
+longer bears it out (`design-docs/triage-source-paths.md` § Withdrawn answers).
+The proposer is told the record moved.
+
 ### Stopped standing
 
 | Where | Answer |

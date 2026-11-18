@@ -268,6 +268,8 @@ type DecisionOccurrenceDetail struct {
 	ProposedAt     string          `json:"proposed_at" doc:"The moment the decision was made"`
 	AgeDays        int             `json:"age_days" doc:"The age of the decision. An old decision should look like one"`
 	AnsweredOn     []string        `json:"answered_on,omitempty" doc:"The files the issue's CVE record listed when a correction by source paths answered this occurrence, every one outside the paths the package is built from. Absent for any other decision"`
+	Recanted       bool            `json:"recanted,omitempty" doc:"Whether a later CVE record withdrew this answer of a correction by source paths, by listing a file under the paths or no files at all. The row has lapsed and the finding is open for a person"`
+	RecantedOn     []string        `json:"recanted_on,omitempty" doc:"The files the CVE record listed when it withdrew the answer. Absent where it listed none"`
 }
 
 // DecisionArgument renders what a decision says, with the reasoning it
@@ -364,7 +366,7 @@ func DescribeDecisionOccurrences(ctx context.Context, db bun.IDB, store *triage.
 	for _, occurrence := range occurrences {
 		ids = append(ids, occurrence.ID)
 	}
-	answeredOn, err := store.AnsweredOn(ctx, ids)
+	answers, err := store.SourceAnswers(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -385,7 +387,9 @@ func DescribeDecisionOccurrences(ctx context.Context, db bun.IDB, store *triage.
 			ProposedByName: who.Label(occurrence.ProposedBy),
 			ProposedAt:     Stamp(occurrence.ProposedAt),
 			AgeDays:        int(store.Age(&occurrence).Hours() / 24),
-			AnsweredOn:     answeredOn[occurrence.ID],
+			AnsweredOn:     answers[occurrence.ID].AnsweredOn,
+			Recanted:       answers[occurrence.ID].Withdrawn,
+			RecantedOn:     answers[occurrence.ID].WithdrawnOn,
 		})
 	}
 	return details, nil

@@ -33,6 +33,9 @@ type ToReaffirm struct {
 	// on a decision a severity bears on. Both can hold.
 	CodeMoved  bool
 	RatedWorse bool
+	// SourceFiles says a later CVE record withdrew an answer of a correction by
+	// source paths, recorded when it did.
+	SourceFiles bool
 	// Was and Now are how bad the issue was judged to be when the decision was
 	// made and how bad it is judged to be here now: for the first row rated
 	// worse where one was, and for the representative row otherwise.
@@ -125,6 +128,14 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 	if err != nil {
 		return nil, 0, err
 	}
+	lapsedIDs := make([]int64, 0, len(lapsedRows))
+	for _, row := range lapsedRows {
+		lapsedIDs = append(lapsedIDs, row.ID)
+	}
+	recanted, err := s.SourceAnswers(ctx, lapsedIDs)
+	if err != nil {
+		return nil, 0, err
+	}
 	keys := make([][2]int64, 0, len(lapsedRows))
 	for _, row := range lapsedRows {
 		keys = append(keys, [2]int64{row.ProductID, row.VulnerabilityID})
@@ -137,6 +148,9 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 		entry := gathered[row.DecisionID]
 		if moved[row.ID] {
 			entry.CodeMoved = true
+		}
+		if recanted[row.ID].Withdrawn {
+			entry.SourceFiles = true
 		}
 		key := [2]int64{row.ProductID, row.VulnerabilityID}
 		if !entry.RatedWorse && turnsOnSeverity(entry.Decision) &&

@@ -14,6 +14,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
+	"github.com/nexthop-ai/openpsirt/internal/triage"
 )
 
 // linuxPerf is a binary package built from a slice of the kernel's source.
@@ -105,6 +106,65 @@ func TestACorrectionBySourcePathsIsProposedAndReadBack(t *testing.T) {
 		if len(rows.Items) != 1 || rows.Items[0].Occurrence.Vulnerability != "CVE-2024-26600" ||
 			!slices.Equal(rows.Items[0].AnsweredOn, []string{"drivers/phy/ti/phy-omap-usb2.c"}) {
 			t.Errorf("the decision's occurrences read as %+v", rows.Items)
+		}
+
+		// The build's VEX document says nothing of it until a second person
+		// agrees, then says not affected, with the reason, as of any wrong match.
+		const vexAt = "/v1/products/mine/branches-and-tags/master/variants/broadcom/vex"
+		type statement struct {
+			Vulnerability struct {
+				Name string `json:"name"`
+			} `json:"vulnerability"`
+			Status          string `json:"status"`
+			Justification   string `json:"justification"`
+			ImpactStatement string `json:"impact_statement"`
+		}
+		var waiting struct {
+			Statements []statement `json:"statements"`
+		}
+		httpapitest.Read(t, r, "triager", vexAt, &waiting)
+		if len(waiting.Statements) != 0 {
+			t.Errorf("a correction nobody agreed to publishes %+v", waiting.Statements)
+		}
+		r.Agreed(t, made.DecisionID)
+		var agreed struct {
+			Statements []statement `json:"statements"`
+		}
+		httpapitest.Read(t, r, "triager", vexAt, &agreed)
+		if len(agreed.Statements) != 1 || agreed.Statements[0].Vulnerability.Name != "CVE-2024-26600" ||
+			agreed.Statements[0].Status != "not_affected" ||
+			agreed.Statements[0].Justification != "vulnerable_code_not_present" ||
+			agreed.Statements[0].ImpactStatement != "" {
+			t.Errorf("the agreed correction publishes %+v, want the driver issue not affected", agreed.Statements)
+		}
+
+		// A later record naming a file in perf withdraws the answer, and the
+		// row says so beside the files it was answered on.
+		if _, err := r.DB.DB.NewUpdate().Table("vulnerability").
+			Set(`"program_files" = ?`, "drivers/phy/ti/phy-omap-usb2.c\ntools/perf/util/evsel.c").
+			Where(`"identifier" = ?`, "CVE-2024-26600").Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		var buildID int64
+		if err := r.DB.DB.NewSelect().Table("finding").Column("build_id").Limit(1).
+			Scan(t.Context(), &buildID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := triage.NewStore(r.DB.DB).AnswerBySource(t.Context(), buildID); err != nil {
+			t.Fatal(err)
+		}
+		var recanted struct {
+			Items []struct {
+				AnsweredOn []string `json:"answered_on"`
+				Recanted   bool     `json:"recanted"`
+				RecantedOn []string `json:"recanted_on"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/decision-occurrences?product=mine", &recanted)
+		if len(recanted.Items) != 1 || !recanted.Items[0].Recanted ||
+			!slices.Equal(recanted.Items[0].AnsweredOn, []string{"drivers/phy/ti/phy-omap-usb2.c"}) ||
+			!slices.Equal(recanted.Items[0].RecantedOn, []string{"drivers/phy/ti/phy-omap-usb2.c", "tools/perf/util/evsel.c"}) {
+			t.Errorf("the withdrawn answer reads as %+v", recanted.Items)
 		}
 
 		// Naming the paths of the whole source answers nothing, and says so.

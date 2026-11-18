@@ -233,6 +233,14 @@ func (s *Store) Withdraw(ctx context.Context, subject access.Subject, decisionID
 			Where(`"withdrawn_at" IS NULL`).Exec(ctx); err != nil {
 			return fmt.Errorf("withdraw a decision: %w", err)
 		}
+		// A correction by source paths answers nothing more, its rows a later
+		// record withdrew included.
+		if _, err := tx.NewUpdate().Model((*SourceCorrection)(nil)).
+			Set(`"withdrawn_at" = ?`, now).
+			Where(`"sc"."decision_id" = ?`, decisionID).
+			Where(`"sc"."withdrawn_at" IS NULL`).Exec(ctx); err != nil {
+			return fmt.Errorf("withdraw a decision: %w", err)
+		}
 		if _, err := tx.NewUpdate().Model((*DecisionOccurrence)(nil)).
 			Set(`"state" = ?`, Withdrawn).
 			Set(`"ended_at" = ?`, now).
@@ -325,6 +333,9 @@ type ForPerson struct {
 	// RatedWorse says the rows lapsed because the issue was rated worse,
 	// rather than because the code moved.
 	RatedWorse bool
+	// SourceFiles says the rows were answers of a correction by source paths
+	// that the issue's record no longer bears out.
+	SourceFiles bool
 }
 
 func (s *Store) undoBatch(ctx context.Context, subject access.Subject, batch string) (Undone, error) {

@@ -4639,6 +4639,16 @@ components:
         reasoning:
           description: The justification as it currently stands, in markdown. Empty where you may read only some of the occurrences the decision covers
           type: string
+        recanted:
+          description: Whether a later CVE record withdrew this answer of a correction by source paths, by listing a file under the paths or no files at all. The row has lapsed and the finding is open for a person
+          type: boolean
+        recanted_on:
+          description: The files the CVE record listed when it withdrew the answer. Absent where it listed none
+          items:
+            type: string
+          type:
+            - array
+            - "null"
       required:
         - decision_occurrence
         - occurrence
@@ -14672,6 +14682,9 @@ components:
           description: The number of its occurrences that lapsed, counting one occurrence at two versions twice
           format: int64
           type: integer
+        source_files:
+          description: Whether a later CVE record withdrew an answer of a correction by source paths, by listing a file under the paths or no files at all
+          type: boolean
         was:
           description: How bad that issue was judged to be when the decision was made, or the representative issue where none was rated worse. Absent where it was unrated
           type: string
@@ -14684,6 +14697,7 @@ components:
         - issues
         - occurrences
         - code_moved
+        - source_files
         - rated_worse
       type: object
     ToReaffirmOutputBody:
