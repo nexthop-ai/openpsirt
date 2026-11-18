@@ -353,6 +353,11 @@ describe("the Dependencies trend", () => {
     mount.render(screen(<Home who={person([readingDependencies("sonic")])} />, "/"));
     await settle();
     expect(steps[0]).toEqual({ days: 30, weeks: undefined });
+    const scanned = [...mount.host().querySelectorAll("button")].find(
+      (each) => each.textContent === "Scan date",
+    );
+    await act(async () => scanned?.click());
+    await settle();
     const weekly = [...mount.host().querySelectorAll("button")].find(
       (each) => each.textContent === "Weekly",
     );
@@ -369,8 +374,62 @@ describe("the Dependencies trend", () => {
     );
     mount.render(screen(<Home who={person([readingDependencies("sonic")])} />, "/"));
     await settle();
+    const scanned = [...mount.host().querySelectorAll("button")].find(
+      (each) => each.textContent === "Scan date",
+    );
+    await act(async () => scanned?.click());
+    await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("Nothing open or moving in 30 days.");
     expect(text).not.toContain("First scan or gap");
+  });
+
+  it("plots by build date by default, offering Daily and Weekly only by scan date", async () => {
+    const asked: unknown[] = [];
+    serve((path, init) => {
+      if (path === "/v1/trend/built") {
+        asked.push((init as { params?: { query?: Record<string, unknown> } }).params?.query);
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Home who={person([readingDependencies("sonic")])} />, "/"));
+    await settle();
+    expect(asked).toHaveLength(1);
+    expect(mount.host().textContent).toContain("No scanned uploads to plot.");
+    const buttons = () => [...mount.host().querySelectorAll("button")].map((b) => b.textContent);
+    expect(buttons()).not.toContain("Weekly");
+    const scanned = [...mount.host().querySelectorAll("button")].find(
+      (each) => each.textContent === "Scan date",
+    );
+    await act(async () => scanned?.click());
+    await settle();
+    expect(buttons()).toContain("Weekly");
+  });
+
+  it("reads two build dates as a direction", async () => {
+    serve((path) =>
+      path === "/v1/trend/built"
+        ? {
+            data: {
+              items: [
+                {
+                  at: "2026-09-09",
+                  open: 13037,
+                  baseline: 13037,
+                  first_scans: 1,
+                  by_severity: { critical: 740 },
+                },
+                { at: "2026-11-17", open: 6501, corrected: 6536, by_severity: { critical: 420 } },
+              ],
+            },
+          }
+        : { data: { items: [], total: 0 } },
+    );
+    mount.render(screen(<Home who={person([readingDependencies("sonic")])} />, "/"));
+    await settle();
+    const text = mount.host().textContent ?? "";
+    expect(text).toContain("Backlog shrinking · open down 6,536");
+    expect(text).toContain("Critical 740 → 420");
+    expect(text).not.toContain("Not enough history");
   });
 });

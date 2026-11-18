@@ -167,7 +167,7 @@ release readiness. Each counts dependency findings, drawn under `design-docs/int
 | Rule | Reason |
 |---|---|
 | Open is the trend's latest point at every scope, counting an issue at each component | A tile switching unit as the picker moves quotes two figures for one word |
-| The trend panel draws thirty daily steps, or twelve weekly ones once switched; severity over time follows it | A team fixing dozens a day sees it by the day (`design-docs/analytics-program.md` § Trends) |
+| The trend panel plots by build date unless Scan date is picked: the twelve latest days holding a build, to scale in time; by scan date, thirty daily steps, or twelve weekly ones once switched; severity over time follows it | Each build reads as what it shipped then, and the gap between builds is the time they took (`design-docs/analytics-program.md` § Build date axis); a team fixing dozens a day sees its work by the scan day (§ Trends) |
 | Known exploited is drawn only with a product picked | The list across products counts a row per product |
 
 | Panel | Rule |

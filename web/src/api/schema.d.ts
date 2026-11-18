@@ -7566,6 +7566,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trend/built": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show the findings trend by build date
+         * @description Returns the findings trend with each point at a build date: one point per day or week holding the build time an upload in the selection states, oldest first, each dated by its step's last day. Steps end at midnight UTC, as on the findings trend.
+         *
+         *     At a point, each build counts as its newest upload built by then leaves it. The upload a build holds is counted now. A replaced one is counted as of the last scan of its build that started while it was current, never against today's vulnerability data. An upload no scan reached before it was replaced is passed over.
+         *
+         *     Counted as the findings trend counts: one issue in three packages is three, and a package at a new version is the same package. Flows compare a point with the one before: `new` is open now and at no earlier point; `returned` is open now, not at the point before, and at an earlier one; `corrected` was open at the point before, is not now, and left by a fix; what a build's first upload brought is `baseline`, and `first_scans` says how many builds' first uploads the point is. The first point has nothing before it, so only its baseline moves. `restored` is always zero.
+         *
+         *     `component`, `purl` and `beneath` narrow as on the findings trend.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-built-trend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trend/releases": {
         parameters: {
             query?: never;
@@ -7586,34 +7614,6 @@ export interface paths {
          *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
          */
         get: operations["get-release-trend"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/trend/uploads": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Plot a build's exposure by build time
-         * @description One point per upload of one build, oldest first, placed at the build time its inventory states, with the issues at components open while it was current, split by severity.
-         *
-         *     The inventory the build holds is counted now. A replaced one is counted as of the last scan of the build that started while it was current, never against today's vulnerability data; `as_of` says which moment. An upload no scan reached before it was replaced is no point.
-         *
-         *     Counted as the findings trend counts: one issue in three packages is three, and a package at a new version is the same package.
-         *
-         *     A product, a branch or tag, and a variant must be named, since the uploads are one build's. `component`, `purl` and `beneath` narrow as on the findings trend.
-         *
-         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
-         */
-        get: operations["get-upload-trend"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12752,17 +12752,6 @@ export interface components {
             /** Format: int64 */
             total?: number;
         };
-        ListBodyUploadPointBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ListBodyUploadPointBody.json
-             */
-            readonly $schema?: string;
-            items: components["schemas"]["UploadPointBody"][] | null;
-            /** Format: int64 */
-            total?: number;
-        };
         ListBodyUpstreamSaidBody: {
             /**
              * Format: uri
@@ -16470,34 +16459,6 @@ export interface components {
              * @enum {string}
              */
             status: "in-progress" | "completed" | "failed" | "refused";
-        };
-        UploadPointBody: {
-            /**
-             * Format: date-time
-             * @description The moment counted: the start of the last scan of the build while this inventory was current, or now for the inventory the build holds
-             */
-            as_of: string;
-            /**
-             * Format: date-time
-             * @description The build time the inventory states, which places the point
-             */
-            built_at: string;
-            /** @description Open, split by severity */
-            by_severity: {
-                [key: string]: number;
-            };
-            /** @description Whether the build holds this inventory now. A replaced one is counted as of its last scan, never against today's vulnerability data */
-            current: boolean;
-            /**
-             * Format: int64
-             * @description Issues at components open at that moment
-             */
-            open: number;
-            /**
-             * Format: int64
-             * @description The scan this upload became, as its receipt names it
-             */
-            scan_id: number;
         };
         UploadResult: {
             /**
@@ -29195,7 +29156,7 @@ export interface operations {
             };
         };
     };
-    "get-release-trend": {
+    "get-built-trend": {
         parameters: {
             query?: {
                 /** @description Limit to one product, by name. Empty means every product you can see */
@@ -29204,45 +29165,9 @@ export interface operations {
                 branch_or_tag?: string;
                 /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
                 variant?: string;
-                /** @description The number of releases, most recent kept */
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Get-release-trendResponse"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
-    };
-    "get-upload-trend": {
-        parameters: {
-            query?: {
-                /** @description Limit to one product, by name. Empty means every product you can see */
-                product?: string;
-                /** @description Limit to one branch or tag. Only meaningful with a product */
-                branch_or_tag?: string;
-                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
-                variant?: string;
-                /** @description The number of uploads, most recent kept */
+                /** @description Whether build times are grouped by week rather than by day */
+                weekly?: boolean;
+                /** @description The number of points, most recent kept. Only steps holding a build time are points */
                 limit?: number;
                 /** @description Keep only what is open against components of this name, whatever version */
                 component?: string;
@@ -29271,7 +29196,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyUploadPointBody"];
+                    "application/json": components["schemas"]["ListBodyPointBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-release-trend": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                /** @description The number of releases, most recent kept */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Get-release-trendResponse"];
                 };
             };
             /** @description Error */

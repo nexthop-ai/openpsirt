@@ -30,7 +30,7 @@ func Register(api huma.API, in core.Deps) {
 	registerRemediation(api, in)
 	registerNotes(api, in)
 	registerReleaseTrend(api, in)
-	registerUploadTrend(api, in)
+	registerBuiltTrend(api, in)
 	registerCarrying(api, in)
 	registerDue(api, in)
 	registerExport(api, in)

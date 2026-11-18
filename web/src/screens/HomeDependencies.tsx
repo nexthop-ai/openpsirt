@@ -15,8 +15,9 @@ import {
   PaceLegend,
   Releases,
   Ring,
-  Uploads,
+  AxisSwitch,
   StepSwitch,
+  type TrendAxis,
   type TrendStep,
   stepQuery,
   stepSaid,
@@ -85,6 +86,25 @@ export function DependencyFigures({
       unwrap(await api.GET("/v1/trend", { params: { query: { ...stepQuery(step), ...scope } } })),
   });
   const points = trend.data?.items ?? [];
+  // By build date unless scan date is picked: each build's exposure at the
+  // date its inventory states, so two images months apart sit months apart
+  // even when both were sent today. Scan date stays a click away for the
+  // workload a deadline is measured against.
+  const [axis, setAxis] = useState<TrendAxis>("built");
+  // Daily points by build date, drawn to scale in time, so the gaps between
+  // builds read as the time they took and a weekly step adds nothing.
+  const built = useQuery({
+    queryKey: ["home", "built-trend", scope],
+    enabled: figures && axis === "built",
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/v1/trend/built", {
+          params: { query: { ...scope } },
+        }),
+      ),
+  });
+  const plotted = axis === "built" ? built : trend;
+  const shown = plotted.data?.items ?? [];
   // The other axis. Asked for whenever a product is picked, and drawn instead
   // of the calendar where the product has releases to plot: a tag never moves
   // again, and releases months apart read on a calendar as slow drift rather
@@ -95,16 +115,6 @@ export function DependencyFigures({
     queryFn: async () =>
       unwrap(await api.GET("/v1/trend/releases", { params: { query: { limit: 12, ...scope } } })),
   });
-  // One build's uploads at the build time each states. Asked for where a
-  // whole build is picked, and drawn where it has two uploads to compare.
-  const whole = !!at.product && !!at.branch_or_tag && !!at.variant;
-  const uploads = useQuery({
-    queryKey: ["home", "upload-trend", scope],
-    enabled: figures && whole,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/trend/uploads", { params: { query: { limit: 12, ...scope } } })),
-  });
-  const uploadPoints = uploads.data?.items ?? [];
   // Two releases is the fewest that is a shape. One bar reads as broken
   // rather than as sparse, so the calendar stays until there are two.
   const byRelease = (releases.data?.items ?? []).length >= 2;
@@ -298,28 +308,41 @@ export function DependencyFigures({
               {byRelease ? "Open issues in each release" : "Trend: open, new and corrected issues"}
             </h3>
             <span className="eyebrow" style={{ marginLeft: "auto" }}>
-              {byRelease ? "release over release" : stepSaid(step)} · {counting}
+              {byRelease ? "release over release" : axisSaid(axis, step)} · {counting}
             </span>
-            {!byRelease && <StepSwitch step={step} onStep={setStep} />}
+            {!byRelease && <AxisSwitch axis={axis} onAxis={setAxis} />}
+            {!byRelease && axis === "scanned" && <StepSwitch step={step} onStep={setStep} />}
           </header>
-          {trend.isError ? (
-            <Failed error={trend.error} what="The trend could not be read." />
+          {plotted.isError ? (
+            <Failed error={plotted.error} what="The trend could not be read." />
           ) : releases.isError ? (
             <Failed error={releases.error} what="The release trend could not be read." />
-          ) : trend.isPending || (!!at.product && releases.isPending) ? (
+          ) : plotted.isPending || (!!at.product && releases.isPending) ? (
             <Loading />
           ) : byRelease ? (
             <>
               <Releases points={releases.data?.items ?? []} />
               <p className="hint">Each release against today&rsquo;s vulnerability data.</p>
             </>
-          ) : settled(points).length === 0 ? (
-            <p className="hint">Nothing open or moving in {stepSaid(step)}.</p>
+          ) : settled(shown).length === 0 ? (
+            <p className="hint">
+              {axis === "built"
+                ? "No scanned uploads to plot."
+                : `Nothing open or moving in ${stepSaid(step)}.`}
+            </p>
           ) : (
             <>
-              <Pace points={points} unit={stepUnit(step)} />
+              <Pace points={shown} unit={axisUnit(axis, step)} timed={axis === "built"} />
               <PaceLegend />
-              <p className="reading">{paceReading(points, stepUnit(step))}</p>
+              <p className="reading">{paceReading(shown, axisUnit(axis, step), axisLeast(axis))}</p>
+              {axis === "built" && (
+                <p
+                  className="hint"
+                  title="Each build counts as its newest upload by that date left it. A replaced upload is counted as of its last scan, not against today's data."
+                >
+                  Older uploads as of their last scan.
+                </p>
+              )}
             </>
           )}
         </div>
@@ -331,39 +354,15 @@ export function DependencyFigures({
               Open, by severity
             </span>
           </header>
-          <Reading query={trend} what="The trend could not be read.">
+          <Reading query={plotted} what="The trend could not be read.">
             {() => (
               <>
-                <Mix points={points} />
-                <p className="reading">{mixReading(points)}</p>
+                <Mix points={shown} timed={axis === "built"} />
+                <p className="reading">{mixReading(shown, axisLeast(axis))}</p>
               </>
             )}
           </Reading>
         </div>
-
-        {whole && (uploads.isError || uploadPoints.length >= 2) && (
-          <div className="panel wide">
-            <header>
-              <h3>Open issues in each upload</h3>
-              <span className="eyebrow" style={{ marginLeft: "auto" }}>
-                by build time · {counting}
-              </span>
-            </header>
-            {uploads.isError ? (
-              <Failed error={uploads.error} what="The uploads could not be read." />
-            ) : (
-              <>
-                <Uploads points={uploadPoints} />
-                <p
-                  className="hint"
-                  title="A replaced upload is counted as of its last scan, not against today's data."
-                >
-                  Older uploads as of their last scan.
-                </p>
-              </>
-            )}
-          </div>
-        )}
 
         <div className="panel">
           <header>
@@ -386,6 +385,23 @@ export function DependencyFigures({
       </div>
     </>
   );
+}
+
+// The window a trend heading names: the calendar's, or the build dates the
+// points sit at.
+function axisSaid(axis: TrendAxis, step: TrendStep): string {
+  return axis === "scanned" ? stepSaid(step) : "by build date";
+}
+
+// The fewest points a reading speaks over: two build dates compare two
+// inventories, while a calendar's first days are a backlog arriving.
+function axisLeast(axis: TrendAxis): number | undefined {
+  return axis === "built" ? 2 : undefined;
+}
+
+// The points' plural, as a reading counts them.
+function axisUnit(axis: TrendAxis, step: TrendStep): string {
+  return axis === "scanned" ? stepUnit(step) : "build dates";
 }
 
 // A branch beside the last release cut from it: is what we are about to ship

@@ -186,7 +186,11 @@ split and the ring use the library.
 
 | Rule | Reason |
 |---|---|
-| Every trend panel offers Daily and Weekly, daily first | |
+| Every trend panel on calendar steps offers Daily and Weekly, daily first | |
+| Home's trend panel offers Build date and Scan date, build date first; Daily and Weekly appear by scan date alone | Each says on hover what a point is; a point by build date is a day, placed to scale |
+| By build date, the x axis is to scale in time, bars no wider than the closest two dates leave room for, and a date is named where it clears the next | Two images months apart and two a day apart read as the time between them |
+| The first and last points sit half a bar in from the chart's edges | A bar centered on an end point stays whole however few points there are |
+| Severity over time draws whole at once, with no entry animation | An animation clips each area to a rectangle widening from nothing, so a page captured or printed before it ends shows an empty plot |
 | The chart starts at the first step holding anything, so the open line's scale starts where scanning began | Before the first scan nothing is open, and drawn, the line spans zero to the whole inventory |
 | The open axis is labeled in whole numbers where brief labels would read the same | A fitted scale over a backlog moving by tens puts 8,271 and 8,290 both at 8.3k |
 | The trend and the burndown are drawn from one set of parts: the flow bars, the marks, the grid's round values and the dates under the axis | A second copy drifts from the first |

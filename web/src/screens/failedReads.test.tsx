@@ -197,9 +197,38 @@ describe("a secondary read that fails", () => {
       ),
     );
     await settle();
+    // The calendar's points, so the severity panel draws the read that failed.
+    const scanned = [...mount.host().querySelectorAll("button")].find(
+      (each) => each.textContent === "Scan date",
+    );
+    await act(async () => scanned?.click());
+    await settle();
     const text = mount.host().textContent ?? "";
     expect(text).toContain("The trend could not be read.");
     expect(text).not.toContain("Nothing is open.");
+    expect(text).not.toContain("Not enough history yet.");
+  });
+
+  it("draws no trend by build date that could not be read", async () => {
+    failing("/v1/trend/built");
+    mount.render(
+      screen(
+        <Home
+          who={{
+            identity: "ana",
+            name: "Ana",
+            admin: false,
+            kind: "person",
+            reach: [readingDependencies("sonic")],
+            outcomes: [],
+          }}
+        />,
+      ),
+    );
+    await settle();
+    const text = mount.host().textContent ?? "";
+    expect(text).toContain("The trend could not be read.");
+    expect(text).not.toContain("No scanned uploads to plot.");
     expect(text).not.toContain("Not enough history yet.");
   });
 

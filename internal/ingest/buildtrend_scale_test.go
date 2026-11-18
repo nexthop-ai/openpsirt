@@ -156,23 +156,130 @@ func TestMeasureABuildTrendOverNightlyUploads(t *testing.T) {
 
 		who := access.NewPerson(1, "a reader", false,
 			map[int64][]access.Role{w.Product.ID: {access.PublicRead, access.PrivateRead}}, 0)
-		scope := finding.Scope{ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID}
+		scope := finding.Scope{ProductID: &w.Product.ID}
 		for _, limit := range []int{2, 12, trendNights} {
 			const reads = 5
 			var took []time.Duration
-			var points []ingest.UploadPoint
+			var points []finding.Point
 			for range reads + 1 {
 				start := time.Now()
 				var err error
-				if points, err = uploads.BuildTrend(ctx, who, scope, finding.Within{}, limit); err != nil {
+				if points, err = uploads.BuiltTrend(ctx, who, scope, finding.Within{}, 24*time.Hour, limit); err != nil {
 					t.Fatal(err)
 				}
 				took = append(took, time.Since(start))
 			}
 			took = took[1:]
 			slices.Sort(took)
-			t.Logf("build trend of %d uploads: %d points, median of %d reads %v", limit, len(points), reads,
+			t.Logf("trend by build date of %d uploads: %d points, median of %d reads %v", limit, len(points), reads,
 				took[reads/2].Round(time.Millisecond))
+		}
+	})
+}
+
+// manySmallBuilds is how many builds of a small inventory the product holds,
+// each receiving a September and a November upload, and smallIssues how many
+// issues each inventory carries.
+const (
+	manySmallBuilds = 200
+	smallIssues     = 24
+)
+
+func TestMeasureATrendByBuildDateOverManySmallBuilds(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		w := world.New(t, db)
+		store := finding.NewStore(db.DB)
+		uploads := ingest.NewStore(db.DB)
+		now := time.Now().UTC()
+		root := graph.Described{Name: "box", Version: "1.0"}
+		var packages []graph.Described
+		for i := range smallIssues {
+			packages = append(packages, graph.Described{Name: fmt.Sprintf("pkg-%02d", i), Version: "1.0",
+				Purl: fmt.Sprintf("pkg:deb/debian/pkg-%02d@1.0", i)})
+		}
+		builds := []int64{w.Build.ID}
+		for b := 1; b < manySmallBuilds; b++ {
+			variant := w.DeclareVariant(w.Product, fmt.Sprintf("variant-%03d", b), true)
+			builds = append(builds, w.BuildFor(w.Branch, variant).ID)
+		}
+		seeded := time.Now()
+		for _, build := range builds {
+			for upload, built := range []time.Time{now.Add(-70 * 24 * time.Hour), now.Add(-24 * time.Hour)} {
+				arrived := now.Add(-time.Duration(4-2*upload) * 24 * time.Hour)
+				scan, _, err := uploads.Record(ctx, ingest.Arriving{
+					BuildID: build, ContentHash: fmt.Sprintf("build-%d-upload-%d", build, upload), BuiltAt: built,
+					ParserVersion: "measure",
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := db.DB.NewUpdate().Table("scan").Set(`"received_at" = ?`, arrived).
+					Where(`"id" = ?`, scan.ID).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				snap := graph.Snapshot{Root: root, Components: packages}
+				if _, err := world.ApplyGraph(ctx, db.DB, build, scan.ID, snap); err != nil {
+					t.Fatal(err)
+				}
+				if err := uploads.Made(ctx, scan.ID, len(packages), len(packages), ""); err != nil {
+					t.Fatal(err)
+				}
+				run, err := store.Begin(ctx, finding.Run{
+					BuildID: build, Scanner: "measure", ScannerVersion: "0", DatabaseVersion: "0", RanHere: true,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := db.DB.NewUpdate().Table("scan_run").Set(`"started_at" = ?`, arrived.Add(time.Minute)).
+					Where(`"id" = ?`, run.ID).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				// November fixes half of September's issues.
+				var reported []finding.Reported
+				for i, p := range packages {
+					if upload == 0 || i%2 == 0 {
+						reported = append(reported, finding.Reported{
+							Issue:     finding.Named{Identifier: fmt.Sprintf("CVE-2026-%05d", i), Severity: "high"},
+							Component: p,
+						})
+					}
+				}
+				if _, err := store.Apply(ctx, build, run.ID, reported); err != nil {
+					t.Fatal(err)
+				}
+				if err := store.Finish(ctx, run.ID, "0", "0", "", nil); err != nil {
+					t.Fatal(err)
+				}
+			}
+		}
+		dbtest.SettleStatistics(t, db)
+		var findings int
+		if err := db.DB.NewSelect().TableExpr(`"finding"`).ColumnExpr(`COUNT(*)`).Scan(ctx, &findings); err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("%d builds of %d packages, two uploads each: %d findings; seeded in %v",
+			len(builds), len(packages), findings, time.Since(seeded).Round(time.Second))
+
+		who := access.NewPerson(1, "a reader", false,
+			map[int64][]access.Role{w.Product.ID: {access.PublicRead, access.PrivateRead}}, 0)
+		const reads = 5
+		var took []time.Duration
+		var points []finding.Point
+		for range reads + 1 {
+			start := time.Now()
+			var err error
+			if points, err = uploads.BuiltTrend(ctx, who, finding.Scope{}, finding.Within{}, 24*time.Hour, 12); err != nil {
+				t.Fatal(err)
+			}
+			took = append(took, time.Since(start))
+		}
+		took = took[1:]
+		slices.Sort(took)
+		t.Logf("trend by build date over every product: %d points, median of %d reads %v", len(points), reads,
+			took[reads/2].Round(time.Millisecond))
+		if len(points) != 2 || points[0].Open != smallIssues || points[1].Open != smallIssues/2 {
+			t.Errorf("got %+v, want two points holding %d and %d", points, smallIssues, smallIssues/2)
 		}
 	})
 }

@@ -4,12 +4,12 @@
 package ingest_test
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -96,16 +96,28 @@ func reader(w *world.World) access.Subject {
 		map[int64][]access.Role{w.Product.ID: {access.PublicRead, access.PrivateRead}}, 0)
 }
 
-func TestABuildTrendCountsEachUploadAsOfItsLastScanAtItsBuildTime(t *testing.T) {
+// day is a step of the trend by build date.
+const day = 24 * time.Hour
+
+// builtTrend reads the trend by build date over a scope, daily.
+func builtTrend(t *testing.T, w *world.World, who access.Subject, scope finding.Scope,
+	within finding.Within) []finding.Point {
+	t.Helper()
+	points, err := ingest.NewStore(w.DB.DB).BuiltTrend(t.Context(), who, scope, within, day, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return points
+}
+
+func TestATrendByBuildDateCountsEachUploadAsOfItsLastScanAtItsBuildDate(t *testing.T) {
 	world.Each(t, func(t *testing.T, w *world.World) {
-		ctx := t.Context()
 		now := time.Now().UTC().Truncate(time.Second)
-		day := 24 * time.Hour
 		u := &uploads{t: t, w: w, build: w.Build.ID, now: now}
 
 		// September's image, scanned twice while it was current. The second
 		// scan finds one more issue, so the point is its last scan's.
-		september := u.upload(now.Add(-60*day), now.Add(-5*day), kernelOld, curl)
+		u.upload(now.Add(-60*day), now.Add(-5*day), kernelOld, curl)
 		u.scan(now.Add(-5*day+time.Minute),
 			issue("CVE-2026-0001", "critical", kernelOld), issue("CVE-2026-0002", "high", kernelOld),
 			issue("CVE-2026-0003", "high", curl))
@@ -115,73 +127,239 @@ func TestABuildTrendCountsEachUploadAsOfItsLastScanAtItsBuildTime(t *testing.T) 
 		// An upload replaced before any scan reached it is no point.
 		u.upload(now.Add(-30*day), now.Add(-3*day), kernelOld, curl)
 		// November's: the kernel moved past its issues, and curl's stays.
-		november := u.upload(now.Add(-day), now.Add(-2*day), kernelNew, curl)
+		u.upload(now.Add(-day), now.Add(-2*day), kernelNew, curl)
 		u.scan(now.Add(-2*day+time.Minute), issue("CVE-2026-0003", "high", curl))
 
-		scope := finding.Scope{ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID}
-		points, err := ingest.NewStore(w.DB.DB).BuildTrend(ctx, reader(w), scope, finding.Within{}, 12)
-		if err != nil {
-			t.Fatal(err)
-		}
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
 		if len(points) != 2 {
 			t.Fatalf("got %d points, want 2: September and November, and nothing for the unscanned upload: %+v",
 				len(points), points)
 		}
 		sep, nov := points[0], points[1]
-		if sep.ScanID != september || nov.ScanID != november {
-			t.Fatalf("points are uploads %d and %d, want %d then %d", sep.ScanID, nov.ScanID, september, november)
+		// A point is its step's end, as on the calendar trend, which names it
+		// by the day before.
+		if want := now.Add(-60 * day).Truncate(day).Add(day); !sep.At.Equal(want) {
+			t.Errorf("September ends at %v, want %v, the end of the day its inventory states it was built",
+				sep.At, want)
 		}
-		if !sep.BuiltAt.Equal(now.Add(-60*day)) || !nov.BuiltAt.Equal(now.Add(-day)) {
-			t.Errorf("points sit at %v and %v, want the build times each inventory states", sep.BuiltAt, nov.BuiltAt)
+		if want := now.Add(-day).Truncate(day).Add(day); !nov.At.Equal(want) {
+			t.Errorf("November ends at %v, want %v", nov.At, want)
 		}
 		if sep.Open != 4 || sep.BySeverity["critical"] != 1 || sep.BySeverity["high"] != 3 {
-			t.Errorf("September holds %d open %v, want 4 as of its last scan: 1 critical, 3 high", sep.Open, sep.BySeverity)
+			t.Errorf("September holds %d open %v, want 4 as of its last scan: 1 critical, 3 high",
+				sep.Open, sep.BySeverity)
 		}
-		if !sep.AsOf.Equal(now.Add(-4*day)) || sep.Current {
-			t.Errorf("September is counted at %v (current %v), want its last scan's start, replaced", sep.AsOf, sep.Current)
+		if sep.Baseline != 4 || sep.FirstScans != 1 || sep.New != 0 {
+			t.Errorf("September brought %d baseline and %d new from %d first uploads, want 4, 0 and 1",
+				sep.Baseline, sep.New, sep.FirstScans)
 		}
-		if nov.Open != 1 || !nov.Current {
-			t.Errorf("November holds %d open (current %v), want 1, the inventory the build holds", nov.Open, nov.Current)
+		if nov.Open != 1 || nov.Corrected != 3 || nov.CorrectedBySeverity["critical"] != 1 || nov.New != 0 {
+			t.Errorf("November holds %d open, %d corrected (%v), %d new; want 1, 3 with 1 critical, 0",
+				nov.Open, nov.Corrected, nov.CorrectedBySeverity, nov.New)
 		}
 	})
 }
 
-func TestABuildTrendCountsOnlyWhatTheNarrowingKeeps(t *testing.T) {
+func TestATrendByBuildDateReadsEachBuildAtItsOwnUpload(t *testing.T) {
 	world.Each(t, func(t *testing.T, w *world.World) {
-		ctx := t.Context()
+		now := time.Now().UTC().Truncate(time.Second)
+		a := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		b := &uploads{t: t, w: w, build: w.BuildFor(w.Branch, w.Internal).ID, now: now}
+
+		// Both builds hold one issue at curl in September; the second build's
+		// copy is the same issue at the same component, counted once.
+		a.upload(now.Add(-60*day), now.Add(-6*day), curl)
+		a.scan(now.Add(-6*day+time.Minute), issue("CVE-2026-0003", "high", curl))
+		b.upload(now.Add(-60*day), now.Add(-6*day), curl)
+		b.scan(now.Add(-6*day+time.Minute), issue("CVE-2026-0003", "high", curl))
+		// November: the first build finds a second issue, which is new; the
+		// second build is not uploaded again, so it is read as September left
+		// it, though a later scan of it stopped reporting curl.
+		a.upload(now.Add(-day), now.Add(-2*day), curl)
+		a.scan(now.Add(-2*day+time.Minute),
+			issue("CVE-2026-0003", "high", curl), issue("CVE-2026-0005", "medium", curl))
+		b.scan(now.Add(-time.Hour))
+
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
+		if len(points) != 2 {
+			t.Fatalf("got %d points, want 2: %+v", len(points), points)
+		}
+		if points[0].Open != 1 || points[0].Baseline != 1 || points[0].FirstScans != 2 {
+			t.Errorf("September holds %d open, %d baseline, %d first uploads; want 1, 1 and 2: one issue at one component in two builds",
+				points[0].Open, points[0].Baseline, points[0].FirstScans)
+		}
+		if points[1].Open != 2 || points[1].New != 1 || points[1].Corrected != 0 {
+			t.Errorf("November holds %d open, %d new, %d corrected; want 2, 1 and 0", points[1].Open,
+				points[1].New, points[1].Corrected)
+		}
+	})
+}
+
+func TestABuildFirstUploadedLaterBringsBaselineNotNewWork(t *testing.T) {
+	world.Each(t, func(t *testing.T, w *world.World) {
+		now := time.Now().UTC().Truncate(time.Second)
+		a := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		b := &uploads{t: t, w: w, build: w.BuildFor(w.Branch, w.Internal).ID, now: now}
+		a.upload(now.Add(-60*day), now.Add(-6*day), curl)
+		a.scan(now.Add(-6*day+time.Minute), issue("CVE-2026-0003", "high", curl))
+		b.upload(now.Add(-day), now.Add(-2*day), kernelOld)
+		b.scan(now.Add(-2*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
+		if len(points) != 2 {
+			t.Fatalf("got %d points, want 2: %+v", len(points), points)
+		}
+		if p := points[1]; p.Open != 2 || p.Baseline != 1 || p.New != 0 || p.FirstScans != 1 {
+			t.Errorf("the later build's first upload gave %d open, %d baseline, %d new from %d first uploads; want 2, 1, 0 and 1",
+				p.Open, p.Baseline, p.New, p.FirstScans)
+		}
+	})
+}
+
+func TestAnIssueTheScannerStoppedReportingIsNotCorrectedByBuildDate(t *testing.T) {
+	world.Each(t, func(t *testing.T, w *world.World) {
+		now := time.Now().UTC().Truncate(time.Second)
+		u := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		u.upload(now.Add(-60*day), now.Add(-6*day), curl)
+		u.scan(now.Add(-6*day+time.Minute), issue("CVE-2026-0003", "high", curl))
+		// The same curl, and the scanner says nothing of it: no fix.
+		u.upload(now.Add(-day), now.Add(-2*day), curl)
+		u.scan(now.Add(-2*day + time.Minute))
+
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
+		if len(points) != 2 || points[1].Open != 0 || points[1].Corrected != 0 {
+			t.Fatalf("got %+v, want November holding nothing and correcting nothing", points)
+		}
+	})
+}
+
+func TestAnIssueBackAfterAnUploadWithoutItIsReturned(t *testing.T) {
+	world.Each(t, func(t *testing.T, w *world.World) {
+		now := time.Now().UTC().Truncate(time.Second)
+		u := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		u.upload(now.Add(-60*day), now.Add(-9*day), kernelOld)
+		u.scan(now.Add(-9*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+		u.upload(now.Add(-30*day), now.Add(-6*day), kernelNew)
+		u.scan(now.Add(-6*day + time.Minute))
+		u.upload(now.Add(-day), now.Add(-2*day), kernelOld)
+		u.scan(now.Add(-2*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
+		if len(points) != 3 {
+			t.Fatalf("got %d points, want 3: %+v", len(points), points)
+		}
+		if points[1].Corrected != 1 || points[2].Returned != 1 || points[2].New != 0 {
+			t.Errorf("got corrected %d, then returned %d and new %d; want 1, 1 and 0",
+				points[1].Corrected, points[2].Returned, points[2].New)
+		}
+	})
+}
+
+func TestATrendByBuildDateCountsOnlyWhatTheNarrowingKeeps(t *testing.T) {
+	world.Each(t, func(t *testing.T, w *world.World) {
 		now := time.Now().UTC().Truncate(time.Second)
 		u := &uploads{t: t, w: w, build: w.Build.ID, now: now}
 		u.upload(now.Add(-time.Hour), now.Add(-time.Hour), kernelOld, curl)
 		u.scan(now.Add(-time.Hour+time.Minute),
 			issue("CVE-2026-0001", "critical", kernelOld), issue("CVE-2026-0003", "high", curl))
 
-		scope := finding.Scope{ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID}
-		points, err := ingest.NewStore(w.DB.DB).BuildTrend(ctx, reader(w), scope,
-			finding.Within{Component: "curl"}, 12)
-		if err != nil {
-			t.Fatal(err)
-		}
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID},
+			finding.Within{Component: "curl"})
 		if len(points) != 1 || points[0].Open != 1 {
 			t.Fatalf("got %+v, want one point holding curl's one issue", points)
 		}
 	})
 }
 
-func TestABuildTrendIsRefusedForASelectionThatIsNotOneBuild(t *testing.T) {
+func TestATrendByBuildDateShowsAStrangerNothing(t *testing.T) {
+	world.Each(t, func(t *testing.T, w *world.World) {
+		now := time.Now().UTC().Truncate(time.Second)
+		u := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		u.upload(now.Add(-time.Hour), now.Add(-time.Hour), curl)
+		u.scan(now.Add(-time.Hour+time.Minute), issue("CVE-2026-0003", "high", curl))
+
+		stranger := access.NewPerson(w.Person.ID, "a stranger", false, map[int64][]access.Role{}, 0)
+		if points := builtTrend(t, w, stranger, finding.Scope{}, finding.Within{}); len(points) != 0 {
+			t.Fatalf("a stranger read %+v, want nothing", points)
+		}
+	})
+}
+
+func TestATrendByBuildDateCountsAnIssueInTwoProductsInTheStrictestBandEitherGivesIt(t *testing.T) {
+	// One row per issue and build reaches the count, in no order anything
+	// sets, so the band has to be chosen rather than left to whichever row
+	// came last.
 	world.Each(t, func(t *testing.T, w *world.World) {
 		ctx := t.Context()
-		w.BuildFor(w.Branch, w.Internal)
-		s := ingest.NewStore(w.DB.DB)
-		// Two variants of the branch are two builds.
-		branch := finding.Scope{ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID}
-		if _, err := s.BuildTrend(ctx, reader(w), branch, finding.Within{}, 12); !errors.Is(err, finding.ErrNotOneBuild) {
-			t.Errorf("a branch of two variants answered %v, want it refused as not one build", err)
+		now := time.Now().UTC().Truncate(time.Second)
+		other := w.DeclareProduct("hedgehog", "Hedgehog")
+		branch := w.DeclareBranchOrTag(other, "main", catalog.Branch, nil)
+		variant := w.DeclareVariant(other, "box", true)
+		a := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		b := &uploads{t: t, w: w, build: w.BuildFor(branch, variant).ID, now: now}
+		both := []finding.Reported{issue("CVE-2026-0006", "", curl), issue("CVE-2026-0007", "", curl)}
+		a.upload(now.Add(-day), now.Add(-2*day), curl)
+		a.scan(now.Add(-2*day+time.Minute), both...)
+		b.upload(now.Add(-day), now.Add(-2*day), curl)
+		b.scan(now.Add(-2*day+time.Minute), both...)
+		rate := func(product int64, identifier, severity string) {
+			var id int64
+			if err := w.DB.DB.NewSelect().TableExpr(`"vulnerability" AS "v"`).ColumnExpr(`"v"."id"`).
+				Where(`"v"."identifier" = ?`, identifier).Scan(ctx, &id); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := w.DB.DB.NewInsert().Model(&finding.IssueRating{
+				VulnerabilityID: id, ProductID: product, Severity: severity,
+			}).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
 		}
-		// Somebody holding nothing on the product reads no build of it.
-		stranger := access.NewPerson(w.Person.ID, "a stranger", false, map[int64][]access.Role{}, 0)
-		one := finding.Scope{ProductID: &w.Product.ID, BranchOrTagID: &w.Branch.ID, VariantID: &w.Customer.ID}
-		if _, err := s.BuildTrend(ctx, stranger, one, finding.Within{}, 12); !errors.Is(err, finding.ErrNotOneBuild) {
-			t.Errorf("a stranger's build trend answered %v, want it refused as not a build they read", err)
+		rate(w.Product.ID, "CVE-2026-0006", "low")
+		rate(other.ID, "CVE-2026-0006", "medium")
+		rate(w.Product.ID, "CVE-2026-0007", "medium")
+		rate(other.ID, "CVE-2026-0007", "low")
+
+		who := access.NewPerson(w.Person.ID, "a reader", false, map[int64][]access.Role{
+			w.Product.ID: {access.PublicRead}, other.ID: {access.PublicRead}}, 0)
+		points := builtTrend(t, w, who, finding.Scope{}, finding.Within{})
+		if len(points) != 1 || points[0].Open != 2 || points[0].BySeverity["medium"] != 2 {
+			t.Fatalf("two issues each rated low in one product and medium in the other gave %+v; want one point, 2 open, both medium",
+				points)
+		}
+	})
+}
+
+func TestAFlawRecordedInTwoBuildsIsReadInEachAtItsOwnMoment(t *testing.T) {
+	// A flaw recorded by hand opens in every build named at one moment with no
+	// scan, so its rows in two builds are alike in all but the build. Each
+	// build is read at its own moment, so neither may stand for the other.
+	world.Each(t, func(t *testing.T, w *world.World) {
+		ctx := t.Context()
+		now := time.Now().UTC().Truncate(time.Second)
+		a := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		other := w.BuildFor(w.Branch, w.Internal)
+		b := &uploads{t: t, w: w, build: other.ID, now: now}
+		a.upload(now.Add(-60*day), now.Add(-9*day), curl)
+		a.scan(now.Add(-9*day + time.Minute))
+		b.upload(now.Add(-60*day), now.Add(-9*day), curl)
+		b.scan(now.Add(-9*day + time.Minute))
+		a.upload(now.Add(-day), now.Add(-2*day), curl)
+		a.scan(now.Add(-2*day + time.Minute))
+
+		planner := access.NewPerson(w.Person.ID, "a planner", false, map[int64][]access.Role{
+			w.Product.ID: {access.PublicRead, access.PrivateRead, access.PublicTriage, access.PrivateTriage}}, 0)
+		if _, _, err := finding.NewStore(w.DB.DB).Enter(ctx, planner, finding.Entering{
+			BuildIDs: []int64{w.Build.ID, other.ID}, Component: curl.Name, Severity: "high",
+			Summary: "The parser accepts a message it should refuse.",
+		}); err != nil {
+			t.Fatal(err)
+		}
+
+		// September: the first build is read at its September scan, before
+		// the flaw; the second holds September still, so it is read now.
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
+		if len(points) != 2 || points[0].Open != 1 || points[1].Open != 1 {
+			t.Fatalf("got %+v; want two points each holding the flaw, September through the second build", points)
 		}
 	})
 }

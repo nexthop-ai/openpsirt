@@ -13,7 +13,7 @@ Benchmark runs behind the analytics rules.
 - [Counts by identifying name](#counts-by-identifying-name)
 - [Many builds](#many-builds)
 - [Many small builds](#many-small-builds)
-- [Uploads of one build](#uploads-of-one-build)
+- [Build date axis](#build-date-axis)
 
 ## Early grouping
 
@@ -475,25 +475,38 @@ measured in one session (`make measure`, `TestMeasureReadsAcrossManySmallBuilds`
 | The count names at most 200 builds a statement | Past 200 values in a list MySQL 8.4 reads the list value by value rather than as ranges. Counting 1,000 builds' open findings: MySQL 40 ms at 500 a statement, 10 ms at 200, 16 ms at 150; PostgreSQL 5 ms, 6 ms and 7 ms; MariaDB 7 ms, 8 ms and 16 ms |
 | The count reads table rows where the condition is not in the index picked | For the work nobody holds, PostgreSQL scanned the table at 500 builds a statement, and at 200 read the index of open findings by build and took each holder from the table |
 
-## Uploads of one build
+## Build date axis
 
-Justifies `design-docs/analytics-program.md` § Uploads of one build, the read
-from the earliest point's moment. One build of the full-size image, 6,843
-packages each carrying one issue and the kernel 3,000, uploaded and scanned
-nightly for 50 nights, each upload dropping one leaf package in thirty and
-restoring the night before's: 453,726 findings. Median of five reads, one
-engine at a time (`make measure`, `TestMeasureABuildTrendOverNightlyUploads`).
+Justifies `design-docs/analytics-program.md` § Build date axis, the read from
+the earliest moment any build is read at. Median of five reads, one engine at a
+time (`make measure`).
 
-| Engine | 2 uploads | 12 uploads | 50 uploads |
+One build of the full-size image, 6,843 packages each carrying one issue and
+the kernel 3,000, uploaded and scanned nightly for 50 nights, each upload
+dropping one leaf package in thirty and restoring the night before's: 453,726
+findings, read at its product (`TestMeasureABuildTrendOverNightlyUploads`).
+
+| Engine | 2 points | 12 points | 50 points |
 |---|--:|--:|--:|
-| SQLite | 254 ms | 446 ms | 1.48 s |
-| PostgreSQL 16 | 197 ms | 303 ms | 385 ms |
-| MySQL 8.4 | 371 ms | 615 ms | 966 ms |
-| MariaDB 11.4 | 136 ms | 293 ms | 379 ms |
+| SQLite | 243 ms | 435 ms | 748 ms |
+| PostgreSQL 16 | 205 ms | 308 ms | 424 ms |
+| MySQL 8.4 | 372 ms | 619 ms | 1.03 s |
+| MariaDB 11.4 | 148 ms | 323 ms | 469 ms |
+
+200 builds of 24 packages, each uploaded in September and again in November
+with half its issues fixed: 4,800 findings, read across every product
+(`TestMeasureATrendByBuildDateOverManySmallBuilds`).
+
+| Engine | 2 points |
+|---|--:|
+| SQLite | 35 ms |
+| PostgreSQL 16 | 21 ms |
+| MySQL 8.4 | 21 ms |
+| MariaDB 11.4 | 24 ms |
 
 | Reading | Detail |
 |---|---|
 | 453,726 rows are one night's 153,889, each night's drop, and the kernel twice | Each night opens and closes about 600 findings. The kernel is a leaf, so the drop takes it out on nights 10 and 40: its 135,575 findings close as removed and open again as new rows the night after, the shape of a broken upload |
-| Cost follows the oldest upload plotted | Each point adds the findings opened since the one before; twelve uploads, the default, read in under two thirds of a second on every engine |
-| SQLite rises most with the points | 254 ms at 2 uploads to 1.48 s at 50, against 197 ms to 385 ms on PostgreSQL |
-| Two full images cost what the calendar trend costs | The demo's SQLite, September and November SONiC images per build, served: broadcom 2.30 s against 2.28 s for the same build's 30-day trend, mellanox 1.00 s; September broadcom's scan opened 373,331 findings |
+| Cost follows the oldest point plotted | Each point adds the findings opened since the one before; twelve points, the default, read in under two thirds of a second on every engine |
+| Many builds cost their findings, not their count | 200 builds read in their two uploads apiece in at most 35 ms; uploads and scans are read in chunks of builds |
+| Two full images per build cost what the calendar trend costs | The demo's SQLite, September and November SONiC images per build, served: every product 3.35 s against 3.09 s for the 30-day calendar trend, broadcom alone 2.31 s; September broadcom's scan opened 373,331 findings |

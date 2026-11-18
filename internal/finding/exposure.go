@@ -5,113 +5,169 @@ package finding
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"sort"
 	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/access"
-	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
 
-// ErrNotOneBuild is a read about one build asked of a selection that is not
-// exactly one build the reader may read.
-var ErrNotOneBuild = errors.New("the selection is not one build")
-
-// Held is what a selection held open at one moment, counted as the trend
-// counts: issues at components, by the component's identifying name.
-type Held struct {
-	At   time.Time
-	Open int
-	// BySeverity is Open split by the strictest band any open finding of the
-	// issue held.
-	BySeverity map[string]int
+// Reading is one point of a trend by build date: the moment each build in the
+// scope is read at, and the builds whose first upload the point is.
+//
+// A build absent from Builds held no upload by the point's date, so it adds
+// nothing to it.
+type Reading struct {
+	At     time.Time
+	Builds map[int64]time.Time
+	First  map[int64]bool
 }
 
-// OneBuild is the build a scope names, where the subject may read it.
-//
-// A selection naming several builds, or none the subject may read, is refused
-// with ErrNotOneBuild: a chart of whichever build sorted first is a chart of
-// somewhere else.
-func (s *Store) OneBuild(ctx context.Context, subject access.Subject, scope Scope) (int64, error) {
+// TrendBuilds is the builds a trend over this scope reads, on products the
+// subject may read, in identifier order.
+func (s *Store) TrendBuilds(ctx context.Context, subject access.Subject, scope Scope) ([]int64, error) {
 	if subject.Kind != access.Person {
-		return 0, access.Denied("read a build's exposure over its uploads")
+		return nil, access.Denied("read how findings are trending")
 	}
 	products, all := subject.Products()
-	builds, err := s.readableBuilds(ctx, scope, products, all)
-	if err != nil {
-		return 0, err
-	}
-	if len(builds) != 1 {
-		return 0, refusal.Errorf("%w: a build's uploads are one build's, and %d builds are in scope",
-			ErrNotOneBuild, len(builds))
-	}
-	return builds[0], nil
+	return s.readableBuilds(ctx, scope, products, all)
 }
 
-// OpenAt counts, at each of these moments, the issues at components open in
-// the scope, split by severity, in the order the moments were given.
+// TrendAtReadings is the trend at these readings, oldest first: at each, the
+// issues at components open in the scope, each build read at its own moment,
+// and what moved since the reading before.
 //
-// An issue is open at a moment when one of its findings opened at or before it
-// and closed after it, or not at all: the trend's rule, so a point here and a
-// step there ending at the same moment agree. The findings are read once, from
-// the earliest moment through now, so the cost follows the earliest moment.
-func (s *Store) OpenAt(ctx context.Context, subject access.Subject, scope Scope, within Within,
-	moments []time.Time) ([]Held, error) {
+// An issue is open at a reading when, in some build the reading names, one of
+// its findings opened at or before that build's moment and closed after it, or
+// not at all: the trend's rule, applied to each build at its own moment. The
+// unit, the severity an issue takes and the narrowing are the calendar
+// trend's. The flows compare consecutive readings:
+//
+//   - new: open now, at no earlier reading, and held by a build that is not
+//     first read here;
+//   - baseline: open now for the first time, held only by builds first read
+//     here;
+//   - returned: open now, not at the reading before, open at an earlier one;
+//   - corrected: open at the reading before, not now, and every one of its
+//     findings that closed in between closed by a resolution.
+//
+// The first reading has nothing before it, so only its baseline moves. The
+// findings are read once, from the earliest moment through now, so the cost
+// follows the earliest moment.
+func (s *Store) TrendAtReadings(ctx context.Context, subject access.Subject, scope Scope, within Within,
+	readings []Reading) ([]Point, error) {
 
 	if subject.Kind != access.Person {
-		return nil, access.Denied("read a build's exposure over its uploads")
+		return nil, access.Denied("read how findings are trending")
 	}
-	out := make([]Held, len(moments))
-	for i, at := range moments {
-		out[i] = Held{At: at, BySeverity: map[string]int{}}
+	points := make([]Point, len(readings))
+	for k, r := range readings {
+		points[k] = Point{At: r.At, BySeverity: map[string]int{}, NewBySeverity: map[string]int{},
+			CorrectedBySeverity: map[string]int{}, ReturnedBySeverity: map[string]int{}}
+		for build, first := range r.First {
+			if _, read := r.Builds[build]; first && read {
+				points[k].FirstScans++
+			}
+		}
 	}
 	products, all := subject.Products()
-	if len(moments) == 0 || (!all && len(products) == 0) {
-		return out, nil
+	var earliest time.Time
+	for _, r := range readings {
+		for _, at := range r.Builds {
+			if earliest.IsZero() || at.Before(earliest) {
+				earliest = at
+			}
+		}
+	}
+	if earliest.IsZero() || (!all && len(products) == 0) {
+		return points, nil
 	}
 	narrow, builds, err := s.trendNarrowing(ctx, subject, products, all, scope, within)
 	if err != nil {
 		return nil, err
 	}
-	earliest := slices.MinFunc(moments, func(a, b time.Time) int { return a.Compare(b) })
-	// The rows open at the earliest moment or opened since: trendMoments reads
-	// those still open after a moment, and one closed exactly at the earliest
-	// moment is gone by it.
-	rows, err := s.trendMoments(ctx, narrow, within, builds, earliest)
+	rows, err := s.momentsOf(ctx, narrow, within, builds, earliest, true)
 	if err != nil {
 		return nil, err
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].key().less(rows[j].key()) })
 
-	open := make([]bool, len(moments))
-	rank := make([]int, len(moments))
-	band := make([]string, len(moments))
+	n := len(readings)
+	open := make([]bool, n)
+	rank := make([]int, n)
+	band := make([]string, n)
+	// fresh[k] is whether every build holding the issue at reading k is first
+	// read there.
+	fresh := make([]bool, n)
+	// quiet[k] is whether a finding open at reading k-1 closed before reading
+	// k by something other than a resolution.
+	quiet := make([]bool, n)
+	openAt := func(row trendRow, at time.Time) bool {
+		return !row.OpenedAt.After(at) && (row.ClosedAt == nil || row.ClosedAt.After(at))
+	}
 	for i := 0; i < len(rows); {
 		id := rows[i].key()
 		clear(open)
 		clear(rank)
 		clear(band)
+		clear(quiet)
+		for k := range fresh {
+			fresh[k] = true
+		}
 		for ; i < len(rows) && rows[i].key() == id; i++ {
 			row := rows[i]
 			r := Ranks(row.Severity)
-			for k, at := range moments {
-				if row.OpenedAt.After(at) || (row.ClosedAt != nil && !row.ClosedAt.After(at)) {
+			for k, reading := range readings {
+				at, read := reading.Builds[row.BuildID]
+				if !read {
 					continue
 				}
-				// An issue open at two of its components' versions, or in two
-				// products, takes the strictest band, as the trend's open does.
-				if !open[k] || r > rank[k] {
-					open[k], rank[k], band[k] = true, r, row.Severity
+				if openAt(row, at) {
+					// An issue open at two of its components' versions, or in
+					// two builds, takes the strictest band, as the trend's
+					// open does.
+					if !open[k] || r > rank[k] {
+						open[k], rank[k], band[k] = true, r, row.Severity
+					}
+					if !reading.First[row.BuildID] {
+						fresh[k] = false
+					}
+				}
+				if k == 0 {
+					continue
+				}
+				// Open when this build was read before, gone by now, and not
+				// by a fix: the departure is no correction.
+				before, readBefore := readings[k-1].Builds[row.BuildID]
+				if readBefore && openAt(row, before) && !openAt(row, at) &&
+					row.ClosedAt != nil && !Closure(row.ClosedBecause).Resolves() {
+					quiet[k] = true
 				}
 			}
 		}
-		for k := range moments {
+		for k := range readings {
 			if open[k] {
-				out[k].Open++
-				out[k].BySeverity[band[k]]++
+				points[k].Open++
+				points[k].BySeverity[band[k]]++
+			}
+			was := k > 0 && open[k-1]
+			switch {
+			case open[k] && !was:
+				switch {
+				case slices.Contains(open[:max(k-1, 0)], true):
+					points[k].Returned++
+					points[k].ReturnedBySeverity[band[k]]++
+				case fresh[k]:
+					points[k].Baseline++
+				case k > 0:
+					points[k].New++
+					points[k].NewBySeverity[band[k]]++
+				}
+			case was && !open[k] && !quiet[k]:
+				points[k].Corrected++
+				points[k].CorrectedBySeverity[band[k-1]]++
 			}
 		}
 	}
-	return out, nil
+	return points, nil
 }

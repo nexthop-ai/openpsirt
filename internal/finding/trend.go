@@ -445,13 +445,21 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 // are read.
 func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within Within, builds []int64,
 	since time.Time) ([]trendRow, error) {
+	return s.momentsOf(ctx, narrow, within, builds, since, false)
+}
+
+// momentsOf is trendMoments, with each build's moments kept apart where
+// byBuild is set: a trend by build date reads every build at its own moment,
+// so one build's row must never stand for another's.
+func (s *Store) momentsOf(ctx context.Context, narrow trendNarrowing, within Within, builds []int64,
+	since time.Time, byBuild bool) ([]trendRow, error) {
 	chunks, err := s.chunks(ctx, builds, `("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
 	if err != nil {
 		return nil, err
 	}
 	narrowed := make([]*bun.SelectQuery, 0, len(chunks))
 	for _, chunk := range chunks {
-		one, err := narrow(ctx, s.buildMoments(chunk),
+		one, err := narrow(ctx, s.buildMoments(chunk, byBuild),
 			`("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
 		if err != nil {
 			return nil, err
@@ -491,7 +499,7 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within 
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("read what changed over time: %w", err)
 	}
-	rows = mergedMoments(rows)
+	rows = mergedMoments(rows, byBuild)
 	if err := s.nameComponents(ctx, rows); err != nil {
 		return nil, err
 	}
@@ -500,8 +508,15 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within 
 
 // buildMoments is these builds' findings reduced to moments, before the
 // narrowing applies: an issue at a component in one product, opened and
-// closed at one moment each, by one run.
-func (s *Store) buildMoments(builds []int64) *bun.SelectQuery {
+// closed at one moment each, by one run. With byBuild, each build's moments
+// are its own.
+func (s *Store) buildMoments(builds []int64, byBuild bool) *bun.SelectQuery {
+	group := `"f"."vulnerability_id", "f"."component_id", "f"."opened_at", "f"."opened_run_id", "f"."closed_at", "f"."closed_because", "st"."product_id"`
+	build := `MIN("f"."build_id") AS "build_id"`
+	if byBuild {
+		group += `, "f"."build_id"`
+		build = `"f"."build_id" AS "build_id"`
+	}
 	return s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
@@ -524,28 +539,32 @@ func (s *Store) buildMoments(builds []int64) *bun.SelectQuery {
 		// to another component of the same name.
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
 		// The build, because a removal is an upload to one build.
-		ColumnExpr(`MIN("f"."build_id") AS "build_id"`).
+		ColumnExpr(build).
 		ColumnExpr(`COUNT(*) AS "findings"`).
 		Where(`"f"."build_id" IN (?)`, bun.List(builds)).
-		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "f"."opened_at", "f"."opened_run_id", "f"."closed_at", "f"."closed_because", "st"."product_id"`)
+		GroupExpr(group)
 }
 
 // mergedMoments is rows with one row per moment, where reductions of several
 // builds, or an absent and an empty reason, read one moment twice. The merged
 // row counts every finding of both and names the lower build, as one
-// reduction over both builds would.
-func mergedMoments(rows []trendRow) []trendRow {
+// reduction over both builds would. With byBuild, rows of two builds are two
+// moments.
+func mergedMoments(rows []trendRow, byBuild bool) []trendRow {
 	type moment struct {
-		vulnerability, component, product int64
-		opened, run, closed               int64
-		isClosed                          bool
-		because                           string
+		vulnerability, component, product, build int64
+		opened, run, closed                      int64
+		isClosed                                 bool
+		because                                  string
 	}
 	at := make(map[moment]int, len(rows))
 	out := rows[:0]
 	for _, row := range rows {
 		key := moment{vulnerability: row.VulnerabilityID, component: row.ComponentID, product: row.ProductID,
 			opened: row.OpenedAt.UnixNano(), run: -1, because: row.ClosedBecause}
+		if byBuild {
+			key.build = row.BuildID
+		}
 		if row.OpenedRunID != nil {
 			key.run = *row.OpenedRunID
 		}
