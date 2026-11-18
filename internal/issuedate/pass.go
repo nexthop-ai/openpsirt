@@ -42,6 +42,10 @@ const MostPerPass = 200
 // then its other names, until one answers.
 const mostNames = 5
 
+// mostAsks bounds the requests for one issue: its names, and the records an
+// answer names as holding one of them as an alias.
+const mostAsks = mostNames + mostAliased
+
 // betweenAsks is the pause between one request and the next.
 const betweenAsks = 100 * time.Millisecond
 
@@ -132,7 +136,7 @@ func (p *Pass) Once(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	answered := 0
-	// One issue is up to five requests, so the lease is renewed on the clock
+	// One issue is up to mostAsks requests, so the lease is renewed on the clock
 	// as well as on the count.
 	renewal := queue.NewRenewal(p.asking, queue.LeaseFor(p.interval), p.Now)
 	for _, issue := range due {
@@ -179,19 +183,48 @@ func (p *Pass) Once(ctx context.Context) (int, error) {
 
 // ask asks each name in turn until OSV knows one, and answers no dates where
 // it knows none. A name OSV refuses is passed over like one it does not know.
+//
+// A name OSV holds as an alias of other records sends the pass to those
+// records next, and the first that answers is the issue's answer. A record
+// reached that way is not followed further, and no name is asked twice for
+// one issue, so an alias naming another, or naming itself, ends.
 func (p *Pass) ask(ctx context.Context, names []string) (Dates, error) {
-	for i, name := range names {
-		if i > 0 {
+	type asking struct {
+		name     string
+		followed bool
+	}
+	queue := make([]asking, 0, len(names))
+	for _, name := range names {
+		queue = append(queue, asking{name: name})
+	}
+	asked := map[string]bool{}
+	for requests := 0; len(queue) > 0 && requests < mostAsks; {
+		next := queue[0]
+		queue = queue[1:]
+		folded := strings.ToUpper(next.name)
+		if asked[folded] {
+			continue
+		}
+		asked[folded] = true
+		if requests > 0 {
 			background.Pause(ctx, p.Pause)
 		}
-		dates, err := p.Asker.Dates(ctx, name)
+		requests++
+		dates, err := p.Asker.Dates(ctx, next.name)
+		var aliased *Aliased
 		switch {
 		case err == nil:
 			background.Pause(ctx, p.Pause)
 			return dates, nil
+		case errors.As(err, &aliased) && !next.followed:
+			named := make([]asking, 0, len(aliased.Names)+len(queue))
+			for _, name := range aliased.Names {
+				named = append(named, asking{name: name, followed: true})
+			}
+			queue = append(named, queue...)
 		case errors.Is(err, ErrUnknown):
 		case errors.Is(err, ErrUnaskable):
-			p.logger.Warn("OSV will not answer about this name", "name", name, "error", err)
+			p.logger.Warn("OSV will not answer about this name", "name", next.name, "error", err)
 		default:
 			return Dates{}, err
 		}

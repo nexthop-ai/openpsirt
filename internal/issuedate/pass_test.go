@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -26,7 +27,10 @@ type osv struct {
 	says      map[string]issuedate.Dates
 	fails     map[string]bool
 	unaskable map[string]bool
-	asked     []string
+	// aliases is the records OSV names for a name it holds only as their
+	// alias.
+	aliases map[string][]string
+	asked   []string
 }
 
 func (o *osv) Dates(_ context.Context, name string) (issuedate.Dates, error) {
@@ -38,6 +42,9 @@ func (o *osv) Dates(_ context.Context, name string) (issuedate.Dates, error) {
 	}
 	if o.unaskable[name] {
 		return issuedate.Dates{}, issuedate.ErrUnaskable
+	}
+	if named, ok := o.aliases[name]; ok {
+		return issuedate.Dates{}, &issuedate.Aliased{Names: named}
 	}
 	dates, known := o.says[name]
 	if !known {
@@ -139,6 +146,92 @@ func TestIssueDatesAreAskedOnceAndAgainWhenStale(t *testing.T) {
 		}
 		if kept := datesOf(t, db, "CVE-2026-0001"); kept.Published == nil || !kept.Published.Equal(published) {
 			t.Errorf("an issue OSV stopped serving holds %+v, want the dates it gave kept", kept)
+		}
+	})
+}
+
+// A name OSV holds only as another record's alias is answered by that record:
+// curl publishes CVE-2026-86409 as CURL-CVE-2026-86409, and OSV answers the CVE
+// with the curl name and no record.
+func TestAnIssueOSVHoldsAsAnAliasTakesThatRecordsDates(t *testing.T) {
+	dbtest.Two(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		clock := dbtest.NewClock()
+		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "CVE-2026-86409"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		answers := &osv{
+			aliases: map[string][]string{"CVE-2026-86409": {"CURL-CVE-2026-86409"}},
+			says:    map[string]issuedate.Dates{"CURL-CVE-2026-86409": {Published: published, Modified: modified}},
+		}
+		if asked, err := newPass(db, answers, clock).Once(ctx); err != nil || asked != 1 {
+			t.Fatalf("answered %d (%v), want the one issue", asked, err)
+		}
+		got := datesOf(t, db, "CVE-2026-86409")
+		if got.Published == nil || !got.Published.Equal(published) || got.Modified == nil || !got.Modified.Equal(modified) {
+			t.Errorf("an issue OSV holds as an alias holds %+v, want the dates of the record it names; asked %v",
+				got, answers.asked)
+		}
+	})
+}
+
+// A record reached through an alias is not followed further, and no name is
+// asked twice for one issue, so aliases naming each other end; the requests
+// for one issue are bounded however many names answers send it to.
+func TestFollowingAliasesEnds(t *testing.T) {
+	dbtest.Two(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		clock := dbtest.NewClock()
+		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{
+			{Identifier: "CVE-2026-0050"},
+			{Identifier: "CVE-2026-0051", Aliases: []string{
+				"GHSA-aaaa-aaaa-aaa1", "GHSA-aaaa-aaaa-aaa2", "GHSA-aaaa-aaaa-aaa3", "GHSA-aaaa-aaaa-aaa4",
+			}},
+			{Identifier: "CVE-2026-0052", Aliases: []string{"GHSA-bbbb-bbbb-bbbb"}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		answers := &osv{aliases: map[string][]string{
+			// A names B; B names A, itself, and a record that would answer.
+			"CVE-2026-0050": {"LOOP-B"},
+			"LOOP-B":        {"CVE-2026-0050", "LOOP-B", "LOOP-KNOWN"},
+			// Every name sends the pass to three more.
+			"CVE-2026-0051":       {"FAN-1", "FAN-2", "FAN-3"},
+			"GHSA-AAAA-AAAA-AAA1": {"FAN-4", "FAN-5", "FAN-6"},
+			"GHSA-AAAA-AAAA-AAA2": {"FAN-7", "FAN-8", "FAN-9"},
+			// An answer naming one of the issue's own names.
+			"CVE-2026-0052": {"GHSA-BBBB-BBBB-BBBB"},
+		}, says: map[string]issuedate.Dates{"LOOP-KNOWN": {Published: published}}}
+		if asked, err := newPass(db, answers, clock).Once(ctx); err != nil || asked != 3 {
+			t.Fatalf("answered %d (%v), want all three issues", asked, err)
+		}
+		if got := datesOf(t, db, "CVE-2026-0050"); got.Published != nil || got.Asked == nil {
+			t.Errorf("an issue whose aliases name each other holds %+v, want asked with no date", got)
+		}
+		perIssue := map[string]int{}
+		for _, name := range answers.asked {
+			switch {
+			case strings.HasPrefix(name, "LOOP-"), name == "CVE-2026-0050":
+				perIssue["loop"]++
+			case strings.HasSuffix(name, "0052"), strings.HasPrefix(name, "GHSA-BBBB"):
+				perIssue["own"]++
+			default:
+				perIssue["fan"]++
+			}
+		}
+		if perIssue["loop"] != 2 {
+			t.Errorf("the looping issue was asked %d times, want its name and the one record it names: %v",
+				perIssue["loop"], answers.asked)
+		}
+		if perIssue["fan"] != 8 {
+			t.Errorf("the fanning issue was asked %d times, want eight, its five names and three followed: %v",
+				perIssue["fan"], answers.asked)
+		}
+		if perIssue["own"] != 2 {
+			t.Errorf("an issue whose answer names its own other name was asked %d times, want each name once: %v",
+				perIssue["own"], answers.asked)
 		}
 	})
 }

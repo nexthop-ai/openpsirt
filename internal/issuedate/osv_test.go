@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -89,6 +90,46 @@ func TestOSVAnswersAreClassified(t *testing.T) {
 	for _, path := range paths {
 		if path == "/v1/vulns/..%2Fadmin" || path == "/admin" {
 			t.Errorf("a name that is no identifier was sent: %s", path)
+		}
+	}
+}
+
+// A not-found answer naming the records that hold the name as an alias names
+// them, shaped as identifiers and bounded; it still reads as unknown to a
+// caller that does not follow them.
+func TestOSVNamesTheRecordsHoldingANameAsAnAlias(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		switch r.URL.Path {
+		case "/v1/vulns/CVE-2026-86409":
+			// Recorded from api.osv.dev.
+			_, _ = w.Write([]byte(`{"code":5,"message":"Vulnerability not found, but the following aliases were: CURL-CVE-2026-86409"}`))
+		case "/v1/vulns/CVE-2026-0404":
+			_, _ = w.Write([]byte(`{"code":5,"message":"Vulnerability not found, but the following aliases were: ` +
+				`../admin, A-1, B 2, C-3, D-4, E-5"}`))
+		default:
+			_, _ = w.Write([]byte(`{"code":5,"message":"Vulnerability not found"}`))
+		}
+	}))
+	defer server.Close()
+	client := &issuedate.OSV{HTTP: server.Client(), Base: server.URL}
+	for name, want := range map[string][]string{
+		"CVE-2026-86409": {"CURL-CVE-2026-86409"},
+		"CVE-2026-0404":  {"A-1", "C-3", "D-4"},
+		"CVE-2026-0405":  nil,
+	} {
+		_, err := client.Dates(t.Context(), name)
+		if !errors.Is(err, issuedate.ErrUnknown) {
+			t.Errorf("%s answered %v, want it unknown to a caller not following aliases", name, err)
+		}
+		var aliased *issuedate.Aliased
+		var got []string
+		if errors.As(err, &aliased) {
+			got = aliased.Names
+		}
+		if !slices.Equal(got, want) {
+			t.Errorf("%s names %q, want %q", name, got, want)
 		}
 	}
 }

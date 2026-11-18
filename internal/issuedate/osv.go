@@ -51,6 +51,20 @@ type Asker interface {
 // ErrUnknown says OSV holds no record under the name.
 var ErrUnknown = errors.New("OSV holds no record under this name")
 
+// Aliased says OSV holds no record under the name asked, and names the
+// records it holds under it as an alias. It reads as ErrUnknown to a caller
+// that does not follow the names.
+type Aliased struct {
+	Names []string
+}
+
+func (a *Aliased) Error() string {
+	return "OSV holds this name as an alias of " + strings.Join(a.Names, ", ")
+}
+
+// Is makes an alias answer an unknown name to a caller that does not follow it.
+func (a *Aliased) Is(target error) bool { return target == ErrUnknown }
+
 // ErrUnaskable says the name cannot be asked about, or OSV refuses it in a way
 // it repeats every time.
 var ErrUnaskable = errors.New("this name cannot be asked about")
@@ -62,6 +76,16 @@ var ErrNotAnswering = errors.New("OSV is not answering")
 // mostBody bounds one record. A kernel issue's record lists every affected
 // branch, which runs to hundreds of kilobytes.
 const mostBody = 8 << 20
+
+// mostNotFound bounds a not-found answer, which is one short sentence.
+const mostNotFound = 64 << 10
+
+// mostAliased bounds the names one not-found answer may send the pass to.
+const mostAliased = 3
+
+// aliasesWere is the words that end OSV's not-found message where it holds the
+// name as an alias of other records, which follow them, comma-separated.
+const aliasesWere = "aliases were:"
 
 // askable is the shape of an advisory identifier: letters, digits and the
 // separators advisory databases use. Anything else is never sent.
@@ -99,7 +123,7 @@ func (o *OSV) Dates(ctx context.Context, name string) (Dates, error) {
 	defer func() { _ = resp.Body.Close() }()
 	switch {
 	case resp.StatusCode == http.StatusNotFound:
-		return Dates{}, ErrUnknown
+		return Dates{}, notFound(resp.Body)
 	case resp.StatusCode == http.StatusBadRequest:
 		return Dates{}, fmt.Errorf("%w: %s answered %s", ErrUnaskable, at, resp.Status)
 	case resp.StatusCode != http.StatusOK:
@@ -138,6 +162,44 @@ func Spelled(name string) string {
 	default:
 		return name
 	}
+}
+
+// notFound reads a not-found answer: the records OSV names where it holds the
+// name as their alias, otherwise ErrUnknown.
+//
+// OSV answers `{"code":5,"message":"Vulnerability not found, but the following
+// aliases were: CURL-CVE-2026-86409"}`, and states the names nowhere else.
+// Only names shaped as identifiers are kept, at most mostAliased of them.
+func notFound(body io.Reader) error {
+	read, err := io.ReadAll(io.LimitReader(body, mostNotFound))
+	if err != nil {
+		return ErrUnknown
+	}
+	var answer struct {
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(read, &answer) != nil {
+		return ErrUnknown
+	}
+	_, listed, found := strings.Cut(answer.Message, aliasesWere)
+	if !found {
+		return ErrUnknown
+	}
+	aliased := &Aliased{}
+	for _, name := range strings.Split(listed, ",") {
+		name = strings.TrimSpace(name)
+		if !askable.MatchString(name) {
+			continue
+		}
+		aliased.Names = append(aliased.Names, name)
+		if len(aliased.Names) == mostAliased {
+			break
+		}
+	}
+	if len(aliased.Names) == 0 {
+		return ErrUnknown
+	}
+	return aliased
 }
 
 // parse reads the two dates from a record. A record stating no publication

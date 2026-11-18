@@ -140,6 +140,8 @@ background, because no scanner report carries either (REQ-82).
 | On unless turned off, a setting read before every request | An identifier is public; an air-gapped deployment turns it off |
 | Only a published vulnerability, by the row it stands as | A flaw minted here and an analyzer's rule are known to nobody outside |
 | The issue's own identifier is asked first, then its CVE names, its GitHub names and the rest, five at most, until one answers | |
+| A not-found answer naming records that hold the name as an alias sends the pass to those records next; the first that answers is the issue's answer, publication date included | OSV files an issue under its publisher's name: curl publishes CVE-2026-86409 as CURL-CVE-2026-86409, and OSV answers the CVE with that name and no record |
+| An answer sends the pass to three names at most, each shaped as an advisory identifier; a record reached through an alias is not followed further, and no name is asked twice for one issue, so one issue is eight requests at most | Aliases naming each other, or one issue's own names, end |
 | A name is sent as OSV spells it: a GitHub advisory's suffix lower case, openSUSE's prefix mixed | Names are stored in capitals and OSV matches exactly |
 | A name that is no advisory identifier is never sent | |
 | Only the two dates are taken | Severity and fix state stay the scanner's |
