@@ -129,8 +129,9 @@ all 11,435.
 
 ## Issue dates
 
-An issue's published and last-modified dates are read from OSV, asked in the
-background, because no scanner report carries either (REQ-82).
+An issue's published and last-modified dates, and its links to the change that
+fixes it, are read from OSV, asked in the background, because no scanner report
+carries either (REQ-82).
 
 | Rule | Reason |
 |---|---|
