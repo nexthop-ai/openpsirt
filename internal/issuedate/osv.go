@@ -92,7 +92,7 @@ const mostNotFound = 64 << 10
 const mostAliased = 3
 
 // aliasesWere is the words that end OSV's not-found message where it holds the
-// name as an alias of other records, which follow them, comma-separated.
+// name as an alias of other records, which follow them, separated by spaces.
 const aliasesWere = "aliases were:"
 
 // askable is the shape of an advisory identifier: letters, digits and the
@@ -194,8 +194,8 @@ func notFound(body io.Reader) error {
 		return ErrUnknown
 	}
 	aliased := &Aliased{}
-	for _, name := range strings.Split(listed, ",") {
-		name = strings.TrimSpace(name)
+	// OSV joins the names with a space; a comma is read as one too.
+	for _, name := range strings.FieldsFunc(listed, func(r rune) bool { return r == ',' || unicode.IsSpace(r) }) {
 		if !askable.MatchString(name) {
 			continue
 		}

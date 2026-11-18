@@ -112,7 +112,10 @@ func TestOSVNamesTheRecordsHoldingANameAsAnAlias(t *testing.T) {
 			_, _ = w.Write([]byte(`{"code":5,"message":"Vulnerability not found, but the following aliases were: CURL-CVE-2026-86409"}`))
 		case "/v1/vulns/CVE-2026-0404":
 			_, _ = w.Write([]byte(`{"code":5,"message":"Vulnerability not found, but the following aliases were: ` +
-				`../admin, A-1, B 2, C-3, D-4, E-5"}`))
+				`../admin A-1 B/2 C-3 D-4 E-5"}`))
+		case "/v1/vulns/CVE-2026-0406":
+			_, _ = w.Write([]byte(`{"code":5,"message":"Vulnerability not found, but the following aliases were: ` +
+				`GHSA-2v3c-4w5x-6y7z PYSEC-2026-11"}`))
 		default:
 			_, _ = w.Write([]byte(`{"code":5,"message":"Vulnerability not found"}`))
 		}
@@ -122,6 +125,7 @@ func TestOSVNamesTheRecordsHoldingANameAsAnAlias(t *testing.T) {
 	for name, want := range map[string][]string{
 		"CVE-2026-86409": {"CURL-CVE-2026-86409"},
 		"CVE-2026-0404":  {"A-1", "C-3", "D-4"},
+		"CVE-2026-0406":  {"GHSA-2v3c-4w5x-6y7z", "PYSEC-2026-11"},
 		"CVE-2026-0405":  nil,
 	} {
 		_, err := client.Ask(t.Context(), name)
