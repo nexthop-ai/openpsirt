@@ -493,6 +493,7 @@ engine at a time (`make measure`, `TestMeasureABuildTrendOverNightlyUploads`).
 
 | Reading | Detail |
 |---|---|
+| 453,726 rows are one night's 153,889, each night's drop, and the kernel twice | Each night opens and closes about 600 findings. The kernel is a leaf, so the drop takes it out on nights 10 and 40: its 135,575 findings close as removed and open again as new rows the night after, the shape of a broken upload |
 | Cost follows the oldest upload plotted | Each point adds the findings opened since the one before; twelve uploads, the default, read in under two thirds of a second on every engine |
 | SQLite rises most with the points | 254 ms at 2 uploads to 1.48 s at 50, against 197 ms to 385 ms on PostgreSQL |
 | Two full images cost what the calendar trend costs | The demo's SQLite, September and November SONiC images per build, served: broadcom 2.30 s against 2.28 s for the same build's 30-day trend, mellanox 1.00 s; September broadcom's scan opened 373,331 findings |
