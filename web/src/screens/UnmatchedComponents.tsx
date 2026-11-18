@@ -23,15 +23,15 @@ const PAGE = 200;
 const REASONS: Record<Body<"ReasonCountBody">["reason"], { label: string; fix: string }> = {
   "no-identifier": {
     label: "No package identifier",
-    fix: "No purl. A CPE on its own matches nothing.",
+    fix: "No purl, and no CPE with a version.",
   },
   "unpublished-kind": {
     label: "Nothing published for this kind",
-    fix: "No vulnerability data exists for container images or source repositories.",
+    fix: "No vulnerability data exists for container images or source repositories. A CPE with a version would match.",
   },
   "no-version": {
     label: "No version",
-    fix: "Missing, or written as UNKNOWN or (devel).",
+    fix: "Missing, or written as UNKNOWN or (devel). A CPE with a version would match.",
   },
   "no-distribution": {
     label: "No distribution",

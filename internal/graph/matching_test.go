@@ -15,6 +15,9 @@ func TestWhatTheScannerCannotMatchIsNamedWithTheReason(t *testing.T) {
 	// Each row is a shape the scanner was run over with one component per
 	// inventory, and the reason is what it answered nothing for.
 	const cpe = "cpe:2.3:a:openssl:openssl:1.1.1a:*:*:*:*:*:*:*"
+	const anyVersion = "cpe:2.3:a:openssl:openssl:*:*:*:*:*:*:*:*"
+	const notApplicable = "cpe:2.3:a:openssl:openssl:-:*:*:*:*:*:*:*"
+	const unknown = "cpe:2.3:a:openssl:openssl:UNKNOWN:*:*:*:*:*:*:*"
 	for _, c := range []struct {
 		purl, cpe, version string
 		want               graph.Unmatchable
@@ -28,21 +31,38 @@ func TestWhatTheScannerCannotMatchIsNamedWithTheReason(t *testing.T) {
 		{"pkg:pypi/requests@2.19.0", "", "2.19.0", ""},
 		{"pkg:cargo/openssl@0.10.55", "", "0.10.55", ""},
 		{"pkg:npm/lodash@4.17.15", "", "4.17.15", ""},
+		// A CPE stating a version is matched on its own.
+		{"", cpe, "1.1.1a", ""},
+		{"", "cpe:/a:openssl:openssl:1.1.1a", "1.1.1a", ""},
+		{"pkg:oci/openssl", cpe, "", ""},
+		{"pkg:docker/library/openssl", cpe, "", ""},
+		{"pkg:github/tianocore/edk2", "cpe:2.3:a:tianocore:edk2:202202:*:*:*:*:*:*:*", "", ""},
+		{"pkg:generic/openssl@UNKNOWN", cpe, "UNKNOWN", ""},
+		{"pkg:generic/openssl", cpe, "", ""},
+		{"pkg:deb/debian/openssl?distro=debian-12", cpe, "", ""},
 
 		{"", "", "1.1.1a", graph.NoIdentifier},
-		{"", cpe, "1.1.1a", graph.NoIdentifier},
+		{"", anyVersion, "1.1.1a", graph.NoIdentifier},
+		{"", "cpe:/a:openssl:openssl", "1.1.1a", graph.NoIdentifier},
+		// An escaped colon stays inside its field, so the version is the any.
+		{"", `cpe:2.3:a:openssl:open\:ssl:*:*:*:*:*:*:*:*`, "1.1.1a", graph.NoIdentifier},
+		{"", "openssl 1.1.1a", "1.1.1a", graph.NoIdentifier},
 		{"https://example.com/openssl", "", "1.1.1a", graph.NoIdentifier},
 		{"pkg:oci/docker-database@latest", "", "latest", graph.UnpublishedKind},
 		// An image as it is stored, and as the docker type names one.
 		{"pkg:oci/docker-database?arch=amd64", "", "", graph.UnpublishedKind},
+		{"pkg:oci/openssl", anyVersion, "", graph.UnpublishedKind},
+		{"pkg:oci/openssl", notApplicable, "", graph.UnpublishedKind},
 		{"pkg:docker/library/nginx", "", "", graph.UnpublishedKind},
 		{"pkg:github/sonic-net/sonic-swss@abcdef123456", "", "abcdef123456", graph.UnpublishedKind},
-		{"pkg:generic/openssl@UNKNOWN", cpe, "UNKNOWN", graph.NoVersion},
-		{"pkg:generic/openssl", cpe, "", graph.NoVersion},
+		{"pkg:generic/openssl@UNKNOWN", unknown, "UNKNOWN", graph.NoVersion},
+		{"pkg:generic/openssl@UNKNOWN", anyVersion, "UNKNOWN", graph.NoVersion},
+		{"pkg:generic/openssl", anyVersion, "", graph.NoVersion},
 		{"pkg:golang/golang.org/x/net@(devel)", "", "(devel)", graph.NoVersion},
 		{"pkg:pypi/requests", "", " ", graph.NoVersion},
 		// No version comes before no distribution: either alone is enough.
 		{"pkg:deb/debian/openssl", "", "", graph.NoVersion},
+		{"pkg:deb/debian/openssl", cpe, "", graph.NoVersion},
 		{"pkg:deb/debian/openssl@3.0.11-1", "", "3.0.11-1", graph.NoDistribution},
 		{"pkg:deb/debian/openssl@3.0.11-1", cpe, "3.0.11-1", graph.NoDistribution},
 		{"pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64", "", "6.12.41-1", graph.NoDistribution},

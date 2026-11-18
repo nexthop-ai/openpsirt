@@ -92,7 +92,7 @@ them and links to the list, and the catalog carries it for a whole build.
 
 | Reason | The component |
 |---|---|
-| No package identifier | Has none. A CPE alone matches nothing |
+| No package identifier | Has none |
 | Nothing published for this kind | Is a container image or a source repository |
 | No version | States none, or `UNKNOWN` or `(devel)` |
 | No distribution | Is a Debian, RPM or Alpine package naming no distribution release through `distro` or through `os_name` and `os_version` |
@@ -104,6 +104,8 @@ them and links to the list, and the catalog carries it for a whole build.
 | One reason per component, the first in the order above | Counts sum to the total |
 | Worked out when asked | Reading a qualifier parses an identifier |
 | Each reason is a shape the scanner was measured matching nothing for | |
+| A component whose CPE states a version is matchable, whatever its package identifier is or says, except a distribution's package naming no distribution release | The scanner matches on the CPE alone; a distribution's package without its release matched 0 with one |
+| A CPE stating any version (`*`), not applicable (`-`), or `UNKNOWN` leaves the component's reason as it was | Its matches are every advisory against the product, which is a guess |
 | The tree's count and this list are one function | |
 
 Measured with grype 0.119.0 against its database of 2026-09-28, one component
@@ -118,10 +120,25 @@ per inventory:
 | RPM or Alpine with no distribution | 0 |
 | Alpine with `distro=alpine-3.18.0` | 19 |
 | Generic `openssl` 1.1.1a with a CPE | 54 |
-| The same with no CPE, with no package identifier and a CPE, or with the version `UNKNOWN` or none | 0 |
+| The same with no CPE | 0 |
 | Go, PyPI, Cargo and npm packages at a version | 17, 5, 12 and 6 |
 | The same with no version, or Go at `(devel)` | 0 |
 | A container image, a GitHub repository | 0 |
+
+Measured with grype 0.121.3 against its database of 2026-11-18, one component
+per inventory, for a CPE beside each shape:
+
+| Shape | CPE version | Matches |
+|---|---|---:|
+| No package identifier, `openssl` | 1.1.1a | 60 |
+| Generic `openssl` at `UNKNOWN` | 1.1.1a | 60 |
+| GitHub `tianocore/edk2` with no version | 202202 | 22 |
+| Container image `openssl` with no version | `*` or `-` | 327 |
+| Generic `openssl` with no version | `*` | 327 |
+| Generic `openssl` at `UNKNOWN` | `*` | 0 |
+| Container image named for a SONiC image, its CPE made from its name | `*` | 0 |
+| Debian `openssl` with no distribution | 1.1.1n | 0 |
+| Generic `openssl` 1.1.1a with no CPE, GitHub `frr` at a commit with none | — | 0 |
 
 A real SONiC broadcom inventory of 7,088 components reads as 3,268 matchable and
 3,820 not:

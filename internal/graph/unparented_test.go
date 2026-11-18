@@ -248,21 +248,24 @@ func TestASubtreeHoldingACycleIsEachComponentOnce(t *testing.T) {
 }
 
 func TestWhatNothingCanMatchIsCounted(t *testing.T) {
-	// A CPE with no package identifier is counted: the scanner matches
-	// nothing on it.
+	// A CPE at any version with no package identifier is counted: the
+	// scanner matches every advisory on it, which is a guess. One stating a
+	// version is matched on.
 	each(t, func(t *testing.T, f *fixture) {
 		ctx := t.Context()
 		matched := graph.Described{Purl: "pkg:deb/debian/curl@8.4.0?distro=debian-12",
 			Name: "curl", Version: "8.4.0"}
 		byName := graph.Described{Name: "bash", Version: "4.4.18-4.ph3"}
 		byPlatform := graph.Described{Name: "busybox", Version: "1.36",
-			CPE: "cpe:2.3:a:busybox:busybox:1.36:*:*:*:*:*:*:*"}
+			CPE: "cpe:2.3:a:busybox:busybox:*:*:*:*:*:*:*:*"}
+		byVersion := graph.Described{Name: "openssl", Version: "1.1.1a",
+			CPE: "cpe:2.3:a:openssl:openssl:1.1.1a:*:*:*:*:*:*:*"}
 		if _, err := fixtures.ApplyGraph(ctx, f.db, f.buildID, f.scan(t), graph.Snapshot{
 			Root:       root,
-			Components: []graph.Described{matched, byName, byPlatform},
+			Components: []graph.Described{matched, byName, byPlatform, byVersion},
 			Dependencies: []graph.Dependency{
 				{Parent: root, Child: matched}, {Parent: root, Child: byName},
-				{Parent: root, Child: byPlatform},
+				{Parent: root, Child: byPlatform}, {Parent: root, Child: byVersion},
 			},
 		}); err != nil {
 			t.Fatal(err)
@@ -271,8 +274,8 @@ func TestWhatNothingCanMatchIsCounted(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tally.Components != 3 || tally.Unmatched != 2 {
-			t.Errorf("counted %+v, want 3 components of which bash and busybox are unmatched", tally)
+		if tally.Components != 4 || tally.Unmatched != 2 {
+			t.Errorf("counted %+v, want 4 components of which bash and busybox are unmatched", tally)
 		}
 	})
 }
