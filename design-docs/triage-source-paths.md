@@ -69,7 +69,7 @@ files are the record's, read from the snapshot each scan reads
 | Withdrawing is the one way it ends, its withdrawn answers included | |
 | One whose every row was set aside answers nothing more | A rule set aside row by row has nobody standing behind it |
 | Agreed, it is published as not affected with its reason, as any wrong match is, for every issue it answers, later ones included; a waiting row publishes nothing | Each later answer reaches customers with no second look at that issue |
-| It is not bounded: no cap on how many occurrences it answers | The reviewer approves one rule, and the re-check re-examines every answer on every scan |
+| It is not bounded: no cap on how many occurrences it answers (REQ-27) | The reviewer approves one rule, and the re-check re-examines every answer on every scan |
 
 ## Answers on later scans
 
