@@ -61,14 +61,18 @@ DEMO_USER ?= dev
 # who could also change the settings would not be exercising anything.
 DEMO_CAST ?= 8081:ana:public-read,public-triage,approver \
              8082:ben:public-read,public-triage,approver
-# What the demo and the dev loop seed, one build per entry:
+# What the demo and the dev loop seed, one upload per entry, in order:
 #   inventory,product,display name,branch,variant
 # The inventory is an .xz of a CycloneDX file under the SBOM package's
 # testdata. Adding a variant is adding a line — a second variant of the same
 # product is what exercises decisions carrying across variants
-# (REQ-25), which the two switch-image builds are.
+# (REQ-25), which the two switch-image builds are. A build named twice receives
+# both inventories, the second newer, so it carries real change between
+# uploads: the September images, then the November ones.
 DEMO_BUILDS ?= internal/sbom/testdata/switch-image.cdx.json.xz,sonic,SONiC,master,broadcom \
-               internal/sbom/testdata/switch-image-mellanox.cdx.json.xz,sonic,SONiC,master,mellanox
+               internal/sbom/testdata/switch-image-mellanox.cdx.json.xz,sonic,SONiC,master,mellanox \
+               internal/sbom/testdata/switch-image-20261117.cdx.json.xz,sonic,SONiC,master,broadcom \
+               internal/sbom/testdata/switch-image-mellanox-20261118.cdx.json.xz,sonic,SONiC,master,mellanox
 # The first build's fields, split: inventory, product, product name, stream
 # and variant. The demo's single-product acts are about that build.
 comma := ,
@@ -436,16 +440,36 @@ seed-upload = curl -sS --noproxy '*' -o /dev/null -w "  upload $(5)/$(6)/$(7) %{
 	  -F "inventory=@$(4)" \
 	  "$(1)/v1/products/$(5)/branches-and-tags/$(6)/variants/$(7)/sboms"
 
-# Every build DEMO_BUILDS names: its product, branch and variant declared, the
+# Every entry DEMO_BUILDS holds: its product, branch and variant declared, the
 # grant on its product, and its inventory uploaded. The same arguments as
 # seed-grant, with $(4) the directory the inventories are written to.
-seed-builds = for entry in $(DEMO_BUILDS); do \
+#
+# A build's later upload waits until its earlier one is scanned. An upload
+# arriving before the scan replaces the earlier graph unscanned, and the build
+# then holds one scan and no change between its uploads.
+seed-builds = sent=""; for entry in $(DEMO_BUILDS); do \
 	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
 	  xz -dc "$$file" > "$(4)/$$product-$$stream-$$variant.cdx.json"; \
 	  $(call seed-declare,$(1),$(2),$(3),$(build-specs)); \
 	  $(call seed-grant,$(1),$(2),$(3),$$product); \
+	  case " $$sent " in *" $$product:$$stream:$$variant "*) \
+	    $(call seed-wait,$(1),$(2),$$product,$$stream,$$variant) ;; esac; \
 	  $(call seed-upload,$(1),$(2),$(3),$(4)/$$product-$$stream-$$variant.cdx.json,$$product,$$stream,$$variant); \
+	  sent="$$sent $$product:$$stream:$$variant"; \
 	done
+
+# Waits until the newest upload of product $(3), stream $(4) and variant $(5)
+# is scanned, through the API at $(1) with the headers in $(2). A failed run is
+# retried by its job, so a failed state is no end to wait for. Gives up after
+# 30 minutes; a full-size image scans in about three.
+seed-wait = printf "  wait for $(3)/$(4)/$(5) to scan"; waited=0; \
+	until curl -sS --noproxy '*' $(2) \
+	    "$(1)/v1/products/$(3)/branches-and-tags/$(4)/variants/$(5)/sboms?limit=1" \
+	    | grep -q '"state":"scanned"'; do \
+	  waited=$$((waited + 1)); \
+	  if [ $$waited -gt 180 ]; then echo " — gave up after 30 minutes"; exit 1; fi; \
+	  sleep 10; \
+	done; echo
 
 # What seed-builds declares for one build, read from the shell variables its
 # loop sets.
@@ -459,7 +483,8 @@ build-specs = \
 # $(1), reached with the headers in $(2).
 seed-status = builds=""; for entry in $(DEMO_BUILDS); do \
 	  IFS=',' read -r file product display stream variant <<< "$$entry"; \
-	  builds="$$builds $$product:$$stream:$$variant"; \
+	  case " $$builds " in *" $$product:$$stream:$$variant "*) ;; \
+	  *) builds="$$builds $$product:$$stream:$$variant" ;; esac; \
 	done; \
 	for triple in $$builds $(3); do \
 	  IFS=':' read -r product stream variant <<< "$$triple"; \

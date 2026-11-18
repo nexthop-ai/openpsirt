@@ -145,6 +145,8 @@ var Held = []Entry{
 	{"internal/sbom/testdata/supplier-product-inside.openvex.json", Ours, ""},
 	{"internal/sbom/testdata/switch-image.cdx.json.xz", Ours, ""},
 	{"internal/sbom/testdata/switch-image-mellanox.cdx.json.xz", Ours, ""},
+	{"internal/sbom/testdata/switch-image-20261117.cdx.json.xz", Ours, ""},
+	{"internal/sbom/testdata/switch-image-mellanox-20261118.cdx.json.xz", Ours, ""},
 	{"internal/scanner/testdata/grype-output.json", Ours, ""},
 	{"internal/scanner/testdata/grype-known-exploited.json", Ours, ""},
 	{"testdata/link-schemes.json", Ours, ""},
