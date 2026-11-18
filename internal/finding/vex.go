@@ -687,8 +687,8 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 		aboveNames := make([]string, 0, len(above))
 		for _, c := range above {
 			aboveNames = append(aboveNames, folded(c.Name))
-			if c.PackageFolded != "" && c.PackageFolded != folded(c.Name) {
-				aboveNames = append(aboveNames, c.PackageFolded)
+			if apart := graph.PackageFolded(c.Purl); apart != "" && apart != folded(c.Name) {
+				aboveNames = append(aboveNames, apart)
 			}
 		}
 		var beneath []Statement
@@ -732,29 +732,23 @@ func (s *Store) shipsProducts(ctx context.Context, productID int64,
 	if len(named) == 0 {
 		return shipped, nil
 	}
-	var rows []struct {
-		Name    string `bun:"name_folded"`
-		Package string `bun:"package_folded"`
-	}
+	var rows []string
 	err := s.db.NewSelect().
 		Distinct().
-		TableExpr(`"component" AS "pc"`).
-		ColumnExpr(`"pc"."name_folded", COALESCE("pc"."package_folded", '') AS "package_folded"`).
-		Join(`JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"`).
+		TableExpr(`"component_name" AS "pc"`).
+		ColumnExpr(`"pc"."name_folded"`).
+		Join(`JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."component_id"`).
 		Join(`JOIN "build" AS "pt" ON "pt"."id" = "pn"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "ps" ON "ps"."id" = "pt"."branch_or_tag_id"`).
 		Where(`"ps"."product_id" = ?`, productID).
 		Where(`"pn"."closed_scan_id" IS NULL`).
-		Where(`("pc"."name_folded" IN (?) OR "pc"."package_folded" IN (?))`, bun.List(named), bun.List(named)).
+		Where(`"pc"."name_folded" IN (?)`, bun.List(named)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which suppliers' products this ships: %w", err)
 	}
-	for _, row := range rows {
-		shipped[row.Name] = true
-		if row.Package != "" {
-			shipped[row.Package] = true
-		}
+	for _, name := range rows {
+		shipped[name] = true
 	}
 	return shipped, nil
 }

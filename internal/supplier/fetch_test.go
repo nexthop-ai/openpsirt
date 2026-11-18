@@ -470,9 +470,19 @@ func TestAnAdvisoryNamingAShippedIdentifierIsRecordedWhateverTheComponentIsCalle
 	// an advisory names it by its identifier.
 	shipping(t, func(t *testing.T, f *ships) {
 		ctx := t.Context()
+		// As the rows stand where the first inventory named it so: its own
+		// name, and the package's name its identifier gives beside it.
 		if _, err := f.db.DB.NewUpdate().Table("component").
 			Set(`"name" = ?`, "Netlink library").Set(`"name_folded" = ?`, "netlink library").
 			Where(`"purl" = ?`, "pkg:deb/debian/libnl-3-200@3.7.0").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Table("component_name").Set(`"name_folded" = ?`, "netlink library").
+			Where(`"name_folded" = ?`, "libnl-3-200").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewInsert().Model(&graph.ComponentName{NameFolded: "libnl-3-200",
+			ComponentID: f.componentID(t, "pkg:deb/debian/libnl-3-200@3.7.0")}).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		p := serving(t)
@@ -731,4 +741,15 @@ func TestAListingWithMisshapedFieldsNobodyReadsIsStillRead(t *testing.T) {
 			t.Fatalf("the pass read %d documents and recorded %d claims", took.Documents, took.Recorded)
 		}
 	})
+}
+
+// componentID is the component holding the identifier given.
+func (f *ships) componentID(t *testing.T, purl string) int64 {
+	t.Helper()
+	var id int64
+	if err := f.db.DB.NewSelect().Table("component").Column("id").
+		Where(`"purl" = ?`, purl).Scan(t.Context(), &id); err != nil {
+		t.Fatal(err)
+	}
+	return id
 }

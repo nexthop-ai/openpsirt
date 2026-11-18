@@ -1000,39 +1000,33 @@ func ours(advisory sbom.Advisory, ships map[string]bool) []finding.Statement {
 	return statements
 }
 
-// shipped is every component name this product holds, folded, and every name
-// a held component's own identifier gives. A statement is stored under the
-// name its identifier gives, and a component under the name its first
+// shipped is every name a component this product holds goes by, folded: its
+// own, and the name its package identifier gives. A statement is stored under
+// the name its identifier gives, and a component under the name its first
 // inventory gave it, which a later one may not repeat.
 //
 // One statement for the product rather than one per build: a product with
 // forty builds shares nearly all of its components between them, and asking
 // per build would be forty scans for one set.
 func (f *Fetcher) shipped(ctx context.Context, productID int64) (map[string]bool, error) {
-	var held []struct {
-		Name    string `bun:"name_folded"`
-		Package string `bun:"package_folded"`
-	}
+	var names []string
 	err := f.db.NewSelect().
 		Distinct().
-		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`"c"."name_folded", COALESCE("c"."package_folded", '') AS "package_folded"`).
-		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
+		TableExpr(`"component_name" AS "cn"`).
+		ColumnExpr(`"cn"."name_folded"`).
+		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "cn"."component_id"`).
 		Join(`JOIN "build" AS "b" ON "b"."id" = "n"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"n"."closed_scan_id" IS NULL`).
 		Where(`"n"."is_root" = ?`, false).
-		Scan(ctx, &held)
+		Scan(ctx, &names)
 	if err != nil {
 		return nil, fmt.Errorf("read what this product ships: %w", err)
 	}
-	ships := make(map[string]bool, len(held))
-	for _, one := range held {
-		ships[one.Name] = true
-		if one.Package != "" {
-			ships[one.Package] = true
-		}
+	ships := make(map[string]bool, len(names))
+	for _, name := range names {
+		ships[name] = true
 	}
 	return ships, nil
 }

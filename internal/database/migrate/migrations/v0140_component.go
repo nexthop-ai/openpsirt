@@ -10,20 +10,16 @@ import (
 	"strings"
 
 	"github.com/uptrace/bun"
+
+	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// packageBatchV0140 is how many components one read of the package step
-// takes.
-const packageBatchV0140 = 5_000
-
+// namesBatchV0140 is how many components one read of the names step takes.
+const namesBatchV0140 = 5_000
 
 // componentV0140 is v0.14.0's declaration of the component table.
 //
-// v0.13.0's, with what the inventory says the component is, and the name the
-// component's package identifier gives, folded, with an index on it. A
-// component keeps the name its first inventory gave it, and a statement is
-// stored under the name its identifier gives, so a statement is matched to a
-// component by either.
+// v0.13.0's, with what the inventory says the component is.
 func componentV0140(t *columnTypes) []string {
 	statements := append([]string(nil), componentV0130(t)...)
 	statements[0] = withColumn(statements[0], `"license"            `+t.free+` NULL,`,
@@ -31,13 +27,26 @@ func componentV0140(t *columnTypes) []string {
 			-- the width of an index's summary. Shown where no index gave a
 			-- summary. Absent where no inventory said.
 			"description"        `+t.free+` NULL,`)
-	statements[0] = withColumn(statements[0], `"identifying_folded" `+t.name+` NULL,`,
-		`-- The name the package identifier gives, folded: decoded, without
-			-- namespace, version, qualifiers or subpath. Null where the
-			-- component carries no package identifier.
-			"package_folded" `+t.name+` NULL,`)
-	return append(statements,
-		`CREATE INDEX "component_package_folded_idx" ON "component" ("package_folded")`)
+	return statements
+}
+
+// componentNameV0140 is v0.14.0's declaration of the component name table:
+// every name a component goes by, folded. Its own name, and the name its
+// package identifier gives where that differs. A component keeps the name its
+// first inventory gave it, and a statement is stored under the name its
+// identifier gives, so a statement reaches a component through this table by
+// one indexed equality whichever name it used.
+func componentNameV0140(t *columnTypes) []string {
+	return []string{
+		`CREATE TABLE "component_name" (
+			"id"           ` + t.id + `,
+			"component_id" ` + t.ref + ` NOT NULL,
+			"name_folded"  ` + t.name + ` NOT NULL,
+			CONSTRAINT "component_name_unique" UNIQUE ("name_folded", "component_id"),
+			CONSTRAINT "component_name_component_fk" FOREIGN KEY ("component_id") REFERENCES "component"("id")
+		)` + t.suffix,
+		`CREATE INDEX "component_name_component_idx" ON "component_name" ("component_id")`,
+	}
 }
 
 // componentDescriptionV0140 adds the column holding what the inventory says a
@@ -56,57 +65,70 @@ func componentDescriptionV0140(ctx context.Context, tx bun.Tx) error {
 		add: []added{{column: "description"}}})
 }
 
-// componentPackageV0140 adds the column holding the name each component's
-// package identifier gives, fills it, and indexes it.
+// componentNameRowV0140 is one row of the component name table as the names
+// step writes it.
+type componentNameRowV0140 struct {
+	bun.BaseModel `bun:"table:component_name"`
+	ID            int64  `bun:"id,pk,autoincrement"`
+	ComponentID   int64  `bun:"component_id"`
+	NameFolded    string `bun:"name_folded"`
+}
+
+// componentNamesV0140 makes the component name table and fills it: each
+// component's folded name, and the folded name its package identifier gives
+// where that differs, the second by a copy of the application's rule.
 //
-// Filled only where empty, so a start after one that stopped fills what it
-// left.
-func componentPackageV0140(ctx context.Context, tx bun.Tx) error {
+// A name already held is kept, so a start after one that stopped fills what
+// it left.
+func componentNamesV0140(ctx context.Context, tx bun.Tx) error {
 	u, err := upgraderIn(ctx, tx)
 	if err != nil {
 		return err
 	}
-	present, err := u.hasColumn("component", "package_folded")
+	present, err := u.hasTable("component_name")
 	if err != nil {
 		return err
 	}
 	if !present {
-		if err := u.change(componentV0140(u.t), change{table: "component",
-			add: []added{{column: "package_folded"}}}); err != nil {
+		if err := u.create(componentNameV0140(u.t), "component_name"); err != nil {
+			return err
+		}
+	} else if held, err := u.hasIndex("component_name", "component_name_component_idx"); err != nil {
+		return err
+	} else if !held {
+		if err := u.index(componentNameV0140(u.t), "component_name", "component_name_component_idx"); err != nil {
 			return err
 		}
 	}
 	for after := int64(0); ; {
 		var rows []struct {
-			ID   int64  `bun:"id"`
-			Purl string `bun:"purl"`
+			ID     int64  `bun:"id"`
+			Purl   string `bun:"purl"`
+			Folded string `bun:"name_folded"`
 		}
 		if err := tx.NewSelect().TableExpr(`"component"`).
-			ColumnExpr(`"id", "purl"`).
-			Where(`"id" > ?`, after).
-			Where(`"purl" IS NOT NULL`).
-			Where(`"package_folded" IS NULL`).
-			OrderExpr(`"id"`).Limit(packageBatchV0140).
+			ColumnExpr(`"id", COALESCE("purl", '') AS "purl", COALESCE("name_folded", '') AS "name_folded"`).
+			Where(`"id" > ?`, after).OrderExpr(`"id"`).Limit(namesBatchV0140).
 			Scan(ctx, &rows); err != nil {
-			return fmt.Errorf("read the components holding a package identifier: %w", err)
+			return fmt.Errorf("read the components whose names are kept: %w", err)
 		}
+		named := make([]componentNameRowV0140, 0, len(rows))
 		for _, row := range rows {
 			after = row.ID
-			name := packageNameV0140(row.Purl)
-			if name == "" {
-				continue
+			if row.Folded != "" {
+				named = append(named, componentNameRowV0140{ComponentID: row.ID, NameFolded: row.Folded})
 			}
-			if _, err := tx.NewUpdate().TableExpr(`"component"`).
-				Set(`"package_folded" = ?`, foldedV0130(name)).
-				Where(`"id" = ?`, row.ID).Exec(ctx); err != nil {
-				return fmt.Errorf("store the package name of component %d: %w", row.ID, err)
+			if apart := foldedV0130(packageNameV0140(row.Purl)); apart != "" && apart != row.Folded {
+				named = append(named, componentNameRowV0140{ComponentID: row.ID, NameFolded: apart})
 			}
 		}
-		if len(rows) < packageBatchV0140 {
-			break
+		if err := database.InBatchesKeeping(ctx, tx, named); err != nil {
+			return fmt.Errorf("keep the names components go by: %w", err)
+		}
+		if len(rows) < namesBatchV0140 {
+			return nil
 		}
 	}
-	return u.index(componentV0140(u.t), "component", "component_package_folded_idx")
 }
 
 // packageNameV0140 is the name a package identifier gives its package, as
@@ -131,7 +153,7 @@ func packageNameV0140(purl string) string {
 	}
 	name := segments[len(segments)-1]
 	if decoded, err := url.PathUnescape(name); err == nil {
-		name = decoded
+		return printableV0130(decoded)
 	}
-	return printableV0130(name)
+	return name
 }

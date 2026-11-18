@@ -243,6 +243,7 @@ func StatementsV0140(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
 		"component":              componentV0140(t),
+		"component_name":         componentNameV0140(t),
 		"finding":                findingV0140(t),
 		"received_vex_statement": receivedStatementV0140(t),
 		"source_answer":          sourceAnswerV0140(t),
@@ -441,3 +442,7 @@ func StopV0140AfterClaimNotes(ctx context.Context, db *database.DB) error {
 			add: []added{{column: "notes_id"}}})
 	})
 }
+
+// PackageFoldedV0140 is the name v0.14.0's upgrade stores for a component's
+// package identifier.
+func PackageFoldedV0140(purl string) string { return foldedV0130(packageNameV0140(purl)) }

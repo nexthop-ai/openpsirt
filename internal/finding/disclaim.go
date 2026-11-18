@@ -538,7 +538,10 @@ func isProduct(product sbom.Target, c graph.Component, atVersion bool) bool {
 		// pkg:generic/sonic-utilities beside "SONiC utilities".
 	case base != "" && !sbom.GenericNamespaceAgrees(base, c.Purl):
 		return false
-	case product.Name == "" || !strings.EqualFold(product.Name, c.Name):
+	case product.Name == "" || !strings.EqualFold(product.Name, c.Name) &&
+		!strings.EqualFold(product.Name, graph.PartsOfPurl(c.Purl).Name):
+		// By the component's name, or the name its package identifier
+		// gives: a component keeps the name its first inventory gave it.
 		return false
 	}
 	return !atVersion || (version != "" && version == heldVersion)

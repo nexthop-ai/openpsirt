@@ -148,7 +148,7 @@ A statement depending on the upstream's own build is offered, never applied.
 
 | Rule | Reason |
 |---|---|
-| Offered beside each open finding of the product at the same issue, by any of its names, at a component of the same name and version | |
+| Offered beside each open finding of the product at the same issue, by any of its names, at a component of the same name, or whose package identifier gives that name, and the same version | A component keeps the name its first inventory gave it |
 | Listed in the review queue beside decisions awaiting a second person, in the products the reader reads | |
 | Not offered where somebody here proposed or agreed a decision about the occurrence | |
 | A component named alone in other software's document is offered too | § Statements recorded |

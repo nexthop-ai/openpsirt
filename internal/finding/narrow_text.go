@@ -28,9 +28,12 @@ import (
 // nothing, and its statement is matched by package. Asked once per statement
 // rather than per finding.
 //
-// A component is matched by its name and by the name its package identifier
-// gives, which is what a statement is stored under: a component keeps the name
-// its first inventory gave it.
+// A component is matched by every name it goes by, which is what a statement
+// may be stored under: its own, and the name its package identifier gives,
+// each a row of its own so each match is one indexed equality. Matched by
+// either of two columns of the component instead, the reads took twice as
+// long and more (design-docs/findings-measurements.md § Statements matched by
+// name).
 func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 	publishers, saidIt := trimmed(f.Publishers), trimmed(f.VexStatus)
 	if len(publishers) > 0 || len(saidIt) > 0 {
@@ -52,12 +55,12 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		}
 		narrowing := strings.Join(asked, " AND ")
 		alone := narrowing + ` AND ("ss"."within" IS NULL OR NOT EXISTS (SELECT 1
-			FROM "component" AS "pc"
-			JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"
+			FROM "component_name" AS "pc"
+			JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."component_id"
 			JOIN "build" AS "pt" ON "pt"."id" = "pn"."build_id"
 			JOIN "branch_or_tag" AS "ps" ON "ps"."id" = "pt"."branch_or_tag_id"
 			WHERE "ps"."product_id" = "ss"."product_id" AND "pn"."closed_scan_id" IS NULL
-			  AND ("pc"."name_folded" = "ss"."within" OR "pc"."package_folded" = "ss"."within")))`
+			  AND "pc"."name_folded" = "ss"."within"))`
 
 		// The issue under its own name, and under every other name it
 		// goes by: which identifier a publisher chose says nothing
@@ -72,16 +75,16 @@ func (f Filter) sayingIt(q *bun.SelectQuery) *bun.SelectQuery {
 		// LOWERon the issue's side the plan scanned the whole
 		// vulnerability table, and the whole alias table, once per
 		// statement.
-		pairs := `(SELECT "ss"."product_id" AS "product_id", "vc"."id" AS "component_id",
+		pairs := `(SELECT "ss"."product_id" AS "product_id", "vc"."component_id" AS "component_id",
 			"vv"."issue_id" AS "vulnerability_id"
 			FROM "received_vex_statement" AS "ss"
-			JOIN "component" AS "vc" ON ("vc"."name_folded" = "ss"."component" OR "vc"."package_folded" = "ss"."component")
+			JOIN "component_name" AS "vc" ON "vc"."name_folded" = "ss"."component"
 			JOIN "vulnerability" AS "vv" ON "vv"."identifier_folded" = "ss"."vulnerability"
 			WHERE ` + alone + `
 			UNION
-			SELECT "ss"."product_id", "vc"."id", "vl"."vulnerability_id"
+			SELECT "ss"."product_id", "vc"."component_id", "vl"."vulnerability_id"
 			FROM "received_vex_statement" AS "ss"
-			JOIN "component" AS "vc" ON ("vc"."name_folded" = "ss"."component" OR "vc"."package_folded" = "ss"."component")
+			JOIN "component_name" AS "vc" ON "vc"."name_folded" = "ss"."component"
 			JOIN "vulnerability_alias" AS "vl" ON "vl"."identifier_folded" = "ss"."vulnerability"
 			WHERE ` + alone + `)`
 

@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -418,9 +419,24 @@ func TestAnOfferReachesAComponentStoredUnderAnotherName(t *testing.T) {
 		w := newWorld(t, f)
 		w.trust()
 		w.read()
+		// As the rows stand where the first inventory named it so: its own
+		// name, and the package's name its identifier gives beside it.
+		before, err := w.findings.UpstreamSaid(t.Context(), w.proposer, w.fork.ID, libnl.Name)
+		if err != nil || len(before) == 0 {
+			t.Fatalf("the upstream says %d things about %s (%v), so this asks nothing", len(before), libnl.Name, err)
+		}
+		var id int64
+		if err := w.DB.DB.NewSelect().Table("component").Column("id").
+			Where(`"purl" = ?`, libnl.Purl).Scan(t.Context(), &id); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := w.DB.DB.NewUpdate().Table("component").
 			Set(`"name" = ?`, "Netlink library").Set(`"name_folded" = ?`, "netlink library").
-			Where(`"purl" = ?`, libnl.Purl).Exec(t.Context()); err != nil {
+			Where(`"id" = ?`, id).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.DB.DB.NewInsert().Model(&graph.ComponentName{ComponentID: id,
+			NameFolded: "netlink library"}).Exec(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 		offers, err := w.findings.Offers(t.Context(), w.proposer, w.fork.ID)
@@ -429,6 +445,14 @@ func TestAnOfferReachesAComponentStoredUnderAnotherName(t *testing.T) {
 		}
 		if len(offers) != 2 {
 			t.Errorf("offered %d, want the upstream's own-build statement at both of the fork's builds", len(offers))
+		}
+		said, err := w.findings.UpstreamSaid(t.Context(), w.proposer, w.fork.ID, "Netlink library")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(said) != len(before) {
+			t.Errorf("the upstream says %d things about the component by its other name, want the %d it says by its package's",
+				len(said), len(before))
 		}
 	})
 }

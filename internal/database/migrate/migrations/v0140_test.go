@@ -4,12 +4,17 @@
 package migrations_test
 
 import (
+	"slices"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 )
 
 // v0140 is the migration v0.14.0 carries v0.13.0's schema across with.
@@ -82,10 +87,11 @@ func TestTheV0140UpgradeMakesAnIndexAStoppedStartLeftUnmade(t *testing.T) {
 	})
 }
 
-// The v0.14.0 upgrade stores the name each component's package identifier
-// gives, folded and decoded, and none for a component carrying no identifier
-// or one that is not a package identifier.
-func TestTheV0140UpgradeStoresEachComponentsPackageName(t *testing.T) {
+// The v0.14.0 upgrade keeps every name each component goes by: its own name
+// folded, and the name its package identifier gives, folded and decoded,
+// where that differs; and nothing for a component with neither. A start after
+// one that stopped keeps what it found and adds what it left.
+func TestTheV0140UpgradeKeepsEveryNameAComponentGoesBy(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
@@ -95,18 +101,51 @@ func TestTheV0140UpgradeStoresEachComponentsPackageName(t *testing.T) {
 			"pkg:generic/repro/InsydeH2O@05.47.45.0027?arch=x86_64#bin")
 		scoped := s.component("core", "7.0.0", "pkg:npm/%40babel/core%2Bx@7.0.0")
 		bare := s.component("bash", "5.2", "")
+		same := s.component("OpenSSL", "3.0.11", "pkg:deb/debian/openssl@3.0.11")
 		other := s.component("thing", "1", "https://example.com/thing")
-		dbtest.MigrateTo(t, db, v0140)
-		for id, want := range map[int64]string{renamed: "insydeh2o", scoped: "core+x", bare: "", other: ""} {
-			var got *string
-			if err := db.DB.NewRaw(`SELECT "package_folded" FROM "component" WHERE "id" = ?`, id).
-				Scan(ctx, &got); err != nil {
-				t.Fatal(err)
-			}
-			if (got == nil) != (want == "") || (got != nil && *got != want) {
-				t.Errorf("component %d holds the package name %v, want %q", id, got, want)
+		want := map[int64][]string{renamed: {"insydeh2o", "repro platform"}, scoped: {"core", "core+x"},
+			bare: {"bash"}, same: {"openssl"}, other: {"thing"}}
+		held := func() {
+			t.Helper()
+			for id, names := range want {
+				var got []string
+				if err := db.DB.NewRaw(`SELECT "name_folded" FROM "component_name" WHERE "component_id" = ? ORDER BY "name_folded"`, id).
+					Scan(ctx, &got); err != nil {
+					t.Fatal(err)
+				}
+				if !slices.Equal(got, names) {
+					t.Errorf("component %d goes by %q, want %q", id, got, names)
+				}
 			}
 		}
+		dbtest.MigrateTo(t, db, v0140)
+		held()
+		if _, err := db.ExecContext(ctx, `DELETE FROM "component_name" WHERE "component_id" IN (?)`,
+			bun.List([]int64{renamed, scoped})); err != nil {
+			t.Fatal(err)
+		}
+		unrecordLatest(t, db)
+		dbtest.MigrateTo(t, db, v0140)
+		held()
 		leaveAtLatest(t, ctx, db)
 	})
+}
+
+// The upgrade carries its own copy of the rule naming a component's package,
+// so a later change to the application's leaves what the upgrade wrote as it
+// was. Held to the application's here, over every shape the rule reads.
+func TestTheV0140UpgradeNamesAPackageAsTheApplicationDoes(t *testing.T) {
+	purls := []string{"", "pkg:deb/debian/openssl@3.0.11-1?arch=amd64", "PKG:Generic/Repro/InsydeH2O@1#bin",
+		"pkg:npm/%40babel/core%2Bx@7.0.0", "pkg:npm/@babel/core", "pkg:generic/foo%zz\x01@1",
+		"pkg:generic/f%01oo@1", "pkg:generic/x", "pkg:generic", "pkg:/generic/x@1", "pkg://deb/debian/x@1",
+		"https://example.com/thing", "not a purl", " pkg:pypi/Requests@2 ", "pkg:golang/golang.org/x/net@v0.7.0",
+		"pkg:generic/" + strings.Repeat("Ü", 300) + "@1", "pkg:generic/ünï@1", "pkg:maven/a/b@1?type=jar"}
+	for _, purl := range purls {
+		if got, want := migrations.PackageFoldedV0140(purl), graph.PackageFolded(purl); got != want {
+			t.Errorf("%q: the upgrade names %q, the application %q", purl, got, want)
+		}
+	}
+	if len(purls) == 0 {
+		t.Fatal("no identifier was compared, so this checked nothing")
+	}
 }

@@ -94,13 +94,18 @@ func placedAt(t *testing.T, f *fixture, rows []finding.Finding) map[string]findi
 }
 
 // everySpellingOfY runs a test with Y stored under the name its package
-// identifier gives, and under another name an inventory gave it, which a
-// statement naming Y by its identifier still reaches.
+// identifier gives, under another name an inventory gave it, which a
+// statement naming Y by its identifier still reaches, and under another name
+// with an identifier in a namespace the statement does not name, which a
+// statement reaches by the package's name.
 func everySpellingOfY(t *testing.T, fn func(t *testing.T, acmeY graph.Described)) {
 	t.Helper()
 	renamed := acmeY
 	renamed.Name = "Acme Y Platform"
-	for _, y := range []graph.Described{acmeY, renamed} {
+	namespaced := renamed
+	namespaced.Name = "Acme Y Appliance"
+	namespaced.Purl = "pkg:generic/acme/acme-y@4.2"
+	for _, y := range []graph.Described{acmeY, renamed, namespaced} {
 		t.Run(y.Name, func(t *testing.T) { fn(t, y) })
 	}
 }
@@ -568,25 +573,46 @@ func TestTheListFindsWhatASupplierAnsweredAndNothingElse(t *testing.T) {
 
 func TestTheListFindsAStatementAboutAComponentStoredUnderAnotherName(t *testing.T) {
 	// A component keeps the name its first inventory gave it, and a statement
-	// is stored under the name its package identifier gives.
+	// is stored under the name its package identifier gives. Named by an
+	// alias the issue carries, and by the identifier of an issue merged into
+	// it, which no alias of the finding's issue holds; the list reaches each
+	// apart.
 	firmware := graph.Described{Purl: "pkg:generic/repro/insydeh2o@05.47.45.0027",
 		Name: "Repro Platform", Version: "05.47.45.0027"}
-	each(t, func(t *testing.T, f *fixture) {
-		f.shipped(t, graph.Snapshot{Root: root, Components: []graph.Described{firmware},
-			Dependencies: []graph.Dependency{{Parent: root, Child: firmware}}})
-		f.reported(t, found(inside, firmware))
-		f.publishes(t, []finding.Statement{finding.StatementOf(sbom.Suppression{
-			Vulnerability: inside, Status: sbom.Affected,
-		}, sbom.Target{Purl: firmware.Purl})}, "sha256:acme-firmware")
-		groups, _, err := f.store.Groups(t.Context(), f.holding(t, access.PublicTriage), f.scope, 50, 0,
-			finding.Filter{Publishers: []string{"Acme Security"}})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(groups) != 1 {
-			t.Errorf("what Acme spoke about is %d groups, want the firmware", len(groups))
-		}
-	})
+	for _, named := range []struct{ why, issue string }{
+		{"by an alias", "GHSA-repr-o000-0001"},
+		{"by an issue merged into it", "GHSA-repr-o000-0002"},
+	} {
+		t.Run(named.why, func(t *testing.T) {
+			each(t, func(t *testing.T, f *fixture) {
+				ctx := t.Context()
+				f.shipped(t, graph.Snapshot{Root: root, Components: []graph.Described{firmware},
+					Dependencies: []graph.Dependency{{Parent: root, Child: firmware}}})
+				f.reported(t, found("CVE-2021-45970", firmware, "GHSA-repr-o000-0001"))
+				if _, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx, []finding.Named{
+					{Identifier: "GHSA-repr-o000-0002"},
+				}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := f.db.DB.NewUpdate().TableExpr(`"vulnerability"`).
+					Set(`"issue_id" = ?`, f.issueID(t, "CVE-2021-45970")).
+					Where(`"id" = ?`, f.issueID(t, "GHSA-repr-o000-0002")).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				f.publishes(t, []finding.Statement{finding.StatementOf(sbom.Suppression{
+					Vulnerability: named.issue, Status: sbom.Affected,
+				}, sbom.Target{Purl: firmware.Purl})}, "sha256:acme-firmware")
+				groups, _, err := f.store.Groups(ctx, f.holding(t, access.PublicTriage), f.scope, 50, 0,
+					finding.Filter{Publishers: []string{"Acme Security"}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(groups) != 1 {
+					t.Errorf("what Acme spoke about is %d groups, want the firmware", len(groups))
+				}
+			})
+		})
+	}
 }
 
 func TestTheRegisterListsWhatASupplierClosedWithTheirWords(t *testing.T) {

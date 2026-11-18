@@ -16,6 +16,7 @@ justifies. `make measure` re-runs the harness-driven ones.
 - [Replaced inventory check](#replaced-inventory-check)
 - [Remediation beside a check](#remediation-beside-a-check)
 - [Time to fix from publication](#time-to-fix-from-publication)
+- [Statements matched by name](#statements-matched-by-name)
 
 ## Fan-out cost
 
@@ -294,3 +295,39 @@ all time, two runs each.
 |---|---|
 | The difference | Inside run-to-run noise: the date is one column of the issue row the statement already joins |
 | MySQL and MariaDB | Not measured; SQLite and PostgreSQL show no cost |
+
+## Statements matched by name
+
+Justifies matching a statement to a component through a row per name the
+component goes by (`design-docs/data-model-components.md` § Component
+identity, `design-docs/ingest-claims.md`). Model: the full-size image at six
+builds, 6,843 packages and 113,334 findings, one in ten components named apart
+from its package identifier. 3,585 statements from one publisher, each placed
+inside a product of its own, one in seven a package this product ships; and
+3,585 upstream statements awaiting review, one in six naming a shipped
+component at its version. Median of five reads as the administrator, on one
+quiet host, the servers holding their data in memory.
+`TestMeasureReadsMatchingStatementsToComponents` is the harness.
+
+| Engine | Read | One column, own name alone | Either of two columns, an OR | Either of two columns, split | A row per name |
+|---|---|---:|---:|---:|---:|
+| SQLite | Narrowed by publisher | 363 ms | 336 ms | 393 ms | 390 ms |
+| SQLite | Narrowed by what was said | 392 ms | | 412 ms | 366 ms |
+| SQLite | Offers for review | 109 ms | 16 ms | 555 ms | 112 ms |
+| PostgreSQL 16 | Narrowed by publisher | 331 ms | | 908 ms | 284 ms |
+| PostgreSQL 16 | Narrowed by what was said | 797 ms | | 8,715 ms | 512 ms |
+| PostgreSQL 16 | Offers for review | 122 ms | | 158 ms | 128 ms |
+| MySQL 8.4 | Narrowed by publisher | 319 ms | 720 ms | 490 ms | 363 ms |
+| MySQL 8.4 | Narrowed by what was said | 347 ms | | 557 ms | 347 ms |
+| MySQL 8.4 | Offers for review | 109 ms | 251 ms | 110 ms | 110 ms |
+| MariaDB 11.4 | Narrowed by publisher | 417 ms | 1,132 ms | 759 ms | 511 ms |
+| MariaDB 11.4 | Narrowed by what was said | 408 ms | | 795 ms | 504 ms |
+| MariaDB 11.4 | Offers for review | 97 ms | 279 ms | 293 ms | 80 ms |
+
+| Reading | Detail |
+|---|---|
+| A row per name | Within run-to-run noise of the component's own name alone on every engine: each match stays one indexed equality on one column |
+| Either of two columns | Two columns compared, by an OR or as two probes, lose the single index every engine starts the placed-alone test and the pairs from; PostgreSQL narrowed by what was said took 8.7 s |
+| The two middle columns | Earlier runs on the same model; a blank cell was not measured |
+| The OR on a second model | 19 s on MySQL and 17 s on MariaDB narrowed by publisher, against 18 to 135 ms with one column |
+
