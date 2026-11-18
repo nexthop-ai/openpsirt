@@ -5,7 +5,7 @@ import { act } from "react";
 import { describe, expect, it } from "vitest";
 
 import { SourceMatch } from "./FindingSource";
-import { accept, mounted, screen } from "../test/mount";
+import { accept, mounted, screen, settle } from "../test/mount";
 import { change } from "../test/controls";
 
 const mount = mounted();
@@ -69,6 +69,7 @@ describe("a match made through a source package", () => {
       "Built from tools/.",
     );
     await press("Propose");
+    await settle();
     const body = (sent()[0]?.[1] as { body: Record<string, unknown> }).body;
     expect(body).toEqual({
       package: "linux-perf",
