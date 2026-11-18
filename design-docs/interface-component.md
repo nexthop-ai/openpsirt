@@ -54,6 +54,8 @@ carries) and the act hangs off it.
 | Nothing to upgrade to is a state, not an empty form | Where no version fixes anything, the work is a decision |
 | The decision over many issues at one component is linked here, beside the count no version fixes, and as the action where nothing fixes anything | |
 | What the product's upstream says about the component is a card: every standing statement about a component of this name at any version, with issue, version, status, mark, link and decline control; drawn only where it says something | |
+| The package card opens on one line saying what the package is: the index's summary, else the inventory's description, which says so on hover (`design-docs/findings-components.md` § Inventory descriptions) | A generic package no index is asked about shows nothing but its name otherwise |
+| That line is text, never markdown | Both are somebody else's words |
 | A container image lists the versions each build stated for it, newest first, with the dates each was stated across; the first five shown and the rest counted | An image carries no version of its own (`design-docs/data-model-components.md` § Container images) |
 
 Every count on the page but the security testing ones is of dependency

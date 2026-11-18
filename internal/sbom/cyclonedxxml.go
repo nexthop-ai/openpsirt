@@ -148,6 +148,8 @@ func (c *reader) xmlComponent(el xml.StartElement) (graph.Described, string, []g
 			return c.x.into(&s.described.Purl)
 		case "cpe":
 			return c.x.into(&s.described.CPE)
+		case "description":
+			return c.x.into(&s.described.Description)
 		case "supplier":
 			return c.x.children(func(f xml.StartElement) error {
 				if f.Name.Local == "name" {

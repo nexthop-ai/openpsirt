@@ -281,7 +281,19 @@ export function Component() {
             <h3>
               The package <span className="id">{pkg.name}</span>
             </h3>
-            {pkg.summary && <p className="reading">{pkg.summary}</p>}
+            {/* The index's line where it gave one, the inventory's where it did
+                not: a package no index is asked about has only the
+                inventory's. Text, never markup, because both are somebody
+                else's. */}
+            {pkg.summary ? (
+              <p className="reading">{pkg.summary}</p>
+            ) : (
+              pkg.description && (
+                <p className="reading" title="As the inventory describes it">
+                  {pkg.description}
+                </p>
+              )
+            )}
             <dl className="facts">
               <dt>Identifier</dt>
               <dd className="id" style={{ wordBreak: "break-all" }}>

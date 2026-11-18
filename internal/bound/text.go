@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"unicode"
 )
 
 // Text is another program's bytes as text every engine stores: each run of
@@ -24,6 +25,29 @@ func Text(s string) string {
 }
 
 func hasInvalid(s string) bool { return strings.ToValidUTF8(s, "") != s }
+
+// MostLine is how many characters one line saying what a package is keeps:
+// an index's summary and an inventory's description alike. It is a label read
+// in a card, so a paragraph a publisher put there is cut.
+const MostLine = 300
+
+// Line is another program's description of a package as one line of at most
+// MostLine characters: repaired as Text repairs it, each space or line break
+// read as a space, every other control character dropped, each run of spaces
+// one space, cut on a character and trimmed. A control character drawn on a
+// screen is invisible text that changes what a reader sees.
+func Line(s string) string {
+	s = strings.Map(func(r rune) rune {
+		switch {
+		case unicode.IsSpace(r):
+			return ' '
+		case unicode.IsControl(r):
+			return -1
+		}
+		return r
+	}, Text(s))
+	return strings.TrimSpace(HeadRunes(strings.Join(strings.Fields(s), " "), MostLine))
+}
 
 // TextIn makes every string reachable from v, which is a pointer, what Text
 // makes it: the fields of a struct, the elements of a slice or an array, the

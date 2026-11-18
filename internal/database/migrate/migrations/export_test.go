@@ -242,6 +242,7 @@ func StatementsV0130(engine database.Engine) map[string][]string {
 func StatementsV0140(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
+		"component":              componentV0140(t),
 		"finding":                findingV0140(t),
 		"received_vex_statement": receivedStatementV0140(t),
 		"source_answer":          sourceAnswerV0140(t),

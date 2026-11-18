@@ -200,6 +200,8 @@ func (c *reader) component() (graph.Described, string, []graph.Described, error)
 			return c.into(&s.described.Purl)
 		case "cpe":
 			return c.into(&s.described.CPE)
+		case "description":
+			return c.into(&s.described.Description)
 		case "type":
 			// The format's word for what kind of thing this is. Only one is
 			// read: a container image is identified by its name (IsImage).

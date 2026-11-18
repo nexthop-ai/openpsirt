@@ -112,6 +112,11 @@ type Component struct {
 	// wrote it. From the inventory, filled in the way Supplier is, and absent
 	// wherever a producer states none.
 	License string `bun:"license"`
+	// Description is what the inventory says the component is, as one line
+	// cut to bound.MostLine characters. From the inventory, filled in the way
+	// Supplier is. A screen shows it where no index gave a Summary, which is
+	// every package an index is not asked about.
+	Description string `bun:"description"`
 }
 
 // Described is a component as a scan describes it, before it has been matched
@@ -133,6 +138,10 @@ type Described struct {
 	// listed, joined as a conjunction, where it lists several. Not part of
 	// identity, for the reason Supplier is not.
 	License string
+	// Description is what a producer says the component is, in its own
+	// words: one line, cut to bound.MostLine characters. Not part of
+	// identity, for the reason Supplier is not.
+	Description string
 	// Container is whether the format describes the component as a container
 	// image: a CycloneDX component of type container, or an SPDX package
 	// whose primary purpose is a container. Read only where the component
@@ -598,6 +607,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 		d = d.trimmed()
 		d.Supplier = bound.HeadRunes(d.Supplier, statedWidth)
 		d.License = bound.HeadRunes(d.License, statedWidth)
+		d.Description = bound.Line(d.Description)
 		byIdentity[d.Identity()] = d
 	}
 	if len(byIdentity) == 0 {
@@ -629,6 +639,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 			FoldKey:        d.FoldKey(),
 			Supplier:       d.Supplier,
 			License:        d.License,
+			Description:    d.Description,
 			FirstSeenAt:    now,
 		})
 	}
@@ -643,6 +654,10 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 	}
 	if err := c.fillBlank(ctx, "license", "the license of", byIdentity, known,
 		func(d Described) string { return d.License }); err != nil {
+		return nil, err
+	}
+	if err := c.fillBlank(ctx, "description", "what the inventory says of", byIdentity, known,
+		func(d Described) string { return d.Description }); err != nil {
 		return nil, err
 	}
 	if len(missing) > 0 {
@@ -727,6 +742,9 @@ func (d *Described) FillFrom(other Described) {
 	}
 	if d.License == "" {
 		d.License = other.License
+	}
+	if d.Description == "" {
+		d.Description = other.Description
 	}
 	if d.Repository == "" {
 		d.Repository = other.Repository
@@ -1012,16 +1030,19 @@ const foldedWidth = database.NameWidth
 // that states no supplier or license never gets one, however many later scans
 // say what it is.
 //
-// The column is one of the two names Intern passes, never anything a caller
-// supplies. Grouped by value, so the number of statements is the number of
-// distinct values in the scan rather than the number of components: a night's
-// apply issues enough statements already, and a real image names a few dozen
-// suppliers and a few hundred licenses across thousands of rows.
+// The column is one of the names Intern passes, never anything a caller
+// supplies. The rows still blank are read first, so a nightly scan of a build
+// whose rows are all filled writes nothing; a description differs on nearly
+// every component, so grouping by value alone would be one statement per
+// component on every scan. What is left is grouped by value, so the number of
+// statements is the number of distinct values being filled: a real image names
+// a few dozen suppliers and a few hundred licenses across thousands of rows.
 func (c *Components) fillBlank(ctx context.Context, column, what string,
 	described map[string]Described, known map[string]int64,
 	said func(Described) string) error {
 
-	byValue := map[string][]int64{}
+	stated := map[int64]string{}
+	ids := make([]int64, 0, len(described))
 	for identity, d := range described {
 		value := strings.TrimSpace(said(d))
 		if value == "" {
@@ -1033,13 +1054,33 @@ func (c *Components) fillBlank(ctx context.Context, column, what string,
 		if !have {
 			continue
 		}
-		byValue[value] = append(byValue[value], id)
+		stated[id] = value
+		ids = append(ids, id)
+	}
+	byValue := map[string][]int64{}
+	err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+		var blank []int64
+		if err := c.db.NewSelect().Model((*Component)(nil)).
+			Column("id").
+			Where(`"id" IN (?)`, bun.List(batch)).
+			Where("? IS NULL OR ? = ?", bun.Ident(column), bun.Ident(column), "").
+			Scan(ctx, &blank); err != nil {
+			return err
+		}
+		for _, id := range blank {
+			byValue[stated[id]] = append(byValue[stated[id]], id)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("read which components have no record of %s them: %w", what, err)
 	}
 	// Batched, and on identifiers rather than on identity strings. A Debian
 	// inventory names one supplier for nearly every component, so a group here
 	// is the whole inventory — measured at 8,373 — and one statement binding
 	// that many parameters is refused by two of the four engines, inside the
-	// transaction the scan applies in.
+	// transaction the scan applies in. The blank test stays on the write,
+	// because another transaction may have filled a row since it was read.
 	for value, ids := range byValue {
 		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
 			_, err := c.db.NewUpdate().Model((*Component)(nil)).

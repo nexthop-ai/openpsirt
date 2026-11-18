@@ -80,15 +80,18 @@ type FoldPackageBody struct {
 	// Summary is the ecosystem index's own description of the package, where
 	// one was asked and answered. Absent is the ordinary case rather than a
 	// gap.
-	Summary    string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
-	ProjectURL string `json:"project_url,omitempty" doc:"The address the index gives for where the package is developed. Absent where it does not say"`
-	Supplier   string `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
-	License    string `json:"license,omitempty" doc:"The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none"`
-	Newest     string `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
-	NewestAt   string `json:"newest_released_at,omitempty" doc:"The date that version shipped, where the index said"`
-	FirstSeen  string `json:"first_seen" doc:"The moment a scan of this deployment first reported the package"`
-	Issues     int    `json:"issues" doc:"Distinct vulnerabilities open against this binary alone"`
-	Consumers  int    `json:"consumers" doc:"The number of things pulling this binary in here"`
+	Summary string `json:"summary,omitempty" doc:"One line saying what the package is, as its ecosystem's index states it. Absent where no index serves one — the Go module protocol has no such field — and where no index is asked, which is every distribution package"`
+	// Description is the inventory's own line about the package, which a
+	// screen shows where Summary is absent.
+	Description string `json:"description,omitempty" doc:"One line saying what the package is, as the inventory states it: a CycloneDX component's description, or an SPDX package's summary, else its description. Cut to 300 characters on one line. The first inventory stating one is kept, and a later one fills it only where none was stated. Absent where no inventory says"`
+	ProjectURL  string `json:"project_url,omitempty" doc:"The address the index gives for where the package is developed. Absent where it does not say"`
+	Supplier    string `json:"supplier,omitempty" doc:"The supplier the scan named — a distribution, a vendor, a project. From the inventory rather than from an index, and absent for plenty of it"`
+	License     string `json:"license,omitempty" doc:"The license the inventory declares for it: an SPDX expression where the producer wrote one, a producer's own license names joined with AND where it listed several, and what somebody concluded where nothing was declared. Absent where the inventory states none"`
+	Newest      string `json:"newest_version,omitempty" doc:"The newest version the ecosystem's index knows of. Absent where no index is asked, which is every distribution package"`
+	NewestAt    string `json:"newest_released_at,omitempty" doc:"The date that version shipped, where the index said"`
+	FirstSeen   string `json:"first_seen" doc:"The moment a scan of this deployment first reported the package"`
+	Issues      int    `json:"issues" doc:"Distinct vulnerabilities open against this binary alone"`
+	Consumers   int    `json:"consumers" doc:"The number of things pulling this binary in here"`
 	// StatedVersions is what a container image was stamped with, build by
 	// build. An image is identified by its name, so its version is not
 	// part of what it is.
@@ -181,7 +184,7 @@ func registerComponent(api huma.API, in core.Deps) {
 					Namespace:      graph.NamespaceOf(one.Purl),
 					PackagePageURL: page, PackagePageName: called,
 					Summary: one.Summary, ProjectURL: one.ProjectURL,
-					Supplier: one.Supplier, License: one.License,
+					Supplier: one.Supplier, License: one.License, Description: one.Description,
 					Newest: one.Newest, NewestAt: core.StampAt(one.NewestAt), FirstSeen: core.Stamp(one.FirstSeen),
 					Issues: one.Issues, Consumers: one.Consumers,
 					StatedVersions: stated,

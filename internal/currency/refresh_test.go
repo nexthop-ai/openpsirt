@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/currency"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -670,7 +671,7 @@ func TestOneReplicaAsksTheIndexes(t *testing.T) {
 // staff who hold the most access.
 func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
-		long := strings.Repeat("a", currency.MostSummary+120)
+		long := strings.Repeat("a", bound.MostLine+120)
 		r, _ := seed(t, db, []component{
 			{purl: "pkg:npm/kept@1.0.0"},
 			{purl: "pkg:npm/clipped@1.0.0"},
@@ -716,9 +717,9 @@ func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
 		if clipped.Summary == nil {
 			t.Fatal("a long summary was dropped rather than shortened")
 		}
-		if n := len([]rune(*clipped.Summary)); n > currency.MostSummary {
+		if n := len([]rune(*clipped.Summary)); n > bound.MostLine {
 			t.Errorf("the summary kept %d runes, more than the %d bound",
-				n, currency.MostSummary)
+				n, bound.MostLine)
 		}
 
 		hostile := got["pkg:npm/hostile@1.0.0"]

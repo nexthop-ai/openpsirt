@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/docread"
 	"github.com/nexthop-ai/openpsirt/internal/refusal"
 )
@@ -228,6 +229,16 @@ func sentinel(value string) string {
 		return ""
 	}
 	return value
+}
+
+// statedDescription is what an SPDX package says it is: its summary, and its
+// description where it states no summary. Both versions of the format define
+// the summary as the short one, and what is kept is one line.
+func statedDescription(summary, description string) string {
+	if said := bound.Line(sentinel(summary)); said != "" {
+		return said
+	}
+	return bound.Line(sentinel(description))
 }
 
 // buildTime reads the time an inventory says its build was made. An empty

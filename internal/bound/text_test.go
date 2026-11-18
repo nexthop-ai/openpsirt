@@ -4,7 +4,9 @@
 package bound_test
 
 import (
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/nexthop-ai/openpsirt/internal/bound"
 )
@@ -24,6 +26,38 @@ func TestTextDropsNULAndReplacesInvalidBytes(t *testing.T) {
 	// the bytes either side into a character.
 	if got := bound.Text("\xc3\x00\xa9"); got != "\uFFFD\uFFFD" {
 		t.Errorf("bytes either side of a NUL came back as %q", got)
+	}
+}
+
+func TestLineIsOneLineOfPrintableText(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"  Intel Boot Agent\n\n  v1.5.89\t(x86)  ", "Intel Boot Agent v1.5.89 (x86)"},
+		{"bell\a and \x1b[31mred\x1b[0m", "bell and [31mred[0m"},
+		{"caf\xe9\x00 au lait", "caf� au lait"},
+		{"next\u0085line", "next line"},
+		{" \n\t ", ""},
+	} {
+		if got := bound.Line(c.in); got != c.want {
+			t.Errorf("Line(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+// The cut counts characters, so a description in a script taking three bytes a
+// character keeps as many characters as one in ASCII, and none is split.
+func TestLineCutsAtMostLineCharacters(t *testing.T) {
+	for _, unit := range []string{"a", "界"} {
+		got := bound.Line(strings.Repeat(unit, bound.MostLine+50))
+		if n := utf8.RuneCountInString(got); n != bound.MostLine {
+			t.Errorf("a long run of %q kept %d characters, want %d", unit, n, bound.MostLine)
+		}
+		if !utf8.ValidString(got) {
+			t.Errorf("a long run of %q was cut inside a character", unit)
+		}
+	}
+	// A space where the cut lands is not kept at the end.
+	if got := bound.Line(strings.Repeat("a", bound.MostLine-1) + " b"); got != strings.Repeat("a", bound.MostLine-1) {
+		t.Errorf("a cut on a space kept %q at the end", got[len(got)-2:])
 	}
 }
 

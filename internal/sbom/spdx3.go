@@ -135,6 +135,9 @@ type spdx3Element struct {
 
 	// purpose is what a package is for, in the format's own vocabulary.
 	purpose string
+
+	// summary and description are what an element is, said short and long.
+	summary, description string
 }
 
 // spdx3Context refuses a version this reader was not written against, from the
@@ -190,6 +193,10 @@ func (c *reader) spdx3Element() (spdx3Element, error) {
 			return c.into(&e.purl)
 		case "software_primaryPurpose":
 			return c.into(&e.purpose)
+		case "summary":
+			return c.into(&e.summary)
+		case "description":
+			return c.into(&e.description)
 		case "simplelicensing_licenseExpression":
 			return c.into(&e.expression)
 		case "externalIdentifier":
@@ -495,7 +502,8 @@ func (c *reader) spdx3Package(e spdx3Element) error {
 		CPE:     sentinel(e.cpe),
 		// Only one purpose is read: a container image is identified by its
 		// name (IsImage).
-		Container: e.purpose == "container",
+		Container:   e.purpose == "container",
+		Description: statedDescription(e.summary, e.description),
 	}
 	printable(&described)
 	if err := described.Valid(); err != nil {

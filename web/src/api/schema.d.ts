@@ -11721,6 +11721,8 @@ export interface components {
              * @description The number of things pulling this binary in here
              */
             consumers: number;
+            /** @description One line saying what the package is, as the inventory states it: a CycloneDX component's description, or an SPDX package's summary, else its description. Cut to 300 characters on one line. The first inventory stating one is kept, and a later one fills it only where none was stated. Absent where no inventory says */
+            description?: string;
             /** @description The moment a scan of this deployment first reported the package */
             first_seen: string;
             /**
