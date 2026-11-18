@@ -31,7 +31,8 @@ func TestWhatTheScannerCannotMatchIsNamedWithTheReason(t *testing.T) {
 		{"pkg:pypi/requests@2.19.0", "", "2.19.0", ""},
 		{"pkg:cargo/openssl@0.10.55", "", "0.10.55", ""},
 		{"pkg:npm/lodash@4.17.15", "", "4.17.15", ""},
-		// A CPE stating a version is matched on its own.
+		// A CPE stating a version is matched on its own, where the type's
+		// matcher reads a CPE.
 		{"", cpe, "1.1.1a", ""},
 		{"", "cpe:/a:openssl:openssl:1.1.1a", "1.1.1a", ""},
 		{"pkg:oci/openssl", cpe, "", ""},
@@ -39,11 +40,13 @@ func TestWhatTheScannerCannotMatchIsNamedWithTheReason(t *testing.T) {
 		{"pkg:github/tianocore/edk2", "cpe:2.3:a:tianocore:edk2:202202:*:*:*:*:*:*:*", "", ""},
 		{"pkg:generic/openssl@UNKNOWN", cpe, "UNKNOWN", ""},
 		{"pkg:generic/openssl", cpe, "", ""},
-		{"pkg:deb/debian/openssl?distro=debian-12", cpe, "", ""},
+		{"pkg:conan/openssl", cpe, "", ""},
+		{"pkg:apk/alpine/openssl@1.1.1a", cpe, "1.1.1a", ""},
 
 		{"", "", "1.1.1a", graph.NoIdentifier},
 		{"", anyVersion, "1.1.1a", graph.NoIdentifier},
 		{"", "cpe:/a:openssl:openssl", "1.1.1a", graph.NoIdentifier},
+		{"", "cpe:/a:openssl:openssl:-", "1.1.1a", graph.NoIdentifier},
 		// An escaped colon stays inside its field, so the version is the any.
 		{"", `cpe:2.3:a:openssl:open\:ssl:*:*:*:*:*:*:*:*`, "1.1.1a", graph.NoIdentifier},
 		{"", "openssl 1.1.1a", "1.1.1a", graph.NoIdentifier},
@@ -65,6 +68,12 @@ func TestWhatTheScannerCannotMatchIsNamedWithTheReason(t *testing.T) {
 		{"pkg:deb/debian/openssl", cpe, "", graph.NoVersion},
 		{"pkg:deb/debian/openssl@3.0.11-1", "", "3.0.11-1", graph.NoDistribution},
 		{"pkg:deb/debian/openssl@3.0.11-1", cpe, "3.0.11-1", graph.NoDistribution},
+		// A type whose matcher reads no CPE answers by its identifier alone.
+		{"pkg:deb/debian/openssl?distro=debian-12", cpe, "", graph.NoVersion},
+		{"pkg:deb/debian/openssl@UNKNOWN?distro=debian-12", cpe, "UNKNOWN", graph.NoVersion},
+		{"pkg:rpm/redhat/openssl?distro=rhel-9", cpe, "", graph.NoVersion},
+		{"pkg:pypi/django@UNKNOWN", cpe, "UNKNOWN", graph.NoVersion},
+		{"pkg:npm/lodash", cpe, "", graph.NoVersion},
 		{"pkg:deb/sonic/linux-image@6.12.41-1?arch=amd64", "", "6.12.41-1", graph.NoDistribution},
 		{"pkg:rpm/redhat/openssl@1.1.1k-1.el8", "", "1.1.1k-1.el8", graph.NoDistribution},
 		{"pkg:apk/alpine/openssl@3.1.0-r0?os_name=alpine", "", "3.1.0-r0", graph.NoDistribution},

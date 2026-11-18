@@ -16562,7 +16562,7 @@ export interface components {
             /** @description The package identifier the scanner is given, where there is one */
             purl?: string;
             /**
-             * @description Why the scanner cannot match it. A component whose CPE states a version is matchable, unless it is a distribution's package naming no distribution release. no-identifier: no package identifier. unpublished-kind: a package type no vulnerability data is published against, such as a container image or a source repository. no-version: no version, or one reading unknown. no-distribution: a distribution's package that does not name the distribution release it was built for. generic-without-cpe: a generic package with no CPE
+             * @description Why the scanner cannot match it. A component whose CPE states a version is matchable, unless its package identifier is of a language's type or a deb or rpm, which are matched by the identifier alone. no-identifier: no package identifier. unpublished-kind: a package type no vulnerability data is published against, such as a container image or a source repository. no-version: no version, or one reading unknown. no-distribution: a distribution's package that does not name the distribution release it was built for. generic-without-cpe: a generic package with no CPE
              * @enum {string}
              */
             reason: "no-identifier" | "unpublished-kind" | "no-version" | "no-distribution" | "generic-without-cpe";

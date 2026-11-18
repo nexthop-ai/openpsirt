@@ -31,7 +31,7 @@ const REASONS: Record<Body<"ReasonCountBody">["reason"], { label: string; fix: s
   },
   "no-version": {
     label: "No version",
-    fix: "Missing, or written as UNKNOWN or (devel). A CPE with a version would match.",
+    fix: "Missing, or written as UNKNOWN or (devel). A CPE with a version would match, except on a language, deb or rpm package.",
   },
   "no-distribution": {
     label: "No distribution",

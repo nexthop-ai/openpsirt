@@ -56,6 +56,15 @@ var unpublished = map[string]bool{"oci": true, "github": true}
 // distribution release the identifier states.
 var distributions = map[string]bool{"deb": true, "rpm": true, "apk": true}
 
+// noCPE is the package types whose matcher the scanner runs without a CPE: a
+// language's or a distribution's, which answers from its own advisories by
+// the identifier alone. Every other type, Alpine's included, reaches a matcher
+// reading the CPE.
+var noCPE = map[string]bool{
+	"deb": true, "rpm": true, "npm": true, "pypi": true, "gem": true, "cargo": true,
+	"golang": true, "maven": true, "nuget": true, "hex": true,
+}
+
 // Unmatchable reports why the scanner cannot match this component, or empty
 // where it can.
 //
@@ -63,13 +72,13 @@ var distributions = map[string]bool{"deb": true, "rpm": true, "apk": true}
 // distribution worked out the way the scanner's inventory works it out, from
 // `distro` or from `os_name` and `os_version`.
 //
-// A CPE stating a version is matched on its own, whatever the identifier is
-// or says, except a distribution's package naming no distribution release,
-// which the scanner matches on nothing. A CPE at any version is not counted:
-// it matches every advisory against the product, which is a guess.
+// A CPE stating a version is matched on its own, whatever the identifier
+// says, where the identifier's type reaches a matcher reading a CPE. A CPE at
+// any version is not counted: it matches every advisory against the product,
+// which is a guess.
 func (d Described) Unmatchable() Unmatchable {
 	parts := PartsOfPurl(d.Purl)
-	if versionedCPE(d.CPE) && (!distributions[parts.Type] || parts.Distro != "") {
+	if versionedCPE(d.CPE) && !noCPE[parts.Type] {
 		return ""
 	}
 	switch {
