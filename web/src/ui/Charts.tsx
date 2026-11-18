@@ -18,7 +18,7 @@ import {
 import type { Body } from "../api/client";
 import { BANDS as LADDER, BELOW_LOW, COLORS } from "./severities";
 import { type Step, began, outran, settled } from "./trend";
-import { FlowBars, FlowMark, labelled, roundTicks, scanLines } from "./flowchart";
+import { FlowBars, FlowMark, dayOf, labelled, namedAt, roundTicks, scanLines } from "./flowchart";
 
 // The step a calendar trend is drawn in, the windows each is asked over, and
 // the words a heading carries. Daily shows a team fixing dozens a day; weekly
@@ -61,12 +61,51 @@ export function StepSwitch({
   );
 }
 
+// What a trend's points sit at: the date each build's inventory states, or
+// the day its scans ran.
+export type TrendAxis = "built" | "scanned";
+
+// The switch between the two axes on a trend panel.
+export function AxisSwitch({
+  axis,
+  onAxis,
+}: {
+  axis: TrendAxis;
+  onAxis: (axis: TrendAxis) => void;
+}) {
+  const offered: [TrendAxis, string, string][] = [
+    [
+      "built",
+      "Build date",
+      "Each point is what the builds held at the date their inventories state",
+    ],
+    ["scanned", "Scan date", "Each point is what was open at the end of the day scans ran"],
+  ];
+  return (
+    <div className="seg noprint" role="group" aria-label="Axis">
+      {offered.map(([each, label, said]) => (
+        <button
+          key={each}
+          type="button"
+          title={said}
+          aria-pressed={axis === each}
+          onClick={() => onAxis(each)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // The three shapes the reporting decisions name, drawn small. They sit inside
 // panels rather than on a page of their own, so they carry no title and no
 // legend — the panel says what they are, and a reading underneath says what
 // they mean, which is the part a number cannot say for itself.
 
-type Point = Step & { at?: string };
+// A label, where given, names the point under an evenly spaced axis in place of
+// its date: a release by its tag.
+type Point = Step & { at?: string; label?: string };
 
 // The four bands, folded the way the server folds them.
 //
@@ -120,6 +159,18 @@ function day(at?: string): string {
   return (at ?? "").slice(5, 10);
 }
 
+// Where each point sits across a chart's width, from 0 to 1: evenly, or to
+// scale in time where the gaps between dates are part of what is read.
+function spread(points: Point[], timed: boolean): number[] {
+  const n = points.length;
+  if (n === 1) return [0.5];
+  if (!timed) return points.map((_, i) => i / (n - 1));
+  const times = points.map((p) => dayOf(p.at));
+  const first = times[0] ?? 0;
+  const span = Math.max(1, (times[n - 1] ?? 0) - first);
+  return times.map((t) => (t - first) / span);
+}
+
 // Open, with new, returned and corrected beneath it. Separately they are
 // numbers; together they say whether a team is keeping pace.
 //
@@ -171,11 +222,13 @@ export function Pace({
   words = ISSUE_WORDS,
   marks: given = [],
   unit = "steps",
+  timed = false,
 }: {
   points: Point[];
   words?: PaceWords;
   marks?: PaceMark[];
   unit?: string;
+  timed?: boolean;
 }) {
   const from = began(all);
   const points = all.slice(from);
@@ -189,7 +242,14 @@ export function Pace({
     gap = 16,
     botH = 46;
   const n = points.length;
-  const x = (i: number) => (n === 1 ? (L + W - R) / 2 : L + (i * (W - L - R)) / (n - 1));
+  const at = spread(points, timed);
+  // Bars no wider than the closest two points leave room for, so dates a day
+  // apart on a scale of months stay two bars.
+  const closest = Math.min(1, ...at.slice(1).map((v, i) => v - (at[i] ?? 0)));
+  const bw = Math.max(2, Math.min(((W - L - R) / n) * 0.34, closest * (W - L - R) * 0.8));
+  // The first and last points sit half a bar in from the edges, so a bar
+  // centered on one stays inside the chart however few points there are.
+  const x = (i: number) => L + bw / 2 + (at[i] ?? 0) * (W - L - R - bw);
   const opens = points.map((p) => p.open ?? 0);
   const news = points.map((p) => p.new ?? 0);
   const backs = points.map((p) => p.returned ?? 0);
@@ -209,11 +269,16 @@ export function Pace({
   const zero = T + topH + gap + botH / 2;
   const most = Math.max(1, ...news.map((v, i) => v + (backs[i] ?? 0)), ...dones);
   const scale = (botH / 2 - 4) / most;
-  const bw = Math.max(2, ((W - L - R) / n) * 0.34);
 
   const pts = opens.map((v, i) => `${x(i)},${y(v)}`).join(" ");
   const last = n - 1;
   const every = Math.max(1, Math.ceil(n / 8));
+  const named = timed
+    ? namedAt(
+        points.map((_, i) => x(i)),
+        40,
+      )
+    : null;
 
   return (
     <svg
@@ -275,7 +340,7 @@ export function Pace({
         />
       ))}
       {points.map((p, i) =>
-        labelled(i, last, every) ? (
+        (named ? named.has(i) : labelled(i, last, every)) ? (
           <text
             key={p.at ?? i}
             className="axis"
@@ -339,18 +404,38 @@ export function paceLabel(points: Point[], words: PaceWords, unit: string): stri
 
 // The same total, split. A flat line with a rising critical share is getting
 // worse, and one line cannot show that.
-export function Mix({ points }: { points: Point[] }) {
+export function Mix({ points, timed = false }: { points: Point[]; timed?: boolean }) {
   const data = settled(points).map((p) => {
-    return { at: day(p.at), ...folded(p.by_severity ?? {}) };
+    return { at: p.label ?? day(p.at), t: dayOf(p.at), ...folded(p.by_severity ?? {}) };
   });
   if (data.length === 0) return null;
+  const said = (t: number) => day(new Date(t).toISOString());
   return (
-    <ResponsiveContainer width="100%" height={180}>
+    // Sized before the container is measured, so the chart draws where nothing
+    // reports a size.
+    <ResponsiveContainer width="100%" height={180} initialDimension={{ width: 560, height: 180 }}>
       <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
         <CartesianGrid strokeOpacity={0.14} vertical={false} />
-        <XAxis dataKey="at" tick={axis} tickLine={false} axisLine={false} />
+        {timed ? (
+          <XAxis
+            dataKey="t"
+            type="number"
+            scale="time"
+            domain={["dataMin", "dataMax"]}
+            ticks={data.map((d) => d.t)}
+            tickFormatter={said}
+            tick={axis}
+            tickLine={false}
+            axisLine={false}
+          />
+        ) : (
+          <XAxis dataKey="at" tick={axis} tickLine={false} axisLine={false} />
+        )}
         <YAxis tick={axis} tickLine={false} axisLine={false} width={46} tickFormatter={brief} />
-        <Tooltip contentStyle={tip} />
+        <Tooltip
+          contentStyle={tip}
+          labelFormatter={(label) => (timed ? said(Number(label)) : String(label))}
+        />
         {BANDS.map((band) => (
           <Area
             key={band.key}
@@ -360,6 +445,9 @@ export function Mix({ points }: { points: Point[] }) {
             stroke={band.color}
             fill={band.color}
             fillOpacity={0.5}
+            // Drawn whole at once: the entry animation reveals the areas over
+            // time, and a page captured before it ends shows an empty plot.
+            isAnimationActive={false}
           />
         ))}
       </AreaChart>

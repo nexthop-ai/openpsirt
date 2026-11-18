@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { describe, expect, it } from "vitest";
-import { Pace, Releases, Ring, paceLabel, paceMarks, tickWords } from "./Charts";
+import { Mix, Pace, Releases, Ring, paceLabel, paceMarks, tickWords } from "./Charts";
 import { mounted } from "../test/mount";
 
 const mount = mounted();
@@ -17,6 +17,55 @@ const point = (at: string, open: number, fresh: number, corrected: number, retur
 });
 
 describe("the backlog's pace", () => {
+  it("places build dates to scale in time, keeping two dates a day apart two bars", () => {
+    mount.render(
+      <Pace
+        timed
+        points={[
+          { ...point("2026-09-09", 13062, 0, 0), baseline: 13062, first_scans: 2 },
+          point("2026-11-17", 12992, 144, 0),
+          point("2026-11-18", 6548, 18, 6466),
+        ]}
+      />,
+    );
+    const centers = [...mount.host().querySelectorAll("rect")].map(
+      (bar) => Number(bar.getAttribute("x")) + Number(bar.getAttribute("width")) / 2,
+    );
+    const [sep, nov17, nov18] = [...new Set(centers)].sort((a, b) => a - b);
+    // 69 days against one.
+    expect((nov17! - sep!) / (nov18! - nov17!)).toBeGreaterThan(60);
+    const widths = [...mount.host().querySelectorAll("rect")].map((bar) =>
+      Number(bar.getAttribute("width")),
+    );
+    expect(Math.max(...widths)).toBeLessThan(nov18! - nov17!);
+    const labels = [...mount.host().querySelectorAll("text.axis")].map((t) => t.textContent);
+    expect(labels).toContain("09-09");
+    expect(labels).toContain("11-18");
+    expect(labels).not.toContain("11-17");
+  });
+
+  it("keeps every bar inside the chart where few points make them wide", () => {
+    mount.render(
+      <Pace
+        points={[
+          { ...point("2026-09-09", 13062, 0, 0), baseline: 13062, first_scans: 2 },
+          point("2026-11-17", 12992, 144, 0),
+          point("2026-11-18", 6548, 18, 6466),
+        ]}
+      />,
+    );
+    const chart = mount.host().querySelector("svg");
+    const width = Number(chart?.getAttribute("viewBox")?.split(" ")[2]);
+    const bars = [...mount.host().querySelectorAll("rect")];
+    expect(bars.length).toBeGreaterThan(0);
+    for (const bar of bars) {
+      const left = Number(bar.getAttribute("x"));
+      const right = left + Number(bar.getAttribute("width"));
+      expect(left).toBeGreaterThanOrEqual(0);
+      expect(right).toBeLessThanOrEqual(width);
+    }
+  });
+
   it("says in words how the backlog moved and how often arrivals outran answers", () => {
     mount.render(
       <Pace
@@ -181,4 +230,41 @@ describe("the open issues in each release", () => {
     const bars = Array.from(mount.host().querySelectorAll("rect"));
     expect(bars[1]?.getAttribute("height")).toBe("1");
   });
+});
+
+describe("severity over time", () => {
+  const points = [
+    {
+      at: "2026-09-09",
+      open: 12848,
+      by_severity: { critical: 733, high: 4100, medium: 7400, low: 615 },
+    },
+    {
+      at: "2026-11-17",
+      open: 12992,
+      by_severity: { critical: 739, high: 4120, medium: 7500, low: 633 },
+    },
+    {
+      at: "2026-11-18",
+      open: 6548,
+      by_severity: { critical: 420, high: 2070, medium: 3456, low: 602 },
+    },
+  ];
+
+  for (const timed of [false, true]) {
+    it(`draws an area for every severity at once${timed ? ", by build date" : ""}`, () => {
+      mount.render(<Mix points={points} timed={timed} />);
+      const areas = [...mount.host().querySelectorAll("path.recharts-area-area")];
+      expect(areas).toHaveLength(4);
+      for (const area of areas) {
+        expect(area.getAttribute("d") ?? "").toMatch(/^M[\d.]+,[\d.]+/);
+        // An entry animation clips each area to a rectangle widening from
+        // nothing, so a page caught before it runs shows an empty plot.
+        const clipped = area.closest("[clip-path]")?.getAttribute("clip-path");
+        const id = clipped?.match(/url\(#(.+)\)/)?.[1];
+        const clip = id ? mount.host().querySelector(`[id="${id}"] rect`) : null;
+        expect(clip?.getAttribute("width") ?? "visible").not.toBe("0");
+      }
+    });
+  }
 });

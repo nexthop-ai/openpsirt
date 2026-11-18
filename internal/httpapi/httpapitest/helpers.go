@@ -90,12 +90,18 @@ func (r *Reach) Recorded(t testing.TB, build int64, hash string) int64 {
 }
 
 // Shipped records an upload of a build and applies its graph, with no scanner
-// run: what a build holds before anything has been reported against it.
+// run: what a build holds before anything has been reported against it. The
+// upload is applied, as one the pipeline made, so a read of applied uploads,
+// such as the trend by build date, reaches it.
 func (r *Reach) Shipped(t testing.TB, b Build, hash string, snapshot graph.Snapshot) (build, scan int64) {
 	t.Helper()
 	build = r.BuildOf(t, b)
 	scan = r.Recorded(t, build, hash)
 	if _, err := fixture.ApplyGraph(t.Context(), r.DB.DB, build, scan, snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if err := ingest.NewStore(r.DB.DB).Made(t.Context(), scan, len(snapshot.Components),
+		len(snapshot.Components), ""); err != nil {
 		t.Fatal(err)
 	}
 	return build, scan
@@ -111,7 +117,8 @@ func (r *Reach) Argued(t testing.TB, build, scan int64, claims []sbom.Suppressio
 	}
 }
 
-// Ran applies one scanner run reporting these findings against a build.
+// Ran applies one finished scanner run reporting these findings against a
+// build.
 func (r *Reach) Ran(t testing.TB, build int64, reported []finding.Reported) {
 	t.Helper()
 	findings := finding.NewStore(r.DB.DB)
@@ -123,6 +130,11 @@ func (r *Reach) Ran(t testing.TB, build int64, reported []finding.Reported) {
 		t.Fatal(err)
 	}
 	if _, err := findings.Apply(t.Context(), build, run.ID, reported); err != nil {
+		t.Fatal(err)
+	}
+	// Finished, as a run the pipeline completed, so a read of successful runs
+	// reaches it.
+	if err := findings.Finish(t.Context(), run.ID, seededScannerVersion, seededDatabaseVersion, "", nil); err != nil {
 		t.Fatal(err)
 	}
 }

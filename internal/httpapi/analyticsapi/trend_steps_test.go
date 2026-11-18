@@ -75,7 +75,7 @@ func TestATrendInDaysHasADailyStepEndingToday(t *testing.T) {
 
 func TestATrendAskedInWeeksAndDaysIsRefused(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
-		for _, route := range trendRoutes {
+		for _, route := range calendarRoutes {
 			got := httpapitest.AsPerson(t, r, "triager", http.MethodGet, route+"?weeks=4&days=30", "")
 			if got.Code != http.StatusUnprocessableEntity || !strings.Contains(got.Body.String(), "send one") {
 				t.Errorf("%s with weeks and days answered %d, want 422 saying to send one: %s",

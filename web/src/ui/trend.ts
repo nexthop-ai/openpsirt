@@ -68,10 +68,11 @@ export function outran(p: Step): boolean {
 }
 
 // The direction of the backlog, or too little history to say. The unit is the
-// step's name, "days" or "weeks".
-export function paceReading(points: Step[], unit = "weeks"): string {
+// step's name, "days" or "weeks". Least is the fewest points that say a
+// direction: two build dates already compare two inventories.
+export function paceReading(points: Step[], unit = "weeks", least = ENOUGH): string {
   const range = settled(points);
-  if (range.length < ENOUGH) return "Not enough history.";
+  if (range.length < least) return "Not enough history.";
   const ahead = range.filter(outran).length;
   const first = range[0]?.open ?? 0;
   const last = range[range.length - 1]?.open ?? 0;
@@ -85,9 +86,9 @@ export function paceReading(points: Step[], unit = "weeks"): string {
 }
 
 // The critical share's direction, over the same history.
-export function mixReading(points: Step[]): string {
+export function mixReading(points: Step[], least = ENOUGH): string {
   const range = settled(points);
-  if (range.length < ENOUGH) return "Not enough history yet.";
+  if (range.length < least) return "Not enough history yet.";
   const first = range[0]?.by_severity?.critical ?? 0;
   const last = range[range.length - 1]?.by_severity?.critical ?? 0;
   if (first === last) return `Critical unchanged at ${last.toLocaleString()}`;

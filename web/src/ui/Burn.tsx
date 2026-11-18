@@ -3,7 +3,7 @@
 
 import type { Body } from "../api/client";
 import { tickWords } from "./Charts";
-import { FlowBars, FlowMark, labelled, roundTicks, scanLines } from "./flowchart";
+import { FlowBars, FlowMark, dayOf, labelled, roundTicks, scanLines } from "./flowchart";
 import { DAY_MS } from "./when";
 
 // The two panels of a findings burndown: what is left with the day's flows
@@ -15,10 +15,6 @@ export type Projection = Body<"ProjectionBody">;
 
 function md(at: string): string {
   return at.slice(5, 10);
-}
-
-function dayOf(at: string): number {
-  return Date.parse(`${at.slice(0, 10)}T00:00:00Z`);
 }
 
 // The days a mark is drawn on, with what each says.

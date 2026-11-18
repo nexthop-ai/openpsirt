@@ -5,6 +5,7 @@ package analyticsapi_test
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -15,9 +16,14 @@ import (
 // a variant naming exactly one build.
 const oneBuild = "product=mine&branch_or_tag=master&variant=broadcom"
 
-// trendRoutes are the two answers drawn from one trend: the chart and its
-// export. Both resolve the component the same way and refuse the same way.
-var trendRoutes = []string{"/v1/trend", "/v1/trend.csv"}
+// calendarRoutes are the two answers drawn from the calendar trend: the chart
+// and its export. Both take their steps the same way.
+var calendarRoutes = []string{"/v1/trend", "/v1/trend.csv"}
+
+// trendRoutes are the answers drawn from the findings trend: the calendar's
+// and the chart by build date. Each resolves the component the same way and
+// refuses the same way.
+var trendRoutes = append(slices.Clone(calendarRoutes), "/v1/trend/built")
 
 func TestATrendBeneathAComponentIsAskedOfOneBuild(t *testing.T) {
 	// One package shipped under two namespaces. Every subtest asks a trend

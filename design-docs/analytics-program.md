@@ -8,6 +8,7 @@ Satisfies REQ-33, REQ-35, REQ-53, REQ-54, REQ-82.
 ## Contents
 
 - [Trends](#trends)
+- [Build date axis](#build-date-axis)
 - [Subtree trends](#subtree-trends)
 - [Burndown](#burndown)
 - [Deadlines](#deadlines)
@@ -34,6 +35,7 @@ it. A component is its identifying name, at any version.
 |---|---|---|
 | A branch | Calendar time, in daily or weekly steps | Scanned nightly (REQ-54); a team fixing dozens a day sees it by the day |
 | Tagged releases | Release over release, oldest first, as bars | Frozen points; a line between them draws a path nothing traveled |
+| Any selection, by build date | The build time each inventory states, in daily or weekly steps (§ Build date axis) | Two inventories sent close together show no change on a trend dated by scans (REQ-54) |
 
 ### Counts by identity
 
@@ -89,6 +91,53 @@ build's first scan is a baseline rather than new work.
 | A release with nothing open is still a point | Counts attach to the list of every scanned build; absent says never scanned |
 | Release over release counts each issue at a component open against the release, a component by its identifying name | The unit of the calendar trend and of Home's open figure beside it |
 | A corrected issue counts at the severity it held while open, at the end of the step before | |
+
+## Build date axis
+
+The calendar trend with each point at a build date: one point per day or week
+holding the build time an upload in the selection states, each build read as
+its newest upload by then left it (REQ-54). An old image uploaded beside
+today's shows the drop between them, which the calendar puts inside one step.
+
+| Rule | Reason |
+|---|---|
+| Any selection: every product, a product, a branch or tag, or one build, on products the reader may read | The same question at every scope Home offers |
+| A step is a day or a week ending at midnight UTC, the last at the coming one, as on the calendar; only steps holding a build time are points, the latest 1 to 50, twelve unless named, oldest first, each dated by its last day | A chart's points (`design-docs/api-lists.md` § Paging); a step with no build adds nothing to read |
+| At a point, each build is read as its newest upload built by the step's end; a build with none by then adds nothing | Builds are released at different dates, and each counts as what it shipped then |
+| An inventory is current from its arrival until the next applied one arrives | The replaced-inventory check reads currency the same way (`design-docs/findings-closure.md` § Replaced inventories) |
+| A replaced inventory is read at the start of the last successful scan of its build, other than a check, that started while it was current | What was known of it then; dating it today would cost a scan each (REQ-54) |
+| The inventory a build holds is read now, once a scan has reached it | |
+| An inventory no scan has reached is passed over, held or replaced, and its build read as the upload before it left it | Nothing ever judged it |
+| An issue at a component is open at a point when, in some build, one of its findings opened at or before that build's moment and closed after it, or not at all | The calendar's rule, applied to each build at its own moment |
+| Each build's findings are reduced apart, never merged with another build's | Each build is read at its own moment; a flaw recorded in two builds at once is otherwise one row read at one build's moment |
+| The unit, the severity split, the never-present closures and the narrowings to a component, a package identifier prefix or a subtree are the calendar trend's | One definition of open on one screen |
+
+### Flows between points
+
+| Series | An issue at a component counted at a point |
+|---|---|
+| Open | Open at the point |
+| New | Open, at no earlier point, and held by a build not read for the first time here |
+| Baseline | Open for the first time, held only by builds whose first upload this point is (REQ-54) |
+| Returned | Open, not at the point before, and open at an earlier one; not returned after a gap |
+| Returned after a gap | Returned, the closure it reverses a removal by an upload that moved its build's inventory sharply, by the calendar's rule (§ Trends); drawn as a mark, never a bar |
+| Corrected | Open at the point before, not at this one, and every one of its findings that closed in between closed by a resolution (`design-docs/analytics.md` § The counting unit) |
+| First scans | The builds whose first upload this point is |
+
+| Rule | Reason |
+|---|---|
+| The first point has nothing before it; only its baseline moves | A flow is a difference between points |
+| A build is first read where its first upload is plotted, and not at a point whose step cuts off its earlier uploads | Baseline is an inventory arriving, never the window starting |
+| The closure a return reverses is the latest of its findings to close, in a build the point before reads, by the moment that build is read at | The departure the point before shows |
+| The findings are read once, from the earliest moment any build is read at through now | Cost follows the oldest point plotted (`design-docs/analytics-measurements.md` § Build date axis) |
+
+### Home
+
+| Rule | Reason |
+|---|---|
+| Home's trend and severity panels plot by build date unless scan date is picked, in daily points on an axis to scale in time | A deployment sending each build more than once reads as exposure build by build; scan date answers workload, one click away; the gap between builds is part of the reading, so a weekly step adds nothing |
+| The latest point of open by severity stays the calendar's, open now; by build date the calendar is read for that one day alone | The figure beside it is today's |
+| A product with two releases plots release over release, whichever axis is picked, in both the trend and severity over time | Tags are frozen points (REQ-54) |
 
 ## Subtree trends
 
@@ -340,6 +389,9 @@ deferral counts for the part that ran, and overlapping stretches count once.
 | Limit | Detail |
 |---|---|
 | An issue rated differently in two products counts once, in the strictest band | Trends, aging buckets and fixes agree on one screen |
+| By build date, a replaced upload is read as of its last scan, never against today's vulnerability data | An issue published after it was replaced never counts against it, so an old upload can read cleaner than it was; a tag is rescanned daily and is the way to compare releases against today's data |
+| By build date, a point moves when a later scan of an inventory it reads runs, and an upload replaced the moment it arrived is passed over | Each is what was known of it; nothing is stored |
+| By build date, builds released on one day share a point however far apart they arrived | The axis is the date an inventory states, and a step holds a day or a week |
 | A component a rescan removed, with no component of its name left in the build, sits beneath nothing | Its closures leave the trend of the component it sat beneath; there is no present version to count them at, as for code findings |
 | A finding two dismissals answer at once counts twice toward its moment on the burndown | The moment's answered findings are summed over dismissals; one live decision per key keeps it rare |
 | A dismissal needing nobody that was sent back is read as never in force, and one sent back after an agreement keeps the agreement's span | The record keeps whether it is sent back, not when |

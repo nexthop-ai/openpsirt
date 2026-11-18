@@ -13,6 +13,26 @@ export function labelled(i: number, last: number, every: number): boolean {
   return i === last || (i % every === 0 && last - i >= every);
 }
 
+// A date as the start of its day in UTC, for an axis drawn to scale in time.
+export function dayOf(at?: string): number {
+  return Date.parse(`${(at ?? "").slice(0, 10)}T00:00:00Z`);
+}
+
+// Which points name their date under the axis: the last always, then each
+// earlier one far enough from the label after it to be read.
+export function namedAt(xs: number[], room: number): Set<number> {
+  const named = new Set<number>();
+  let next = Infinity;
+  for (let i = xs.length - 1; i >= 0; i--) {
+    const at = xs[i] ?? 0;
+    if (next - at >= room) {
+      named.add(i);
+      next = at;
+    }
+  }
+  return named;
+}
+
 // A handful of round values from a floor to a top, for a chart's grid.
 export function roundTicks(lo: number, hi: number, want: number): number[] {
   const span = Math.max(1, hi - lo);

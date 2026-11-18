@@ -7566,6 +7566,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/trend/built": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show the findings trend by build date
+         * @description Returns the findings trend with each point at a build date: one point per day or week holding the build time an upload in the selection states, oldest first, each dated by its step's last day. Steps end at midnight UTC, as on the findings trend.
+         *
+         *     At a point, each build counts as its newest upload built by then leaves it. The upload a build holds is counted now. A replaced one is counted as of the last scan of its build that started while it was current, never against today's vulnerability data. An upload no scan has reached, held or replaced, is passed over, and its build counts as the upload before it.
+         *
+         *     Counted as the findings trend counts: one issue in three packages is three, and a package at a new version is the same package. Flows compare a point with the one before, as each field describes. A return after an upload that removed a sharp share of its build's inventory is counted in `restored` alone. The first point has nothing before it, so only its baseline moves.
+         *
+         *     `component`, `purl` and `beneath` narrow as on the findings trend.
+         *
+         *     Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+         */
+        get: operations["get-built-trend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/trend/releases": {
         parameters: {
             query?: never;
@@ -8936,6 +8964,64 @@ export interface components {
              */
             undecided?: number;
             variant: string;
+        };
+        BuiltPointBody: {
+            /**
+             * Format: date
+             * @description The last day of the step holding the build times, which ends at midnight UTC after it
+             */
+            at: string;
+            /**
+             * Format: int64
+             * @description Issues at components open for the first time at this point, held only by builds whose first upload this point is. Not new: a first upload is an inventory arriving
+             */
+            baseline: number;
+            /** @description Open, split by severity */
+            by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Issues at components open at the point before and not at this one, where every finding that closed in between closed by a fix
+             */
+            corrected: number;
+            /** @description Corrected, split by the severity each held at the point before */
+            corrected_by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Builds whose first upload this point is
+             */
+            first_scans: number;
+            /**
+             * Format: int64
+             * @description Issues at components open at this point and at no earlier point, held by a build counted at an earlier point
+             */
+            new: number;
+            /** @description New, split by severity */
+            new_by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Issues at components open at this point, each build counted as its newest upload built by then
+             */
+            open: number;
+            /**
+             * Format: int64
+             * @description Issues at components back after an upload that moved a sharp share of its build's inventory removed them: a broken inventory put right. Not in returned
+             */
+            restored: number;
+            /**
+             * Format: int64
+             * @description Issues at components open at this point, not at the point before, and open at an earlier one, other than those counted in restored
+             */
+            returned: number;
+            /** @description Returned, split by severity */
+            returned_by_severity: {
+                [key: string]: number;
+            };
         };
         BulkApprovalBody: {
             approved_at: string;
@@ -12303,6 +12389,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["BranchOrTagBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyBuiltPointBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyBuiltPointBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["BuiltPointBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -29116,6 +29213,60 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    "get-built-trend": {
+        parameters: {
+            query?: {
+                /** @description Limit to one product, by name. Empty means every product you can see */
+                product?: string;
+                /** @description Limit to one branch or tag. Only meaningful with a product */
+                branch_or_tag?: string;
+                /** @description Limit to one variant. Only meaningful with a product, and independent of the branch */
+                variant?: string;
+                /** @description Whether build times are grouped by week rather than by day */
+                weekly?: boolean;
+                /** @description The number of points, most recent kept. Only steps holding a build time are points */
+                limit?: number;
+                /** @description Keep only what is open against components of this name, whatever version */
+                component?: string;
+                /** @description Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused */
+                purl?: string;
+                /** @description Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices */
+                beneath?: string;
+                /** @description The version, where the build holds that name at several */
+                beneath_version?: string;
+                /** @description The ecosystem, for the few names a build holds at one version as two components */
+                beneath_ecosystem?: string;
+                /** @description The namespace, for the few names a build holds at one version in one ecosystem as two components */
+                beneath_namespace?: string;
+                /** @description Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused */
+                beneath_purl?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListBodyBuiltPointBody"];
+                };
             };
             /** @description Error */
             default: {
