@@ -160,8 +160,10 @@ document.
 | The notes are read at every status, beside the impact or action statement and never in its place | The format applies them to any status |
 | Notes are text: invalid bytes and NUL repaired, cut on a character boundary to the bound a typed markdown field has, never refused | The words are somebody else's; one long explanation refuses no scan |
 | Stored once however many subjects the statement names, in the store the reasoning uses, and pointed at by the claim or statement | A statement naming thousands of components repeats one explanation |
-| Notes join a build's claim identity where given; a claim giving none keys as before notes were stored | A new explanation closes one claim and opens another, as new reasoning does |
-| Notes are part of what a received statement claims: a revision changing only its notes sets the statement aside | An approval cites the words it read |
+| Notes join a build's claim identity where given; a claim giving none keys as before notes were stored | Other notes close one claim and open another, as new reasoning does |
+| An open claim holding no notes, said again with notes and otherwise alike, stays open, takes the notes and is keyed by them | Closed and opened again, its patches leave the published documents until the next scan is applied |
+| Notes are part of what a received statement claims: a revision giving other notes sets the statement aside, and an approval citing it is told (`design-docs/notifications-work.md` § Embargo notices) | An approval cites the words it read |
+| A received statement holding no notes, said again with notes and otherwise alike, keeps its row, its decline and what cites it, and takes the notes | A row stored before notes were kept holds none; set aside, a triager's decline is lost |
 | A statement about the build's root carries its notes into the build's claim | |
 | Shown and never rendered, on every screen that shows them | A third party's text reaches the staff with the most access (REQ-66) |
 | A CSAF document states no notes on a product's status; its vulnerability notes describe the issue and are not read as a claim's | |

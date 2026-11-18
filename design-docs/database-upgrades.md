@@ -287,10 +287,10 @@ two tables gain a column.
 | `suppression` | The status notes a build's claim gives, null for every claim stored before (`design-docs/ingest-claims.md` § Status notes) |
 | `received_vex_statement` | The status notes a received statement gives, null for every statement stored before |
 
-The first upload or fetch after the upgrade of a document whose statements give
-status notes reads them as changed: each is set aside and recorded again with
-its notes, as a revision is. The first scan after the upgrade of a build whose
-claims give notes closes each and opens it again the same way.
+A statement or claim the upgrade leaves without notes takes them in place when
+its document or the build's next inventory gives them: the row stays, with its
+decline, what cites it and the findings it answers, and no alert is raised
+(`design-docs/ingest-claims.md` § Status notes).
 
 Each index is dropped and made again, so an upgrade stopped between the two
 makes it. Each column is added where the table lacks it, so a start that

@@ -498,7 +498,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		if err := heldBy.Scan(ctx); err != nil {
 			return fmt.Errorf("ask what they said before: %w", err)
 		}
-		repeated, gone, fresh := pairRepeated(held, claims)
+		repeated, noted, gone, fresh := pairRepeated(held, claims)
 
 		// A claim the document no longer makes is set aside by its revision,
 		// overtaken or not, and nothing brings it back.
@@ -539,6 +539,9 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 				return fmt.Errorf("keep what they said again: %w", err)
 			}
 			recorded += len(ids)
+		}
+		if err := takeNotes(ctx, tx, noted); err != nil {
+			return err
 		}
 
 		toInsert := fresh
@@ -853,8 +856,14 @@ func (p placed) SaidAt() *time.Time {
 
 // pairRepeated pairs each claim a document makes with a standing row making
 // the same claim, and answers the repeated rows by where the document now
-// places them, the standing rows the document no longer makes, and the claims
-// it makes that nothing stands for.
+// places them, the repeated rows gaining status notes by those notes, the
+// standing rows the document no longer makes, and the claims it makes that
+// nothing stands for.
+//
+// A row holding no notes repeats a claim saying the same with notes, and takes
+// them in place: a statement stored before notes were kept keeps its row, its
+// decline and what cites it when its document is read again. A row holding
+// notes repeats only a claim with the same notes.
 //
 // A repeat is the same claim placing the supplier's product in the same place.
 // A claim moved to another release of the product is a different claim, and
@@ -863,7 +872,7 @@ func (p placed) SaidAt() *time.Time {
 // placed anywhere, once no exact repeat wants it. Rows are paired in a fixed
 // order on both sides, so two identical claims placed in two products each
 // keep one row.
-func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statement) {
+func pairRepeated(held, said []Statement) (map[placed][]int64, map[string][]int64, []int64, []Statement) {
 	sorted := slices.Clone(held)
 	slices.SortFunc(sorted, func(a, b Statement) int { return cmp.Compare(a.ID, b.ID) })
 	exactly := func(one Statement) string { return claimOf(one) + "\x00" + placementOf(one) }
@@ -899,12 +908,36 @@ func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statem
 		}
 		rest = append(rest, one)
 	}
-	var fresh []Statement
+	var unnoted []Statement
 	for _, one := range rest {
 		if rows := unplaced[claimOf(one)]; len(rows) > 0 {
 			keep(one, rows[0])
 			unplaced[claimOf(one)] = rows[1:]
 			continue
+		}
+		unnoted = append(unnoted, one)
+	}
+	// A claim with notes repeats a row holding none that says the rest of it,
+	// placed where it stood or recorded before products were read, and the
+	// row takes the notes.
+	noted := map[string][]int64{}
+	var fresh []Statement
+	for _, one := range unnoted {
+		bare := one
+		bare.Notes = ""
+		if one.Notes != "" {
+			if rows := exact[exactly(bare)]; len(rows) > 0 {
+				keep(one, rows[0])
+				noted[one.Notes] = append(noted[one.Notes], rows[0].ID)
+				exact[exactly(bare)] = rows[1:]
+				continue
+			}
+			if rows := unplaced[claimOf(bare)]; len(rows) > 0 {
+				keep(one, rows[0])
+				noted[one.Notes] = append(noted[one.Notes], rows[0].ID)
+				unplaced[claimOf(bare)] = rows[1:]
+				continue
+			}
 		}
 		fresh = append(fresh, one)
 	}
@@ -917,7 +950,36 @@ func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statem
 		}
 	}
 	slices.Sort(gone)
-	return repeated, gone, fresh
+	return repeated, noted, gone, fresh
+}
+
+// takeNotes points the rows given at the status notes each now repeats with,
+// storing the notes once each.
+func takeNotes(ctx context.Context, tx bun.IDB, noted map[string][]int64) error {
+	if len(noted) == 0 {
+		return nil
+	}
+	said := make([]string, 0, len(noted))
+	for notes := range noted {
+		said = append(said, notes)
+	}
+	stored, err := internWords(ctx, tx, said)
+	if err != nil {
+		return err
+	}
+	for notes, ids := range noted {
+		id := wordsID(stored, notes)
+		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+			_, err := tx.NewUpdate().Model((*Statement)(nil)).
+				Set(`"notes_id" = ?`, id).
+				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
+			return err
+		})
+		if err != nil {
+			return fmt.Errorf("keep the notes they gave: %w", err)
+		}
+	}
+	return nil
 }
 
 // nullable is a value written as a null where it is empty, the way the

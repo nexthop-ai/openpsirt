@@ -248,10 +248,18 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 		for _, row := range open {
 			held[row.Identity] = row.ID
 		}
+		gained := gainingNotes(wanted, open)
+		if err := takeClaimNotes(ctx, tx, gained); err != nil {
+			return err
+		}
+		taking := make(map[string]bool, len(gained))
+		for _, row := range gained {
+			taking[row.Identity] = true
+		}
 
 		var opening []Claim
 		for identity, row := range wanted {
-			if _, already := held[identity]; !already {
+			if _, already := held[identity]; !already && !taking[identity] {
 				opening = append(opening, row)
 			}
 		}
@@ -268,6 +276,9 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 		var closing []int64
 		for _, row := range open {
 			if _, still := wanted[row.Identity]; still {
+				continue
+			}
+			if _, kept := gained[row.ID]; kept {
 				continue
 			}
 			if !stated[sbom.Origin(row.Origin)] {
@@ -294,6 +305,62 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 		return nil
 	}()
 	return applied, err
+}
+
+// gainingNotes pairs each claim giving status notes that no open claim makes
+// with an open claim holding no notes that says the rest of it, by the open
+// claim's row. A claim stored before notes were kept takes them in place, so
+// it stays open and the findings it answers stay answered; closed and opened
+// again, every patch it declares drops out of the published documents until
+// the next scan of the build is applied.
+func gainingNotes(wanted map[string]Claim, open []Claim) map[int64]Claim {
+	held := make(map[string]bool, len(open))
+	bare := map[string]int64{}
+	for _, row := range open {
+		held[row.Identity] = true
+		if row.NotesID == nil {
+			bare[row.Identity] = row.ID
+		}
+	}
+	gained := map[int64]Claim{}
+	for identity, row := range wanted {
+		if row.Notes == "" || held[identity] {
+			continue
+		}
+		plain := row
+		plain.Notes = ""
+		if id, ok := bare[claimIdentity(plain)]; ok {
+			gained[id] = row
+			delete(bare, claimIdentity(plain))
+		}
+	}
+	return gained
+}
+
+// takeClaimNotes points each open claim given at the notes its claim now
+// gives, and keys it as that claim.
+func takeClaimNotes(ctx context.Context, tx bun.IDB, gained map[int64]Claim) error {
+	if len(gained) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(gained))
+	rows := make([]Claim, 0, len(gained))
+	for id, row := range gained {
+		ids = append(ids, id)
+		rows = append(rows, row)
+	}
+	if err := pointAtWords(ctx, tx, rows); err != nil {
+		return err
+	}
+	for i, id := range ids {
+		if _, err := tx.NewUpdate().Model((*Claim)(nil)).
+			Set(`"identity" = ?`, rows[i].Identity).
+			Set(`"notes_id" = ?`, rows[i].NotesID).
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
+			return fmt.Errorf("keep the notes the build gave: %w", err)
+		}
+	}
+	return nil
 }
 
 // pointAtWords stores the reasoning and the status notes the claims give,

@@ -6,6 +6,7 @@ package finding_test
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	world "github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 
@@ -140,4 +141,135 @@ func (f *fixture) standingStatements(t *testing.T) []finding.Statement {
 		t.Fatal(err)
 	}
 	return rows
+}
+
+// upstreamSays records an upstream's document about zlib in the product, its
+// one statement giving the notes given, under the digest given.
+func (f *fixture) upstreamSays(t *testing.T, notes, digest string) {
+	t.Helper()
+	claim := noted(sbom.NotAffected, notes)
+	who := f.planner(t, access.PublicTriage)
+	if _, _, err := f.store.RecordStatements(t.Context(), who, f.productID, finding.Supplied{
+		Source: finding.FromUpstream, Publisher: "Example Upstream", Identifier: "VEX-upstream-zlib",
+		Document: "https://upstream.example.test/zlib.json", Digest: digest,
+	}, []finding.Statement{finding.StatementOf(claim, claim.Targets[0])}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// standingRow is the one statement in force in the product, with when it was
+// declined.
+func (f *fixture) standingRow(t *testing.T) finding.Statement {
+	t.Helper()
+	var rows []finding.Statement
+	if err := f.db.DB.NewSelect().Model(&rows).
+		Column("id", "declined_at").
+		Join(finding.NotesJoin("ss")).ColumnExpr(finding.NotesColumn+` AS "notes"`).
+		Where(`"ss"."product_id" = ?`, f.productID).Where(`"ss"."superseded_at" IS NULL`).
+		Scan(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("%d statements stand, want one", len(rows))
+	}
+	return rows[0]
+}
+
+// A statement stored holding no notes, read again from a document now giving
+// them, keeps its row and its decline and takes the notes.
+func TestAStatementGainingStatusNotesKeepsItsRowAndItsDecline(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.upstreamSays(t, "", "sha256:upstream-1")
+		before := f.standingRow(t)
+		if _, err := f.store.Decline(t.Context(), f.planner(t, access.PublicTriage), before.ID); err != nil {
+			t.Fatal(err)
+		}
+		f.upstreamSays(t, "Built without the gzip reader", "sha256:upstream-2")
+		after := f.standingRow(t)
+		if after.ID != before.ID || after.DeclinedAt == nil || after.Notes != "Built without the gzip reader" {
+			t.Errorf("row %d declined at %v with notes %q stands, want row %d still declined with the notes",
+				after.ID, after.DeclinedAt, after.Notes, before.ID)
+		}
+	})
+}
+
+// A revision repeating a statement's notes keeps its row, the same bytes read
+// again over a row whose notes went missing write them back, and a revision
+// giving other notes sets the row aside.
+func TestARevisionRepeatingAStatementsNotesKeepsItsRow(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.upstreamSays(t, "Built without the gzip reader", "sha256:upstream-1")
+		before := f.standingRow(t)
+		f.upstreamSays(t, "Built without the gzip reader", "sha256:upstream-2")
+		if after := f.standingRow(t); after.ID != before.ID {
+			t.Errorf("repeating the notes set row %d aside for row %d", before.ID, after.ID)
+		}
+
+		if _, err := f.db.DB.NewUpdate().Table("received_vex_statement").
+			Set(`"notes_id" = NULL`).Where(`"id" = ?`, before.ID).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		f.upstreamSays(t, "Built without the gzip reader", "sha256:upstream-2")
+		if after := f.standingRow(t); after.ID != before.ID || after.Notes != "Built without the gzip reader" {
+			t.Errorf("the same bytes again left row %d with notes %q, want row %d with them back",
+				after.ID, after.Notes, before.ID)
+		}
+
+		// Other notes are another statement: the row is set aside, so what
+		// cites it is told.
+		f.upstreamSays(t, "Built with the gzip reader turned off", "sha256:upstream-3")
+		if after := f.standingRow(t); after.ID == before.ID || after.Notes != "Built with the gzip reader turned off" {
+			t.Errorf("other notes left row %d standing with notes %q, want a new row with them",
+				after.ID, after.Notes)
+		}
+	})
+}
+
+// A build's notes are text cut to the bound, whatever the producer wrote.
+func TestABuildsStatusNotesAreCutToTheBound(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, beside(acmeY))
+		f.argues(t, noted(sbom.AlreadyFixed, strings.Repeat("n", finding.MostWords+100)+"\xff"))
+		var notes string
+		if err := f.db.DB.NewSelect().TableExpr(`"suppression" AS "sup"`).
+			Join(finding.NotesJoin("sup")).ColumnExpr(finding.NotesColumn).
+			Where(`"sup"."build_id" = ?`, f.build).Scan(t.Context(), &notes); err != nil {
+			t.Fatal(err)
+		}
+		if len(notes) != finding.MostWords || !utf8.ValidString(notes) {
+			t.Errorf("stored %d bytes of notes, valid text %v, want %d of valid text",
+				len(notes), utf8.ValidString(notes), finding.MostWords)
+		}
+	})
+}
+
+// A claim stored holding no notes, said again with notes, stays open and takes
+// them: closed and opened again, its patches would drop out of the published
+// documents until the next scan is applied.
+func TestABuildsClaimGainingStatusNotesStaysOpen(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, beside(acmeY))
+		f.argues(t, noted(sbom.AlreadyFixed, ""))
+		before := f.openClaims(t)
+		applied, err := world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
+			[]sbom.Suppression{noted(sbom.AlreadyFixed, "Backported in 4.2-3")}, everyOrigin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		after := f.openClaims(t)
+		if applied.Opened != 0 || applied.Closed != 0 || len(after) != 1 || after[0].ID != before[0].ID ||
+			after[0].NotesID == nil {
+			t.Errorf("opened %d and closed %d, leaving %+v open, want claim %d open with its notes",
+				applied.Opened, applied.Closed, after, before[0].ID)
+		}
+		// Said again with the same notes, nothing moves.
+		applied, err = world.RecordClaims(t.Context(), f.db, f.build, f.lastScan,
+			[]sbom.Suppression{noted(sbom.AlreadyFixed, "Backported in 4.2-3")}, everyOrigin)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if applied.Opened != 0 || applied.Closed != 0 {
+			t.Errorf("saying the notes again opened %d and closed %d", applied.Opened, applied.Closed)
+		}
+	})
 }
