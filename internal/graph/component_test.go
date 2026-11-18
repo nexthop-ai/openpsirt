@@ -14,6 +14,7 @@ import (
 
 	"github.com/uptrace/bun"
 
+	"github.com/nexthop-ai/openpsirt/internal/bound"
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -337,6 +338,71 @@ func licenseOf(t *testing.T, f *fixture, identity string) string {
 		Scan(t.Context(), &said)
 	if err != nil {
 		t.Fatalf("read the license: %v", err)
+	}
+	return said
+}
+
+// One component row serves every build and product shipping it, so what an
+// inventory says it is follows the supplier's rule: the first statement stands
+// and a later one fills it only where none was stated.
+func TestADescriptionIsCutWrittenOnTheInsertAndFilledInByALaterReport(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		components := graph.NewComponents(f.db.DB)
+
+		stated := graph.Described{
+			Purl: "pkg:generic/option-rom-0x8086-0x1533-x86-legacy@1.5.89",
+			Name: "option-rom-0x8086-0x1533-x86-legacy", Version: "1.5.89",
+			Description: "Intel Boot Agent v1.5.89 (x86 legacy)\nfor Intel I210 " +
+				"Gigabit Network Connection" + strings.Repeat(" and more", 100),
+		}
+		quiet := graph.Described{Purl: "pkg:generic/firmware@2", Name: "firmware", Version: "2"}
+		if _, err := components.Intern(ctx, []graph.Described{stated, quiet}); err != nil {
+			t.Fatal(err)
+		}
+		got := descriptionOf(t, f, stated.Identity())
+		if !strings.HasPrefix(got, "Intel Boot Agent v1.5.89 (x86 legacy) for Intel I210") {
+			t.Errorf("a new component is described as %q, want it on one line", got)
+		}
+		// A cut landing on a space keeps one character fewer.
+		if n := utf8.RuneCountInString(got); n > bound.MostLine || n < bound.MostLine-1 {
+			t.Errorf("the description is stored at %d characters, want %d", n, bound.MostLine)
+		}
+		if got := descriptionOf(t, f, quiet.Identity()); got != "" {
+			t.Errorf("a component no inventory described is described as %q", got)
+		}
+
+		said := quiet
+		said.Description = "Board firmware"
+		if _, err := components.Intern(ctx, []graph.Described{said}); err != nil {
+			t.Fatal(err)
+		}
+		if got := descriptionOf(t, f, quiet.Identity()); got != "Board firmware" {
+			t.Errorf("after a report describing it, the description is %q", got)
+		}
+
+		other := quiet
+		other.Description = "Something else"
+		if _, err := components.Intern(ctx, []graph.Described{other}); err != nil {
+			t.Fatal(err)
+		}
+		if got := descriptionOf(t, f, quiet.Identity()); got != "Board firmware" {
+			t.Errorf("a later report overwrote the description with %q", got)
+		}
+	})
+}
+
+// descriptionOf reads back what a component is recorded as being.
+func descriptionOf(t *testing.T, f *fixture, identity string) string {
+	t.Helper()
+	var said string
+	err := f.db.DB.NewSelect().
+		TableExpr(`"component" AS "c"`).
+		ColumnExpr(`COALESCE("c"."description", '')`).
+		Where(`"c"."identity" = ?`, identity).
+		Scan(t.Context(), &said)
+	if err != nil {
+		t.Fatalf("read the description: %v", err)
 	}
 	return said
 }

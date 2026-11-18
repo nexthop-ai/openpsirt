@@ -56,7 +56,7 @@ depth, and documents per scan. Each is configuration, never a constant.
 | Nesting becomes an edge | For some producers it is the only structure stated |
 | Two components sharing one identifier are refused | |
 | An edge whose ends resolve to one component is dropped and counted | Content identity can merge two identifiers the producer could not know were one |
-| Facts stated twice (supplier, what a component was built from) are resolved once the document closes | Key order is the producer's choice |
+| Facts stated twice (supplier, what a component was built from, what a package is) are resolved once the document closes | Key order is the producer's choice |
 
 ## Tolerated and refused
 

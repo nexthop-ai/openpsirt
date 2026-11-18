@@ -294,6 +294,33 @@ func TestAComponentAnswersWhetherOrNotAnythingIsOpenAgainstIt(t *testing.T) {
 	})
 }
 
+// What the inventory says a package is reaches the reader beside what an index
+// says, both from the shared row: a screen picks between them.
+func TestAPackageCarriesTheInventorysDescriptionBesideTheIndexSummary(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, twoConsumers())
+		if _, err := f.db.DB.NewUpdate().TableExpr(`"component"`).
+			Set(`"description" = ?`, "Switch state service").
+			Set(`"summary" = ?`, "SONiC switch state service").
+			Where(`"purl" = ?`, swss.Purl).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		builds, err := f.store.AcrossBuilds(t.Context(), f.holding(t, access.PublicTriage),
+			f.wholeProduct(), swss.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(builds) != 1 || len(builds[0].Packages) != 1 {
+			t.Fatalf("read %+v, want one build shipping one package", builds)
+		}
+		got := builds[0].Packages[0]
+		if got.Description != "Switch state service" || got.Summary != "SONiC switch state service" {
+			t.Errorf("the package is described as %q and summarized as %q",
+				got.Description, got.Summary)
+		}
+	})
+}
+
 func TestTheVersionWorthTakingLeadsRatherThanTheOneThatFixedMost(t *testing.T) {
 	// Measured on the demo's kernel: of 168 open, the 6.12.100-1 release fixed
 	// 49 and the newest named, 6.12.107-1, fixed 2 — so ranked on what each

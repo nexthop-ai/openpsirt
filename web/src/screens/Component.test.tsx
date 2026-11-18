@@ -146,3 +146,34 @@ describe("scheduling an upgrade of a component", () => {
     expect(mount.host().textContent).toContain("No build of this product ships it.");
   });
 });
+
+describe("what a component is", () => {
+  function described(pkg: Record<string, string>) {
+    const one = build("master", "broadcom", "1.5.89", []);
+    serving([{ ...one, packages: [{ ...one.packages[0], ...pkg }] }]);
+    mount.render(screen(<Component />, "/products/sonic/components/libnl", PATTERN));
+  }
+
+  function lines(): Element[] {
+    const card = Array.from(mount.host().querySelectorAll(".card")).find((each) =>
+      each.querySelector("h3")?.textContent?.startsWith("The package"),
+    );
+    return Array.from(card?.querySelectorAll(":scope > p.reading") ?? []);
+  }
+
+  it("shows the inventory's description where no index gave a summary", async () => {
+    described({ description: "Intel Boot Agent <b>v1.5.89</b>" });
+    await settle();
+    const [line] = lines();
+    // Somebody else's words, drawn as text.
+    expect(line?.textContent).toBe("Intel Boot Agent <b>v1.5.89</b>");
+    expect(line?.querySelector("b")).toBeNull();
+    expect(line?.getAttribute("title")).toBe("As the inventory describes it");
+  });
+
+  it("shows the index's summary over the inventory's description", async () => {
+    described({ summary: "Netlink library", description: "From the inventory" });
+    await settle();
+    expect(lines().map((each) => each.textContent)).toEqual(["Netlink library"]);
+  });
+});

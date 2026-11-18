@@ -210,6 +210,9 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 		// The license the package declares and the one somebody concluded,
 		// resolved after the object like the two above.
 		declared, concluded string
+		// What the package is, said two ways, resolved after the object like
+		// the others.
+		summary, description string
 	)
 	if err := c.count(); err != nil {
 		return graph.Described{}, "", err
@@ -243,6 +246,10 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 			return c.into(&declared)
 		case "licenseConcluded":
 			return c.into(&concluded)
+		case "summary":
+			return c.into(&summary)
+		case "description":
+			return c.into(&description)
 		case "externalRefs":
 			return c.spdxExternalRefs(&described)
 		case "primaryPackagePurpose":
@@ -262,6 +269,7 @@ func (c *reader) spdxPackage() (graph.Described, string, error) {
 	if err != nil {
 		return graph.Described{}, "", err
 	}
+	described.Description = statedDescription(summary, description)
 	printable(&described)
 	if err := described.Valid(); err != nil {
 		return graph.Described{}, "", refusal.Errorf("%w, so it cannot be tracked", err)

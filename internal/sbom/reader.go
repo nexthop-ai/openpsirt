@@ -680,6 +680,9 @@ func printable(d *graph.Described) {
 	d.UpstreamName = graph.Printable(d.UpstreamName)
 	d.UpstreamVersion = graph.Printable(d.UpstreamVersion)
 	d.Repository = graph.Printable(d.Repository)
+	// Cut here rather than when stored, so a document of long descriptions
+	// holds no more than a line of each while it is read.
+	d.Description = bound.Line(d.Description)
 }
 
 // into reads one string into dst.

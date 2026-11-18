@@ -201,7 +201,7 @@ product.
 | The scanner is given the node's statement, gaps filled from other builds of the same product, earliest first; a build's claim is matched against the same | Matched against the row, a claim misses a binary another product described first |
 | A VEX statement names the component by the node's identifier | |
 | Nothing stated is overwritten; qualifiers compare key by key ignoring capitals | |
-| The supplier and the license fill in on the row where it has none | `design-docs/findings-components.md` § Component suppliers |
+| The supplier, the license and the description fill in on the row where it has none | `design-docs/findings-components.md` § Component suppliers and `design-docs/findings-components.md` § Inventory descriptions |
 | The repository a build states is held on its node without credential, query or fragment, never filled from another build | `design-docs/analysis-source.md` § Placement |
 | Restating an identifier writes the node in place and opens and closes nothing | |
 | The fold key never moves after first storage | An upgrade commitment keyed on it keeps its coverage |

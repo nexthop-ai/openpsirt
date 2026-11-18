@@ -1,8 +1,8 @@
 # Components
 
 What is kept about a component beyond its identity: who supplied it, its
-license, how a scanner matched it, its declared scope, and the addresses a
-reader is offered.
+license, how a scanner matched it, its declared scope, the addresses a reader
+is offered, and the line saying what it is.
 
 Satisfies REQ-08, REQ-13.
 
@@ -15,6 +15,7 @@ Satisfies REQ-08, REQ-13.
 - [Declared dependency scope](#declared-dependency-scope)
 - [Derived addresses](#derived-addresses)
 - [Index responses](#index-responses)
+- [Inventory descriptions](#inventory-descriptions)
 - [Limits](#limits)
 
 ## Component interning
@@ -136,12 +137,39 @@ saying what the package is and where it is developed.
 | Absent is ordinary | One ecosystem's protocol has no such field, and distribution packages are not asked |
 | The index's stated address beats one derived from the name | |
 | Project pages before the repository; the first that may be stored wins | A home page of "UNKNOWN" falls through |
-| Bounded and judged before storage: the summary cut on a rune; the address absolute, `http` or `https`, and held to the typed-link rules (REQ-66, REQ-69) | Third-party text rendered to the staff with most access |
+| Bounded and judged before storage: the summary made one line by the rule § Inventory descriptions gives; the address absolute, `http` or `https`, and held to the typed-link rules (REQ-66, REQ-69) | Third-party text rendered to the staff with most access |
 | A refused half keeps the rest | |
 | Maven Central costs a second request (the project document, which also gives the date); off unless turned on | |
 
-A distribution package's description is not built: it lives in a per-release
-index file, a different shape from per-package asks.
+A distribution package's description is not asked of an index: it lives in a
+per-release index file, a different shape from per-package asks. An inventory
+stating one supplies it (§ Inventory descriptions).
+
+## Inventory descriptions
+
+What a producer says a component is. A generic package has no index, so it is
+the only line saying what the component is; 23 of 7,605 components on a SONiC
+switch image carry one.
+
+| Format | Where it is stated |
+|---|---|
+| CycloneDX, JSON or XML | The component's `description` |
+| SPDX 2.x | The package's `summary`, else its `description` |
+| SPDX 3.x | The element's `summary`, else its `description` |
+
+| Rule | Reason |
+|---|---|
+| SPDX's summary beats its description, whichever order the producer wrote them in | Both versions define the summary as the short one, and one line is kept |
+| One line: invalid bytes replaced, each space or line break one space, every other control or format character dropped, runs of space collapsed, cut to 300 characters on a character and trimmed (REQ-66, REQ-69) | Third-party text rendered to the staff with most access; a control or format character is invisible text changing what a reader sees, a right-to-left override reordering the line |
+| An index's summary is made one line by the same rule and bound | The two take the same place on a screen |
+| Cut while the document is read | A document of long descriptions holds one line of each |
+| `NOASSERTION` and `NONE` are nothing stated | |
+| One per component row: the first statement stands, and a later one fills it only where none was stated, within one document and across uploads | The row is shared by every build and product shipping the component. The latest upload winning lets one product's producer rewrite another product's page on every scan; one per build stores a label per node for a disagreement no measured producer has |
+| One product's inventory states it for every product shipping the component: a reader of another product sees it on that product's page, as the supplier and license are seen | It says what the component is, never which product shipped it, and the page lists a component only to readers of a product shipping it (REQ-42). Words a recorded flaw writes onto a shared issue are withheld instead, because they describe the undisclosed flaw (`design-docs/findings-flaws.md` § Recorded words on a shared issue) |
+| Never part of identity | As for suppliers |
+| Shown where no index gave a summary; an index's summary wins | The index holds the publisher's own words, refreshed by every newest-version ask |
+| Filling a row reads which rows are still blank before writing, for the supplier and the license as well | A description differs on nearly every component, so writes grouped by value alone are one statement per component on every scan |
+| Absent where nothing is stated, and a screen shows nothing | A component held before the column existed carries none until a scan of a build shipping it states one |
 
 ## Limits
 

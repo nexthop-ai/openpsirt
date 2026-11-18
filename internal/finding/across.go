@@ -79,9 +79,11 @@ type FoldPackage struct {
 	// is developed, both as an ecosystem's index stated them.
 	Summary    string
 	ProjectURL string
-	// Supplier and License are what the inventory said, rather than an index.
-	Supplier string
-	License  string
+	// Supplier, License and Description are what the inventory said, rather
+	// than an index.
+	Supplier    string
+	License     string
+	Description string
 	// Newest is what the ecosystem's index says is current and when it
 	// shipped, and FirstSeen when this deployment first saw the component.
 	Newest    string
@@ -191,7 +193,7 @@ func (s *Store) AcrossBuilds(ctx context.Context, subject access.Subject, scope 
 		row.Packages = append(row.Packages, FoldPackage{
 			Name: one.Name, Version: one.Version, Purl: one.Purl,
 			Summary: one.Summary, ProjectURL: one.ProjectURL,
-			Supplier: one.Supplier, License: one.License,
+			Supplier: one.Supplier, License: one.License, Description: one.Description,
 			Newest: one.Newest, NewestAt: one.NewestAt, FirstSeen: one.FirstSeen,
 			Issues: open.onEach[binaryIn{one.BuildID, one.ComponentID}], Consumers: one.Consumers,
 			Stated: stated[graph.BuildComponent{BuildID: one.BuildID, ComponentID: one.ComponentID}],
@@ -462,6 +464,7 @@ type packageRow struct {
 	ProjectURL    string     `bun:"project_url"`
 	Supplier      string     `bun:"supplier"`
 	License       string     `bun:"license"`
+	Description   string     `bun:"description"`
 	Newest        string     `bun:"latest_version"`
 	NewestAt      *time.Time `bun:"latest_released_at"`
 	FirstSeen     time.Time  `bun:"first_seen_at"`
@@ -515,6 +518,7 @@ func (s *Store) packagesAcross(ctx context.Context, buildIDs []int64, held heldB
 		ColumnExpr(`COALESCE("c"."project_url", '') AS "project_url"`).
 		ColumnExpr(`COALESCE("c"."supplier", '') AS "supplier"`).
 		ColumnExpr(`COALESCE("c"."license", '') AS "license"`).
+		ColumnExpr(`COALESCE("c"."description", '') AS "description"`).
 		ColumnExpr(`COALESCE("c"."latest_version", '') AS "latest_version"`).
 		ColumnExpr(`"c"."latest_released_at" AS "latest_released_at"`).
 		ColumnExpr(`"c"."first_seen_at" AS "first_seen_at"`).

@@ -277,8 +277,8 @@ brings together, one lapses.
 
 ## The v0.14.0 upgrade
 
-Migration 48. Three indexes are made again, each holding one more column, and
-two tables gain a column.
+Migration 48. Three indexes are made again, each holding one more column,
+five tables gain a column, and two tables are made.
 
 | Table | Gains |
 |---|---|
@@ -286,11 +286,16 @@ two tables gain a column.
 | `finding` | The opened-run and closed-run indexes hold why a finding closed, last, so what each upload changed is counted from them alone |
 | `suppression` | The status notes a build's claim gives, null for every claim stored before (`design-docs/ingest-claims.md` § Status notes) |
 | `received_vex_statement` | The status notes a received statement gives, null for every statement stored before |
+| `finding` | The source package it was matched through, null for every finding stored before until its next scan |
+| `vulnerability` | The files its record lists, null for every issue stored before until its next scan (`design-docs/ingest-scanner.md` § Program files) |
+| `source_correction`, `source_answer` | Made: a correction by source paths, and what it answered on which files (`design-docs/triage.md` § Corrections) |
+| `component` | What the inventory says the component is, null for every component stored before (`design-docs/findings-components.md` § Inventory descriptions) |
 
 A statement or claim the upgrade leaves without notes takes them in place when
 its document or the build's next inventory gives them: the row stays, with its
 decline, what cites it and the findings it answers, and no alert is raised
-(`design-docs/ingest-claims.md` § Status notes).
+(`design-docs/ingest-claims.md` § Status notes). A component the upgrade leaves
+without a description takes one from the next inventory stating it.
 
 Each index is dropped and made again, so an upgrade stopped between the two
 makes it. Each column is added where the table lacks it, so a start that

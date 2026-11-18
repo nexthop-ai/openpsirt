@@ -478,7 +478,7 @@ func (r *Refresher) record(ctx context.Context, id int64, latest Latest) error {
 	// Absent is normal and overwrites nothing: the module proxy serves no
 	// summary at all, so a package with a version and no summary is the
 	// ordinary case rather than a half-written row.
-	if summary := clip(latest.Summary, MostSummary); summary != "" {
+	if summary := bound.Line(latest.Summary); summary != "" {
 		q = q.Set(`"summary" = ?`, summary)
 	}
 	if project := addressable(latest.Project); project != "" {
@@ -528,21 +528,6 @@ func (r *Refresher) forget(ctx context.Context, id int64) error {
 		return fmt.Errorf("drop what an index said about a name of ours: %w", err)
 	}
 	return nil
-}
-
-// MostSummary bounds what an index's one-line summary may be.
-//
-// A label rather than a document. What some indexes call a description is a
-// whole README and this is not that field, but a publisher may still put a
-// paragraph in the summary, and a row of a table is not where a paragraph is
-// read. Cut on a rune boundary, because cutting a byte sequence in half makes
-// text no renderer can draw.
-const MostSummary = 300
-
-// clip shortens text to a bound, on a rune boundary, and trims what is left.
-func clip(text string, most int) string {
-	text = strings.Join(strings.Fields(bound.Text(text)), " ")
-	return strings.TrimSpace(bound.HeadRunes(text, most))
 }
 
 // MostAddress bounds an address an index hands over.

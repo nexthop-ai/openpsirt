@@ -89,6 +89,7 @@ plugin's two encodings of one build to one build.
 | Built from | a pedigree | a relationship to another package | `ancestorOf` or `descendantOf` |
 | What a carried patch resolves | a pedigree patch naming the vulnerability | cannot be stated | cannot be stated |
 | Container image | `type` `container` | `primaryPackagePurpose` `CONTAINER` | `software_primaryPurpose` `container` |
+| What it is | `description` | `summary`, else `description` | `summary`, else `description` |
 
 | Rule | Reason |
 |---|---|

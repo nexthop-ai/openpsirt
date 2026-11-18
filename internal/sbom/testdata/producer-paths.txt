@@ -21,7 +21,7 @@ skipped @graph[].createdBy[]:string
 skipped @graph[].createdUsing[]:string
 read @graph[].creationInfo:string
 skipped @graph[].dataLicense:string
-skipped @graph[].description:string
+read @graph[].description:string
 read @graph[].externalIdentifier[].externalIdentifierType:string
 read @graph[].externalIdentifier[].identifier:string
 skipped @graph[].externalIdentifier[].type:string
@@ -55,7 +55,7 @@ read @graph[].software_primaryPurpose:string
 skipped @graph[].software_sourceInfo:string
 read @graph[].spdxId:string
 read @graph[].specVersion:string
-skipped @graph[].summary:string
+read @graph[].summary:string
 skipped @graph[].suppliedBy:string
 read @graph[].to[]:string
 read @graph[].type:string
@@ -75,7 +75,7 @@ read components[].components[].purl:string
 read components[].components[].type:string
 read components[].components[].version:string
 read components[].cpe:string
-skipped components[].description:string
+read components[].description:string
 skipped components[].externalReferences[].comment:string
 skipped components[].externalReferences[].hashes[].alg:string
 skipped components[].externalReferences[].hashes[].content:string
@@ -222,7 +222,7 @@ skipped packages[].checksums[].algorithm:string
 skipped packages[].checksums[].checksumValue:string
 skipped packages[].comment:string
 skipped packages[].copyrightText:string
-skipped packages[].description:string
+read packages[].description:string
 skipped packages[].downloadLocation:string
 skipped packages[].externalRefs[].referenceCategory:string
 read packages[].externalRefs[].referenceLocator:string
@@ -239,7 +239,7 @@ skipped packages[].packageFileName:string
 skipped packages[].packageVerificationCode.packageVerificationCodeValue:string
 read packages[].primaryPackagePurpose:string
 skipped packages[].sourceInfo:string
-skipped packages[].summary:string
+read packages[].summary:string
 read packages[].supplier:string
 read packages[].versionInfo:string
 skipped product_tree.branches[].branches[].branches[].category:string
@@ -355,7 +355,7 @@ read vulnerabilities[].threats[].product_ids[]:string
 skipped vulnerabilities[].title:string
 skipped vulnerabilities[].updated:string
 read xml:bom.components.component.cpe:text
-skipped xml:bom.components.component.description:text
+read xml:bom.components.component.description:text
 skipped xml:bom.components.component.externalReferences.reference.url:text
 skipped xml:bom.components.component.externalReferences.reference@type:attribute
 skipped xml:bom.components.component.group:text

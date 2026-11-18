@@ -6505,6 +6505,9 @@ components:
           description: The number of things pulling this binary in here
           format: int64
           type: integer
+        description:
+          description: "One line saying what the package is, as the inventory states it: a CycloneDX component's description, or an SPDX package's summary, else its description. Cut to 300 characters on one line. The first inventory stating one is kept, and a later one fills it only where none was stated. Absent where no inventory says"
+          type: string
         first_seen:
           description: The moment a scan of this deployment first reported the package
           type: string
