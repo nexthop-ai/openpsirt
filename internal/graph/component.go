@@ -66,6 +66,11 @@ type Component struct {
 	// worked out per row, the release chart read 1.3 s where it had read
 	// 0.33 s (design-docs/analytics-measurements.md § Counts by identifying name).
 	IdentifyingFolded string `bun:"identifying_folded,nullzero"`
+	// PackageFolded is the name the package identifier gives, folded, and
+	// empty where the component carries no package identifier. A component
+	// keeps the name its first inventory gave it, which a later one may not
+	// repeat, and a statement is stored under the name its identifier gives.
+	PackageFolded string `bun:"package_folded,nullzero"`
 	// FoldKey groups the binary packages one source package was built at one
 	// version into the thing a person acts on. It groups; it does not
 	// identify — Identity above is what a finding, a decision and a node hang
@@ -634,6 +639,7 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 			Identity: identity, Purl: d.Purl, CPE: d.CPE, Name: d.Name, Version: d.Version,
 			NameFolded:        Folded(d.Name),
 			IdentifyingFolded: StoredIdentifying(d.Name, d.Version, d.Purl),
+			PackageFolded:     Folded(PartsOfPurl(d.Purl).Name),
 			UpstreamName:      d.UpstreamName, UpstreamVersion: d.UpstreamVersion,
 			UpstreamFolded: Folded(d.UpstreamName),
 			FoldKey:        d.FoldKey(),

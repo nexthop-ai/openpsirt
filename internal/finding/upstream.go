@@ -193,7 +193,9 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 	var out []Offer
 	q := s.db.NewSelect().
 		TableExpr(`"received_vex_statement" AS "ss"`).
-		Join(`JOIN "component" AS "c" ON "c"."name_folded" = "ss"."component" AND "c"."version" = "ss"."about"`).
+		// By the component's name and by the name its package identifier
+		// gives: a component keeps the name its first inventory gave it.
+		Join(`JOIN "component" AS "c" ON ("c"."name_folded" = "ss"."component" OR "c"."package_folded" = "ss"."component") AND "c"."version" = "ss"."about"`).
 		Join(`JOIN `+named+` AS "names" ON "names"."folded" = "ss"."vulnerability"`).
 		Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "names"."issue_id" AND "f"."component_id" = "c"."id"`).
 		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).

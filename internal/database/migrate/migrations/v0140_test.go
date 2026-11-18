@@ -5,6 +5,7 @@ package migrations_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
@@ -77,6 +78,35 @@ func TestTheV0140UpgradeMakesAnIndexAStoppedStartLeftUnmade(t *testing.T) {
 		unrecordLatest(t, db)
 		dbtest.MigrateTo(t, db, v0140)
 		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0140(db.Server.Engine))
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// The v0.14.0 upgrade stores the name each component's package identifier
+// gives, folded and decoded, and none for a component carrying no identifier
+// or one that is not a package identifier.
+func TestTheV0140UpgradeStoresEachComponentsPackageName(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0130)
+		s := &seederV0120{t: t, db: db, at: time.Date(2026, 11, 18, 2, 0, 0, 0, time.UTC)}
+		renamed := s.component("Repro Platform", "05.47.45.0027",
+			"pkg:generic/repro/InsydeH2O@05.47.45.0027?arch=x86_64#bin")
+		scoped := s.component("core", "7.0.0", "pkg:npm/%40babel/core%2Bx@7.0.0")
+		bare := s.component("bash", "5.2", "")
+		other := s.component("thing", "1", "https://example.com/thing")
+		dbtest.MigrateTo(t, db, v0140)
+		for id, want := range map[int64]string{renamed: "insydeh2o", scoped: "core+x", bare: "", other: ""} {
+			var got *string
+			if err := db.DB.NewRaw(`SELECT "package_folded" FROM "component" WHERE "id" = ?`, id).
+				Scan(ctx, &got); err != nil {
+				t.Fatal(err)
+			}
+			if (got == nil) != (want == "") || (got != nil && *got != want) {
+				t.Errorf("component %d holds the package name %v, want %q", id, got, want)
+			}
+		}
 		leaveAtLatest(t, ctx, db)
 	})
 }

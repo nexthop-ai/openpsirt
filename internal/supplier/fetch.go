@@ -1010,13 +1010,13 @@ func ours(advisory sbom.Advisory, ships map[string]bool) []finding.Statement {
 // per build would be forty scans for one set.
 func (f *Fetcher) shipped(ctx context.Context, productID int64) (map[string]bool, error) {
 	var held []struct {
-		Name string `bun:"name_folded"`
-		Purl string `bun:"purl"`
+		Name    string `bun:"name_folded"`
+		Package string `bun:"package_folded"`
 	}
 	err := f.db.NewSelect().
 		Distinct().
 		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`"c"."name_folded", COALESCE("c"."purl", '') AS "purl"`).
+		ColumnExpr(`"c"."name_folded", COALESCE("c"."package_folded", '') AS "package_folded"`).
 		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
 		Join(`JOIN "build" AS "b" ON "b"."id" = "n"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
@@ -1030,8 +1030,8 @@ func (f *Fetcher) shipped(ctx context.Context, productID int64) (map[string]bool
 	ships := make(map[string]bool, len(held))
 	for _, one := range held {
 		ships[one.Name] = true
-		if own := (sbom.Target{Purl: one.Purl}).ComponentNamed(); own != "" {
-			ships[graph.Folded(own)] = true
+		if one.Package != "" {
+			ships[one.Package] = true
 		}
 	}
 	return ships, nil

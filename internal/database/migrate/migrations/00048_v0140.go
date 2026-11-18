@@ -36,12 +36,15 @@ func upV0140(ctx context.Context, sqldb *sql.DB) error {
 //     the files its CVE record lists, and a correction by source paths is
 //     kept with what it answered and on which files.
 //   - A component holds what the inventory says it is.
+//   - A component holds the name its package identifier gives, folded and
+//     indexed, which a statement is matched by beside its own name.
 func upgradeV0140(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{
 		findingIndexesV0140,
 		statementNotesV0140,
 		sourceCorrectionsV0140,
 		componentDescriptionV0140,
+		componentPackageV0140,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err

@@ -99,6 +99,7 @@ one claim shape.
 | The same bytes uploaded again record the times the document states where the rows hold none | |
 | The same bytes again write nothing where they read as what stands, and replace it where the reader now derives differently | |
 | A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is `frr` |
+| A statement, and the product it names, reach a component by the component's name or by the name its package identifier gives, in every read that matches them | A component keeps the name its first inventory gave it (`design-docs/data-model-components.md` § Component identity) |
 | A shipping-inside product is stored as package identifier, folded name and version | |
 | What a statement names its supplier's product as is stored: inside a named product, a product named alone, or nothing; only the first two place anything | |
 | A claim repeated word for word, placed where it stood, keeps its row and takes the new digest and moment; a row stored before products were read takes its new placement | A superseded claim tells citing approvals the publisher changed their word |

@@ -410,6 +410,29 @@ func TestDecliningAStatementThatIsNotAnUpstreamsIsRefused(t *testing.T) {
 	})
 }
 
+// A component keeps the name its first inventory gave it, and an upstream's
+// statement is stored under the name its package identifier gives, so an
+// offer is found by either.
+func TestAnOfferReachesAComponentStoredUnderAnotherName(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		if _, err := w.DB.DB.NewUpdate().Table("component").
+			Set(`"name" = ?`, "Netlink library").Set(`"name_folded" = ?`, "netlink library").
+			Where(`"purl" = ?`, libnl.Purl).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		offers, err := w.findings.Offers(t.Context(), w.proposer, w.fork.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(offers) != 2 {
+			t.Errorf("offered %d, want the upstream's own-build statement at both of the fork's builds", len(offers))
+		}
+	})
+}
+
 // The offers of a product are refused to somebody who does not read it,
 // rather than answered as none.
 func TestTheOffersOfAProductTheReaderCannotSeeAreRefused(t *testing.T) {

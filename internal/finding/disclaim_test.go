@@ -93,6 +93,18 @@ func placedAt(t *testing.T, f *fixture, rows []finding.Finding) map[string]findi
 	return out
 }
 
+// everySpellingOfY runs a test with Y stored under the name its package
+// identifier gives, and under another name an inventory gave it, which a
+// statement naming Y by its identifier still reaches.
+func everySpellingOfY(t *testing.T, fn func(t *testing.T, acmeY graph.Described)) {
+	t.Helper()
+	renamed := acmeY
+	renamed.Name = "Acme Y Platform"
+	for _, y := range []graph.Described{acmeY, renamed} {
+		t.Run(y.Name, func(t *testing.T) { fn(t, y) })
+	}
+}
+
 // beside is zlib inside Y, and the same zlib pulled in by curl outside it.
 func beside(product graph.Described) graph.Snapshot {
 	return graph.Snapshot{
@@ -454,98 +466,125 @@ func TestAnOccurrenceTheSupplierAnswersOnSomeRoutesIsNotRunningOut(t *testing.T)
 }
 
 func TestAStatementAboutAComponentInsideAProductIsEvidenceOnlyBeneathIt(t *testing.T) {
-	each(t, func(t *testing.T, f *fixture) {
-		ctx := t.Context()
-		who := f.planner(t, access.PublicTriage)
-		said := func(issue string) []finding.Statement {
-			t.Helper()
-			interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
-				[]finding.Named{{Identifier: issue, Severity: "high"}})
-			if err != nil {
-				t.Fatal(err)
+	everySpellingOfY(t, func(t *testing.T, acmeY graph.Described) {
+		each(t, func(t *testing.T, f *fixture) {
+			ctx := t.Context()
+			who := f.planner(t, access.PublicTriage)
+			said := func(issue string) []finding.Statement {
+				t.Helper()
+				interned, err := finding.NewVulnerabilities(f.db.DB).Intern(ctx,
+					[]finding.Named{{Identifier: issue, Severity: "high"}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				var componentID int64
+				if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id").
+					Where(`"c"."purl" = ?`, zlib.Purl).Scan(ctx, &componentID); err != nil {
+					t.Fatal(err)
+				}
+				got, err := f.store.SaidAbout(ctx, who, f.productID, interned[issue],
+					[]string{issue}, "zlib", zlib.Purl, f.build, componentID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return got
 			}
-			var componentID int64
-			if err := f.db.DB.NewSelect().TableExpr(`"component" AS "c"`).Column("c.id").
-				Where(`"c"."purl" = ?`, zlib.Purl).Scan(ctx, &componentID); err != nil {
-				t.Fatal(err)
-			}
-			got, err := f.store.SaidAbout(ctx, who, f.productID, interned[issue],
-				[]string{issue}, "zlib", zlib.Purl, f.build, componentID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			return got
-		}
 
-		// Y in the build, and zlib pulled in only by curl.
-		f.shipped(t, graph.Snapshot{
-			Root:       root,
-			Components: []graph.Described{acmeY, curl, zlib},
-			Dependencies: []graph.Dependency{
-				{Parent: root, Child: acmeY},
-				{Parent: root, Child: curl},
-				{Parent: curl, Child: zlib},
-			},
+			// Y in the build, and zlib pulled in only by curl.
+			f.shipped(t, graph.Snapshot{
+				Root:       root,
+				Components: []graph.Described{acmeY, curl, zlib},
+				Dependencies: []graph.Dependency{
+					{Parent: root, Child: acmeY},
+					{Parent: root, Child: curl},
+					{Parent: curl, Child: zlib},
+				},
+			})
+			f.acmeSays(t)
+			if got := said(inside); len(got) != 0 {
+				t.Errorf("a statement about the zlib inside Y is evidence on a zlib outside it: %+v", got)
+			}
+			if got := said(productOnly); len(got) != 0 {
+				t.Errorf("a statement about Y alone is evidence on a zlib outside it: %+v", got)
+			}
+
+			// And now inside Y as well.
+			f.shipped(t, beside(acmeY))
+			if got := said(inside); len(got) != 1 || got[0].Within != "acme-y" {
+				t.Errorf("the statement about the zlib inside Y reads %+v on the zlib inside it", got)
+			}
+			if got := said(productOnly); len(got) != 1 || got[0].Component != "acme-y" {
+				t.Errorf("the statement about Y alone reads %+v on the zlib inside it", got)
+			}
 		})
-		f.acmeSays(t)
-		if got := said(inside); len(got) != 0 {
-			t.Errorf("a statement about the zlib inside Y is evidence on a zlib outside it: %+v", got)
-		}
-		if got := said(productOnly); len(got) != 0 {
-			t.Errorf("a statement about Y alone is evidence on a zlib outside it: %+v", got)
-		}
-
-		// And now inside Y as well.
-		f.shipped(t, beside(acmeY))
-		if got := said(inside); len(got) != 1 || got[0].Within != "acme-y" {
-			t.Errorf("the statement about the zlib inside Y reads %+v on the zlib inside it", got)
-		}
-		if got := said(productOnly); len(got) != 1 || got[0].Component != "acme-y" {
-			t.Errorf("the statement about Y alone reads %+v on the zlib inside it", got)
-		}
 	})
 }
 
 func TestTheListFindsWhatASupplierAnsweredAndNothingElse(t *testing.T) {
-	// A statement about the zlib inside Y reaches the list through the occurrence
-	// the run answered with it, and not through every zlib in the build.
-	each(t, func(t *testing.T, f *fixture) {
-		f.shipped(t, graph.Snapshot{
-			Root:       root,
-			Components: []graph.Described{acmeY, other, libpng, curl, zlib},
-			Dependencies: []graph.Dependency{
-				{Parent: root, Child: acmeY},
-				{Parent: root, Child: other},
-				{Parent: root, Child: curl},
-				{Parent: acmeY, Child: libpng},
-				{Parent: other, Child: libpng},
-				{Parent: libpng, Child: zlib},
-				{Parent: curl, Child: zlib},
-			},
+	everySpellingOfY(t, func(t *testing.T, acmeY graph.Described) {
+		// A statement about the zlib inside Y reaches the list through the occurrence
+		// the run answered with it, and not through every zlib in the build.
+		each(t, func(t *testing.T, f *fixture) {
+			f.shipped(t, graph.Snapshot{
+				Root:       root,
+				Components: []graph.Described{acmeY, other, libpng, curl, zlib},
+				Dependencies: []graph.Dependency{
+					{Parent: root, Child: acmeY},
+					{Parent: root, Child: other},
+					{Parent: root, Child: curl},
+					{Parent: acmeY, Child: libpng},
+					{Parent: other, Child: libpng},
+					{Parent: libpng, Child: zlib},
+					{Parent: curl, Child: zlib},
+				},
+			})
+			f.acmeSays(t)
+			f.reported(t, found(inside, zlib))
+			who := f.holding(t, access.PublicTriage)
+			occurrences := func(filter finding.Filter) int {
+				t.Helper()
+				groups, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, filter)
+				if err != nil {
+					t.Fatal(err)
+				}
+				total := 0
+				for _, g := range groups {
+					total += g.Occurrences
+				}
+				return total
+			}
+			if got := occurrences(finding.Filter{}); got != 2 {
+				t.Fatalf("the list holds %d occurrences, want the two zlib occurrences", got)
+			}
+			if got := occurrences(finding.Filter{Publishers: []string{"Acme Security"}}); got != 1 {
+				t.Errorf("what Acme spoke about is %d occurrences, want the one under the shared libpng", got)
+			}
+			if got := occurrences(finding.Filter{VexStatus: []string{"not_affected"}}); got != 1 {
+				t.Errorf("what a supplier called not affected is %d occurrences, want 1", got)
+			}
 		})
-		f.acmeSays(t)
-		f.reported(t, found(inside, zlib))
-		who := f.holding(t, access.PublicTriage)
-		occurrences := func(filter finding.Filter) int {
-			t.Helper()
-			groups, _, err := f.store.Groups(t.Context(), who, f.scope, 50, 0, filter)
-			if err != nil {
-				t.Fatal(err)
-			}
-			total := 0
-			for _, g := range groups {
-				total += g.Occurrences
-			}
-			return total
+	})
+}
+
+func TestTheListFindsAStatementAboutAComponentStoredUnderAnotherName(t *testing.T) {
+	// A component keeps the name its first inventory gave it, and a statement
+	// is stored under the name its package identifier gives.
+	firmware := graph.Described{Purl: "pkg:generic/repro/insydeh2o@05.47.45.0027",
+		Name: "Repro Platform", Version: "05.47.45.0027"}
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, graph.Snapshot{Root: root, Components: []graph.Described{firmware},
+			Dependencies: []graph.Dependency{{Parent: root, Child: firmware}}})
+		f.reported(t, found(inside, firmware))
+		f.publishes(t, []finding.Statement{finding.StatementOf(sbom.Suppression{
+			Vulnerability: inside, Status: sbom.Affected,
+		}, sbom.Target{Purl: firmware.Purl})}, "sha256:acme-firmware")
+		groups, _, err := f.store.Groups(t.Context(), f.holding(t, access.PublicTriage), f.scope, 50, 0,
+			finding.Filter{Publishers: []string{"Acme Security"}})
+		if err != nil {
+			t.Fatal(err)
 		}
-		if got := occurrences(finding.Filter{}); got != 2 {
-			t.Fatalf("the list holds %d occurrences, want the two zlib occurrences", got)
-		}
-		if got := occurrences(finding.Filter{Publishers: []string{"Acme Security"}}); got != 1 {
-			t.Errorf("what Acme spoke about is %d occurrences, want the one under the shared libpng", got)
-		}
-		if got := occurrences(finding.Filter{VexStatus: []string{"not_affected"}}); got != 1 {
-			t.Errorf("what a supplier called not affected is %d occurrences, want 1", got)
+		if len(groups) != 1 {
+			t.Errorf("what Acme spoke about is %d groups, want the firmware", len(groups))
 		}
 	})
 }

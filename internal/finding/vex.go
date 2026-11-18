@@ -651,7 +651,7 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	// component under the name its first inventory gave it, which a later one
 	// may not repeat. Asked by both.
 	called := []string{folded(component)}
-	if own := folded(nameOf(purl)); own != "" && own != called[0] {
+	if own := graph.Folded(graph.PartsOfPurl(purl).Name); own != "" && own != called[0] {
 		called = append(called, own)
 	}
 	var said []Statement
@@ -687,6 +687,9 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 		aboveNames := make([]string, 0, len(above))
 		for _, c := range above {
 			aboveNames = append(aboveNames, folded(c.Name))
+			if c.PackageFolded != "" && c.PackageFolded != folded(c.Name) {
+				aboveNames = append(aboveNames, c.PackageFolded)
+			}
 		}
 		var beneath []Statement
 		err := withWords(s.db.NewSelect().Model(&beneath)).
@@ -729,23 +732,29 @@ func (s *Store) shipsProducts(ctx context.Context, productID int64,
 	if len(named) == 0 {
 		return shipped, nil
 	}
-	var rows []string
+	var rows []struct {
+		Name    string `bun:"name_folded"`
+		Package string `bun:"package_folded"`
+	}
 	err := s.db.NewSelect().
 		Distinct().
 		TableExpr(`"component" AS "pc"`).
-		ColumnExpr(`"pc"."name_folded"`).
+		ColumnExpr(`"pc"."name_folded", COALESCE("pc"."package_folded", '') AS "package_folded"`).
 		Join(`JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"`).
 		Join(`JOIN "build" AS "pt" ON "pt"."id" = "pn"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "ps" ON "ps"."id" = "pt"."branch_or_tag_id"`).
 		Where(`"ps"."product_id" = ?`, productID).
 		Where(`"pn"."closed_scan_id" IS NULL`).
-		Where(`"pc"."name_folded" IN (?)`, bun.List(named)).
+		Where(`("pc"."name_folded" IN (?) OR "pc"."package_folded" IN (?))`, bun.List(named), bun.List(named)).
 		Scan(ctx, &rows)
 	if err != nil {
 		return nil, fmt.Errorf("read which suppliers' products this ships: %w", err)
 	}
-	for _, name := range rows {
-		shipped[name] = true
+	for _, row := range rows {
+		shipped[row.Name] = true
+		if row.Package != "" {
+			shipped[row.Package] = true
+		}
 	}
 	return shipped, nil
 }
