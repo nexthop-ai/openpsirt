@@ -164,7 +164,15 @@ func (s *Store) reaffirm(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return nil, err
 	}
-	full := needsFullApproval(*previous, *previous.Decision, severityNow, carryable != nil)
+	// An answer of a correction by source paths that was withdrawn is never
+	// carried: what withdrew it is a fact the agreement was not given over,
+	// and the decision re-made is one no later pass re-checks.
+	answers, err := s.SourceAnswers(ctx, []int64{previous.ID})
+	if err != nil {
+		return nil, err
+	}
+	full := needsFullApproval(*previous, *previous.Decision, severityNow, carryable != nil) ||
+		answers[previous.ID].Withdrawn
 
 	proposal := remade(*previous.Decision, occurrence, r.Reasoning, r.By, severityNow, full)
 	// The same decision re-made, so it keeps the builds it was made on.

@@ -51,8 +51,12 @@ func Lapse(one triage.ForPerson) Telling {
 	why := " stopped applying: the code it was about has moved."
 	again := " The finding is open again, and re-affirming it is yours to do."
 	switch {
-	case one.SourceFiles:
+	case one.SourceWithdrawn == triage.WithdrawnByRecord:
 		why = " stopped applying: the issue's record no longer puts every file outside the paths the package is built from."
+	case one.SourceWithdrawn == triage.WithdrawnByMatch:
+		why = " stopped applying: a scan now matches the issue there other than through the source package."
+	case one.SourceWithdrawn == triage.WithdrawnByIncident:
+		why = " stopped applying: an incident was recorded through the issue in this product."
 	case one.RatedWorse:
 		why = " stopped applying: the issue is rated worse than when it was made."
 	case one.Probable:

@@ -57,15 +57,17 @@ func sourceAnswerV0140(t *columnTypes) []string {
 	return []string{
 		// The files the issue's record listed when the row was written, one
 		// a line in byte order. Kept, because the record can change after
-		// and the row is answered on what it said then. Withdrawn when a
-		// later record no longer puts every file outside the paths: the
-		// moment, and the files that record listed, empty where it lists
-		// none.
+		// and the row is answered on what it said then. Withdrawn when the
+		// answer stops holding: the moment; what withdrew it, the record
+		// (record), a match other than through the source (match) or an
+		// incident (incident); and the files the record listed where it
+		// was the record, empty where it lists none.
 		`CREATE TABLE "source_answer" (
 			"id"                     ` + t.id + `,
 			"decision_occurrence_id" ` + t.ref + ` NOT NULL,
 			"files"                  ` + t.text + ` NOT NULL,
 			"withdrawn_at"           ` + t.timestamp + ` NULL,
+			"withdrawn_because"      ` + t.kind + ` NULL,
 			"withdrawn_on"           ` + t.text + ` NULL,
 			CONSTRAINT "source_answer_occurrence_unique" UNIQUE ("decision_occurrence_id"),
 			CONSTRAINT "source_answer_occurrence_fk" FOREIGN KEY ("decision_occurrence_id") REFERENCES "decision_occurrence"("id")
@@ -117,6 +119,23 @@ func sourceCorrectionsV0140(ctx context.Context, tx bun.Tx) error {
 		if !present {
 			if err := u.create(table.declared(u.t), table.name); err != nil {
 				return err
+			}
+			continue
+		}
+		// A table a stopped upgrade made may lack the indexes made after it.
+		_, indexes, err := pick(table.declared(u.t), table.name)
+		if err != nil {
+			return err
+		}
+		for _, stmt := range indexes {
+			held, err := u.hasIndex(table.name, createsIndex.FindStringSubmatch(stmt)[1])
+			if err != nil {
+				return err
+			}
+			if !held {
+				if err := u.run([]string{stmt}); err != nil {
+					return err
+				}
 			}
 		}
 	}

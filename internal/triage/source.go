@@ -11,8 +11,10 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/uptrace/bun"
@@ -21,6 +23,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/cverecord"
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/filed"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/rating"
@@ -74,18 +77,44 @@ type sourceAnswer struct {
 	ID                   int64  `bun:"id,pk,autoincrement"`
 	DecisionOccurrenceID int64  `bun:"decision_occurrence_id,notnull"`
 	Files                string `bun:"files,notnull"`
-	// WithdrawnAt and WithdrawnOn are when a later record withdrew the
-	// answer and the files that record listed, empty where it listed none.
-	WithdrawnAt *time.Time `bun:"withdrawn_at"`
-	WithdrawnOn *string    `bun:"withdrawn_on"`
+	// WithdrawnAt is when the answer was withdrawn, WithdrawnBecause what
+	// withdrew it, and WithdrawnOn the files the record listed then, empty
+	// where it listed none or the record did not withdraw it.
+	WithdrawnAt      *time.Time        `bun:"withdrawn_at"`
+	WithdrawnBecause *SourceWithdrawal `bun:"withdrawn_because"`
+	WithdrawnOn      *string           `bun:"withdrawn_on"`
+}
+
+// SourceWithdrawal is what withdrew an answer of a correction by source paths.
+type SourceWithdrawal string
+
+const (
+	// WithdrawnByRecord is the issue's record listing a file under the paths,
+	// or no files.
+	WithdrawnByRecord SourceWithdrawal = "record"
+	// WithdrawnByMatch is a scan matching the issue at the occurrence on the
+	// package's own name, a CPE or another source.
+	WithdrawnByMatch SourceWithdrawal = "match"
+	// WithdrawnByIncident is an incident recorded through the issue in the
+	// product.
+	WithdrawnByIncident SourceWithdrawal = "incident"
+)
+
+// SourceWithdrawals is every reason an answer is withdrawn, in the order the
+// API offers them.
+func SourceWithdrawals() []SourceWithdrawal {
+	return []SourceWithdrawal{WithdrawnByRecord, WithdrawnByMatch, WithdrawnByIncident}
 }
 
 // SourceAnswer is what one occurrence a correction by source paths answered
 // rests on: the files the record listed when it was answered and, where a
 // later record withdrew the answer, the files that record listed.
 type SourceAnswer struct {
-	AnsweredOn  []string
-	Withdrawn   bool
+	AnsweredOn []string
+	Withdrawn  bool
+	// Because is what withdrew it, and WithdrawnOn the files the record
+	// listed where the record did.
+	Because     SourceWithdrawal
 	WithdrawnOn []string
 }
 
@@ -122,6 +151,11 @@ type SourceProposed struct {
 var ErrNothingMatchedThrough = refusal.New("nothing open in this product is matched that way with " +
 	"every file its record lists outside those paths")
 
+// ErrSourceWithdrawn is returned when a correction by source paths that was
+// withdrawn is revised.
+var ErrSourceWithdrawn = refusal.New("a correction by source paths that was withdrawn stays withdrawn; " +
+	"propose a new one")
+
 // normalized is a proposal with its names folded and its paths in the one
 // spelling they are compared in, or the refusal saying what is wrong with it.
 func (p SourceProposal) normalized() (SourceProposal, error) {
@@ -146,6 +180,8 @@ func (p SourceProposal) normalized() (SourceProposal, error) {
 		}
 		cleaned, ok := cverecord.SourcePath(stated)
 		switch {
+		case strings.ContainsFunc(stated, unicode.IsControl):
+			return p, refusal.Errorf("%q holds a control character; name one path per entry", stated)
 		case !ok:
 			return p, refusal.Errorf("%q leaves the source tree; name a path within it, such as tools/perf", stated)
 		case cleaned == "":
@@ -239,9 +275,9 @@ func (s *Store) ProposeBySource(ctx context.Context, subject access.Subject,
 // withdrawn.
 func (s *Store) AnswerBySource(ctx context.Context, buildID int64) (BySource, error) {
 	var out BySource
-	var withdrawn []int64
+	var withdrawn map[SourceWithdrawal][]int64
 	err := s.writing(ctx, func(ctx context.Context, within *Store, tx bun.Tx) error {
-		out, withdrawn = BySource{}, nil
+		out, withdrawn = BySource{}, map[SourceWithdrawal][]int64{}
 		var productID int64
 		if err := tx.NewSelect().TableExpr(`"build" AS "b"`).
 			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
@@ -249,16 +285,41 @@ func (s *Store) AnswerBySource(ctx context.Context, buildID int64) (BySource, er
 			Where(`"b"."id" = ?`, buildID).Scan(ctx, &productID); err != nil {
 			return fmt.Errorf("read the product of build %d: %w", buildID, err)
 		}
+		// The stamp of every correction in the product, read before whether
+		// each stands: a withdrawal committing after this read changes the
+		// stamp, so the restamp below matches nothing and the pass is taken
+		// again against the withdrawn correction.
+		var all []int64
+		if err := tx.NewSelect().Model((*SourceCorrection)(nil)).Column("decision_id").
+			Where(`"sc"."product_id" = ?`, productID).Scan(ctx, &all); err != nil {
+			return fmt.Errorf("read the corrections by source paths here: %w", err)
+		}
+		if len(all) == 0 {
+			return nil
+		}
+		stamps, err := within.stampsOf(ctx, all)
+		if err != nil {
+			return err
+		}
 		rules, err := within.standingBySource(ctx, productID)
 		if err != nil {
 			return err
 		}
 		for _, rule := range rules {
-			ids, err := within.recheckBy(ctx, rule)
+			moved, err := within.recheckBy(ctx, rule)
 			if err != nil {
 				return err
 			}
-			withdrawn = append(withdrawn, ids...)
+			touched := false
+			for because, ids := range moved {
+				withdrawn[because] = append(withdrawn[because], ids...)
+				touched = touched || len(ids) > 0
+			}
+			if touched {
+				if err := within.restamp(ctx, rule.DecisionID, stamps[rule.DecisionID]); err != nil {
+					return err
+				}
+			}
 		}
 		for _, rule := range rules {
 			decision := new(Decision)
@@ -269,34 +330,55 @@ func (s *Store) AnswerBySource(ctx context.Context, buildID int64) (BySource, er
 			if err != nil {
 				return err
 			}
+			if n > 0 {
+				if err := within.restamp(ctx, rule.DecisionID, stamps[rule.DecisionID]); err != nil {
+					return err
+				}
+			}
 			out.Answered += n
 		}
 		return nil
 	})
-	if err != nil || len(withdrawn) == 0 {
+	if err != nil {
 		return out, err
 	}
 	// Committed, so what was withdrawn is reported even when reading who to
 	// tell fails part way.
-	out.Withdrawn.Rows = int64(len(withdrawn))
-	told, err := s.proposersOfAll(ctx, withdrawn, database.InBulk.Most)
-	for i := range told {
-		told[i].SourceFiles = true
+	for _, because := range SourceWithdrawals() {
+		ids := withdrawn[because]
+		if len(ids) == 0 {
+			continue
+		}
+		out.Withdrawn.Rows += int64(len(ids))
+		told, err := s.proposersOfAll(ctx, ids, database.InBulk.Most)
+		for i := range told {
+			told[i].SourceWithdrawn = because
+		}
+		out.Withdrawn.Told = append(out.Withdrawn.Told, told...)
+		if err != nil {
+			return out, err
+		}
 	}
-	out.Withdrawn.Told = told
-	return out, err
+	return out, nil
 }
 
-// recheckBy withdraws every live answer of a correction whose issue's record
-// no longer puts every file outside the paths: it now lists a file under one,
-// or lists none. The row lapses, which opens the finding for a person and
-// tells the proposer, and its answer keeps the files it was answered on beside
-// the moment and the files the record lists now.
+// recheckBy withdraws every live answer of a correction that no longer holds,
+// by what withdrew it:
+//
+//   - the issue's record no longer puts every file outside the paths: it now
+//     lists a file under one, or lists none;
+//   - an open finding of the issue at the occurrence, in any build of the
+//     product, is matched on the package's own name, a CPE or another source.
+//
+// The row lapses, which opens the finding for a person and tells the
+// proposer, and its answer keeps the files it was answered on beside the
+// moment, the reason, and the files the record lists now.
 //
 // Every live answer in the product is examined, not only the scanned build's:
 // a record is one per issue, and the build that last reported it need not be
-// the one scanned next.
-func (s *Store) recheckBy(ctx context.Context, rule SourceCorrection) ([]int64, error) {
+// the one scanned next. An answer at an occurrence no build holds open any more
+// is left: it covers nothing, and is examined again where the issue returns.
+func (s *Store) recheckBy(ctx context.Context, rule SourceCorrection) (map[SourceWithdrawal][]int64, error) {
 	var live []struct {
 		ID              int64 `bun:"id"`
 		VulnerabilityID int64 `bun:"vulnerability_id"`
@@ -326,47 +408,134 @@ func (s *Store) recheckBy(ctx context.Context, rule SourceCorrection) ([]int64, 
 	if err != nil {
 		return nil, err
 	}
+	rematched, err := s.matchedOtherwise(ctx, rule)
+	if err != nil {
+		return nil, err
+	}
 	paths := rule.PathList()
-	byFiles := map[string][]int64{}
-	var order []string
+	type withdrawal struct {
+		because SourceWithdrawal
+		on      *string
+	}
+	byReason := map[withdrawal][]int64{}
+	var order []withdrawal
 	for _, row := range live {
-		listed := files[row.VulnerabilityID]
-		if outsideAll(listed, paths) {
+		var w withdrawal
+		switch listed := files[row.VulnerabilityID]; {
+		case !outsideAll(listed, paths):
+			on := strings.Join(listed, "\n")
+			w = withdrawal{because: WithdrawnByRecord, on: &on}
+		case rematched[row.ID]:
+			w = withdrawal{because: WithdrawnByMatch}
+		default:
 			continue
 		}
-		on := strings.Join(listed, "\n")
-		if _, ok := byFiles[on]; !ok {
-			order = append(order, on)
+		key := w
+		if w.on != nil {
+			// Grouped by the files, so one statement records each list.
+			for _, held := range order {
+				if held.because == w.because && held.on != nil && *held.on == *w.on {
+					key = held
+				}
+			}
 		}
-		byFiles[on] = append(byFiles[on], row.ID)
+		if _, ok := byReason[key]; !ok {
+			order = append(order, key)
+		}
+		byReason[key] = append(byReason[key], row.ID)
 	}
-	if len(order) == 0 {
+	out := map[SourceWithdrawal][]int64{}
+	moment := s.now().Truncate(time.Microsecond)
+	for _, w := range order {
+		ids := byReason[w]
+		if err := s.withdrawAnswers(ctx, ids, moment, w.because, w.on); err != nil {
+			return nil, fmt.Errorf("withdraw what correction %d answered: %w", rule.DecisionID, err)
+		}
+		out[w.because] = append(out[w.because], ids...)
+	}
+	return out, nil
+}
+
+// withdrawAnswers lapses these rows of corrections by source paths and records
+// on each answer when, why, and the files the record listed where it was the
+// record. A row another writer moved in between is a lost race.
+func (s *Store) withdrawAnswers(ctx context.Context, ids []int64, moment time.Time,
+	because SourceWithdrawal, on *string) error {
+
+	for start := 0; start < len(ids); start += database.BatchSize {
+		chunk := ids[start:min(start+database.BatchSize, len(ids))]
+		changed, err := markLapsed(ctx, s.db, chunk, moment)
+		if err != nil {
+			return err
+		}
+		if changed != int64(len(chunk)) {
+			return database.ErrGoAgain
+		}
+		if _, err := s.db.NewUpdate().Model((*sourceAnswer)(nil)).
+			Set(`"withdrawn_at" = ?`, moment).
+			Set(`"withdrawn_because" = ?`, because).
+			Set(`"withdrawn_on" = ?`, on).
+			Where(`"sa"."decision_occurrence_id" IN (?)`, bun.List(chunk)).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("record why an answer was withdrawn: %w", err)
+		}
+	}
+	return nil
+}
+
+// matchedOtherwise is the live answers of a correction at an occurrence where
+// an open finding of the issue, in any build of the product, is not matched
+// through the correction's source: on the package's own name, a CPE, or
+// another source.
+func (s *Store) matchedOtherwise(ctx context.Context, rule SourceCorrection) (map[int64]bool, error) {
+	var ids []int64
+	if err := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
+		ColumnExpr(`"de"."id"`).
+		Join(finding.DecisionOccurrenceIssue).
+		Where(`"de"."decision_id" = ?`, rule.DecisionID).
+		Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
+		Where(`EXISTS (SELECT 1 FROM "finding" AS "f2"`+
+			` JOIN "build" AS "b2" ON "b2"."id" = "f2"."build_id"`+
+			` JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "b2"."branch_or_tag_id"`+
+			` WHERE "st2"."product_id" = "de"."product_id" AND `+finding.DecisionOccurrenceOf("f2")+
+			` AND "f2"."closed_at" IS NULL`+
+			` AND ("f2"."matched_through" IS NULL OR "f2"."matched_through" <> ?))`, rule.Source).
+		Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read what is matched otherwise than through %s: %w", rule.Source, err)
+	}
+	out := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
+// withdrawForIncident withdraws every live answer of a correction by source
+// paths about an issue in a product an incident was just recorded through,
+// and answers the rows withdrawn. The correction keeps standing for every
+// other issue.
+func (s *Store) withdrawForIncident(ctx context.Context, productID, vulnerabilityID int64,
+	moment time.Time) ([]int64, error) {
+
+	var ids []int64
+	if err := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
+		Join(`JOIN "source_answer" AS "sa" ON "sa"."decision_occurrence_id" = "de"."id"`).
+		ColumnExpr(`"de"."id"`).
+		Where(`"de"."product_id" = ?`, productID).
+		Where(finding.FiledUnder(filed.DecisionOccurrenceIssue), vulnerabilityID).
+		Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
+		Where(`"sa"."withdrawn_at" IS NULL`).
+		OrderExpr(`"de"."id"`).
+		Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read what corrections by source paths answer about this issue: %w", err)
+	}
+	if len(ids) == 0 {
 		return nil, nil
 	}
-	moment := s.now().Truncate(time.Microsecond)
-	var withdrawn []int64
-	for _, on := range order {
-		ids := byFiles[on]
-		for start := 0; start < len(ids); start += database.BatchSize {
-			chunk := ids[start:min(start+database.BatchSize, len(ids))]
-			changed, err := markLapsed(ctx, s.db, chunk, moment)
-			if err != nil {
-				return nil, fmt.Errorf("withdraw what correction %d answered: %w", rule.DecisionID, err)
-			}
-			if changed != int64(len(chunk)) {
-				return nil, database.ErrGoAgain
-			}
-			if _, err := s.db.NewUpdate().Model((*sourceAnswer)(nil)).
-				Set(`"withdrawn_at" = ?`, moment).
-				Set(`"withdrawn_on" = ?`, on).
-				Where(`"sa"."decision_occurrence_id" IN (?)`, bun.List(chunk)).
-				Exec(ctx); err != nil {
-				return nil, fmt.Errorf("record why correction %d stopped answering: %w", rule.DecisionID, err)
-			}
-			withdrawn = append(withdrawn, chunk...)
-		}
+	if err := s.withdrawAnswers(ctx, ids, moment, WithdrawnByIncident, nil); err != nil {
+		return nil, err
 	}
-	return withdrawn, nil
+	return ids, nil
 }
 
 // standingBySource is the corrections by source paths in a product that still
@@ -417,6 +586,9 @@ func (s *Store) SourceAnswers(ctx context.Context, occurrenceIDs []int64) (map[i
 		}
 		for _, answer := range answers {
 			one := SourceAnswer{AnsweredOn: strings.Split(answer.Files, "\n"), Withdrawn: answer.WithdrawnAt != nil}
+			if answer.WithdrawnBecause != nil {
+				one.Because = *answer.WithdrawnBecause
+			}
 			if answer.WithdrawnOn != nil && *answer.WithdrawnOn != "" {
 				one.WithdrawnOn = strings.Split(*answer.WithdrawnOn, "\n")
 			}
@@ -466,7 +638,7 @@ func (s *Store) answerBy(ctx context.Context, decision *Decision, rule SourceCor
 	if err != nil {
 		return 0, err
 	}
-	answered, err := s.unanswered(ctx, covered)
+	answered, err := s.answeredAlready(ctx, rule, covered)
 	if err != nil {
 		return 0, err
 	}
@@ -572,12 +744,23 @@ func outsideAll(files, paths []string) bool {
 	return true
 }
 
-// unanswered reads which of these occurrences a correction already answers,
-// by the key a correction holds an occurrence under.
-func (s *Store) unanswered(ctx context.Context, covered []matchedThrough) (map[string]bool, error) {
-	keys := make([]string, 0, len(covered))
+// answeredAlready is the occurrences, among those covered, a correction answers
+// nothing at: one any live decision holds, under either key; one a decision set
+// aside or returned from the correction ever held; and one whose answer an
+// incident withdrew. A standing won't-fix keyed on the versions is held as
+// surely as a correction keyed on the occurrence. The other two stay out of the
+// correction for good: re-answering them would bring back, under the old
+// agreement, what the agreement excluded or what an attack ended.
+func (s *Store) answeredAlready(ctx context.Context, rule SourceCorrection,
+	covered []matchedThrough) (map[string]bool, error) {
+
+	keys := make([]string, 0, 2*len(covered))
+	keyOf := make(map[string]string, 2*len(covered))
 	for _, at := range covered {
-		keys = append(keys, at.key)
+		for _, key := range liveKeysFor(at.Occurrence) {
+			keys = append(keys, key)
+			keyOf[key] = at.key
+		}
 	}
 	held := map[string]bool{}
 	for start := 0; start < len(keys); start += database.BatchSize {
@@ -586,13 +769,80 @@ func (s *Store) unanswered(ctx context.Context, covered []matchedThrough) (map[s
 			Column("live_key").
 			Where(`"de"."live_key" IN (?)`, bun.List(keys[start:min(start+database.BatchSize, len(keys))])).
 			Scan(ctx, &some); err != nil {
-			return nil, fmt.Errorf("read what is already corrected: %w", err)
+			return nil, fmt.Errorf("read what is already decided: %w", err)
 		}
 		for _, key := range some {
-			held[key] = true
+			held[keyOf[key]] = true
+		}
+	}
+
+	lineage, err := s.lineageOf(ctx, rule.DecisionID)
+	if err != nil {
+		return nil, err
+	}
+	var before []struct {
+		VulnerabilityID    int64  `bun:"vulnerability_id"`
+		OccurrenceIdentity string `bun:"occurrence_identity"`
+	}
+	query := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
+		ColumnExpr(`"de"."vulnerability_id", "de"."occurrence_identity"`).
+		Where(`"de"."live_key" IS NULL`).
+		WhereGroup(" AND ", func(q *bun.SelectQuery) *bun.SelectQuery {
+			q = q.Where(`"de"."decision_id" = ? AND EXISTS (SELECT 1 FROM "source_answer" AS "ia"`+
+				` WHERE "ia"."decision_occurrence_id" = "de"."id" AND "ia"."withdrawn_because" = ?)`,
+				rule.DecisionID, WithdrawnByIncident)
+			if len(lineage) > 1 {
+				q = q.WhereOr(`"de"."decision_id" IN (?)`, bun.List(lineage[1:]))
+			}
+			return q
+		})
+	if err := query.Scan(ctx, &before); err != nil {
+		return nil, fmt.Errorf("read what correction %d held before: %w", rule.DecisionID, err)
+	}
+	if len(before) == 0 {
+		return held, nil
+	}
+	filedUnder := make([]int64, 0, len(before))
+	for _, row := range before {
+		filedUnder = append(filedUnder, row.VulnerabilityID)
+	}
+	issueOf, err := finding.IssuesOf(ctx, s.db, filedUnder)
+	if err != nil {
+		return nil, err
+	}
+	ended := make(map[[2]string]bool, len(before))
+	for _, row := range before {
+		ended[[2]string{strconv.FormatInt(issueOf[row.VulnerabilityID], 10), row.OccurrenceIdentity}] = true
+	}
+	for _, at := range covered {
+		if ended[[2]string{strconv.FormatInt(at.VulnerabilityID, 10), at.OccurrenceIdentity}] {
+			held[at.key] = true
 		}
 	}
 	return held, nil
+}
+
+// lineageOf is a decision and every decision set aside or returned from it,
+// at any remove. A chain too long to follow is cut where it is, which errs
+// toward answering less.
+func (s *Store) lineageOf(ctx context.Context, decisionID int64) ([]int64, error) {
+	all := []int64{decisionID}
+	frontier := all
+	for range 64 {
+		var next []int64
+		if err := s.db.NewSelect().Model((*Decision)(nil)).Column("id").
+			Where(`"derived_from" IN (?)`, bun.List(frontier)).
+			Where(`"kind" IN (?)`, bun.List([]DecisionKind{ReturnedDecision, FindingDecision})).
+			Scan(ctx, &next); err != nil {
+			return nil, fmt.Errorf("read what decision %d was split into: %w", decisionID, err)
+		}
+		if len(next) == 0 {
+			break
+		}
+		all = append(all, next...)
+		frontier = next
+	}
+	return all, nil
 }
 
 // matchedThrough reads the open public findings of published issues at the

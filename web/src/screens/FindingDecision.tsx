@@ -211,14 +211,15 @@ export function Standing({
               {(decision.answered_on ?? []).join(", ")}
             </span>
             {decision.recanted && (
-              <span
-                className="hint"
-                title="A later CVE record listed a file under the paths, or none"
-              >
+              <span className="hint">
                 withdrawn:{" "}
-                {(decision.recanted_on ?? []).length > 0
-                  ? (decision.recanted_on ?? []).join(", ")
-                  : "the record lists no files"}
+                {decision.recanted_by === "match"
+                  ? "matched other than through the source"
+                  : decision.recanted_by === "incident"
+                    ? "incident recorded"
+                    : (decision.recanted_on ?? []).length > 0
+                      ? (decision.recanted_on ?? []).join(", ")
+                      : "the record lists no files"}
               </span>
             )}
           </div>

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { Dated } from "./QueueCard";
+import { Card, Dated } from "./QueueCard";
 import { decisionOf } from "../api/decisions";
 import { answer, mounted, screen, serve, settle } from "../test/mount";
 import { button, change, only, press } from "../test/controls";
@@ -79,5 +79,34 @@ describe("changing a missed promise", () => {
   it("holds an upgrade with its version cleared", async () => {
     await repromised("upgrade-needed", "3.0.15", "  ");
     expect(button(mount.host(), "Change the promise").disabled).toBe(true);
+  });
+});
+
+describe("a correction by source paths waiting", () => {
+  it("shows the rule and its reach as a bulk act does", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    const decision = decisionOf({
+      age_days: 0,
+      builds: ["master · broadcom"],
+      decision: { id: 9, kind: "source", proposed_at: "2026-11-18T00:00:00Z", proposed_by: "bo" },
+      decision_occurrence: { id: 90, outcome: "mismatched", reasoning: "Built from tools/." },
+      rows: 40,
+      issues: 40,
+      occurrences: 40,
+      occurrence: { occurrence: "p9", product: "sonic", vulnerability: "CVE-2024-26600" },
+      proposed_by: "bo",
+      reasoning: "Built from tools/.",
+      source: { package: "linux-perf", source: "linux", paths: ["tools/lib", "tools/perf"] },
+    } as never);
+    mount.render(
+      screen(<Card decision={decision} marked={false} picked={false} onPick={() => {}} />),
+    );
+    await settle();
+    const text = mount.host().textContent ?? "";
+    expect(text).toContain("By source paths");
+    expect(text).toContain("linux-perf built from tools/lib, tools/perf of linux");
+    expect(text).toContain("40 issues");
+    expect(text).not.toContain("one decision in this build");
+    expect(button(mount.host(), "Approve all 40")).not.toBeNull();
   });
 });

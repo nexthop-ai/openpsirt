@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 )
 
@@ -44,6 +46,30 @@ type reached struct {
 func TestEachRouteAnswersItsHolderAndRefusesAnOutsider(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.ScannedWithEvidence(t)
+		// A second build of the product, holding a package matched through
+		// its source, for a correction by source paths to answer.
+		names := catalog.NewStore(r.DB.DB)
+		product, err := names.ProductByName(t.Context(), "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := names.DeclareBranchOrTag(t.Context(), product.ID, "perf", catalog.Branch, nil); err != nil {
+			t.Fatal(err)
+		}
+		perf := graph.Described{
+			Purl: "pkg:deb/debian/linux-perf@6.12.57-1", Name: "linux-perf", Version: "6.12.57-1",
+		}
+		r.ScanAt(t, httpapitest.Build{Product: "mine", BranchOrTag: "perf", Variant: "broadcom"}, "perf",
+			graph.Snapshot{
+				Root:         httpapitest.SeededRoot,
+				Components:   []graph.Described{perf},
+				Dependencies: []graph.Dependency{{Parent: httpapitest.SeededRoot, Child: perf}},
+			},
+			[]finding.Reported{{
+				Issue:     finding.Named{Identifier: "CVE-2024-26600", Severity: "high"},
+				Component: perf, MatchedThrough: "linux",
+				RecordRead: true, RecordFiles: []string{"drivers/phy/ti/phy-omap-usb2.c"},
+			}})
 
 		const build = "/v1/products/mine/branches-and-tags/master/variants/broadcom"
 		for _, c := range []reached{
@@ -105,6 +131,14 @@ func TestEachRouteAnswersItsHolderAndRefusesAnOutsider(t *testing.T) {
 				what: "what to carry from another build", method: http.MethodGet,
 				path: build + "/carried?from=master&from_variant=broadcom",
 				who:  "triager", want: http.StatusOK,
+				refusedFor: "outsider", refusal: http.StatusNotFound,
+			},
+			{
+				what: "a correction by source paths", method: http.MethodPost,
+				path: "/v1/products/mine/source-corrections",
+				body: `{"package":"linux-perf","source":"linux","paths":["tools/perf"],` +
+					`"justification":"vulnerable_code_not_present","reasoning":"Built from tools/."}`,
+				who: "triager", want: http.StatusCreated,
 				refusedFor: "outsider", refusal: http.StatusNotFound,
 			},
 			{

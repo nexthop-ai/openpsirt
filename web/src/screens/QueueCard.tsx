@@ -232,7 +232,10 @@ export function Card({
   // occurrence, and one issue can sit at many.
   const rejecting = issuesIn(decision.outliers?.rows ?? [], aside);
   const draftKey = `send-back:${decision.key}`;
-  const bulk = decision.kind === "bulk";
+  // A correction by source paths is one rule over every issue it answers, so
+  // it is read and agreed to the way a bulk act is.
+  const source = decision.kind === "source";
+  const bulk = decision.kind === "bulk" || source;
   const extension = decision.kind === "extension";
   const busy = approveDecision.isPending || rejectDecision.isPending;
   const error = approveDecision.error ?? rejectDecision.error;
@@ -276,7 +279,7 @@ export function Card({
           onChange={(event) => onPick(event.target.checked)}
           aria-label="Select this decision"
         />
-        {bulk && <span className="bulkmark">Bulk decision</span>}
+        {bulk && <span className="bulkmark">{source ? "By source paths" : "Bulk decision"}</span>}
         {f?.severity && <Severity word={f.severity} />}
         {f?.exploited && <Exploited when />}
         {/* The issue opens its finding, which carries everything an approver
@@ -556,6 +559,18 @@ export function Card({
             Selected rows go back to {decision.proposedBy} as a separate item.
           </p>
         </div>
+      )}
+      {decision.source && (
+        <p className="hint" style={{ margin: 0 }}>
+          <span className="id">{decision.source.package}</span> built from{" "}
+          {(decision.source.paths ?? []).map((path, i) => (
+            <span key={path}>
+              {i > 0 && ", "}
+              <span className="id">{path}</span>
+            </span>
+          ))}{" "}
+          of <span className="id">{decision.source.source}</span>
+        </p>
       )}
       {bulk && !decision.outliers && (
         <p className="hint" style={{ margin: 0 }}>

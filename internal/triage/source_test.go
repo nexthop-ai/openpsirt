@@ -7,6 +7,7 @@ import (
 	"errors"
 	"slices"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -347,7 +348,7 @@ func TestAnAnswerALaterRecordContradictsIsWithdrawn(t *testing.T) {
 			t.Errorf("the scan withdrew %d answers, want the two the records no longer bear out", pass.Withdrawn.Rows)
 		}
 		if len(pass.Withdrawn.Told) != 1 || pass.Withdrawn.Told[0].PersonID != f.triager.ID ||
-			!pass.Withdrawn.Told[0].SourceFiles {
+			pass.Withdrawn.Told[0].SourceWithdrawn != triage.WithdrawnByRecord {
 			t.Errorf("who is told reads %+v, want the proposer, for the record", pass.Withdrawn.Told)
 		}
 		after, _ := f.answeredIssues(t, proposed.DecisionID)
@@ -479,6 +480,14 @@ func TestACorrectionBySourcePathsIsRefusedWhatItCannotSay(t *testing.T) {
 				errors.Is(err, triage.ErrNothingMatchedThrough) {
 				t.Errorf("%s gave %v, want refused for what it says", name, err)
 			}
+		}
+		// A line break would split one stated path into two once the paths are
+		// joined a line each, past every check made of the one.
+		broken := f.perfCorrection()
+		broken.Paths = []string{"tools/perf\n.."}
+		if _, err := f.store.ProposeBySource(t.Context(), f.triager, broken); err == nil ||
+			!strings.Contains(err.Error(), "control character") {
+			t.Errorf("a path holding a line break gave %v, want refused for it", err)
 		}
 		if _, err := f.store.ProposeBySource(t.Context(), f.onlooker, func() triage.SourceProposal {
 			p := f.perfCorrection()

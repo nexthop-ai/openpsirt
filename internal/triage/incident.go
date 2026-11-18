@@ -243,6 +243,22 @@ func (s *Store) RecordIncident(ctx context.Context, subject access.Subject,
 			vulnerabilityID, now); err != nil {
 			return err
 		}
+		// A correction by source paths loses its answers about this issue
+		// alone; it is one argument per issue, and the rest still hold.
+		lapsed, err := within.withdrawForIncident(ctx, productID, vulnerabilityID, now)
+		if err != nil {
+			return err
+		}
+		if len(lapsed) > 0 {
+			told, err := within.proposersOfAll(ctx, lapsed, database.InBulk.Most)
+			if err != nil {
+				return err
+			}
+			for i := range told {
+				told[i].SourceWithdrawn = WithdrawnByIncident
+			}
+			undone.Lapsed = told
+		}
 		return finding.IncidentChanged(ctx, tx, productID, vulnerabilityID, true, now)
 	})
 	if err != nil {

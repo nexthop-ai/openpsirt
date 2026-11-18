@@ -261,15 +261,16 @@ type DecisionOccurrenceDetail struct {
 	Occurrence         OccurrenceBody         `json:"occurrence"`
 	// Finding is the decision's subject, where an open finding still sits at
 	// its occurrence. Absent where none does.
-	Finding        *FindingRefBody `json:"finding,omitempty" doc:"The decision's subject — build, issue, component, where it sits — read from the open finding at its occurrence. Absent where none is open there"`
-	Reasoning      string          `json:"reasoning" doc:"The justification as it currently stands, in markdown. Empty where you may read only some of the occurrences the decision covers"`
-	ProposedBy     string          `json:"proposed_by" doc:"The person who made the decision, by sign-in identity"`
-	ProposedByName string          `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
-	ProposedAt     string          `json:"proposed_at" doc:"The moment the decision was made"`
-	AgeDays        int             `json:"age_days" doc:"The age of the decision. An old decision should look like one"`
-	AnsweredOn     []string        `json:"answered_on,omitempty" doc:"The files the issue's CVE record listed when a correction by source paths answered this occurrence, every one outside the paths the package is built from. Absent for any other decision"`
-	Recanted       bool            `json:"recanted,omitempty" doc:"Whether a later CVE record withdrew this answer of a correction by source paths, by listing a file under the paths or no files at all. The row has lapsed and the finding is open for a person"`
-	RecantedOn     []string        `json:"recanted_on,omitempty" doc:"The files the CVE record listed when it withdrew the answer. Absent where it listed none"`
+	Finding        *FindingRefBody  `json:"finding,omitempty" doc:"The decision's subject — build, issue, component, where it sits — read from the open finding at its occurrence. Absent where none is open there"`
+	Reasoning      string           `json:"reasoning" doc:"The justification as it currently stands, in markdown. Empty where you may read only some of the occurrences the decision covers"`
+	ProposedBy     string           `json:"proposed_by" doc:"The person who made the decision, by sign-in identity"`
+	ProposedByName string           `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
+	ProposedAt     string           `json:"proposed_at" doc:"The moment the decision was made"`
+	AgeDays        int              `json:"age_days" doc:"The age of the decision. An old decision should look like one"`
+	AnsweredOn     []string         `json:"answered_on,omitempty" doc:"The files the issue's CVE record listed when a correction by source paths answered this occurrence, every one outside the paths the package is built from. Absent for any other decision"`
+	Recanted       bool             `json:"recanted,omitempty" doc:"Whether this answer of a correction by source paths was withdrawn. The row has lapsed and the finding is open for a person"`
+	RecantedBy     SourceWithdrawal `json:"recanted_by,omitempty" doc:"What withdrew the answer: a later CVE record listing a file under the paths or no files, a scan matching the issue other than through the source package, or an incident recorded through the issue"`
+	RecantedOn     []string         `json:"recanted_on,omitempty" doc:"The files the CVE record listed when it withdrew the answer. Absent where it listed none"`
 }
 
 // DecisionArgument renders what a decision says, with the reasoning it
@@ -390,6 +391,7 @@ func DescribeDecisionOccurrences(ctx context.Context, db bun.IDB, store *triage.
 			AnsweredOn:     answers[occurrence.ID].AnsweredOn,
 			Recanted:       answers[occurrence.ID].Withdrawn,
 			RecantedOn:     answers[occurrence.ID].WithdrawnOn,
+			RecantedBy:     SourceWithdrawal(answers[occurrence.ID].Because),
 		})
 	}
 	return details, nil

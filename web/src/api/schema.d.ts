@@ -10205,7 +10205,7 @@ export interface components {
             justification: "component_not_present" | "vulnerable_code_not_present";
             /** @description The package answered, by the name it is identified by, such as linux-perf */
             package: string;
-            /** @description The paths within the source the package is built from, such as tools/perf. A file under any of them is one the package may hold */
+            /** @description The paths within the source the package is built from, such as tools/perf, each at most 1,024 bytes. A file under any of them is one the package may hold */
             paths: string[] | null;
             /** @description The reasoning, in markdown, holding for every issue it answers */
             reasoning: string;
@@ -10681,8 +10681,13 @@ export interface components {
             proposed_by_name?: string;
             /** @description The justification as it currently stands, in markdown. Empty where you may read only some of the occurrences the decision covers */
             reasoning: string;
-            /** @description Whether a later CVE record withdrew this answer of a correction by source paths, by listing a file under the paths or no files at all. The row has lapsed and the finding is open for a person */
+            /** @description Whether this answer of a correction by source paths was withdrawn. The row has lapsed and the finding is open for a person */
             recanted?: boolean;
+            /**
+             * @description What withdrew the answer: a later CVE record listing a file under the paths or no files, a scan matching the issue other than through the source package, or an incident recorded through the issue
+             * @enum {string}
+             */
+            recanted_by?: "record" | "match" | "incident";
             /** @description The files the CVE record listed when it withdrew the answer. Absent where it listed none */
             recanted_on?: string[] | null;
         };
@@ -16347,8 +16352,11 @@ export interface components {
              * @description The number of its occurrences that lapsed, counting one occurrence at two versions twice
              */
             rows: number;
-            /** @description Whether a later CVE record withdrew an answer of a correction by source paths, by listing a file under the paths or no files at all */
-            source_files: boolean;
+            /**
+             * @description What withdrew an answer of a correction by source paths among the rows: the issue's record listing a file under the paths or no files, a scan matching the issue other than through the source package, or an incident recorded through the issue
+             * @enum {string}
+             */
+            source_withdrawn?: "record" | "match" | "incident";
             /** @description How bad that issue was judged to be when the decision was made, or the representative issue where none was rated worse. Absent where it was unrated */
             was?: string;
         };
@@ -16858,6 +16866,8 @@ export interface components {
              * @description The number of occurrences it covers, counted once for each issue
              */
             rows: number;
+            /** @description What a correction by source paths names. Absent for any other decision */
+            source?: components["schemas"]["SourceRuleBody"];
         };
         WasSaidBody: {
             /** @description Its text, in markdown */

@@ -60,6 +60,7 @@ issues in drivers a given image never builds.
 | Limited to 200 issues by default, with a ceiling of 50,000 occurrences, both counted over what names resolve to (REQ-27) | A reviewer reads issues; the ceiling guards the write |
 | Re-affirming answers takes 2,000 issues by default only where nothing in the act goes back to an approver; new answers and answers carried to another line take the reviewer's limit | The limit follows what a reviewer reads |
 | A promise to upgrade has no limit (`design-docs/triage-promises.md` § Promised work) | The next scan re-checks it, and a capped promise records a false bump |
+| A correction by source paths has no limit (`design-docs/triage-source-paths.md` § Agreement and ending) | The reviewer reads one rule, and each scan re-checks every answer it holds |
 | Other acts take 2,000 rows by default: reports one ruling covers, occurrences one answer about one issue covers, rows a screen acts on one request at a time | They bound a loop, not a review |
 
 The candidate list carries the issues and findings the narrowing holds and both

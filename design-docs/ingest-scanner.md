@@ -150,7 +150,7 @@ source paths (`design-docs/triage-source-paths.md`).
 |---|---|
 | The record read is the first held of the issue's own identifier and its aliases | As the record's ranges are read |
 | The files are every entry's, deduplicated, in byte order, each relative to the source's root | A file any entry names is one the issue may be in |
-| A list past 1,000 files, a path past 1,024 bytes, or a path leaving the root reads as listing none | A list read in part would answer a correction on the files it kept; at most 36 files and 179 bytes on 2026-11-18 |
+| A list past 1,000 files, a path past 1,024 bytes, a list past 16 KiB joined a path a line, or a path leaving the root or holding a control character reads as listing none | A list read in part would answer a correction on the files it kept; the list is stored whole in one value, which MySQL and MariaDB refuse past their packet size; at most 36 files, 179 bytes and 6.4 KB joined on 2026-11-18 |
 | A scan that read a snapshot replaces what the issue holds, emptying it where the record lists none | The record is the authority on its own list |
 | A scan with no snapshot leaves every issue's files | It knows nothing about any record |
 | Two names of one issue in one report join their files | |

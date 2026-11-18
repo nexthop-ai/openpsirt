@@ -86,6 +86,7 @@ A decision gives way to a fact, never the reverse.
 | Agreeing to such a decision is refused | Approval writes no decision row the write path checks |
 | Refused where a decision is written, so a finding decision, bulk act, re-affirmation, extension and carried decision all meet it | |
 | At one finding, only a decision that the issue does not apply is refused | Identity, deferrals and promises are not contradicted by an attack |
+| A correction by source paths loses its answers about the issue alone, agreed or waiting; its author is told (`design-docs/triage-source-paths.md` § Withdrawn answers) | It is one argument per issue, and the rest still hold |
 | Clearing the record restores nothing | |
 | No act over many issues reaches a standing record, and clearing is one record at a time | |
 | The bulk candidate list marks an attacked issue | A selection reaching one is refused whole |

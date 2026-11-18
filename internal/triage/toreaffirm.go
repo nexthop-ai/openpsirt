@@ -33,9 +33,9 @@ type ToReaffirm struct {
 	// on a decision a severity bears on. Both can hold.
 	CodeMoved  bool
 	RatedWorse bool
-	// SourceFiles says a later CVE record withdrew an answer of a correction by
-	// source paths, recorded when it did.
-	SourceFiles bool
+	// SourceWithdrawn is what withdrew an answer of a correction by source
+	// paths among the rows, empty where nothing did.
+	SourceWithdrawn SourceWithdrawal
 	// Was and Now are how bad the issue was judged to be when the decision was
 	// made and how bad it is judged to be here now: for the first row rated
 	// worse where one was, and for the representative row otherwise.
@@ -149,8 +149,8 @@ func (s *Store) ToReaffirm(ctx context.Context, subject access.Subject, productI
 		if moved[row.ID] {
 			entry.CodeMoved = true
 		}
-		if recanted[row.ID].Withdrawn {
-			entry.SourceFiles = true
+		if answer := recanted[row.ID]; answer.Withdrawn && entry.SourceWithdrawn == "" {
+			entry.SourceWithdrawn = answer.Because
 		}
 		key := [2]int64{row.ProductID, row.VulnerabilityID}
 		if !entry.RatedWorse && turnsOnSeverity(entry.Decision) &&
@@ -214,6 +214,11 @@ func (s *Store) lapsedOfYours(subject access.Subject) *bun.SelectQuery {
 		Where(`"de"."state" = ?`, LapsedState)).
 		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dw" WHERE "dw"."decision_id" = "de"."decision_id"`+
 			` AND "dw"."state" = ?)`, Withdrawn).
+		// A correction by source paths withdrawn whole ends its answers a
+		// record withdrew first, which kept their lapse rather than turning
+		// withdrawn.
+		Where(`NOT EXISTS (SELECT 1 FROM "source_correction" AS "sw" WHERE "sw"."decision_id" = "de"."decision_id"`+
+			` AND "sw"."withdrawn_at" IS NOT NULL)`).
 		Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "dn" WHERE "dn"."decision_id" = "de"."decision_id"`+
 			` AND "dn"."state" = ? AND `+outOfReach+`)`,
 			append([]any{LapsedState}, reachArgs...)...)

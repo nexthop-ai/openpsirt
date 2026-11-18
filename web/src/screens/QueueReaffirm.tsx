@@ -30,11 +30,13 @@ export function reaffirmedNotice(made: Reaffirmed): string {
 
 // Why a decision lapsed, in the words a reader acts on. More than one can hold.
 export function whyLapsed(
-  row: Pick<Row, "code_moved" | "rated_worse" | "source_files" | "was" | "now">,
+  row: Pick<Row, "code_moved" | "rated_worse" | "source_withdrawn" | "was" | "now">,
 ): string[] {
   const why: string[] = [];
   if (row.code_moved) why.push("Code moved");
-  if (row.source_files) why.push("Record no longer bears out the paths");
+  if (row.source_withdrawn === "record") why.push("Record no longer bears out the paths");
+  if (row.source_withdrawn === "match") why.push("Matched other than through the source");
+  if (row.source_withdrawn === "incident") why.push("Incident recorded");
   if (row.rated_worse) {
     why.push(row.now ? `Rated worse: ${row.was || "unrated"} → ${row.now}` : "Rated worse");
   }

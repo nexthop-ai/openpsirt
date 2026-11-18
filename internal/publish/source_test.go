@@ -123,3 +123,51 @@ func statementAbout(doc *vex.Statements, issue string) *vex.Statement {
 	}
 	return nil
 }
+
+// A finding a standing won't-fix covers stays affected when a correction by
+// source paths is proposed and agreed: the won't-fix holds the occurrence at
+// its versions, and the correction answers only what nothing holds.
+func TestAStandingWontFixIsNotPublishedAsAWrongMatch(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.ship(w.Build, sonicRoot, edge{sonicRoot, linuxPerf})
+		w.Report(w.Build, finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2024-26600", Severity: "high", Description: "A driver flaw."},
+			Component: linuxPerf, MatchedThrough: "linux",
+			RecordRead: true, RecordFiles: []string{"drivers/phy/ti/phy-omap-usb2.c"},
+		}, finding.Reported{
+			Issue:     finding.Named{Identifier: "CVE-2023-52603", Severity: "high", Description: "A file system flaw."},
+			Component: linuxPerf, MatchedThrough: "linux",
+			RecordRead: true, RecordFiles: []string{"fs/jfs/jfs_dtree.c"},
+		})
+		w.decide(w.Build, "CVE-2024-26600", linuxPerf, decision{outcome: triage.WontFix})
+		proposed, err := w.decisions.ProposeBySource(t.Context(), w.proposer, triage.SourceProposal{
+			ProductID: w.Product.ID, Package: "linux-perf", Source: "linux",
+			Paths: []string{"tools/perf"}, Justification: triage.CodeNotPresent,
+			Reasoning: "linux-perf is built from tools/ alone.", By: w.proposer.ID,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if proposed.Answered != 1 {
+			t.Errorf("the correction answered %d occurrences, want the one nothing holds", proposed.Answered)
+		}
+		if _, err := w.decisions.ApproveDecision(t.Context(), w.approver, proposed.DecisionID, "", nil, ""); err != nil {
+			t.Fatal(err)
+		}
+		w.publishes(w.Product, true)
+		w.write()
+		held := w.csafAbout(w.Product, "CVE-2024-26600")
+		if held == nil || len(held.Vulnerabilities[0].Status.KnownAffected) != 1 ||
+			len(held.Vulnerabilities[0].Status.KnownNotAffected) != 0 {
+			t.Errorf("the issue a won't-fix holds publishes %+v, want affected", held)
+		}
+		statements := w.openVEXAbout(w.Product, w.Branch.Name)
+		if said := statementAbout(statements, "CVE-2024-26600"); said == nil || said.Status != vex.Affected {
+			t.Errorf("OpenVEX says %+v of the issue a won't-fix holds, want affected", said)
+		}
+		if said := statementAbout(statements, "CVE-2023-52603"); said == nil || said.Status != vex.NotAffected {
+			t.Errorf("OpenVEX says %+v of the issue the correction answers, want not affected", said)
+		}
+	})
+}

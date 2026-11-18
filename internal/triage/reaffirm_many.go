@@ -380,10 +380,19 @@ func (s *Store) planReaffirm(ctx context.Context, subject access.Subject,
 	if err != nil {
 		return reaffirmPlan{}, err
 	}
+	ids := make([]int64, 0, len(lapsed))
+	for _, row := range lapsed {
+		ids = append(ids, row.ID)
+	}
+	answers, err := s.SourceAnswers(ctx, ids)
+	if err != nil {
+		return reaffirmPlan{}, err
+	}
 	full := false
 	for _, row := range lapsed {
 		key := [2]int64{row.ProductID, row.VulnerabilityID}
-		if needsFullApproval(row, *previous, severity[key], carryable != nil) {
+		if needsFullApproval(row, *previous, severity[key], carryable != nil) ||
+			answers[row.ID].Withdrawn {
 			full = true
 		}
 	}

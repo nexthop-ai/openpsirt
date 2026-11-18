@@ -66,18 +66,24 @@ func TestEveryEntrysFilesAreJoinedInOneSpelling(t *testing.T) {
 }
 
 func TestAListLeavingTheTreeOrPastABoundListsNothing(t *testing.T) {
-	cverecord.LowerBounds(t, cverecord.Bounds{Files: 2, FileLength: 20})
+	cverecord.LowerBounds(t, cverecord.Bounds{Files: 3, FileLength: 20, FileBytes: 16})
 	snapshot := built(t, listArchive(t, map[string][]byte{
 		"CVE-2026-10.json": published("CVE-2026-10", "PUBLISHED", "2026-11-18T00:00:00Z",
-			filesEntry("tools/perf/../../../drivers/x.c")),
+			filesEntry("drivers/y.c", "tools/perf/../../../drivers/x.c")),
 		"CVE-2026-11.json": published("CVE-2026-11", "PUBLISHED", "2026-11-18T00:00:00Z",
-			filesEntry("a.c", "b.c", "c.c")),
+			filesEntry("a.c", "b.c", "c.c", "d.c")),
 		"CVE-2026-12.json": published("CVE-2026-12", "PUBLISHED", "2026-11-18T00:00:00Z",
 			filesEntry("drivers/a-very-long-name.c")),
 		"CVE-2026-13.json": published("CVE-2026-13", "PUBLISHED", "2026-11-18T00:00:00Z",
 			filesEntry("a.c", "b.c")),
+		// Three files of seven bytes, within the count and each within the
+		// length, joined past sixteen bytes.
+		"CVE-2026-14.json": published("CVE-2026-14", "PUBLISHED", "2026-11-18T00:00:00Z",
+			filesEntry("one/a.c", "two/b.c", "six/c.c")),
+		"CVE-2026-15.json": published("CVE-2026-15", "PUBLISHED", "2026-11-18T00:00:00Z",
+			filesEntry("a.c", "b\nc.c")),
 	}))
-	for _, id := range []string{"CVE-2026-10", "CVE-2026-11", "CVE-2026-12"} {
+	for _, id := range []string{"CVE-2026-10", "CVE-2026-11", "CVE-2026-12", "CVE-2026-14", "CVE-2026-15"} {
 		if listed := snapshot.Files([]string{id}); len(listed.Files) != 0 {
 			t.Errorf("%s lists %v, want nothing", id, listed.Files)
 		}

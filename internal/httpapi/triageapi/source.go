@@ -59,7 +59,7 @@ func registerSourceCorrection(api huma.API, in core.Deps) {
 		Body    struct {
 			Package       string                `json:"package" minLength:"1" maxLength:"191" doc:"The package answered, by the name it is identified by, such as linux-perf"`
 			Source        string                `json:"source" minLength:"1" maxLength:"191" doc:"The source package it is matched through, such as linux"`
-			Paths         []string              `json:"paths" minItems:"1" maxItems:"64" doc:"The paths within the source the package is built from, such as tools/perf. A file under any of them is one the package may hold"`
+			Paths         []string              `json:"paths" minItems:"1" maxItems:"64" doc:"The paths within the source the package is built from, such as tools/perf, each at most 1,024 bytes. A file under any of them is one the package may hold"`
 			Justification core.CorrectionReason `json:"justification" doc:"Why the issues are not there"`
 			Reasoning     string                `json:"reasoning" minLength:"1" doc:"The reasoning, in markdown, holding for every issue it answers"`
 		}

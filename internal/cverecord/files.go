@@ -19,6 +19,10 @@ var (
 	// longestFile is far above the 179 bytes of the longest path named on
 	// 2026-11-18.
 	longestFile = 1_024
+	// mostFileBytes bounds the list joined, one path a line, far above the
+	// 6.4 KB of the longest joined list on 2026-11-18. A list is stored whole
+	// in one value, which one engine refuses past its packet size.
+	mostFileBytes = 16 << 10
 )
 
 // Listed is the files the record for an issue says the issue is in.
@@ -59,6 +63,7 @@ func (s *Snapshot) Files(identifiers []string) Listed {
 	}
 	seen := map[string]bool{}
 	var files []string
+	joined := 0
 	for _, entry := range record.Affected {
 		for _, stated := range entry.ProgramFiles {
 			file, ok := SourcePath(stated)
@@ -70,7 +75,8 @@ func (s *Snapshot) Files(identifiers []string) Listed {
 			}
 			seen[file] = true
 			files = append(files, file)
-			if len(files) > mostFiles {
+			joined += len(file) + 1
+			if len(files) > mostFiles || joined-1 > mostFileBytes {
 				return listed
 			}
 		}
@@ -82,9 +88,13 @@ func (s *Snapshot) Files(identifiers []string) Listed {
 
 // SourcePath is a path within a source tree in the one spelling it is compared
 // in: relative to the tree's root, with no "." segment, repeated slash or
-// trailing slash. The second result is false for a path that leaves the root.
+// trailing slash. The second result is false for a path that leaves the root
+// or holds a control character, which a list joined a path a line would split.
 // Empty is the root itself.
 func SourcePath(stated string) (string, bool) {
+	if strings.ContainsFunc(stated, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
+		return "", false
+	}
 	trimmed := strings.Trim(strings.TrimSpace(stated), "/")
 	if trimmed == "" {
 		return "", true

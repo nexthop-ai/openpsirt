@@ -187,7 +187,7 @@ func TestACorrectionBySourcePathsIsProposedAndReadBack(t *testing.T) {
 		reader := httpapitest.AsPerson(t, r, "reader", http.MethodPost, "/v1/products/mine/source-corrections",
 			`{"package":"linux-perf","source":"linux","paths":["tools/perf"],`+
 				`"justification":"vulnerable_code_not_present","reasoning":"Built from tools/."}`)
-		if reader.Code != http.StatusForbidden && reader.Code != http.StatusNotFound {
+		if reader.Code != http.StatusForbidden {
 			t.Errorf("a reader proposing answered %d: %s", reader.Code, reader.Body.String())
 		}
 	})

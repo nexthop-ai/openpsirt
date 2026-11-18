@@ -3867,7 +3867,7 @@ components:
           minLength: 1
           type: string
         paths:
-          description: The paths within the source the package is built from, such as tools/perf. A file under any of them is one the package may hold
+          description: The paths within the source the package is built from, such as tools/perf, each at most 1,024 bytes. A file under any of them is one the package may hold
           items:
             type: string
           maxItems: 64
@@ -4640,8 +4640,15 @@ components:
           description: The justification as it currently stands, in markdown. Empty where you may read only some of the occurrences the decision covers
           type: string
         recanted:
-          description: Whether a later CVE record withdrew this answer of a correction by source paths, by listing a file under the paths or no files at all. The row has lapsed and the finding is open for a person
+          description: Whether this answer of a correction by source paths was withdrawn. The row has lapsed and the finding is open for a person
           type: boolean
+        recanted_by:
+          description: "What withdrew the answer: a later CVE record listing a file under the paths or no files, a scan matching the issue other than through the source package, or an incident recorded through the issue"
+          enum:
+            - record
+            - match
+            - incident
+          type: string
         recanted_on:
           description: The files the CVE record listed when it withdrew the answer. Absent where it listed none
           items:
@@ -14682,9 +14689,13 @@ components:
           description: The number of its occurrences that lapsed, counting one occurrence at two versions twice
           format: int64
           type: integer
-        source_files:
-          description: Whether a later CVE record withdrew an answer of a correction by source paths, by listing a file under the paths or no files at all
-          type: boolean
+        source_withdrawn:
+          description: "What withdrew an answer of a correction by source paths among the rows: the issue's record listing a file under the paths or no files, a scan matching the issue other than through the source package, or an incident recorded through the issue"
+          enum:
+            - record
+            - match
+            - incident
+          type: string
         was:
           description: How bad that issue was judged to be when the decision was made, or the representative issue where none was rated worse. Absent where it was unrated
           type: string
@@ -14697,7 +14708,6 @@ components:
         - issues
         - occurrences
         - code_moved
-        - source_files
         - rated_worse
       type: object
     ToReaffirmOutputBody:
@@ -15594,6 +15604,9 @@ components:
           description: The number of occurrences it covers, counted once for each issue
           format: int64
           type: integer
+        source:
+          $ref: "#/components/schemas/SourceRuleBody"
+          description: What a correction by source paths names. Absent for any other decision
       required:
         - decision
         - decision_occurrence

@@ -54,11 +54,16 @@ func TestAMatchOnTheBinaryItselfIsThroughNoSource(t *testing.T) {
 	for name, details := range map[string]string{
 		"its own name": throughLinux + `, {"type": "exact-direct-match",
 			"searchedBy": {"package": {"name": "linux-perf"}}}`,
-		"a CPE":            throughLinux + `, {"type": "cpe-match", "searchedBy": {"cpes": ["cpe:2.3:a:linux:perf"]}}`,
-		"two sources":      throughLinux + `, {"type": "exact-indirect-match", "searchedBy": {"package": {"name": "linux-signed"}}}`,
-		"no source named":  `{"type": "exact-indirect-match", "searchedBy": {}}`,
-		"the binary named": `{"type": "exact-indirect-match", "searchedBy": {"package": {"name": "LINUX-PERF"}}}`,
-		"no detail":        ``,
+		"a CPE":           throughLinux + `, {"type": "cpe-match", "searchedBy": {"cpes": ["cpe:2.3:a:linux:perf"]}}`,
+		"two sources":     throughLinux + `, {"type": "exact-indirect-match", "searchedBy": {"package": {"name": "linux-signed"}}}`,
+		"no source named": `{"type": "exact-indirect-match", "searchedBy": {}}`,
+		// Each beside a match through linux, so the one arm it names is all
+		// that turns it away.
+		"a direct match on the source": throughLinux + `, {"type": "exact-direct-match",
+			"searchedBy": {"package": {"name": "linux"}}}`,
+		"a detail naming nothing first": `{"type": "exact-indirect-match", "searchedBy": {}}, ` + throughLinux,
+		"the binary named":              `{"type": "exact-indirect-match", "searchedBy": {"package": {"name": "LINUX-PERF"}}}`,
+		"no detail":                     ``,
 	} {
 		if got := throughOf(t, perfMatch(details)); got != "" {
 			t.Errorf("a match on %s reads as through %q, want through none", name, got)

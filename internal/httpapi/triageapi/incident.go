@@ -97,6 +97,10 @@ func registerIncident(api huma.API, in core.Deps) {
 		}
 		tellTheProposers(ctx, in, undone, undoneByExploitation,
 			"issue", input.Vulnerability)
+		for _, one := range undone.Lapsed {
+			core.Tell(ctx, in, "could not say that a decision lapsed", notify.Lapse(one),
+				"person", one.PersonID, "issue", input.Vulnerability)
+		}
 
 		// Recorded, and the proposers told. A failure naming who recorded it
 		// answers with the name left blank: answered as a fault, the caller

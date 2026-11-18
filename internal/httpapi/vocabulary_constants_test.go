@@ -73,6 +73,7 @@ func TestEveryVocabularyListsEveryConstantOfItsType(t *testing.T) {
 		listed(triage.QueueReasons()),
 		listed(triage.DecisionKinds()),
 		listed(triage.CodeFindingReasons()),
+		listed(triage.SourceWithdrawals()),
 		listed(analysis.States(), "notFixed"),
 		listed(analysis.Sources()),
 		listed(analysis.RuleStates()),
