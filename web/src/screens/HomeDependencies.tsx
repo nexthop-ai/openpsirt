@@ -15,6 +15,7 @@ import {
   PaceLegend,
   Releases,
   Ring,
+  Uploads,
   StepSwitch,
   type TrendStep,
   stepQuery,
@@ -94,6 +95,16 @@ export function DependencyFigures({
     queryFn: async () =>
       unwrap(await api.GET("/v1/trend/releases", { params: { query: { limit: 12, ...scope } } })),
   });
+  // One build's uploads at the build time each states. Asked for where a
+  // whole build is picked, and drawn where it has two uploads to compare.
+  const whole = !!at.product && !!at.branch_or_tag && !!at.variant;
+  const uploads = useQuery({
+    queryKey: ["home", "upload-trend", scope],
+    enabled: figures && whole,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/trend/uploads", { params: { query: { limit: 12, ...scope } } })),
+  });
+  const uploadPoints = uploads.data?.items ?? [];
   // Two releases is the fewest that is a shape. One bar reads as broken
   // rather than as sparse, so the calendar stays until there are two.
   const byRelease = (releases.data?.items ?? []).length >= 2;
@@ -329,6 +340,30 @@ export function DependencyFigures({
             )}
           </Reading>
         </div>
+
+        {whole && (uploads.isError || uploadPoints.length >= 2) && (
+          <div className="panel wide">
+            <header>
+              <h3>Open issues in each upload</h3>
+              <span className="eyebrow" style={{ marginLeft: "auto" }}>
+                by build time · {counting}
+              </span>
+            </header>
+            {uploads.isError ? (
+              <Failed error={uploads.error} what="The uploads could not be read." />
+            ) : (
+              <>
+                <Uploads points={uploadPoints} />
+                <p
+                  className="hint"
+                  title="A replaced upload is counted as of its last scan, not against today's data."
+                >
+                  Older uploads as of their last scan.
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="panel">
           <header>

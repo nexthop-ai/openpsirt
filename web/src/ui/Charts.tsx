@@ -367,6 +367,70 @@ export function Mix({ points }: { points: Point[] }) {
   );
 }
 
+// One build's uploads, each at the build time its inventory states, stacked by
+// severity. The axis is time, so two images months apart sit months apart, and
+// a replaced upload is drawn as of its last scan.
+export function Uploads({
+  points,
+}: {
+  points: {
+    built_at?: string;
+    as_of?: string;
+    current?: boolean;
+    by_severity?: Record<string, number>;
+  }[];
+}) {
+  const data = points.map((p) => ({
+    at: Date.parse(p.built_at ?? ""),
+    asOf: (p.as_of ?? "").slice(0, 10),
+    current: !!p.current,
+    ...folded(p.by_severity ?? {}),
+  }));
+  if (data.length === 0) return null;
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+        <CartesianGrid strokeOpacity={0.14} vertical={false} />
+        <XAxis
+          dataKey="at"
+          type="number"
+          scale="time"
+          domain={["dataMin", "dataMax"]}
+          ticks={data.map((d) => d.at)}
+          tickFormatter={(at: number) => new Date(at).toISOString().slice(0, 10)}
+          tick={axis}
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis tick={axis} tickLine={false} axisLine={false} width={46} tickFormatter={brief} />
+        <Tooltip
+          contentStyle={tip}
+          labelFormatter={(at, rows) => {
+            const row = rows?.[0]?.payload as { asOf?: string; current?: boolean } | undefined;
+            const built = `Built ${new Date(Number(at)).toISOString().slice(0, 10)}`;
+            return row?.current
+              ? `${built} · open now`
+              : `${built} · as of its last scan, ${row?.asOf ?? ""}`;
+          }}
+        />
+        {BANDS.map((band) => (
+          <Area
+            key={band.key}
+            type="linear"
+            dataKey={band.key}
+            stackId="1"
+            stroke={band.color}
+            fill={band.color}
+            fillOpacity={0.5}
+            dot={{ r: 3 }}
+            isAnimationActive={false}
+          />
+        ))}
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}
+
 // One part of a stacked chart: the key each row counts it under, the words
 // its tooltip names it by, and the token it is drawn in.
 export type StackPart = { key: string; label: string; color: string };

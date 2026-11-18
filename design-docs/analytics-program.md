@@ -8,6 +8,7 @@ Satisfies REQ-33, REQ-35, REQ-53, REQ-54, REQ-82.
 ## Contents
 
 - [Trends](#trends)
+- [Uploads of one build](#uploads-of-one-build)
 - [Subtree trends](#subtree-trends)
 - [Burndown](#burndown)
 - [Deadlines](#deadlines)
@@ -34,6 +35,7 @@ it. A component is its identifying name, at any version.
 |---|---|---|
 | A branch | Calendar time, in daily or weekly steps | Scanned nightly (REQ-54); a team fixing dozens a day sees it by the day |
 | Tagged releases | Release over release, oldest first, as bars | Frozen points; a line between them draws a path nothing traveled |
+| One build's uploads | The build time each inventory states (§ Uploads of one build) | Two inventories sent close together show no change on a trend dated by scans (REQ-54) |
 
 ### Counts by identity
 
@@ -89,6 +91,26 @@ build's first scan is a baseline rather than new work.
 | A release with nothing open is still a point | Counts attach to the list of every scanned build; absent says never scanned |
 | Release over release counts each issue at a component open against the release, a component by its identifying name | The unit of the calendar trend and of Home's open figure beside it |
 | A corrected issue counts at the severity it held while open, at the end of the step before | |
+
+## Uploads of one build
+
+One point per upload of one build, at the build time its inventory states, with
+what was open while it was current, split by severity (REQ-54). An old image
+uploaded beside today's shows the drop between them, which the calendar trend
+puts inside one step.
+
+| Rule | Reason |
+|---|---|
+| A product, a branch or tag, and a variant naming one build the reader may read; anything else refuses | The uploads are one build's |
+| The uploads are those applied to the build's graph, the newest 1 to 50 by the order they applied, twelve unless named, drawn oldest first | A chart's points (`design-docs/api-lists.md` § Paging) |
+| An inventory is current from its arrival until the next applied one arrives | The replaced-inventory check reads currency the same way (`design-docs/findings-closure.md` § Replaced inventories) |
+| A replaced inventory is counted at the start of the last successful scan of the build, other than a check, that started while it was current | What was known of it then; dating it today would cost a scan each (REQ-54) |
+| The inventory the build holds is counted now | |
+| An inventory no scan reached before it was replaced is no point | Nothing ever judged it |
+| An issue at a component is open at a moment when one of its findings opened at or before it and closed after it, or not at all, as on the calendar trend | A point and a step ending at the same moment agree |
+| The unit, the severity split, the never-present closures and the narrowings to a component, a package identifier prefix or a subtree are the calendar trend's | One definition of open on one screen |
+| The findings are read once, from the earliest point's moment through now | Cost follows the oldest upload plotted |
+| Home draws it beside the calendar trend where a whole build is picked and it holds two points; each point says its build date and the moment it was counted | One upload is no comparison |
 
 ## Subtree trends
 
@@ -340,6 +362,8 @@ deferral counts for the part that ran, and overlapping stretches count once.
 | Limit | Detail |
 |---|---|
 | An issue rated differently in two products counts once, in the strictest band | Trends, aging buckets and fixes agree on one screen |
+| A replaced upload is counted as of its last scan, never against today's vulnerability data | An issue published after it was replaced never counts against it, so an old upload can read cleaner than it was; a tag is rescanned daily and is the way to compare releases against today's data |
+| An upload's point moves when a later scan of the same inventory runs, and an upload replaced the moment it arrived is absent | Each is what was known of it; nothing is stored |
 | A component a rescan removed, with no component of its name left in the build, sits beneath nothing | Its closures leave the trend of the component it sat beneath; there is no present version to count them at, as for code findings |
 | A finding two dismissals answer at once counts twice toward its moment on the burndown | The moment's answered findings are summed over dismissals; one live decision per key keeps it rare |
 | A dismissal needing nobody that was sent back is read as never in force, and one sent back after an agreement keeps the agreement's span | The record keeps whether it is sent back, not when |

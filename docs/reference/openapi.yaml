@@ -8548,6 +8548,28 @@ components:
       required:
         - items
       type: object
+    ListBodyUploadPointBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyUploadPointBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/UploadPointBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
     ListBodyUpstreamSaidBody:
       additionalProperties: false
       properties:
@@ -14972,6 +14994,42 @@ components:
       required:
         - received_at
         - status
+      type: object
+    UploadPointBody:
+      additionalProperties: false
+      properties:
+        as_of:
+          description: "The moment counted: the start of the last scan of the build while this inventory was current, or now for the inventory the build holds"
+          format: date-time
+          type: string
+        built_at:
+          description: The build time the inventory states, which places the point
+          format: date-time
+          type: string
+        by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: Open, split by severity
+          type: object
+        current:
+          description: Whether the build holds this inventory now. A replaced one is counted as of its last scan, never against today's vulnerability data
+          type: boolean
+        open:
+          description: Issues at components open at that moment
+          format: int64
+          type: integer
+        scan_id:
+          description: The scan this upload became, as its receipt names it
+          format: int64
+          type: integer
+      required:
+        - scan_id
+        - built_at
+        - as_of
+        - current
+        - open
+        - by_severity
       type: object
     UploadResult:
       additionalProperties: false
@@ -37721,6 +37779,121 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: Show what each release shipped with
+      tags:
+        - Analytics
+      x-openpsirt-requires:
+        scope: person
+        note: Answers only what you may see.
+  /v1/trend/uploads:
+    get:
+      description: |-
+        One point per upload of one build, oldest first, placed at the build time its inventory states, with the issues at components open while it was current, split by severity.
+
+        The inventory the build holds is counted now. A replaced one is counted as of the last scan of the build that started while it was current, never against today's vulnerability data; `as_of` says which moment. An upload no scan reached before it was replaced is no point.
+
+        Counted as the findings trend counts: one issue in three packages is three, and a package at a new version is the same package.
+
+        A product, a branch or tag, and a variant must be named, since the uploads are one build's. `component`, `purl` and `beneath` narrow as on the findings trend.
+
+        Requires: any signed-in person, and not a pipeline key. Answers only what you may see.
+      operationId: get-upload-trend
+      parameters:
+        - description: Limit to one product, by name. Empty means every product you can see
+          explode: false
+          in: query
+          name: product
+          schema:
+            description: Limit to one product, by name. Empty means every product you can see
+            type: string
+        - description: Limit to one branch or tag. Only meaningful with a product
+          explode: false
+          in: query
+          name: branch_or_tag
+          schema:
+            description: Limit to one branch or tag. Only meaningful with a product
+            type: string
+        - description: Limit to one variant. Only meaningful with a product, and independent of the branch
+          explode: false
+          in: query
+          name: variant
+          schema:
+            description: Limit to one variant. Only meaningful with a product, and independent of the branch
+            type: string
+        - description: The number of uploads, most recent kept
+          explode: false
+          in: query
+          name: limit
+          schema:
+            default: 12
+            description: The number of uploads, most recent kept
+            format: int64
+            maximum: 50
+            minimum: 1
+            type: integer
+        - description: Keep only what is open against components of this name, whatever version
+          explode: false
+          in: query
+          name: component
+          schema:
+            description: Keep only what is open against components of this name, whatever version
+            type: string
+        - description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"
+          explode: false
+          in: query
+          name: purl
+          schema:
+            description: "Keep only what is open against components whose package identifier this prefix chooses, whatever version and qualifiers: a package such as pkg:github/sonic-net/sonic-swss, or everything under a path ending in a slash such as pkg:github/sonic-net/. Without the slash it is that package alone. Matched without regard to capitals. A prefix that does not start with pkg: and a type is refused"
+            type: string
+        - description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+          explode: false
+          in: query
+          name: beneath
+          schema:
+            description: Keep only what sits at this component or anywhere under it, which is what the dependency tree's cumulative count counts. A finding on a version a rescan replaced counts where the build's present version of its name sits. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A name the build does not hold answers 404, and one it holds as more than one component answers 409 naming the choices
+            type: string
+        - description: The version, where the build holds that name at several
+          explode: false
+          in: query
+          name: beneath_version
+          schema:
+            description: The version, where the build holds that name at several
+            type: string
+        - description: The ecosystem, for the few names a build holds at one version as two components
+          explode: false
+          in: query
+          name: beneath_ecosystem
+          schema:
+            description: The ecosystem, for the few names a build holds at one version as two components
+            type: string
+        - description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+          explode: false
+          in: query
+          name: beneath_namespace
+          schema:
+            description: The namespace, for the few names a build holds at one version in one ecosystem as two components
+            type: string
+        - description: "Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"
+          explode: false
+          in: query
+          name: beneath_purl
+          schema:
+            description: "Keep only what sits at a component of this package, at any version the build ships it, or anywhere under one: a repository shipped at several commits, such as pkg:github/sonic-net/sonic-swss. A finding under two of them counts once. Not with beneath. A subtree is a walk over one build's edges, so this needs a product, a branch and a variant naming exactly one build. A package the build does not hold answers 404; a path ending in a slash, and a package the build holds as more than 20 components, are refused"
+            maxLength: 512
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListBodyUploadPointBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Plot a build's exposure by build time
       tags:
         - Analytics
       x-openpsirt-requires:
