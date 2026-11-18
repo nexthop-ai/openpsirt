@@ -3985,8 +3985,10 @@ private modules and vendored forks, and they are the candidates to promote into
 <code>OPENPSIRT_UPSTREAM_INTERNAL</code> so they stop being asked about at all.</p>
 <h2 id="issue-publication-dates">Issue publication dates<a class="headerlink" href="#issue-publication-dates" title="Permanent link">&para;</a></h2>
 <p>On unless an administrator turns it off, under Settings. A background pass asks
-OSV, at <code>api.osv.dev</code>, when each issue was published and last modified, and
-stores the two dates. What goes out is the issue's public identifier, one
+OSV, at <code>api.osv.dev</code>, when each issue was published and last modified and
+for its links to the change that fixes it, and stores the two dates, with the
+links as the issue's patch links. With <a href="#patch-branches">Patch branches</a> on,
+those links also decide which repositories are copied. What goes out is the issue's public identifier, one
 request per name asked, and nothing about a build, a component or a product.</p>
 <table>
 <thead>
@@ -4002,11 +4004,15 @@ request per name asked, and nothing about a build, a component or a product.</p>
 </tr>
 <tr>
 <td>Names</td>
-<td>The issue's own identifier first, then its other names, until OSV knows one</td>
+<td>The issue's own identifier first, then its other names, until OSV knows one. A name OSV holds as another record's alias is answered by that record</td>
 </tr>
 <tr>
 <td>Unknown</td>
 <td>An issue OSV holds no record of has no date, and the issue page says so</td>
+</tr>
+<tr>
+<td>Patch links</td>
+<td>A fix reference on the record, and each fixed commit on github.com, gitlab.com or git.kernel.org as a link to its commit page; added beside a report's links and never removed</td>
 </tr>
 <tr>
 <td>Turned off</td>
