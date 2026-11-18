@@ -77,20 +77,23 @@ export function DependencyFigures({
   const navigate = useNavigate();
   const figures = counted(dependencies);
 
-  // Daily by default: a team fixing dozens a day sees it day by day.
-  const [step, setStep] = useState<TrendStep>("day");
-  const trend = useQuery({
-    queryKey: ["home", "trend", scope, step],
-    enabled: figures,
-    queryFn: async () =>
-      unwrap(await api.GET("/v1/trend", { params: { query: { ...stepQuery(step), ...scope } } })),
-  });
-  const points = trend.data?.items ?? [];
   // By build date unless scan date is picked: each build's exposure at the
   // date its inventory states, so two images months apart sit months apart
   // even when both were sent today. Scan date stays a click away for the
   // workload a deadline is measured against.
   const [axis, setAxis] = useState<TrendAxis>("built");
+  // Daily by default: a team fixing dozens a day sees it day by day.
+  const [step, setStep] = useState<TrendStep>("day");
+  // By build date only the latest step is read, for the open figure and the
+  // ring: one day is the least window whose last step is open now.
+  const calendar = axis === "built" ? { days: 1 } : stepQuery(step);
+  const trend = useQuery({
+    queryKey: ["home", "trend", scope, axis === "built" ? "now" : step],
+    enabled: figures,
+    queryFn: async () =>
+      unwrap(await api.GET("/v1/trend", { params: { query: { ...calendar, ...scope } } })),
+  });
+  const points = trend.data?.items ?? [];
   // Daily points by build date, drawn to scale in time, so the gaps between
   // builds read as the time they took and a weekly step adds nothing.
   const built = useQuery({
@@ -118,6 +121,14 @@ export function DependencyFigures({
   // Two releases is the fewest that is a shape. One bar reads as broken
   // rather than as sparse, so the calendar stays until there are two.
   const byRelease = (releases.data?.items ?? []).length >= 2;
+  // The releases as points of the severity split, each named by its tag and
+  // evenly spaced, because the axis is the sequence.
+  const releaseMix = (releases.data?.items ?? []).map((r) => ({
+    at: r.cut,
+    label: r.branch_or_tag_name ?? r.branch_or_tag,
+    open: r.open,
+    by_severity: r.by_severity,
+  }));
 
   // One definition at every scope: the trend's latest point, which counts an
   // issue at each component, at any version, once however many builds hold
@@ -313,17 +324,19 @@ export function DependencyFigures({
             {!byRelease && <AxisSwitch axis={axis} onAxis={setAxis} />}
             {!byRelease && axis === "scanned" && <StepSwitch step={step} onStep={setStep} />}
           </header>
-          {plotted.isError ? (
-            <Failed error={plotted.error} what="The trend could not be read." />
-          ) : releases.isError ? (
+          {releases.isError ? (
             <Failed error={releases.error} what="The release trend could not be read." />
-          ) : plotted.isPending || (!!at.product && releases.isPending) ? (
+          ) : !!at.product && releases.isPending ? (
             <Loading />
           ) : byRelease ? (
             <>
               <Releases points={releases.data?.items ?? []} />
               <p className="hint">Each release against today&rsquo;s vulnerability data.</p>
             </>
+          ) : plotted.isError ? (
+            <Failed error={plotted.error} what="The trend could not be read." />
+          ) : plotted.isPending ? (
+            <Loading />
           ) : settled(shown).length === 0 ? (
             <p className="hint">
               {axis === "built"
@@ -351,17 +364,28 @@ export function DependencyFigures({
           <header>
             <h3>Severity over time</h3>
             <span className="eyebrow" style={{ marginLeft: "auto" }}>
-              Open, by severity
+              Open, by severity{byRelease ? " · release over release" : ""}
             </span>
           </header>
-          <Reading query={plotted} what="The trend could not be read.">
-            {() => (
-              <>
-                <Mix points={shown} timed={axis === "built"} />
-                <p className="reading">{mixReading(shown, axisLeast(axis))}</p>
-              </>
-            )}
-          </Reading>
+          {byRelease ? (
+            <Reading query={releases} what="The release trend could not be read.">
+              {() => (
+                <>
+                  <Mix points={releaseMix} />
+                  <p className="reading">{mixReading(releaseMix, 2)}</p>
+                </>
+              )}
+            </Reading>
+          ) : (
+            <Reading query={plotted} what="The trend could not be read.">
+              {() => (
+                <>
+                  <Mix points={shown} timed={axis === "built"} />
+                  <p className="reading">{mixReading(shown, axisLeast(axis))}</p>
+                </>
+              )}
+            </Reading>
+          )}
         </div>
 
         <div className="panel">

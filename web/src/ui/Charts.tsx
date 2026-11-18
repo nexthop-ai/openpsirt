@@ -18,7 +18,7 @@ import {
 import type { Body } from "../api/client";
 import { BANDS as LADDER, BELOW_LOW, COLORS } from "./severities";
 import { type Step, began, outran, settled } from "./trend";
-import { FlowBars, FlowMark, labelled, roundTicks, scanLines } from "./flowchart";
+import { FlowBars, FlowMark, dayOf, labelled, namedAt, roundTicks, scanLines } from "./flowchart";
 
 // The step a calendar trend is drawn in, the windows each is asked over, and
 // the words a heading carries. Daily shows a team fixing dozens a day; weekly
@@ -103,7 +103,9 @@ export function AxisSwitch({
 // legend — the panel says what they are, and a reading underneath says what
 // they mean, which is the part a number cannot say for itself.
 
-type Point = Step & { at?: string };
+// A label, where given, names the point under an evenly spaced axis in place of
+// its date: a release by its tag.
+type Point = Step & { at?: string; label?: string };
 
 // The four bands, folded the way the server folds them.
 //
@@ -157,36 +159,16 @@ function day(at?: string): string {
   return (at ?? "").slice(5, 10);
 }
 
-// A point's date as a time, for an axis drawn to scale.
-function dated(at?: string): number {
-  return Date.parse(`${(at ?? "").slice(0, 10)}T00:00:00Z`);
-}
-
 // Where each point sits across a chart's width, from 0 to 1: evenly, or to
 // scale in time where the gaps between dates are part of what is read.
 function spread(points: Point[], timed: boolean): number[] {
   const n = points.length;
   if (n === 1) return [0.5];
   if (!timed) return points.map((_, i) => i / (n - 1));
-  const times = points.map((p) => dated(p.at));
+  const times = points.map((p) => dayOf(p.at));
   const first = times[0] ?? 0;
   const span = Math.max(1, (times[n - 1] ?? 0) - first);
   return times.map((t) => (t - first) / span);
-}
-
-// Which points name their date under the axis: the last always, then each
-// earlier one far enough from the label after it to be read.
-function namedAt(xs: number[], room: number): Set<number> {
-  const named = new Set<number>();
-  let next = Infinity;
-  for (let i = xs.length - 1; i >= 0; i--) {
-    const at = xs[i] ?? 0;
-    if (next - at >= room) {
-      named.add(i);
-      next = at;
-    }
-  }
-  return named;
 }
 
 // Open, with new, returned and corrected beneath it. Separately they are
@@ -424,7 +406,7 @@ export function paceLabel(points: Point[], words: PaceWords, unit: string): stri
 // worse, and one line cannot show that.
 export function Mix({ points, timed = false }: { points: Point[]; timed?: boolean }) {
   const data = settled(points).map((p) => {
-    return { at: day(p.at), t: dated(p.at), ...folded(p.by_severity ?? {}) };
+    return { at: p.label ?? day(p.at), t: dayOf(p.at), ...folded(p.by_severity ?? {}) };
   });
   if (data.length === 0) return null;
   const said = (t: number) => day(new Date(t).toISOString());

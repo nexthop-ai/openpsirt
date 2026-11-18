@@ -136,8 +136,8 @@ today's shows the drop between them, which the calendar puts inside one step.
 | Rule | Reason |
 |---|---|
 | Home's trend and severity panels plot by build date unless scan date is picked, in daily points on an axis to scale in time | A deployment sending each build more than once reads as exposure build by build; scan date answers workload, one click away; the gap between builds is part of the reading, so a weekly step adds nothing |
-| The latest point of open by severity stays the calendar's, open now | The figure beside it is today's |
-| A product with two releases plots release over release, whichever axis is picked | Tags are frozen points (REQ-54) |
+| The latest point of open by severity stays the calendar's, open now; by build date the calendar is read for that one day alone | The figure beside it is today's |
+| A product with two releases plots release over release, whichever axis is picked, in both the trend and severity over time | Tags are frozen points (REQ-54) |
 
 ## Subtree trends
 
