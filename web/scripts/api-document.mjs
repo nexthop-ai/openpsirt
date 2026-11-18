@@ -6,11 +6,11 @@
 // an array's maxItems.
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import yaml from "js-yaml";
+import { load } from "js-yaml";
 import { WEB } from "./parsed.mjs";
 
 export function apiDocument() {
-  return yaml.load(readFileSync(path.join(WEB, "..", "docs", "reference", "openapi.yaml"), "utf8"));
+  return load(readFileSync(path.join(WEB, "..", "docs", "reference", "openapi.yaml"), "utf8"));
 }
 
 // The operation of one identifier, or nothing where the document has none.
