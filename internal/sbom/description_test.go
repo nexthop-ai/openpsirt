@@ -101,6 +101,7 @@ func TestASecondFormatPackagesSummaryBeatsItsDescription(t *testing.T) {
 		{"description alone", description, "A boot agent. It loads an operating system over the network."},
 		{"the word for nothing", `, "summary": "NOASSERTION"` + description,
 			"A boot agent. It loads an operating system over the network."},
+		{"a description saying nothing", `, "description": "NOASSERTION"`, ""},
 		{"nothing", "", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

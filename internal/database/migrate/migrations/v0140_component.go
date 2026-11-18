@@ -17,7 +17,7 @@ func componentV0140(t *columnTypes) []string {
 	statements[0] = withColumn(statements[0], `"license"            `+t.free+` NULL,`,
 		`-- What the inventory says the component is, as one line cut to
 			-- the width of an index's summary. Shown where no index gave a
-			-- summary. Null where no inventory said.
+			-- summary. Absent where no inventory said.
 			"description"        `+t.free+` NULL,`)
 	return statements
 }

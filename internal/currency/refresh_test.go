@@ -679,7 +679,7 @@ func TestWhatAnIndexSaysIsBoundedAndItsAddressJudged(t *testing.T) {
 			{purl: "pkg:npm/enormous@1.0.0"},
 		}, map[string]currency.Latest{
 			"kept": {
-				Version: "2.0.0", Summary: "  a   label   with   spaces  ",
+				Version: "2.0.0", Summary: "  a   label\a   with\u202e   spaces  ",
 				Project: "https://example.test/kept",
 			},
 			// A publisher may put a paragraph in the one-line field, and a row

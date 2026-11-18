@@ -33,15 +33,17 @@ const MostLine = 300
 
 // Line is another program's description of a package as one line of at most
 // MostLine characters: repaired as Text repairs it, each space or line break
-// read as a space, every other control character dropped, each run of spaces
-// one space, cut on a character and trimmed. A control character drawn on a
-// screen is invisible text that changes what a reader sees.
+// read as a space, every other control or format character dropped, each run
+// of spaces one space, cut on a character and trimmed. A control or format
+// character drawn on a screen is invisible text that changes what a reader
+// sees: a right-to-left override reorders the line, and a zero-width space
+// splits a word that reads whole.
 func Line(s string) string {
 	s = strings.Map(func(r rune) rune {
 		switch {
 		case unicode.IsSpace(r):
 			return ' '
-		case unicode.IsControl(r):
+		case unicode.IsControl(r), unicode.Is(unicode.Cf, r):
 			return -1
 		}
 		return r

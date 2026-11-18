@@ -35,6 +35,8 @@ func TestLineIsOneLineOfPrintableText(t *testing.T) {
 		{"bell\a and \x1b[31mred\x1b[0m", "bell and [31mred[0m"},
 		{"caf\xe9\x00 au lait", "caf� au lait"},
 		{"next\u0085line", "next line"},
+		{"a\u202eb", "ab"},
+		{"evil\u2066.exe\u2069 zero\u200bwidth\ufeff", "evil.exe zerowidth"},
 		{" \n\t ", ""},
 	} {
 		if got := bound.Line(c.in); got != c.want {
