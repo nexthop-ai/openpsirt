@@ -7577,9 +7577,9 @@ export interface paths {
          * Show the findings trend by build date
          * @description Returns the findings trend with each point at a build date: one point per day or week holding the build time an upload in the selection states, oldest first, each dated by its step's last day. Steps end at midnight UTC, as on the findings trend.
          *
-         *     At a point, each build counts as its newest upload built by then leaves it. The upload a build holds is counted now. A replaced one is counted as of the last scan of its build that started while it was current, never against today's vulnerability data. An upload no scan reached before it was replaced is passed over.
+         *     At a point, each build counts as its newest upload built by then leaves it. The upload a build holds is counted now. A replaced one is counted as of the last scan of its build that started while it was current, never against today's vulnerability data. An upload no scan has reached, held or replaced, is passed over, and its build counts as the upload before it.
          *
-         *     Counted as the findings trend counts: one issue in three packages is three, and a package at a new version is the same package. Flows compare a point with the one before: `new` is open now and at no earlier point; `returned` is open now, not at the point before, and at an earlier one; `corrected` was open at the point before, is not now, and left by a fix; what a build's first upload brought is `baseline`, and `first_scans` says how many builds' first uploads the point is. The first point has nothing before it, so only its baseline moves. `restored` is always zero.
+         *     Counted as the findings trend counts: one issue in three packages is three, and a package at a new version is the same package. Flows compare a point with the one before, as each field describes. A return after an upload that removed a sharp share of its build's inventory is counted in `restored` alone. The first point has nothing before it, so only its baseline moves.
          *
          *     `component`, `purl` and `beneath` narrow as on the findings trend.
          *
@@ -8964,6 +8964,64 @@ export interface components {
              */
             undecided?: number;
             variant: string;
+        };
+        BuiltPointBody: {
+            /**
+             * Format: date
+             * @description The last day of the step holding the build times, which ends at midnight UTC after it
+             */
+            at: string;
+            /**
+             * Format: int64
+             * @description Issues at components open for the first time at this point, held only by builds whose first upload this point is. Not new: a first upload is an inventory arriving
+             */
+            baseline: number;
+            /** @description Open, split by severity */
+            by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Issues at components open at the point before and not at this one, where every finding that closed in between closed by a fix
+             */
+            corrected: number;
+            /** @description Corrected, split by the severity each held at the point before */
+            corrected_by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Builds whose first upload this point is
+             */
+            first_scans: number;
+            /**
+             * Format: int64
+             * @description Issues at components open at this point and at no earlier point, held by a build counted at an earlier point
+             */
+            new: number;
+            /** @description New, split by severity */
+            new_by_severity: {
+                [key: string]: number;
+            };
+            /**
+             * Format: int64
+             * @description Issues at components open at this point, each build counted as its newest upload built by then
+             */
+            open: number;
+            /**
+             * Format: int64
+             * @description Issues at components back after an upload that moved a sharp share of its build's inventory removed them: a broken inventory put right. Not in returned
+             */
+            restored: number;
+            /**
+             * Format: int64
+             * @description Issues at components open at this point, not at the point before, and open at an earlier one, other than those counted in restored
+             */
+            returned: number;
+            /** @description Returned, split by severity */
+            returned_by_severity: {
+                [key: string]: number;
+            };
         };
         BulkApprovalBody: {
             approved_at: string;
@@ -12331,6 +12389,17 @@ export interface components {
              */
             readonly $schema?: string;
             items: components["schemas"]["BranchOrTagBody"][] | null;
+            /** Format: int64 */
+            total?: number;
+        };
+        ListBodyBuiltPointBody: {
+            /**
+             * Format: uri
+             * @description A URL to the JSON Schema for this object.
+             * @example https://example.com/schemas/ListBodyBuiltPointBody.json
+             */
+            readonly $schema?: string;
+            items: components["schemas"]["BuiltPointBody"][] | null;
             /** Format: int64 */
             total?: number;
         };
@@ -29196,7 +29265,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ListBodyPointBody"];
+                    "application/json": components["schemas"]["ListBodyBuiltPointBody"];
                 };
             };
             /** @description Error */

@@ -1943,6 +1943,79 @@ components:
         - variant
         - open
       type: object
+    BuiltPointBody:
+      additionalProperties: false
+      properties:
+        at:
+          description: The last day of the step holding the build times, which ends at midnight UTC after it
+          format: date
+          type: string
+        baseline:
+          description: "Issues at components open for the first time at this point, held only by builds whose first upload this point is. Not new: a first upload is an inventory arriving"
+          format: int64
+          type: integer
+        by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: Open, split by severity
+          type: object
+        corrected:
+          description: Issues at components open at the point before and not at this one, where every finding that closed in between closed by a fix
+          format: int64
+          type: integer
+        corrected_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: Corrected, split by the severity each held at the point before
+          type: object
+        first_scans:
+          description: Builds whose first upload this point is
+          format: int64
+          type: integer
+        new:
+          description: Issues at components open at this point and at no earlier point, held by a build counted at an earlier point
+          format: int64
+          type: integer
+        new_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: New, split by severity
+          type: object
+        open:
+          description: Issues at components open at this point, each build counted as its newest upload built by then
+          format: int64
+          type: integer
+        restored:
+          description: "Issues at components back after an upload that moved a sharp share of its build's inventory removed them: a broken inventory put right. Not in returned"
+          format: int64
+          type: integer
+        returned:
+          description: Issues at components open at this point, not at the point before, and open at an earlier one, other than those counted in restored
+          format: int64
+          type: integer
+        returned_by_severity:
+          additionalProperties:
+            format: int64
+            type: integer
+          description: Returned, split by severity
+          type: object
+      required:
+        - at
+        - open
+        - new
+        - corrected
+        - returned
+        - restored
+        - baseline
+        - first_scans
+        - by_severity
+        - new_by_severity
+        - corrected_by_severity
+        - returned_by_severity
+      type: object
     BulkApprovalBody:
       additionalProperties: false
       properties:
@@ -7703,6 +7776,28 @@ components:
         items:
           items:
             $ref: "#/components/schemas/BranchOrTagBody"
+          type:
+            - array
+            - "null"
+        total:
+          format: int64
+          type: integer
+      required:
+        - items
+      type: object
+    ListBodyBuiltPointBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListBodyBuiltPointBody.json
+          format: uri
+          readOnly: true
+          type: string
+        items:
+          items:
+            $ref: "#/components/schemas/BuiltPointBody"
           type:
             - array
             - "null"
@@ -37666,9 +37761,9 @@ paths:
       description: |-
         Returns the findings trend with each point at a build date: one point per day or week holding the build time an upload in the selection states, oldest first, each dated by its step's last day. Steps end at midnight UTC, as on the findings trend.
 
-        At a point, each build counts as its newest upload built by then leaves it. The upload a build holds is counted now. A replaced one is counted as of the last scan of its build that started while it was current, never against today's vulnerability data. An upload no scan reached before it was replaced is passed over.
+        At a point, each build counts as its newest upload built by then leaves it. The upload a build holds is counted now. A replaced one is counted as of the last scan of its build that started while it was current, never against today's vulnerability data. An upload no scan has reached, held or replaced, is passed over, and its build counts as the upload before it.
 
-        Counted as the findings trend counts: one issue in three packages is three, and a package at a new version is the same package. Flows compare a point with the one before: `new` is open now and at no earlier point; `returned` is open now, not at the point before, and at an earlier one; `corrected` was open at the point before, is not now, and left by a fix; what a build's first upload brought is `baseline`, and `first_scans` says how many builds' first uploads the point is. The first point has nothing before it, so only its baseline moves. `restored` is always zero.
+        Counted as the findings trend counts: one issue in three packages is three, and a package at a new version is the same package. Flows compare a point with the one before, as each field describes. A return after an upload that removed a sharp share of its build's inventory is counted in `restored` alone. The first point has nothing before it, so only its baseline moves.
 
         `component`, `purl` and `beneath` narrow as on the findings trend.
 
@@ -37769,7 +37864,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ListBodyPointBody"
+                $ref: "#/components/schemas/ListBodyBuiltPointBody"
           description: OK
         default:
           content:
