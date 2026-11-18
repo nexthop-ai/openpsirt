@@ -1163,6 +1163,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#from-v0130" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.13.0
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1991,6 +2002,17 @@
         
       </ul>
     </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#from-v0130" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        From v0.13.0
+      
+    </span>
+  </a>
   
 </li>
         
@@ -5596,7 +5618,7 @@ v0.10.2 named <code>reaffirm-claim</code>.</p>
 </tr>
 <tr>
 <td>A component an inventory lists as depending on itself is no longer its own consumer. v0.12.0 opened a finding at that occurrence beside the component's real ones</td>
-<td>Nothing. The build's next scanner run closes those findings as unexplained, since the component is still there, and a build holding several of them logs the warning that one scan went wrong. The component's other occurrences are unchanged</td>
+<td>Nothing. The build's next scanner run closes those findings as removed, since the component no longer pulls itself in. The component's other occurrences are unchanged</td>
 </tr>
 <tr>
 <td>A package identifier written <code>pkg://</code> is read as <code>pkg:</code>, an escaped slash or percent sign inside a name stays part of the name, a percent sign starting no escape is read as itself, and an identifier stating no version is read with the version stated beside it. v0.12.0 read each as another package, or every version as one</td>
@@ -5687,6 +5709,21 @@ decision that cites one raises a "cited statement changed" alert. Where the
 second step records the same words, reasoning included, under the same
 publisher name, the alert clears; where v0.12.0 filed them under a file name, it
 stands until the decision is made again against what the second step recorded.</p>
+<h3 id="from-v0130">From v0.13.0<a class="headerlink" href="#from-v0130" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>What to do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A finding's closure is explained at its occurrence: upgraded or revised where what pulled the component in now pulls in another version of it, removed where that consumer left the build or pulls in nothing of the component's name and no other version of it took its place. v0.13.0 asked of the component across the build, so both closed as unexplained wherever another consumer kept the component, and a build holding several logged the warning that one scan went wrong</td>
+<td>Nothing. A finding v0.13.0 closed keeps the reason it recorded</td>
+</tr>
+</tbody>
+</table>
 
 
 
