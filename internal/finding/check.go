@@ -384,6 +384,7 @@ func (s *Store) CheckReplaced(ctx context.Context, r Replaced, runID int64, repo
 
 		var writing []Finding
 		var issues []int64
+		var under pulledBy
 		for k, f := range wantBefore.findings {
 			if wantBefore.patched[k] || wantBefore.cleared[k] != "" || wantBefore.disclaimed[k] != 0 {
 				continue
@@ -402,7 +403,11 @@ func (s *Store) CheckReplaced(ctx context.Context, r Replaced, runID int64, repo
 			case then.disclaimed:
 				reason, f.StatedBy = Disclaimed, &then.statedBy
 			default:
-				reason, f.MovedTo = after.present.why(before.present.byID[k.occurrence.componentID])
+				if under == nil {
+					under = after.present.pulled(after.occurrences)
+				}
+				reason, f.MovedTo = after.present.whyAt(before.present.byID[k.occurrence.componentID],
+					k.occurrence.consumerID, before.present.nameOf(k.occurrence.consumerID), under)
 			}
 			opened := publishedOf[k.vulnerabilityID]
 			if opened.Before(r.ArrivedAt) {

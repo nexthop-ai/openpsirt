@@ -42,7 +42,7 @@ measures churn:
 | Reason | Why it is not a resolution |
 |---|---|
 | `superseded` | The version moved and the issue came with it |
-| `unexplained` | The scanner stopped reporting it with the component unchanged: a fault |
+| `unexplained` | The scanner stopped reporting it with the component unchanged at its occurrence: a fault |
 | `invalid` | A record taken back was never present. Left out of every open set |
 | `unaffected` | The CVE record states the release was never affected. Left out of every open set |
 | `disclaimed` | A supplier states the product the occurrence sits in is not affected, or an upstream states the component is not affected or fixed at the version shipped. Nothing changed, so the occurrence is in the open sets up to its closure and in the releases an issue was in (`design-docs/findings-closure.md` § Closure reasons) |

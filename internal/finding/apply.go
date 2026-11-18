@@ -798,9 +798,13 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 	// A departing finding's subject is read from the component catalog rather
 	// than from what the variant currently contains — the whole reason it is
 	// closing is usually that it is no longer there.
-	gone := make([]int64, 0, len(plan.departing))
+	// What pulled each in is read the same way, since it may have left too.
+	gone := make([]int64, 0, 2*len(plan.departing))
 	for _, d := range plan.departing {
 		gone = append(gone, d.f.ComponentID)
+		if d.f.ConsumerID != nil {
+			gone = append(gone, *d.f.ConsumerID)
+		}
 	}
 	departed, err := componentsByID(ctx, tx, run.buildID, gone)
 	if err != nil {
@@ -815,8 +819,17 @@ func writePlan(ctx context.Context, tx bun.IDB, run *applyRun, want wantedSet,
 		MovedTo string
 	}
 	byReason := map[closure][]int64{}
+	var under pulledBy
+	if len(plan.departing) > 0 {
+		under = run.present.pulled(run.occurrences)
+	}
 	for _, d := range plan.departing {
-		reason, movedTo := run.present.why(departed[d.f.ComponentID])
+		var consumerID int64
+		if d.f.ConsumerID != nil {
+			consumerID = *d.f.ConsumerID
+		}
+		reason, movedTo := run.present.whyAt(departed[d.f.ComponentID], consumerID,
+			departed[consumerID].IdentifyingName(), under)
 		// Asked before anything else, because every other explanation is
 		// about a finding that went away and this one did not. Recording it as
 		// an upgrade would say a bump fixed something it did not, in a report
