@@ -12,6 +12,7 @@ nobody can tell a producer quirk from a typo in.
 | `image.cdx.xml` | Written by hand: `image.cdx.json` in the **XML encoding**, fact for fact, so that the pedigree, the carried patch and the supplier only that fixture has are read from XML too. The patch's diff carries no hashes here, because the XML schema has nowhere to put them |
 | `openpsirt-image.cdx.json` | Real output, and the only fixture at **CycloneDX 1.7**. The inventory this deployment's own image carries of itself: the scanner's description of the container, composed from its parts by the tool that builds it. It is what the image ships and what the demo ingests, so the revision every shipped inventory now states is read here by evidence rather than by construction |
 | `switch-image.cdx.json.xz` | Real output, and the full-size one. The public SONiC network operating-system image, 6,866 components and 18,948 edges over 18 MB, from a build of sonic-buildimage at `5acba0313`. Compressed because the shape is the point and 18 MB of it is not. See below |
+| `switch-image-20261117.cdx.json.xz`, `switch-image-mellanox-20261118.cdx.json.xz` | Real output: the broadcom and mellanox builds of the same image two months on, for the demo's second upload of each build. See § The November images |
 | `alpine-image.spdx.json` | Real output, and the rich **SPDX** one. syft 1.51.1 — the same producer the 1.7 CycloneDX fixture came from — scanning `alpine:3.20`. It states the root as a relationship from the document, up to twelve spellings of one database key on a single package, and 77 files against 15 packages, which is what makes "a file is not a component" a rule rather than an opinion |
 | `rust-app.spdx.json` | The specification's own example 11, a Rust application and its cargo dependencies. It states the root the other way — a list beside the packages, naming a package and a file built from it — and its dependency edges as `DEPENDS_ON` |
 | `maven-app.spdx.json` | The specification's own example 14, a Maven application enriched by a second tool. Eleven relationships of which six are structural types, four of them surviving as edges because two `CONTAINS` name files rather than packages — which is a better demonstration than the count alone. The remaining five are a test dependency, a test case, what generated what, what the document amends, and the root. It also carries packages with no identifier at all and no version, which is what identity falling back to a name is for |
@@ -274,3 +275,26 @@ It is not yet read by any test. The full-size test reads the broadcom build,
 and a second full-size read would add its cost to every run; what this one
 proves — matching across variants — wants a test that constructs the two
 builds small rather than one that reads sixteen megabytes twice.
+
+## The November images
+
+`switch-image-20261117.cdx.json.xz` and
+`switch-image-mellanox-20261118.cdx.json.xz` are the broadcom and mellanox
+builds of the same switch image, two months after the September pair. The demo
+and the dev loop upload each after its September build, so every SONiC build
+holds two uploads and a real change between them.
+
+| File | Built from | Stated at | Components | Edges | Under `formulation` |
+|---|---|---|--:|--:|--:|
+| `switch-image-20261117.cdx.json.xz` | sonic-buildimage at `b61003e2a` | 2026-11-17 | 6,899 | 20,514 | 664 |
+| `switch-image-mellanox-20261118.cdx.json.xz` | `b61003e2a` with sonic-buildimage #30811 applied, a mellanox test change | 2026-11-18 | 6,940 | 18,676 | 664 |
+
+`b61003e2a` is a commit of the public fork `bhouse-nexthop/sonic-buildimage`.
+Both files come from one producer revision, which lists only the Debian
+packages the image ships, each with its distribution. The September pair is
+from an earlier revision, so a comparison across the two months holds producer
+change beside package change: 735 Debian packages here against 759 in
+September's broadcom build.
+
+No test reads either file.
+
