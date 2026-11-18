@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"strings"
 	"sync"
 	"testing"
@@ -24,7 +25,7 @@ import (
 // osv answers what a test tells it to, so nothing reaches the network.
 type osv struct {
 	mu        sync.Mutex
-	says      map[string]issuedate.Dates
+	says      map[string]issuedate.Record
 	fails     map[string]bool
 	unaskable map[string]bool
 	// aliases is the records OSV names for a name it holds only as their
@@ -33,22 +34,22 @@ type osv struct {
 	asked   []string
 }
 
-func (o *osv) Dates(_ context.Context, name string) (issuedate.Dates, error) {
+func (o *osv) Ask(_ context.Context, name string) (issuedate.Record, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.asked = append(o.asked, name)
 	if o.fails[name] {
-		return issuedate.Dates{}, issuedate.ErrNotAnswering
+		return issuedate.Record{}, issuedate.ErrNotAnswering
 	}
 	if o.unaskable[name] {
-		return issuedate.Dates{}, issuedate.ErrUnaskable
+		return issuedate.Record{}, issuedate.ErrUnaskable
 	}
 	if named, ok := o.aliases[name]; ok {
-		return issuedate.Dates{}, &issuedate.Aliased{Names: named}
+		return issuedate.Record{}, &issuedate.Aliased{Names: named}
 	}
 	dates, known := o.says[name]
 	if !known {
-		return issuedate.Dates{}, issuedate.ErrUnknown
+		return issuedate.Record{}, issuedate.ErrUnknown
 	}
 	return dates, nil
 }
@@ -99,7 +100,7 @@ func TestIssueDatesAreAskedOnceAndAgainWhenStale(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		answers := &osv{says: map[string]issuedate.Dates{
+		answers := &osv{says: map[string]issuedate.Record{
 			"CVE-2026-0001":       {Published: published, Modified: modified},
 			"GHSA-AAAA-BBBB-CCCC": {Published: published},
 		}}
@@ -164,7 +165,7 @@ func TestAnIssueOSVHoldsAsAnAliasTakesThatRecordsDates(t *testing.T) {
 		}
 		answers := &osv{
 			aliases: map[string][]string{"CVE-2026-86409": {"CURL-CVE-2026-86409"}},
-			says:    map[string]issuedate.Dates{"CURL-CVE-2026-86409": {Published: published, Modified: modified}},
+			says:    map[string]issuedate.Record{"CURL-CVE-2026-86409": {Published: published, Modified: modified}},
 		}
 		if asked, err := newPass(db, answers, clock).Once(ctx); err != nil || asked != 1 {
 			t.Fatalf("answered %d (%v), want the one issue", asked, err)
@@ -203,7 +204,7 @@ func TestFollowingAliasesEnds(t *testing.T) {
 			"GHSA-AAAA-AAAA-AAA2": {"FAN-7", "FAN-8", "FAN-9"},
 			// An answer naming one of the issue's own names.
 			"CVE-2026-0052": {"GHSA-BBBB-BBBB-BBBB"},
-		}, says: map[string]issuedate.Dates{"LOOP-KNOWN": {Published: published}}}
+		}, says: map[string]issuedate.Record{"LOOP-KNOWN": {Published: published}}}
 		if asked, err := newPass(db, answers, clock).Once(ctx); err != nil || asked != 3 {
 			t.Fatalf("answered %d (%v), want all three issues", asked, err)
 		}
@@ -235,6 +236,69 @@ func TestFollowingAliasesEnds(t *testing.T) {
 		}
 	})
 }
+
+// pointingAt is what an issue points at, by address.
+func pointingAt(t *testing.T, db *database.DB, identifier string) map[string]finding.ReferenceKind {
+	t.Helper()
+	var rows []finding.Reference
+	if err := db.DB.NewSelect().Model(&rows).
+		Where(`"vulnerability_id" = (SELECT "v"."id" FROM "vulnerability" AS "v" WHERE "v"."identifier" = ?)`,
+			identifier).Scan(t.Context()); err != nil {
+		t.Fatalf("read what %s points at: %v", identifier, err)
+	}
+	out := map[string]finding.ReferenceKind{}
+	for _, row := range rows {
+		if _, twice := out[row.URL]; twice {
+			t.Errorf("%s points at %s twice", identifier, row.URL)
+		}
+		out[row.URL] = row.Kind
+	}
+	return out
+}
+
+// A record's patch links become the issue's, beside what reports gave it: an
+// address a report already gave keeps its row, and asking again adds nothing.
+func TestARecordsPatchLinksAreAddedToTheIssue(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		clock := dbtest.NewClock()
+		const (
+			fix      = "https://github.com/curl/curl/commit/c3c70440e8d9938c0bb732595751e8aebc614f24"
+			reported = "https://example.org/fix"
+			page     = "https://curl.se/docs/CVE-2026-86409.html"
+		)
+		if _, err := finding.NewVulnerabilities(db.DB).Intern(ctx, []finding.Named{{
+			Identifier: "CVE-2026-86409",
+			References: []finding.Reference{{URL: page, Kind: finding.AdvisoryRef}, {URL: reported, Kind: finding.Report}},
+		}}); err != nil {
+			t.Fatal(err)
+		}
+		answers := &osv{
+			aliases: map[string][]string{"CVE-2026-86409": {"CURL-CVE-2026-86409"}},
+			says: map[string]issuedate.Record{"CURL-CVE-2026-86409": {
+				Published: published, Patches: []string{fix, reported},
+			}},
+		}
+		pass := newPass(db, answers, clock)
+		if asked, err := pass.Once(ctx); err != nil || asked != 1 {
+			t.Fatalf("answered %d (%v), want the one issue", asked, err)
+		}
+		want := map[string]finding.ReferenceKind{fix: finding.Patch, reported: finding.Report, page: finding.AdvisoryRef}
+		if got := pointingAt(t, db, "CVE-2026-86409"); !maps.Equal(got, want) {
+			t.Errorf("the issue points at %v, want %v", got, want)
+		}
+		clock.Advance(knownAfterAndADay)
+		if asked, err := pass.Once(ctx); err != nil || asked != 1 {
+			t.Fatalf("a month on answered %d (%v), want the one issue", asked, err)
+		}
+		if got := pointingAt(t, db, "CVE-2026-86409"); !maps.Equal(got, want) {
+			t.Errorf("asked again, the issue points at %v, want %v", got, want)
+		}
+	})
+}
+
+// knownAfterAndADay is past when a known issue is asked again.
+const knownAfterAndADay = issuedate.KnownAfter + 24*time.Hour
 
 // OSV not answering leaves the issue unasked and ends the pass; turned off,
 // the pass asks nothing.
@@ -283,7 +347,7 @@ func TestANameOSVWillNotAnswerAboutIsPassedOver(t *testing.T) {
 		}
 		answers := &osv{
 			unaskable: map[string]bool{"CVE-2026-0020": true},
-			says: map[string]issuedate.Dates{
+			says: map[string]issuedate.Record{
 				"GHSA-DDDD-EEEE-FFFF": {Published: published},
 				"CVE-2026-0021":       {Published: published},
 			},
@@ -334,7 +398,7 @@ func TestAPassWaitsBetweenRequests(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		pass := newPass(db, &osv{says: map[string]issuedate.Dates{"GHSA-GGGG-HHHH-JJJJ": {Published: published}}}, clock)
+		pass := newPass(db, &osv{says: map[string]issuedate.Record{"GHSA-GGGG-HHHH-JJJJ": {Published: published}}}, clock)
 		pass.Pause = 50 * time.Millisecond
 		started := time.Now()
 		if asked, err := pass.Once(ctx); err != nil || asked != 1 {
@@ -423,7 +487,7 @@ func TestARunningPassAsksOnlyWhenOnAndHoldingTheLease(t *testing.T) {
 				}
 				c.stop(t, db)
 				clock := dbtest.NewClock()
-				answers := &osv{says: map[string]issuedate.Dates{"CVE-2026-0040": {Published: published}}}
+				answers := &osv{says: map[string]issuedate.Record{"CVE-2026-0040": {Published: published}}}
 				running(t, newPass(db, answers, clock))
 				// Many cycles of a millisecond each.
 				time.Sleep(100 * time.Millisecond)

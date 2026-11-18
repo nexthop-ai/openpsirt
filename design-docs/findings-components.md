@@ -120,7 +120,7 @@ distribution's tracker, and the package's page in its ecosystem.
 | References rule | Reason |
 |---|---|
 | Patches first; a patch is guessed from the address shape (commit, pull request, diff), erring toward discussion | A backporter needs the change |
-| References from every identifier the issue answers to are kept, deduplicated | A distribution's record points at its tracker; the fixing commits sit on the upstream record the scanner reports alongside |
+| References from every identifier the issue answers to are kept, deduplicated, with the fix links OSV's record holds (`design-docs/findings-issues.md` § Issue dates) | A distribution's record points at its tracker; the fixing commits sit on the upstream record the scanner reports alongside |
 | Two references are one where their addresses match apart from surrounding space; keyed by a digest | Addresses are case-sensitive past the host and longer than an index key |
 
 ## Index responses

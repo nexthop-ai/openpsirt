@@ -11,6 +11,7 @@ Satisfies REQ-78.
 
 - [Switch](#switch)
 - [Link shapes](#link-shapes)
+- [Commit pages](#commit-pages)
 - [Keying](#keying)
 - [The pass](#the-pass)
 - [Host share](#host-share)
@@ -60,6 +61,26 @@ the report.
 | Link reads as | Fetched from |
 |---|---|
 | `cgit.freedesktop.org/drm/drm-misc` | `gitlab.freedesktop.org/drm/misc/kernel` |
+
+## Commit pages
+
+OSV names a fixed commit by its repository's clone address and its hash. A
+page is made for it only where the host's page for a commit has a known shape,
+and every page made reads back as the same repository and commit, so it is
+labeled like any patch link.
+
+| Host | Page made |
+|---|---|
+| github.com | `/{owner}/{repo}/commit/{hash}` |
+| gitlab.com | `/{group…}/{repo}/-/commit/{hash}` |
+| git.kernel.org, the stable and mainline trees | `/stable/c/{hash}`, `/linus/{hash}`, the short links the kernel's own records use |
+| git.kernel.org, any other tree under `/pub/scm/` | `/pub/scm/{path…}/commit/?id={hash}` |
+
+| Rule | Reason |
+|---|---|
+| A page is always `https`, built from recognized parts: an `http` or `https` address with no credentials, port, query or fragment, each path segment in the narrow set, and a hash of 7 to 64 hex characters | A record is a third party's, and its address chooses the host |
+| A host matches exactly; `github.com.evil.test` is another host | |
+| A commit on any other host gets no page | A guessed page shape on an unknown host is a link to nothing, or to somewhere else |
 
 ## Keying
 
@@ -219,3 +240,4 @@ and held) in the pass's own order.
 | A copy comes from the host the link names | The kernel tree is 5.1 GB from git.kernel.org and 1.1 GB from a commits-only mirror, and nothing here knows they are one repository |
 | The copies are one replica's disk, and nothing records which replica holds which | A replica taking the lease starts from none, or from a shared volume |
 | A deployment reaching the internet only through its own proxy fetches nothing | The guard dials directly |
+| A fixed commit OSV names on a host outside § Commit pages is shown nowhere | `go.googlesource.com`, Bitbucket and self-hosted forges each shape a commit page their own way |
