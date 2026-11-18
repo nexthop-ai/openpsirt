@@ -42,18 +42,25 @@ func DataDate(databaseVersion string, started time.Time) time.Time {
 	return started.UTC()
 }
 
+// Judging narrows a query over scan runs, unaliased, to the runs that judged
+// an inventory: finished without a failure, and not a check of a replaced one.
+// The trend by build date reads a replaced inventory at such a run, so it and
+// LastScanned share this one definition.
+func Judging(q *bun.SelectQuery) *bun.SelectQuery {
+	return q.Where(`"checked_scan_id" IS NULL`).
+		Where(`"finished_at" IS NOT NULL`).
+		Where(`COALESCE("failure", '') = ''`)
+}
+
 // LastScanned is the data date of the scan that last reached an inventory of
 // a build current from arrived until replaced: a successful run of the build,
 // other than a check, that started while it was current. Absent where no scan
 // reached it.
 func LastScanned(ctx context.Context, db bun.IDB, buildID int64, arrived, replaced time.Time) (*time.Time, error) {
 	var last []Run
-	if err := db.NewSelect().Model(&last).
+	if err := Judging(db.NewSelect().Model(&last).
 		Column("database_version", "started_at").
-		Where(`"build_id" = ?`, buildID).
-		Where(`"checked_scan_id" IS NULL`).
-		Where(`"finished_at" IS NOT NULL`).
-		Where(`COALESCE("failure", '') = ''`).
+		Where(`"build_id" = ?`, buildID)).
 		Where(`"started_at" >= ?`, arrived).
 		Where(`"started_at" < ?`, replaced).
 		Order("started_at DESC", "id DESC").Limit(1).

@@ -103,7 +103,15 @@ const day = 24 * time.Hour
 func builtTrend(t *testing.T, w *world.World, who access.Subject, scope finding.Scope,
 	within finding.Within) []finding.Point {
 	t.Helper()
-	points, err := ingest.NewStore(w.DB.DB).BuiltTrend(t.Context(), who, scope, within, day, 12)
+	return builtTrendOf(t, w, who, scope, within, 12)
+}
+
+// builtTrendOf reads the trend by build date over a scope, daily, keeping the
+// latest limit points.
+func builtTrendOf(t *testing.T, w *world.World, who access.Subject, scope finding.Scope,
+	within finding.Within, limit int) []finding.Point {
+	t.Helper()
+	points, err := ingest.NewStore(w.DB.DB).BuiltTrend(t.Context(), who, scope, within, day, limit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,18 +175,21 @@ func TestATrendByBuildDateReadsEachBuildAtItsOwnUpload(t *testing.T) {
 		b := &uploads{t: t, w: w, build: w.BuildFor(w.Branch, w.Internal).ID, now: now}
 
 		// Both builds hold one issue at curl in September; the second build's
-		// copy is the same issue at the same component, counted once.
+		// copy is the same issue at the same component, counted once. The
+		// second build alone also holds one at the kernel.
 		a.upload(now.Add(-60*day), now.Add(-6*day), curl)
 		a.scan(now.Add(-6*day+time.Minute), issue("CVE-2026-0003", "high", curl))
-		b.upload(now.Add(-60*day), now.Add(-6*day), curl)
-		b.scan(now.Add(-6*day+time.Minute), issue("CVE-2026-0003", "high", curl))
-		// November: the first build finds a second issue, which is new; the
-		// second build is not uploaded again, so it is read as September left
-		// it, though a later scan of it stopped reporting curl.
+		b.upload(now.Add(-60*day), now.Add(-6*day), curl, kernelOld)
+		b.scan(now.Add(-6*day+time.Minute), issue("CVE-2026-0003", "high", curl),
+			issue("CVE-2026-0001", "critical", kernelOld))
+		// November: the first build finds a second issue, which is new. The
+		// second build is not uploaded again, so September is the upload it
+		// holds and is read now, after a later scan stopped reporting the
+		// kernel's issue: at neither point is that issue open.
 		a.upload(now.Add(-day), now.Add(-2*day), curl)
 		a.scan(now.Add(-2*day+time.Minute),
 			issue("CVE-2026-0003", "high", curl), issue("CVE-2026-0005", "medium", curl))
-		b.scan(now.Add(-time.Hour))
+		b.scan(now.Add(-time.Hour), issue("CVE-2026-0003", "high", curl))
 
 		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
 		if len(points) != 2 {
@@ -360,6 +371,120 @@ func TestAFlawRecordedInTwoBuildsIsReadInEachAtItsOwnMoment(t *testing.T) {
 		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
 		if len(points) != 2 || points[0].Open != 1 || points[1].Open != 1 {
 			t.Fatalf("got %+v; want two points each holding the flaw, September through the second build", points)
+		}
+	})
+}
+
+func TestABuildWhoseFirstDayHoldsTwoUploadsBringsBaselineNotNewWork(t *testing.T) {
+	// Two uploads built on one day share a point, and the first of them is
+	// the build's first upload.
+	world.Each(t, func(t *testing.T, w *world.World) {
+		now := time.Now().UTC().Truncate(time.Second)
+		a := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		b := &uploads{t: t, w: w, build: w.BuildFor(w.Branch, w.Internal).ID, now: now}
+		a.upload(now.Add(-60*day), now.Add(-9*day), curl)
+		a.scan(now.Add(-9*day+time.Minute), issue("CVE-2026-0003", "high", curl))
+		morning := now.Truncate(day).Add(-10*day + time.Hour)
+		b.upload(morning, now.Add(-8*day), kernelOld)
+		b.scan(now.Add(-8*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+		b.upload(morning.Add(4*time.Hour), now.Add(-7*day), kernelOld)
+		b.scan(now.Add(-7*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
+		if len(points) != 2 {
+			t.Fatalf("got %d points, want 2: %+v", len(points), points)
+		}
+		if p := points[1]; p.Open != 2 || p.Baseline != 1 || p.New != 0 || p.FirstScans != 1 {
+			t.Errorf("a build first uploaded twice in one day gave %d open, %d baseline, %d new from %d first uploads; want 2, 1, 0 and 1",
+				p.Open, p.Baseline, p.New, p.FirstScans)
+		}
+	})
+}
+
+func TestABuildWhoseFirstUploadIsCutOffBringsNoBaseline(t *testing.T) {
+	// Baseline is an inventory arriving. A point whose earlier points the limit
+	// cut off is not where any build arrived.
+	world.Each(t, func(t *testing.T, w *world.World) {
+		now := time.Now().UTC().Truncate(time.Second)
+		a := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		b := &uploads{t: t, w: w, build: w.BuildFor(w.Branch, w.Internal).ID, now: now}
+		a.upload(now.Add(-60*day), now.Add(-9*day), curl)
+		a.scan(now.Add(-9*day+time.Minute), issue("CVE-2026-0003", "high", curl))
+		b.upload(now.Add(-60*day), now.Add(-9*day), kernelOld)
+		b.scan(now.Add(-9*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+		a.upload(now.Add(-30*day), now.Add(-6*day), curl)
+		a.scan(now.Add(-6*day+time.Minute), issue("CVE-2026-0003", "high", curl))
+		a.upload(now.Add(-day), now.Add(-2*day), curl)
+		a.scan(now.Add(-2*day+time.Minute), issue("CVE-2026-0003", "high", curl))
+
+		points := builtTrendOf(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{}, 2)
+		if len(points) != 2 {
+			t.Fatalf("got %d points, want 2: %+v", len(points), points)
+		}
+		if p := points[0]; p.Open != 2 || p.Baseline != 0 || p.FirstScans != 0 {
+			t.Errorf("the first point kept gave %d open, %d baseline from %d first uploads; want 2, 0 and 0",
+				p.Open, p.Baseline, p.FirstScans)
+		}
+	})
+}
+
+// fillers are packages carrying nothing, so an upload losing them moves a
+// sharp share of the inventory.
+func fillers(n int) []graph.Described {
+	out := make([]graph.Described, n)
+	for i := range out {
+		name := fmt.Sprintf("filler%02d", i)
+		out[i] = graph.Described{Name: name, Version: "1.0", Purl: "pkg:deb/debian/" + name + "@1.0"}
+	}
+	return out
+}
+
+func TestAReturnAfterASharpRemovalIsRestoredByBuildDate(t *testing.T) {
+	// An upload that lost most of the inventory is a broken one, so what comes
+	// back after it is the inventory put right.
+	world.Each(t, func(t *testing.T, w *world.World) {
+		now := time.Now().UTC().Truncate(time.Second)
+		u := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		whole := append(fillers(12), kernelOld, curl)
+		u.upload(now.Add(-60*day), now.Add(-9*day), whole...)
+		u.scan(now.Add(-9*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+		u.upload(now.Add(-30*day), now.Add(-6*day), curl)
+		u.scan(now.Add(-6*day + time.Minute))
+		u.upload(now.Add(-day), now.Add(-2*day), whole...)
+		u.scan(now.Add(-2*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
+		if len(points) != 3 {
+			t.Fatalf("got %d points, want 3: %+v", len(points), points)
+		}
+		if p := points[2]; p.Restored != 1 || p.Returned != 0 || len(p.ReturnedBySeverity) != 0 || p.New != 0 {
+			t.Errorf("the inventory put right gave %d restored, %d returned %v, %d new; want 1, 0, none and 0",
+				p.Restored, p.Returned, p.ReturnedBySeverity, p.New)
+		}
+	})
+}
+
+func TestAReturnAfterASmallRemovalIsReturnedByBuildDate(t *testing.T) {
+	// One package of fourteen leaving moves too little of the inventory to be
+	// a broken upload, so its issue coming back is a return.
+	world.Each(t, func(t *testing.T, w *world.World) {
+		now := time.Now().UTC().Truncate(time.Second)
+		u := &uploads{t: t, w: w, build: w.Build.ID, now: now}
+		whole := append(fillers(12), kernelOld, curl)
+		u.upload(now.Add(-60*day), now.Add(-9*day), whole...)
+		u.scan(now.Add(-9*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+		u.upload(now.Add(-30*day), now.Add(-6*day), append(fillers(12), curl)...)
+		u.scan(now.Add(-6*day + time.Minute))
+		u.upload(now.Add(-day), now.Add(-2*day), whole...)
+		u.scan(now.Add(-2*day+time.Minute), issue("CVE-2026-0001", "critical", kernelOld))
+
+		points := builtTrend(t, w, reader(w), finding.Scope{ProductID: &w.Product.ID}, finding.Within{})
+		if len(points) != 3 {
+			t.Fatalf("got %d points, want 3: %+v", len(points), points)
+		}
+		if p := points[2]; p.Returned != 1 || p.ReturnedBySeverity["critical"] != 1 || p.Restored != 0 {
+			t.Errorf("a small removal put back gave %d returned %v and %d restored; want 1 critical and 0",
+				p.Returned, p.ReturnedBySeverity, p.Restored)
 		}
 	})
 }

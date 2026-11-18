@@ -106,8 +106,8 @@ today's shows the drop between them, which the calendar puts inside one step.
 | At a point, each build is read as its newest upload built by the step's end; a build with none by then adds nothing | Builds are released at different dates, and each counts as what it shipped then |
 | An inventory is current from its arrival until the next applied one arrives | The replaced-inventory check reads currency the same way (`design-docs/findings-closure.md` § Replaced inventories) |
 | A replaced inventory is read at the start of the last successful scan of its build, other than a check, that started while it was current | What was known of it then; dating it today would cost a scan each (REQ-54) |
-| The inventory a build holds is read now | |
-| An inventory no scan reached before it was replaced is passed over, and its build read as the upload before it left it | Nothing ever judged it |
+| The inventory a build holds is read now, once a scan has reached it | |
+| An inventory no scan has reached is passed over, held or replaced, and its build read as the upload before it left it | Nothing ever judged it |
 | An issue at a component is open at a point when, in some build, one of its findings opened at or before that build's moment and closed after it, or not at all | The calendar's rule, applied to each build at its own moment |
 | Each build's findings are reduced apart, never merged with another build's | Each build is read at its own moment; a flaw recorded in two builds at once is otherwise one row read at one build's moment |
 | The unit, the severity split, the never-present closures and the narrowings to a component, a package identifier prefix or a subtree are the calendar trend's | One definition of open on one screen |
@@ -119,7 +119,8 @@ today's shows the drop between them, which the calendar puts inside one step.
 | Open | Open at the point |
 | New | Open, at no earlier point, and held by a build not read for the first time here |
 | Baseline | Open for the first time, held only by builds whose first upload this point is (REQ-54) |
-| Returned | Open, not at the point before, and open at an earlier one |
+| Returned | Open, not at the point before, and open at an earlier one; not returned after a gap |
+| Returned after a gap | Returned, the closure it reverses a removal by an upload that moved its build's inventory sharply, by the calendar's rule (§ Trends); drawn as a mark, never a bar |
 | Corrected | Open at the point before, not at this one, and every one of its findings that closed in between closed by a resolution (`design-docs/analytics.md` § The counting unit) |
 | First scans | The builds whose first upload this point is |
 
@@ -127,7 +128,7 @@ today's shows the drop between them, which the calendar puts inside one step.
 |---|---|
 | The first point has nothing before it; only its baseline moves | A flow is a difference between points |
 | A build is first read where its first upload is plotted, and not at a point whose step cuts off its earlier uploads | Baseline is an inventory arriving, never the window starting |
-| Restored and returned after a gap are never counted | They are about scans running, and this axis reads inventories |
+| The closure a return reverses is the latest of its findings to close, in a build the point before reads, by the moment that build is read at | The departure the point before shows |
 | The findings are read once, from the earliest moment any build is read at through now | Cost follows the oldest point plotted (`design-docs/analytics-measurements.md` § Build date axis) |
 
 ### Home

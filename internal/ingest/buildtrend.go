@@ -77,12 +77,9 @@ func (s *Store) BuiltTrend(ctx context.Context, subject access.Subject, scope fi
 	runsOf := map[int64][]time.Time{}
 	for start := 0; start < len(builds); start += database.BatchSize {
 		var runs []finding.Run
-		if err := s.db.NewSelect().Model(&runs).
+		if err := finding.Judging(s.db.NewSelect().Model(&runs).
 			Column("build_id", "started_at").
-			Where(`"build_id" IN (?)`, bun.List(builds[start:min(start+database.BatchSize, len(builds))])).
-			Where(`"checked_scan_id" IS NULL`).
-			Where(`"finished_at" IS NOT NULL`).
-			Where(`COALESCE("failure", '') = ''`).
+			Where(`"build_id" IN (?)`, bun.List(builds[start:min(start+database.BatchSize, len(builds))]))).
 			Where(`"started_at" >= ?`, earliest).
 			Order("started_at ASC", "id ASC").
 			Scan(ctx); err != nil {
@@ -149,13 +146,11 @@ func (s *Store) BuiltTrend(ctx context.Context, subject access.Subject, scope fi
 				continue
 			}
 			r.Builds[build] = ups[n-1].read
-			// Its first upload, read here and at no reading before.
-			if n == 1 {
-				before := false
-				if k > 0 {
-					_, before = readings[k-1].Builds[build]
-				}
-				r.First[build] = !before
+			// Its first upload is plotted here: a step holding two of its
+			// uploads still holds its first, and a step cutting off its
+			// earlier uploads does not.
+			if stepEnd(ups[0].BuiltAt).Equal(at) {
+				r.First[build] = true
 			}
 		}
 		readings[k] = r

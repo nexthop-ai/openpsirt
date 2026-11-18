@@ -47,7 +47,10 @@ func (s *Store) TrendBuilds(ctx context.Context, subject access.Subject, scope S
 //     first read here;
 //   - baseline: open now for the first time, held only by builds first read
 //     here;
-//   - returned: open now, not at the reading before, open at an earlier one;
+//   - returned: open now, not at the reading before, open at an earlier one,
+//     other than restored;
+//   - restored: a return whose departure was a removal by an upload that
+//     moved a sharp share of its build's inventory, the calendar trend's rule;
 //   - corrected: open at the reading before, not now, and every one of its
 //     findings that closed in between closed by a resolution.
 //
@@ -105,7 +108,16 @@ func (s *Store) TrendAtReadings(ctx context.Context, subject access.Subject, sco
 	openAt := func(row trendRow, at time.Time) bool {
 		return !row.OpenedAt.After(at) && (row.ClosedAt == nil || row.ClosedAt.After(at))
 	}
+	// A return is told from a broken inventory put right by the closure it
+	// reverses, asked once every return is known, as on the calendar trend.
+	type comeBack struct {
+		point    int
+		severity string
+		closure  *trendRow
+	}
+	var returns []comeBack
 	for i := 0; i < len(rows); {
+		from := i
 		id := rows[i].key()
 		clear(open)
 		clear(rank)
@@ -155,8 +167,8 @@ func (s *Store) TrendAtReadings(ctx context.Context, subject access.Subject, sco
 			case open[k] && !was:
 				switch {
 				case slices.Contains(open[:max(k-1, 0)], true):
-					points[k].Returned++
-					points[k].ReturnedBySeverity[band[k]]++
+					returns = append(returns, comeBack{point: k, severity: band[k],
+						closure: reversedBy(rows[from:i], readings[k-1])})
 				case fresh[k]:
 					points[k].Baseline++
 				case k > 0:
@@ -169,5 +181,40 @@ func (s *Store) TrendAtReadings(ctx context.Context, subject access.Subject, sco
 			}
 		}
 	}
+
+	closures := make([]*trendRow, 0, len(returns))
+	for _, r := range returns {
+		closures = append(closures, r.closure)
+	}
+	sharp, err := s.sharpRemovals(ctx, closures)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range returns {
+		if sharp[r.closure] {
+			points[r.point].Restored++
+		} else {
+			points[r.point].Returned++
+			points[r.point].ReturnedBySeverity[r.severity]++
+		}
+	}
 	return points, nil
+}
+
+// reversedBy is the closure that took an issue out of the open set by this
+// reading: the latest of its findings to close, in a build the reading names,
+// by the moment that build is read at. Absent where none closed.
+func reversedBy(rows []trendRow, r Reading) *trendRow {
+	var last *trendRow
+	for i := range rows {
+		row := &rows[i]
+		at, read := r.Builds[row.BuildID]
+		if !read || row.ClosedAt == nil || row.ClosedAt.After(at) {
+			continue
+		}
+		if last == nil || row.ClosedAt.After(*last.ClosedAt) {
+			last = row
+		}
+	}
+	return last
 }
