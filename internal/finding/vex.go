@@ -77,6 +77,10 @@ type Statement struct {
 	Justification string `bun:"justification"`
 	StatementID   *int64 `bun:"statement_id"`
 	Statement     string `bun:"statement,scanonly"`
+	// Notes is the status notes they gave, whatever the status, stored as the
+	// reasoning is and pointed at by NotesID; filled by withWords.
+	NotesID *int64 `bun:"notes_id"`
+	Notes   string `bun:"notes,scanonly"`
 	// Remediation is the CSAF remediation category the statement gave the
 	// affected products it names, such as none_available or no_fix_planned:
 	// what decides the outcome an affected statement offers. Empty where the
@@ -114,7 +118,8 @@ type Statement struct {
 // withWords reads every column of the statements a query selects, and the
 // reasoning each points at.
 func withWords(q *bun.SelectQuery) *bun.SelectQuery {
-	return q.ColumnExpr("?TableColumns").Join(WordsJoin("ss")).ColumnExpr(WordsColumn + ` AS "statement"`)
+	return q.ColumnExpr("?TableColumns").Join(WordsJoin("ss")).ColumnExpr(WordsColumn + ` AS "statement"`).
+		Join(NotesJoin("ss")).ColumnExpr(NotesColumn + ` AS "notes"`)
 }
 
 // StatementOf is one claim a document makes, about one of the components it
@@ -131,6 +136,7 @@ func StatementOf(claim sbom.Suppression, at sbom.Target) Statement {
 		Status:        string(claim.Status),
 		Justification: claim.Justification,
 		Statement:     claim.Statement,
+		Notes:         claim.Notes,
 		SaidAt:        claim.SaidAt,
 		Remediation:   at.Remediation,
 	}
@@ -429,6 +435,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			claims[i].WithinAbout = bound.HeadRunes(claims[i].WithinAbout, database.NameWidth)
 			claims[i].Justification = bound.HeadRunes(claims[i].Justification, database.NameWidth)
 			claims[i].Statement = WordsOf(claims[i].Statement)
+			claims[i].Notes = WordsOf(claims[i].Notes)
 			if claims[i].SaidAt == nil {
 				claims[i].SaidAt = from.SaidAt
 			}
@@ -449,6 +456,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
 				"within_about", "placement", "status", "justification", "remediation", "said_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
+			Join(NotesJoin("ss")).ColumnExpr(NotesColumn+` AS "notes"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
@@ -481,6 +489,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
 				"within_about", "placement", "status", "justification", "remediation", "said_at", "superseded_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
+			Join(NotesJoin("ss")).ColumnExpr(NotesColumn+` AS "notes"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
@@ -533,9 +542,9 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		}
 
 		toInsert := fresh
-		words := make([]string, 0, len(toInsert))
+		words := make([]string, 0, 2*len(toInsert))
 		for _, one := range toInsert {
-			words = append(words, one.Statement)
+			words = append(words, one.Statement, one.Notes)
 		}
 		stored, err := internWords(ctx, tx, words)
 		if err != nil {
@@ -543,6 +552,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		}
 		for i := range toInsert {
 			toInsert[i].StatementID = wordsID(stored, toInsert[i].Statement)
+			toInsert[i].NotesID = wordsID(stored, toInsert[i].Notes)
 			// The store assigns identity, so a key on the way in is cleared
 			// rather than stated. The engine writes the key it assigned back
 			// into the value it inserted, so a key stated here would be one an
@@ -810,7 +820,7 @@ const (
 // its own on the next reading.
 func claimOf(one Statement) string {
 	return strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
-		one.About, one.Status, one.Justification, one.Statement}, "\x00")
+		one.About, one.Status, one.Justification, one.Statement, one.Notes}, "\x00")
 }
 
 // placementOf is where a statement places its supplier's product.
@@ -935,7 +945,7 @@ func sameReading(held, said []Statement) bool {
 			}
 			out[i] = strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
 				one.About, one.WithinPurl, one.Within, one.WithinAbout, one.Placement, one.Status,
-				one.Justification, one.Remediation, one.Statement, said}, "\x00")
+				one.Justification, one.Remediation, one.Statement, one.Notes, said}, "\x00")
 		}
 		slices.Sort(out)
 		return out

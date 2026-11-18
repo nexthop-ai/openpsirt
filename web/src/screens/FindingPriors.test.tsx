@@ -84,6 +84,30 @@ describe("what others have said about an undecided finding", () => {
     });
   });
 
+  it("shows a statement's status notes as written and carries them into the form", async () => {
+    const startFrom = vi.fn();
+    const notes = "Backported in **3.8-2**; see <b>DSA-1</b>";
+    mount.render(
+      <Priors
+        publishers={[{ ...said, status: "fixed", statement: undefined, notes }]}
+        similar={[]}
+        elsewhere={[]}
+        extending={false}
+        setExtending={vi.fn()}
+        startFrom={startFrom}
+        mayTriage
+      />,
+    );
+    expect(mount.host().textContent).toContain(notes);
+    expect(mount.host().querySelector(".why b, .why strong")).toBeNull();
+    await press(mount.host(), "Start from this");
+    expect(startFrom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reasoning: `Broadcom says fixed of 3.8\n${notes}\n\n`,
+      }),
+    );
+  });
+
   it("applies an approved decision here by extending it", async () => {
     const { startFrom, setExtending } = draw();
     await press(mount.host(), "Apply decision #41 to this issue →");

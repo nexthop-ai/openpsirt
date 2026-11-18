@@ -93,6 +93,7 @@ func (g *Generator) openVEXDocument(product *catalog.Product, branchOrTag, branc
 			Vulnerability: vex.Issue{Name: fact.Issue, Aliases: fact.Aliases},
 			Timestamp:     fact.Since, Products: []vex.Shipped{shipped}, Status: fact.Status,
 			Justification: fact.Justification, ImpactStatement: fact.Impact,
+			StatusNotes: fact.Notes,
 		}
 		if fact.Status == vex.Affected {
 			statement.ActionStatement = fact.Action

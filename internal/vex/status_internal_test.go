@@ -76,7 +76,7 @@ func TestAFixIsNeverStatedWithoutTheMomentItWasSeen(t *testing.T) {
 		{VulnerabilityID: 1, Identifier: "CVE-2026-1", Component: "libnl", First: 5},
 		{VulnerabilityID: 2, Identifier: "CVE-2026-2", Component: "zlib", First: 7},
 	}
-	fixed := datedFixes(rows, map[int64]time.Time{7: seen})
+	fixed := datedFixes(rows, map[int64]patchSeen{7: {ID: 7, ClosedAt: seen}})
 	if len(fixed) != 1 || fixed[0].Component != "zlib" || !fixed[0].PatchedAt.Equal(seen) {
 		t.Errorf("stated %+v fixed, want zlib alone, as of %v", fixed, seen)
 	}

@@ -122,6 +122,13 @@ type Statement struct {
 	// absent, because the justification beside it is what the format asks for
 	// and silence says less wrongly than the wrong text.
 	ImpactStatement string `json:"impact_statement,omitempty"`
+	// StatusNotes is what the claim behind a statement said about its status,
+	// where the statement passes on somebody else's claim: the notes of the
+	// build's own claim on a patch it declares, and a supplier's notes, in
+	// its name, on its statement. A statement from a decision made here has
+	// none, because the decision's only words beyond the mitigation are its
+	// reasoning.
+	StatusNotes string `json:"status_notes,omitempty"`
 }
 
 // Issue is a vulnerability, by the name it is filed under here.
@@ -380,7 +387,8 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 			Products: []Shipped{{
 				ID: shipped, Subcomponents: []Inside{{ID: subject(row.Purl, row.Component)}},
 			}},
-			Status: Fixed,
+			Status:      Fixed,
+			StatusNotes: row.Notes,
 		})
 	}
 
@@ -397,6 +405,7 @@ func (s *Store) document(ctx context.Context, who publisher.Named, named *catalo
 			Status:          NotAffected,
 			Justification:   known(row.Justification),
 			ImpactStatement: row.attributed(),
+			StatusNotes:     row.attributedNotes(),
 		})
 	}
 
@@ -548,6 +557,9 @@ type fixedByPatch struct {
 	Component       string
 	Purl            string
 	PatchedAt       time.Time
+	// Notes is the status notes of the claim that closed the group's first
+	// finding, empty where it gave none.
+	Notes string
 }
 
 // patched reads what the build's own patches fix, which is said as fixed.
@@ -578,31 +590,42 @@ func (s *Store) patched(ctx context.Context, buildID int64,
 	for _, row := range rows {
 		ids = append(ids, row.First)
 	}
-	var dated []struct {
-		ID       int64     `bun:"id"`
-		ClosedAt time.Time `bun:"closed_at"`
-	}
+	var dated []patchSeen
 	where, args := database.InAnyOf(`"f"."id"`, ids)
 	if err := s.idb().NewSelect().
 		TableExpr(`"finding" AS "f"`).
+		// By primary key alone, the claim and its notes as the finding's
+		// closing time is: the claim that closed the finding is the one whose
+		// notes the statement carries.
+		Join(`LEFT JOIN "suppression" AS "sup" ON "sup"."id" = "f"."suppressed_by"`).
+		Join(finding.NotesJoin("sup")).
 		ColumnExpr(`"f"."id" AS "id"`).
 		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
+		ColumnExpr(finding.NotesColumn+` AS "notes"`).
 		Where(where, args...).
 		Scan(ctx, &dated); err != nil {
 		return nil, fmt.Errorf("read when the build's patches were seen: %w", err)
 	}
-	when := make(map[int64]time.Time, len(dated))
+	when := make(map[int64]patchSeen, len(dated))
 	for _, row := range dated {
-		when[row.ID] = row.ClosedAt
+		when[row.ID] = row
 	}
 
 	return datedFixes(rows, when), nil
 }
 
+// patchSeen is when a patch closed one finding, and the status notes of the
+// claim that closed it.
+type patchSeen struct {
+	ID       int64     `bun:"id"`
+	ClosedAt time.Time `bun:"closed_at"`
+	Notes    string    `bun:"notes"`
+}
+
 // datedFixes states each group fixed as of the moment its first finding
 // closed. A group whose finding the second read missed is left out, as a
 // supplier's statement is: a fix dated the zero moment is a claim nobody made.
-func datedFixes(rows []closedGroup, when map[int64]time.Time) []fixedByPatch {
+func datedFixes(rows []closedGroup, when map[int64]patchSeen) []fixedByPatch {
 	fixed := make([]fixedByPatch, 0, len(rows))
 	for _, row := range rows {
 		at, found := when[row.First]
@@ -611,7 +634,7 @@ func datedFixes(rows []closedGroup, when map[int64]time.Time) []fixedByPatch {
 		}
 		fixed = append(fixed, fixedByPatch{
 			VulnerabilityID: row.VulnerabilityID, Identifier: row.Identifier,
-			Component: row.Component, Purl: row.Purl, PatchedAt: at,
+			Component: row.Component, Purl: row.Purl, PatchedAt: at.ClosedAt, Notes: at.Notes,
 		})
 	}
 	return fixed
@@ -643,6 +666,7 @@ type statedBySupplier struct {
 	Version         string
 	Justification   string
 	Statement       string
+	Notes           string
 	Document        string
 	ClosedAt        time.Time
 }
@@ -659,6 +683,16 @@ func (s statedBySupplier) attributed() string {
 		said += " " + s.Statement
 	}
 	return said
+}
+
+// attributedNotes is the supplier's status notes in their name, and nothing
+// where they gave none. A note passed on under this deployment's authorship
+// without a name on it reads as this deployment's.
+func (s statedBySupplier) attributedNotes() string {
+	if s.Notes == "" {
+		return ""
+	}
+	return fmt.Sprintf("Per %s: %s", s.Publisher, s.Notes)
 }
 
 // disclaimed reads what suppliers' statements about their own products, and an
@@ -697,6 +731,7 @@ func (s *Store) disclaimed(ctx context.Context, buildID int64,
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "f"."stated_by"`).
 		Join(finding.WordsJoin("ss")).
+		Join(finding.NotesJoin("ss")).
 		ColumnExpr(`"f"."id" AS "id"`).
 		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
 		ColumnExpr(`"ss"."publisher" AS "publisher"`).
@@ -704,6 +739,7 @@ func (s *Store) disclaimed(ctx context.Context, buildID int64,
 		ColumnExpr(`COALESCE("ss"."within_about", "ss"."about") AS "version"`).
 		ColumnExpr(`COALESCE("ss"."justification", '') AS "justification"`).
 		ColumnExpr(finding.WordsColumn+` AS "statement"`).
+		ColumnExpr(finding.NotesColumn+` AS "notes"`).
 		ColumnExpr(`"ss"."document" AS "document"`).
 		Where(where, args...).
 		Scan(ctx, &read); err != nil {
@@ -721,6 +757,7 @@ type supplierWords struct {
 	Version       string    `bun:"version"`
 	Justification string    `bun:"justification"`
 	Statement     string    `bun:"statement"`
+	Notes         string    `bun:"notes"`
 	Document      string    `bun:"document"`
 }
 
@@ -745,7 +782,7 @@ func attributedTo(rows []closedGroup, read []supplierWords) []statedBySupplier {
 			VulnerabilityID: row.VulnerabilityID, Identifier: row.Identifier,
 			Component: row.Component, Purl: row.Purl,
 			Publisher: one.Publisher, Product: one.Product, Version: one.Version,
-			Justification: one.Justification, Statement: one.Statement,
+			Justification: one.Justification, Statement: one.Statement, Notes: one.Notes,
 			Document: one.Document, ClosedAt: one.ClosedAt,
 		})
 	}

@@ -12,6 +12,7 @@ Satisfies REQ-08, REQ-11, REQ-18, REQ-31, REQ-66.
 - [Stored claims](#stored-claims)
 - [Administrator-supplied VEX](#administrator-supplied-vex)
 - [Supplier advisories](#supplier-advisories)
+- [Status notes](#status-notes)
 - [Name folding](#name-folding)
 - [Limits](#limits)
 
@@ -65,7 +66,7 @@ What each claim does to a finding is `design-docs/findings-closure.md`
 | A claim stores its product's package identifier, name and version beside the subject; a claim naming no product keys as before products were stored | zlib inside curl and every zlib are two claims |
 | A scan's claim stores the package identifier, the name, and a version stated outside the identifier, which joins its identity | 4.2 and 5.0 are two claims |
 | A claim naming no package and its version only as a branch covers that version alone, and closes and reopens once on the first scan after the upgrade | acme-fw 4.2 leaves acme-fw 5.0 open |
-| The carried patches read shows the version: "acme-fw 4.2" | |
+| The carried patches read shows the version, "acme-fw 4.2", and the claim's status notes | |
 | Reasoning given joins the identity, so a new explanation closes one claim and opens another; v0.9.0's upgrade rekeys every stored claim so none reopens | |
 | The subject's name is kept as spelled and folded beside it | |
 | A claim, a published statement and a supplier's statement keep the package identifiers their document wrote, any credential in a qualifier included, and are read only by readers of their build or product; no published document names one | A token is the uploader's or the supplier's, and identity reads the identifier as written. The published documents name components and builds by the identifiers inventories state, stored without a credential (`design-docs/data-model-components.md` § Component identity) |
@@ -146,6 +147,26 @@ claim.
 | The second bound defaults to about 170 MB | About 170 bytes an entry; a real kernel advisory, 794 identifiers named 220,088 times in 27 MB, spends a fifth |
 | One document's claims are written in batches | `design-docs/ingest-measurements.md` § Claim writes |
 
+## Status notes
+
+An OpenVEX statement's `status_notes` say why it has the status it has, at any
+status, and are the one field explaining a `fixed` or `under_investigation`
+statement. They are kept with the claim from every path the OpenVEX reader
+serves: a build's own document, an administrator's upload, and an upstream's
+document.
+
+| Rule | Reason |
+|---|---|
+| The notes are read at every status, beside the impact or action statement and never in its place | The format applies them to any status |
+| Notes are text: invalid bytes and NUL repaired, cut on a character boundary to the bound a typed markdown field has, never refused | The words are somebody else's; one long explanation refuses no scan |
+| Stored once however many subjects the statement names, in the store the reasoning uses, and pointed at by the claim or statement | A statement naming thousands of components repeats one explanation |
+| Notes join a build's claim identity where given; a claim giving none keys as before notes were stored | A new explanation closes one claim and opens another, as new reasoning does |
+| Notes are part of what a received statement claims: a revision changing only its notes sets the statement aside | An approval cites the words it read |
+| A statement about the build's root carries its notes into the build's claim | |
+| Shown and never rendered, on every screen that shows them | A third party's text reaches the staff with the most access (REQ-66) |
+| A CSAF document states no notes on a product's status; its vulnerability notes describe the issue and are not read as a claim's | |
+| A CycloneDX inventory's vulnerability analysis is not read, so its `detail` is not either | Only a pedigree patch is read from CycloneDX |
+
 ## Name folding
 
 | Rule | Reason |
@@ -158,3 +179,4 @@ claim.
 | Limit | Detail |
 |---|---|
 | The range a status list implies is not read | Only enumerated versions carry a claim |
+| The review queue of an upstream's offered statements and the register's closing statement show no status notes | The notes are stored and read on the finding and in the build's claims |

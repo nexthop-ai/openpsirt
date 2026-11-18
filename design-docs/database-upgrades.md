@@ -277,20 +277,30 @@ brings together, one lapses.
 
 ## The v0.14.0 upgrade
 
-Migration 48. Three indexes are made again, each holding one more column.
+Migration 48. Three indexes are made again, each holding one more column, and
+two tables gain a column.
 
 | Table | Gains |
 |---|---|
 | `finding` | The group index holds the run that opened a finding, last, so it holds every column the trend and the burndown group one build by (`design-docs/analytics.md` § Computed on demand) |
 | `finding` | The opened-run and closed-run indexes hold why a finding closed, last, so what each upload changed is counted from them alone |
+| `suppression` | The status notes a build's claim gives, null for every claim stored before (`design-docs/ingest-claims.md` § Status notes) |
+| `received_vex_statement` | The status notes a received statement gives, null for every statement stored before |
+
+The first upload or fetch after the upgrade of a document whose statements give
+status notes reads them as changed: each is set aside and recorded again with
+its notes, as a revision is. The first scan after the upgrade of a build whose
+claims give notes closes each and opens it again the same way.
 
 Each index is dropped and made again, so an upgrade stopped between the two
-makes it.
+makes it. Each column is added where the table lacks it, so a start that
+stopped after the first, as MySQL and MariaDB leave one, adds the second.
 
 | Check, on each engine | What it holds |
 |---|---|
-| A v0.13.0 database | Upgraded, the table built as declared |
+| A v0.13.0 database | Upgraded, the tables built as declared |
 | The same, upgraded and run again with its version unrecorded | Upgraded the same |
+| A v0.13.0 database whose claims already gained the notes column | Upgraded, the tables built as declared |
 
 ## Limits
 

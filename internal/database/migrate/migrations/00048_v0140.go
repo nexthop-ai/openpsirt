@@ -30,8 +30,13 @@ func upV0140(ctx context.Context, sqldb *sql.DB) error {
 //   - A finding's group index holds the run that opened it, and its run
 //     indexes why it closed, so the trend and what each upload changed read
 //     no table row.
+//   - A build's own claims and received statements keep the status notes each
+//     gives.
 func upgradeV0140(ctx context.Context, tx bun.Tx) error {
-	for _, step := range []func(context.Context, bun.Tx) error{findingIndexesV0140} {
+	for _, step := range []func(context.Context, bun.Tx) error{
+		findingIndexesV0140,
+		statementNotesV0140,
+	} {
 		if err := step(ctx, tx); err != nil {
 			return err
 		}

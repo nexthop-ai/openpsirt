@@ -78,6 +78,10 @@ type Suppression struct {
 	// not affected, and Statement is what was written alongside it.
 	Justification string
 	Statement     string
+	// Notes is what the claim says about its status, whatever the status: an
+	// OpenVEX statement's status notes. The one place a producer explains a
+	// claim of fixed or under investigation. Empty where it says nothing.
+	Notes string
 	// Targets are what the claim points at. A claim with none applies to
 	// nothing, which is worth seeing rather than silently discarding.
 	Targets []Target

@@ -242,7 +242,9 @@ func StatementsV0130(engine database.Engine) map[string][]string {
 func StatementsV0140(engine database.Engine) map[string][]string {
 	t := typesFor(engine)
 	return map[string][]string{
-		"finding": findingV0140(t),
+		"finding":                findingV0140(t),
+		"received_vex_statement": receivedStatementV0140(t),
+		"suppression":            suppressionV0140(t),
 	}
 }
 
@@ -419,4 +421,19 @@ func IdentifyingNameV0130(name, version, purl string) string {
 // advisory it rewrites, for a test holding it to the application's.
 func SettledDigestV0130(body []byte) (string, error) {
 	return settledDigestV0130(body)
+}
+
+// StopV0140AfterClaimNotes adds the status notes column to a build's own claims
+// and nothing else: a start of the v0.14.0 upgrade on MySQL or MariaDB that
+// stopped after that column committed.
+func StopV0140AfterClaimNotes(ctx context.Context, db *database.DB) error {
+	ctx = migrate.WithEngine(ctx, db.Server.Engine, slog.New(slog.DiscardHandler))
+	return inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return u.change(suppressionV0140(u.t), change{table: "suppression",
+			add: []added{{column: "notes_id"}}})
+	})
 }

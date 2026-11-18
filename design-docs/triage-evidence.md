@@ -105,6 +105,7 @@ rejecting the absence of a fix as a signal.
 | The same bytes again change nothing | Supersession notifies holders of approvals citing it |
 | Shown against the package named, type and namespace compared, never the version | A short name such as `parser` is many packages |
 | The version a statement was made about is stored and shown beside it | A supplier names the fixing version; some state it only as a branch |
+| A statement's status notes are shown beneath its reasoning, labeled notes, as written and never rendered, and "Start from this" carries them into the reasoning on the line after the publisher's words (`design-docs/ingest-claims.md` § Status notes) | The notes are the explanation a `fixed` or `under_investigation` statement has |
 | A source-tree claim shows however named | Bare name and generic identifier are one claim |
 
 ## Decided elsewhere

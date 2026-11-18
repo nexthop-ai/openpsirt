@@ -162,6 +162,14 @@ export function CarriedPatches({
                               </span>
                             </>
                           )}
+                          {row.notes && (
+                            <>
+                              <br />
+                              <span className="hint" style={{ whiteSpace: "pre-wrap" }}>
+                                {row.notes}
+                              </span>
+                            </>
+                          )}
                         </td>
                         <td className="hint">{on(row.since)}</td>
                         <td>

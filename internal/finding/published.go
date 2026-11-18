@@ -92,7 +92,8 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, buildID int64
 			row := Claim{
 				BuildID: buildID, Vulnerability: one.Vulnerability,
 				Status: one.Status, Justification: one.Justification,
-				StatementID: one.StatementID, Statement: one.Statement, Origin: Published,
+				StatementID: one.StatementID, Statement: one.Statement,
+				NotesID: one.NotesID, Notes: one.Notes, Origin: Published,
 				SubjectPurl: one.Purl, SubjectName: spelled(one),
 				SubjectFolded:  one.Component,
 				SubjectVersion: statedBeside(sbom.Target{Purl: one.Purl, Version: one.About}),

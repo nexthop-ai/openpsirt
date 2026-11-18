@@ -8883,6 +8883,8 @@ export interface components {
             document?: string;
             /** @description The VEX justification term it gave */
             justification?: string;
+            /** @description The status notes it gave, at any status: an OpenVEX statement's status_notes. Plain text, never markdown */
+            notes?: string;
             /** @description Whether the claim arrived on the component itself, as a patch declaring what it fixes */
             pedigree?: boolean;
             /** @description Whose VEX document the claim came from, where it was uploaded on its own rather than with the inventory */
@@ -9181,6 +9183,8 @@ export interface components {
         };
         CarriedDecisionBody: {
             justification?: string;
+            /** @description The status notes the build gave, at any status, shown as written and never rendered */
+            notes?: string;
             /** @description The claim arrived attached to a component — a carried patch saying what it fixes — rather than in a document of its own */
             pedigree: boolean;
             /** @description The date the build first said it, by the scan it arrived in */
@@ -15477,6 +15481,8 @@ export interface components {
             identifier?: string;
             /** @description The term they gave for it, where the status is one that takes one */
             justification?: string;
+            /** @description The status notes they gave, at any status: an OpenVEX statement's status_notes. Plain text, never markdown */
+            notes?: string;
             /**
              * @description The outcome this offers as a prefill, where it was made about the version shipped here. Never applied by itself
              * @enum {string}
@@ -16030,6 +16036,7 @@ export interface components {
             justification?: string;
             products: components["schemas"]["Shipped"][] | null;
             status: string;
+            status_notes?: string;
             /** Format: date-time */
             timestamp: string;
             vulnerability: components["schemas"]["Issue"];

@@ -892,6 +892,14 @@ export function Finding() {
                     <p style={{ whiteSpace: "pre-wrap" }}>{one.statement}</p>
                   </div>
                 )}
+                {one.notes && (
+                  <div className="why">
+                    <span className="hint" title="What the build says about this status">
+                      Notes
+                    </span>
+                    <p style={{ whiteSpace: "pre-wrap" }}>{one.notes}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
