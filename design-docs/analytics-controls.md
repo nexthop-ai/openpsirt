@@ -31,7 +31,7 @@ it was met. A page of the catalog's own (`design-docs/analytics-catalog.md`
 | The row names what pulls the component in beside the occurrence identity | The identity names no location |
 | It narrows by closure reason | A wrong CVE record or supplier statement is found this way |
 | A row closed as unaffected carries the record's lines that closed it, in one cell of a file | The snapshot is replaced by the next |
-| A row a supplier's statement answers carries publisher, product, justification and words, in one cell | On a disclaimed row it closed it; on an open row it answers the routes through the supplier's product |
+| A row a supplier's statement answers carries publisher, product, justification, words and status notes, in one cell, the notes after "Notes:" as written | On a disclaimed row it closed it; on an open row it answers the routes through the supplier's product |
 | It names the upload, its inventory, the run, the scanner, the vulnerability data and the CVE record snapshot | The audit chain runs artifact, inventory, run, scanner and database, disposition |
 | The inventory is a link, never a hash; one let go says so | A tagged release keeps its documents and a branch build does not |
 | It narrows by what stands, outcome, component, issue, and one side of the history, counting the narrowed list | Otherwise later offsets page another list |

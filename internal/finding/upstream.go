@@ -119,8 +119,10 @@ type Offer struct {
 	Build       int64  `bun:"build_id"`
 	Justified   string `bun:"justification"`
 	Reasoning   string `bun:"reasoning"`
-	Identifier  string `bun:"document_id"`
-	Issued      int64  `bun:"vulnerability_id"`
+	// Notes is the statement's status notes, empty where it gave none.
+	Notes      string `bun:"notes"`
+	Identifier string `bun:"document_id"`
+	Issued     int64  `bun:"vulnerability_id"`
 }
 
 // MostOffers bounds one page of offers. The queue is read by a person, and a
@@ -199,6 +201,7 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 		Join(`JOIN "variant" AS "va" ON "va"."id" = "b"."variant_id"`).
 		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "f"."vulnerability_id"`).
 		Join(WordsJoin("ss")).
+		Join(NotesJoin("ss")).
 		ColumnExpr(`"ss"."id" AS "statement_id"`).
 		ColumnExpr(`"st"."name" AS "branch_or_tag"`).
 		ColumnExpr(`"va"."name" AS "variant"`).
@@ -217,6 +220,7 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 		ColumnExpr(`COALESCE("ss"."within", '') AS "within"`).
 		ColumnExpr(`COALESCE("ss"."justification", '') AS "justification"`).
 		ColumnExpr(WordsColumn+` AS "reasoning"`).
+		ColumnExpr(NotesColumn+` AS "notes"`).
 		Where(`"ss"."source" = ?`, FromUpstream).
 		Where(`"ss"."placement" IS NULL`).
 		Where(`"ss"."superseded_at" IS NULL`).

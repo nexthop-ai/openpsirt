@@ -9643,6 +9643,9 @@ components:
         justification:
           description: The reason the upstream gives for a status of not affected
           type: string
+        notes:
+          description: The status notes the upstream gave, at any status. Plain text, never markdown
+          type: string
         product:
           description: The product the finding is in, by name
           type: string
@@ -14099,6 +14102,9 @@ components:
         justification:
           description: The justification the supplier gave, in the exchange format's vocabulary
           type: string
+        notes:
+          description: The status notes the supplier gave. Plain text, never markdown
+          type: string
         product:
           description: The supplier's product the statement is about
           type: string
@@ -15191,6 +15197,9 @@ components:
           type: string
         justification:
           description: The reason the upstream gives for a status of not affected
+          type: string
+        notes:
+          description: The status notes the upstream gave, at any status. Plain text, never markdown
           type: string
         publisher:
           description: The upstream that published it

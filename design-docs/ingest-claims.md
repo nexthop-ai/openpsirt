@@ -179,4 +179,3 @@ document.
 | Limit | Detail |
 |---|---|
 | The range a status list implies is not read | Only enumerated versions carry a claim |
-| The review queue of an upstream's offered statements and the register's closing statement show no status notes | The notes are stored and read on the finding and in the build's claims |

@@ -13370,6 +13370,8 @@ export interface components {
             issue: string;
             /** @description The reason the upstream gives for a status of not affected */
             justification?: string;
+            /** @description The status notes the upstream gave, at any status. Plain text, never markdown */
+            notes?: string;
             /** @description The product the finding is in, by name */
             product: string;
             /** @description The upstream that published it */
@@ -16013,6 +16015,8 @@ export interface components {
             document: string;
             /** @description The justification the supplier gave, in the exchange format's vocabulary */
             justification?: string;
+            /** @description The status notes the supplier gave. Plain text, never markdown */
+            notes?: string;
             /** @description The supplier's product the statement is about */
             product: string;
             /** @description Who published the statement */
@@ -16607,6 +16611,8 @@ export interface components {
             issue: string;
             /** @description The reason the upstream gives for a status of not affected */
             justification?: string;
+            /** @description The status notes the upstream gave, at any status. Plain text, never markdown */
+            notes?: string;
             /** @description The upstream that published it */
             publisher: string;
             /** @description The upstream's own words */

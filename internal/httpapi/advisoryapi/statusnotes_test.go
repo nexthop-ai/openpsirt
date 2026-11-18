@@ -8,6 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nexthop-ai/openpsirt/internal/access"
+	"github.com/nexthop-ai/openpsirt/internal/catalog"
+	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/httpapi/advisoryapi"
 	"github.com/nexthop-ai/openpsirt/internal/httpapi/httpapitest"
 	"github.com/nexthop-ai/openpsirt/internal/sbom"
 )
@@ -44,6 +48,25 @@ func TestASuppliersStatusNotesAreShownAndPublishedInItsName(t *testing.T) {
 		if len(detail.Said) != 1 || detail.Said[0].Notes != notedSays ||
 			detail.Said[0].Statement != "Acme Y never calls inflateGetHeader()." {
 			t.Errorf("the finding shows %+v, want the supplier's words and its notes as written", detail.Said)
+		}
+
+		// The register states the closing statement with its notes, in the
+		// list and in the file.
+		var register struct {
+			Items []struct {
+				Stated *struct {
+					Notes string `json:"notes"`
+				} `json:"stated"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", build+"/register?closed_because=disclaimed", &register)
+		if len(register.Items) != 1 || register.Items[0].Stated == nil ||
+			register.Items[0].Stated.Notes != notedSays {
+			t.Errorf("the register lists %+v, want the closing statement with its notes", register.Items)
+		}
+		file := httpapitest.AsPerson(t, r, "triager", http.MethodGet, build+"/register.csv", "")
+		if file.Code != http.StatusOK || !strings.Contains(file.Body.String(), "Notes: "+notedSays) {
+			t.Errorf("the register file answered %d without the notes:\n%s", file.Code, file.Body.String())
 		}
 
 		var doc struct {
@@ -118,6 +141,51 @@ func TestABuildsStatusNotesAreShownAndPublishedOnItsPatch(t *testing.T) {
 		}
 		if notes, ok := stated["CVE-2026-1000 not_affected"]; !ok || notes != "" {
 			t.Errorf("the document states %v, want the dismissal with no notes", stated)
+		}
+	})
+}
+
+// An upstream's status notes are shown with its statement where it is offered
+// for review and where a component's upstream statements are listed.
+func TestAnUpstreamsStatusNotesAreShownWhereItsStatementIsReviewed(t *testing.T) {
+	httpapitest.EachReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		r.Scanned(t)
+		ctx := t.Context()
+		held, err := catalog.NewStore(r.DB.DB).ProductByName(ctx, "mine")
+		if err != nil {
+			t.Fatal(err)
+		}
+		admin, err := r.Rights.ByIdentity(ctx, "admin")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, _, err := finding.NewStore(r.DB.DB).RecordStatements(ctx,
+			access.Subject{Kind: access.Person, ID: admin.ID}, held.ID, finding.Supplied{
+				Source: finding.FromUpstream, Identifier: "VEX-upstream-mine",
+				Publisher: "Example Upstream", Document: "https://upstream.example.test/mine.json",
+				Digest: strings.Repeat("b", 64),
+			}, []finding.Statement{{
+				Vulnerability: "CVE-2026-9999", Purl: "pkg:deb/debian/libnl-3-200@3.7.0",
+				Component: "libnl-3-200", About: "3.7.0", Status: "not_affected",
+				Justification: "vulnerable_code_not_present", Notes: notedSays,
+			}}); err != nil {
+			t.Fatal(err)
+		}
+
+		var offers struct {
+			Items []advisoryapi.OfferBody `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/upstream-offers", &offers)
+		if len(offers.Items) != 1 || offers.Items[0].Notes != notedSays {
+			t.Errorf("offered %+v, want the upstream's statement with its notes as written", offers.Items)
+		}
+
+		var said struct {
+			Items []advisoryapi.UpstreamSaidBody `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/products/mine/components/libnl-3-200/upstream-statements", &said)
+		if len(said.Items) != 1 || said.Items[0].Notes != notedSays {
+			t.Errorf("the component lists %+v, want the upstream's statement with its notes", said.Items)
 		}
 	})
 }
