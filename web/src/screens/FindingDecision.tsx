@@ -202,6 +202,16 @@ export function Standing({
             )}
           </div>
         )}
+        {/* What a correction by source paths answered this on: the files the
+            record listed then, none under the package's paths. */}
+        {(decision.answered_on ?? []).length > 0 && (
+          <div>
+            <span className="l">Answered on</span>
+            <span className="v mono" title="Files the CVE record listed, all outside the paths">
+              {(decision.answered_on ?? []).join(", ")}
+            </span>
+          </div>
+        )}
         {/* The evidence for a decision that the fix is already here, on the
             screen the decision is read from. It is the one outcome that states
             a fact somebody can check, and it is checked from here. */}

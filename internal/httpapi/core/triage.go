@@ -267,6 +267,7 @@ type DecisionOccurrenceDetail struct {
 	ProposedByName string          `json:"proposed_by_name,omitempty" doc:"Their display name, where it differs from their identity"`
 	ProposedAt     string          `json:"proposed_at" doc:"The moment the decision was made"`
 	AgeDays        int             `json:"age_days" doc:"The age of the decision. An old decision should look like one"`
+	AnsweredOn     []string        `json:"answered_on,omitempty" doc:"The files the issue's CVE record listed when a correction by source paths answered this occurrence, every one outside the paths the package is built from. Absent for any other decision"`
 }
 
 // DecisionArgument renders what a decision says, with the reasoning it
@@ -359,6 +360,14 @@ func DescribeDecisionOccurrences(ctx context.Context, db bun.IDB, store *triage.
 	if err != nil {
 		return nil, err
 	}
+	ids := make([]int64, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		ids = append(ids, occurrence.ID)
+	}
+	answeredOn, err := store.AnsweredOn(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 
 	details := make([]DecisionOccurrenceDetail, 0, len(occurrences))
 	for _, occurrence := range occurrences {
@@ -376,6 +385,7 @@ func DescribeDecisionOccurrences(ctx context.Context, db bun.IDB, store *triage.
 			ProposedByName: who.Label(occurrence.ProposedBy),
 			ProposedAt:     Stamp(occurrence.ProposedAt),
 			AgeDays:        int(store.Age(&occurrence).Hours() / 24),
+			AnsweredOn:     answeredOn[occurrence.ID],
 		})
 	}
 	return details, nil

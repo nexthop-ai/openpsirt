@@ -19,35 +19,37 @@ import (
 const (
 	plainStrings = "a list of plain strings, whose words no type declares"
 	someOutcomes = "a part of triage.Outcomes, which is checked whole"
+	someReasons  = "a part of triage.Justifications, which is checked whole"
 )
 
 // listsApart is every list a route offers that is not held to the constants of
 // its type, with the reason it is not.
 var listsApart = map[string]string{
-	"advisory.ReleaseStatuses":      plainStrings,
-	"advisory.Statuses":             plainStrings,
-	"analysis.CodeFindingAssignees": plainStrings,
-	"analysis.Methods":              plainStrings,
-	"cvss.Bands":                    plainStrings,
-	"finding.AssessmentStates":      plainStrings,
-	"finding.Assignees":             plainStrings,
-	"finding.Bands":                 plainStrings,
-	"finding.BuildSayings":          plainStrings,
-	"finding.LeastFirst":            plainStrings,
-	"finding.MinimumSeverities":     plainStrings,
-	"finding.OutcomesOffered":       plainStrings,
-	"finding.Recordable":            plainStrings,
-	"finding.Sources":               plainStrings,
-	"finding.Supports":              plainStrings,
-	"finding.VexStatuses":           plainStrings,
-	"incident.Malice":               plainStrings,
-	"notify.Platforms":              plainStrings,
-	"sbom.Scopes":                   plainStrings,
-	"triage.CodeFindingOutcomes":    someOutcomes,
-	"triage.OutcomesInBulk":         someOutcomes,
-	"triage.OutcomesOneAtATime":     someOutcomes,
-	"triage.OutcomesThatHideRisk":   someOutcomes,
-	"triage.VulnerabilityOutcomes":  someOutcomes,
+	"advisory.ReleaseStatuses":        plainStrings,
+	"advisory.Statuses":               plainStrings,
+	"analysis.CodeFindingAssignees":   plainStrings,
+	"analysis.Methods":                plainStrings,
+	"cvss.Bands":                      plainStrings,
+	"finding.AssessmentStates":        plainStrings,
+	"finding.Assignees":               plainStrings,
+	"finding.Bands":                   plainStrings,
+	"finding.BuildSayings":            plainStrings,
+	"finding.LeastFirst":              plainStrings,
+	"finding.MinimumSeverities":       plainStrings,
+	"finding.OutcomesOffered":         plainStrings,
+	"finding.Recordable":              plainStrings,
+	"finding.Sources":                 plainStrings,
+	"finding.Supports":                plainStrings,
+	"finding.VexStatuses":             plainStrings,
+	"incident.Malice":                 plainStrings,
+	"notify.Platforms":                plainStrings,
+	"sbom.Scopes":                     plainStrings,
+	"triage.CodeFindingOutcomes":      someOutcomes,
+	"triage.JustificationsCorrecting": someReasons,
+	"triage.OutcomesInBulk":           someOutcomes,
+	"triage.OutcomesOneAtATime":       someOutcomes,
+	"triage.OutcomesThatHideRisk":     someOutcomes,
+	"triage.VulnerabilityOutcomes":    someOutcomes,
 }
 
 // TestEveryOfferedVocabularyIsCheckedOrSetApart holds the lists the routes

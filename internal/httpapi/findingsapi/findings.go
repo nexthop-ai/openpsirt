@@ -552,9 +552,11 @@ type EvidenceBody struct {
 	// way of making it. Recorded as the scanner wrote them and never parsed:
 	// deciding whether a version falls inside a range needs an ordering per
 	// ecosystem, which this does not have and does not attempt.
-	MatchedIn    string `json:"matched_in,omitempty" doc:"The body of vulnerability data that answered, as the scanner names it — an ecosystem's own advisories against the national database's identifiers"`
-	MatchedRange string `json:"matched_range,omitempty" doc:"The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix"`
-	FixedAt      string `json:"fixed_at,omitempty" doc:"The date that version became available"`
+	MatchedIn      string   `json:"matched_in,omitempty" doc:"The body of vulnerability data that answered, as the scanner names it — an ecosystem's own advisories against the national database's identifiers"`
+	MatchedRange   string   `json:"matched_range,omitempty" doc:"The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix"`
+	MatchedThrough string   `json:"matched_through,omitempty" doc:"The source package the scanner matched this through, where every detail of the match was through it. Absent where the match was on the package's own name or a CPE"`
+	RecordFiles    []string `json:"record_files,omitempty" doc:"The source files the issue's CVE record says it is in, as the last scan reading the record had them"`
+	FixedAt        string   `json:"fixed_at,omitempty" doc:"The date that version became available"`
 	// ArrivedFrom says somebody moved this version and the issue came with it.
 	// A different sentence aimed at a different person: whoever did the bump,
 	// rather than whoever triages.
@@ -789,6 +791,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 		FixState: core.FixState(e.FixState), FixedIn: e.FixedIn, ArrivedFrom: e.ArrivedFrom,
 		Matched: core.MatchRoute(e.Matched), MatchedFrom: e.MatchedFrom,
 		MatchedIn: e.MatchedIn, MatchedRange: e.MatchedRange, Recorded: e.Recorded,
+		MatchedThrough: e.MatchedThrough, RecordFiles: e.RecordFiles,
 		LatestVersion: e.LatestVersion, NothingSince: e.NothingSince,
 		AssignedTo: e.AssignedTo, Undisclosed: e.Undisclosed, AssignedByRule: e.AssignedByRule,
 		Labels:      e.Labels,

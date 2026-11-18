@@ -209,6 +209,12 @@ type Evidence struct {
 	// that has one, is the whole argument in a line.
 	MatchedIn    string
 	MatchedRange string
+	// MatchedThrough is the source package the scanner matched this
+	// through, where every detail of the match was through it, and
+	// RecordFiles the files the issue's CVE record lists: together what a
+	// correction by source paths answers on.
+	MatchedThrough string
+	RecordFiles    []string
 }
 
 // occurrencesOf folds the open rows of one finding into the occurrences it sits
@@ -363,6 +369,7 @@ func evidenceFrom(rows []evidenceRow, issue Vulnerability, component graph.Compo
 	evidence.MatchedFrom = rows[0].MatchedFrom
 	evidence.MatchedIn = rows[0].MatchedIn
 	evidence.MatchedRange = rows[0].MatchedRange
+	evidence.MatchedThrough = rows[0].MatchedThrough
 	if component.LatestVersion != nil {
 		evidence.LatestVersion = *component.LatestVersion
 	}
@@ -520,6 +527,7 @@ type evidenceRow struct {
 	MatchedFrom        string     `bun:"matched_from"`
 	MatchedIn          string     `bun:"matched_in"`
 	MatchedRange       string     `bun:"matched_range"`
+	MatchedThrough     string     `bun:"matched_through"`
 	ArrivedFrom        string     `bun:"arrived_from"`
 	Visibility         string     `bun:"visibility"`
 	DiscloseAt         *time.Time `bun:"disclose_at"`
@@ -629,6 +637,7 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, buildID, vul
 		ColumnExpr(`COALESCE("f"."matched_from", '') AS "matched_from"`).
 		ColumnExpr(`COALESCE("f"."matched_in", '') AS "matched_in"`).
 		ColumnExpr(`COALESCE("f"."matched_range", '') AS "matched_range"`).
+		ColumnExpr(`COALESCE("f"."matched_through", '') AS "matched_through"`).
 		ColumnExpr(`COALESCE("f"."arrived_from", '') AS "arrived_from"`).
 		ColumnExpr(`"f"."kind" AS "kind"`).
 		// The first appearance of this occurrence here, and the run that put it
@@ -741,6 +750,11 @@ func (s *Store) Detail(ctx context.Context, subject access.Subject, buildID, vul
 	if evidence.Ratings, err = NewVulnerabilities(s.db).Ratings(ctx, vulnerabilityID); err != nil {
 		return nil, err
 	}
+	files, err := ProgramFiles(ctx, s.db, []int64{vulnerabilityID})
+	if err != nil {
+		return nil, err
+	}
+	evidence.RecordFiles = files[vulnerabilityID]
 
 	// opened is when this first appeared here and what produced it. The
 	// earliest occurrence, because that is the age the deadline relates to, and

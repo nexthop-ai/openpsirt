@@ -197,6 +197,17 @@ function Argument({
             {!decision.argument.scope && <span className="hint">from the reason</span>}
           </div>
         )}
+        {decision.source && (
+          <div>
+            <span className="l">Built from</span>
+            <span className="v mono" title="Paths within the source the package is built from">
+              {(decision.source.paths ?? []).join(", ")}
+            </span>
+            <span className="hint">
+              {decision.source.package} through {decision.source.source}, files outside only
+            </span>
+          </div>
+        )}
         {decision.argument.fixed_version && (
           <div>
             <span className="l">Fixed in</span>

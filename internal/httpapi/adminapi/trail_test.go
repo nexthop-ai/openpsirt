@@ -653,6 +653,7 @@ var outsideTheTrail = map[string]string{
 	"decide":                       "the decision record",
 	"decide-finding":               "the decision record",
 	"decide-in-bulk":               "the decision record",
+	"correct-by-source-paths":      "the decision record",
 	"decide-code-finding":          "the decision record",
 	"record-code-finding-as-flaw":  "the flaw's own record, linked to the code finding; an inclusion it carries is trailed as include-code-finding-in-disclosure's is",
 	"fix-code-finding":             "the decision record",

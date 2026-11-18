@@ -13,6 +13,7 @@ import {
 import { Assess } from "./FindingAssess";
 import { Disclose } from "./FindingDisclose";
 import { Incident } from "./FindingIncident";
+import { SourceMatch } from "./FindingSource";
 import { Notes } from "./FindingNotes";
 import {
   Duplicates,
@@ -689,6 +690,15 @@ export function Finding() {
           version={it.version}
           inData={it.matched_in}
           range={it.matched_range}
+        />
+
+        <SourceMatch
+          product={product}
+          vulnerability={vulnerability}
+          component={it.component ?? ""}
+          through={it.matched_through}
+          files={it.record_files}
+          mayTriage={!!here?.may_triage}
         />
 
         <div className="evblock">

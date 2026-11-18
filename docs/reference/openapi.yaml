@@ -3845,6 +3845,74 @@ components:
         - waiting
         - ruled
       type: object
+    Correct-by-source-pathsRequest:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Correct-by-source-pathsRequest.json
+          format: uri
+          readOnly: true
+          type: string
+        justification:
+          description: Why the issues are not there
+          enum:
+            - component_not_present
+            - vulnerable_code_not_present
+          type: string
+        package:
+          description: The package answered, by the name it is identified by, such as linux-perf
+          maxLength: 191
+          minLength: 1
+          type: string
+        paths:
+          description: The paths within the source the package is built from, such as tools/perf. A file under any of them is one the package may hold
+          items:
+            type: string
+          maxItems: 64
+          minItems: 1
+          type:
+            - array
+            - "null"
+        reasoning:
+          description: The reasoning, in markdown, holding for every issue it answers
+          minLength: 1
+          type: string
+        source:
+          description: The source package it is matched through, such as linux
+          maxLength: 191
+          minLength: 1
+          type: string
+      required:
+        - package
+        - source
+        - paths
+        - justification
+        - reasoning
+      type: object
+    Correct-by-source-pathsResponse:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Correct-by-source-pathsResponse.json
+          format: uri
+          readOnly: true
+          type: string
+        answered:
+          description: The occurrences it answers now, each waiting for a second person
+          format: int64
+          type: integer
+        decision_id:
+          description: The decision recorded, which is what the review queue lists and what is approved
+          format: int64
+          type: integer
+      required:
+        - decision_id
+        - answered
+      type: object
     Count-code-findings-by-releaseResponse:
       additionalProperties: false
       properties:
@@ -4389,6 +4457,9 @@ components:
         security_testing:
           description: At least one occurrence it covers is about security testing material, a static analysis code finding. Agreeing to it takes the approver capability
           type: boolean
+        source:
+          $ref: "#/components/schemas/SourceRuleBody"
+          description: What a correction by source paths names. Absent for any other decision
         undisclosed:
           description: At least one occurrence it covers is about a finding nobody has announced
           type: boolean
@@ -4542,6 +4613,13 @@ components:
           description: The age of the decision. An old decision should look like one
           format: int64
           type: integer
+        answered_on:
+          description: The files the issue's CVE record listed when a correction by source paths answered this occurrence, every one outside the paths the package is built from. Absent for any other decision
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         decision_occurrence:
           $ref: "#/components/schemas/DecisionOccurrenceBody"
         finding:
@@ -5565,6 +5643,9 @@ components:
         matched_range:
           description: The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix
           type: string
+        matched_through:
+          description: The source package the scanner matched this through, where every detail of the match was through it. Absent where the match was on the package's own name or a CPE
+          type: string
         no_deadline:
           description: "The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has scheduled none on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"
           enum:
@@ -5596,6 +5677,13 @@ components:
           description: Every published rating of the issue, one per generation of the scoring system, newest first
           items:
             $ref: "#/components/schemas/RatingBody"
+          type:
+            - array
+            - "null"
+        record_files:
+          description: The source files the issue's CVE record says it is in, as the last scan reading the record had them
+          items:
+            type: string
           type:
             - array
             - "null"
@@ -13758,6 +13846,27 @@ components:
         - occurrence
         - decision_occurrence
         - state
+      type: object
+    SourceRuleBody:
+      additionalProperties: false
+      properties:
+        package:
+          description: The package it answers, by the name it is identified by, in lower case
+          type: string
+        paths:
+          description: The paths within the source the package is built from, in byte order
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        source:
+          description: The source package that package is matched through, in lower case
+          type: string
+      required:
+        - package
+        - source
+        - paths
       type: object
     SpentBody:
       additionalProperties: false
@@ -34899,6 +35008,53 @@ paths:
         - Catalog
       x-openpsirt-requires:
         scope: deployment
+  /v1/products/{product}/source-corrections:
+    post:
+      description: |-
+        Records that a package is not the rest of the source it is built from: a wrong match answering every issue the package is matched through that source for, where the issue's CVE record lists the files it is in and every one of them lies outside the paths the package is built from. linux-perf, matched through linux and built from tools/perf, tools/lib and tools/include, is the case.
+
+        It answers in this product only, at every version, and keeps answering issues published later as scans report them. It never answers an issue whose record lists no files or any file under the paths, a finding matched on the package's own name or a CPE, an undisclosed finding, or an issue this product records an incident through; those stay for a person.
+
+        The reason is one of the two saying something is not there, and the reasoning is required. A second person agrees, always; until then it answers nothing, and an issue answered after the reasoning changes waits for agreement again. It ends only when withdrawn, and is published as not affected with its reason.
+
+        Refused where nothing open in the product is answered by it now. Each answer records the files that justified it, read back as `answered_on` on the decision's occurrences.
+
+        Requires: public-triage or private-triage or security-testing-triage on the product
+      operationId: correct-by-source-paths
+      parameters:
+        - in: path
+          name: product
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Correct-by-source-pathsRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Correct-by-source-pathsResponse"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Propose a correction by source paths
+      tags:
+        - Triage
+      x-openpsirt-requires:
+        scope: product
+        any_of:
+          - public-triage
+          - private-triage
+          - security-testing-triage
   /v1/products/{product}/supplier-advisories:
     get:
       description: |-

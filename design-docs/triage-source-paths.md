@@ -11,6 +11,7 @@ Satisfies REQ-90.
 - [Answered occurrences](#answered-occurrences)
 - [Agreement and ending](#agreement-and-ending)
 - [Answers on later scans](#answers-on-later-scans)
+- [Readback](#readback)
 - [Limits](#limits)
 
 ## The rule
@@ -79,6 +80,15 @@ the first scan that reports it.
 | Only the scanned build's findings are read | A product's other builds were answered when they were scanned |
 | A failure is logged and leaves the scan applied | The next scan answers what this one did not; a scan's findings are not held back by a correction |
 | Two proposals over one occurrence at once leave one; the other's pass fails and is logged | The unique key decides |
+
+## Readback
+
+| Surface | Carries |
+|---|---|
+| A finding's evidence | The source it was matched through and the files its record lists |
+| The decision | The package, source and paths |
+| A decision occurrence | The files it was answered on |
+| The finding screen | The source and files under the match evidence, and the form, filled with the package and source |
 
 ## Limits
 
