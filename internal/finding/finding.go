@@ -91,8 +91,9 @@ func agreedFixedIn(least, most, fixedIn string) string {
 type Closure string
 
 const (
-	// Removed means the component left the occurrence: what pulled it in left
-	// the build or no longer pulls in anything of its name.
+	// Removed means the component left the occurrence, what pulled it in
+	// gone or pulling in nothing of its name, and no other version of its
+	// name took its place in the build.
 	Removed Closure = "removed"
 	// Upgraded means the component's upstream version moved at the
 	// occurrence.

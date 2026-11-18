@@ -109,12 +109,18 @@ func (i inventory) pulled(at consumers) pulledBy {
 // order: the same component is unexplained, then the first at another
 // upstream version is an upgrade to it, then the first at another shipped
 // version is a revision to it.
+//
+// The same component now directly under the product, its consumer still
+// there, is unexplained: a producer that stops naming what pulls a component
+// in moves it onto the product with nothing changed, the mirror of the
+// product's own case. A component that was its own consumer is the exception,
+// since an edge from a component to itself places no occurrence.
 func (i inventory) whyAt(gone graph.Component, consumerID int64, consumer string, under pulledBy) (Closure, string) {
 	if consumerID == 0 {
 		return i.why(gone)
 	}
 	if len(i.byName[consumer]) == 0 {
-		return Removed, ""
+		return i.left(gone)
 	}
 	now := under[consumer][gone.IdentifyingName()]
 	for _, c := range now {
@@ -134,6 +140,21 @@ func (i inventory) whyAt(gone graph.Component, consumerID int64, consumer string
 	}
 	if len(now) > 0 {
 		return Unexplained, ""
+	}
+	if consumerID != gone.ID && slices.ContainsFunc(under[""][gone.IdentifyingName()],
+		func(c graph.Component) bool { return c.ID == gone.ID }) {
+		return Unexplained, ""
+	}
+	return i.left(gone)
+}
+
+// left explains a component nothing of its name is under its consumer any
+// more. Gone from the build with another version of its name in it, it was
+// upgraded or revised, since a release note saying it no longer ships would
+// be false; otherwise it left the occurrence.
+func (i inventory) left(gone graph.Component) (Closure, string) {
+	if reason, movedTo := i.why(gone); reason == Upgraded || reason == Revised {
+		return reason, movedTo
 	}
 	return Removed, ""
 }

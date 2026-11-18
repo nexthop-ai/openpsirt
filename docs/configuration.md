@@ -1763,4 +1763,4 @@ stands until the decision is made again against what the second step recorded.
 
 | Change | What to do |
 |---|---|
-| A finding's closure is explained at its occurrence: upgraded or revised where what pulled the component in now pulls in another version of it, removed where that consumer left the build or pulls in nothing of the component's name. v0.13.0 asked of the component across the build, so both closed as unexplained wherever another consumer kept the component, and a build holding several logged the warning that one scan went wrong | Nothing. A finding v0.13.0 closed keeps the reason it recorded |
+| A finding's closure is explained at its occurrence: upgraded or revised where what pulled the component in now pulls in another version of it, removed where that consumer left the build or pulls in nothing of the component's name and no other version of it took its place. v0.13.0 asked of the component across the build, so both closed as unexplained wherever another consumer kept the component, and a build holding several logged the warning that one scan went wrong | Nothing. A finding v0.13.0 closed keeps the reason it recorded |
