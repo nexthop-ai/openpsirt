@@ -465,6 +465,39 @@ func TestAClaimAboutAGenericRootReachesEveryOccurrence(t *testing.T) {
 	})
 }
 
+func TestAClaimNamingAGenericIdentifierReachesTheComponentHoweverALaterInventoryNamesIt(t *testing.T) {
+	// The component is stored under the name the first inventory gave it. The
+	// second calls it by its package name and sends a statement naming its
+	// identifier exactly, which answers the finding whatever it is named.
+	firmware := func(name string) graph.Described {
+		return graph.Described{Purl: "pkg:generic/repro/insydeh2o@05.47.45.0027", Name: name,
+			Version: "05.47.45.0027", CPE: "cpe:2.3:a:insyde:insydeh2o:05.47.45.0027:*:*:*:*:*:*:*"}
+	}
+	shipping := func(component graph.Described) graph.Snapshot {
+		return graph.Snapshot{Root: root, Components: []graph.Described{component},
+			Dependencies: []graph.Dependency{{Parent: root, Child: component}}}
+	}
+	each(t, func(t *testing.T, f *fixture) {
+		f.shipped(t, shipping(firmware("Repro Platform")))
+		renamed := firmware("insydeh2o")
+		f.shipped(t, shipping(renamed))
+		f.argues(t, sbom.Suppression{
+			Vulnerability: "CVE-2021-45970", Status: sbom.NotAffected,
+			Justification: "vulnerable_code_not_present",
+			Targets:       []sbom.Target{{Purl: renamed.Purl}},
+			Origin:        sbom.FromStatement,
+		})
+		f.reported(t, found("CVE-2021-45970", renamed))
+		rows := f.every(t)
+		if len(rows) != 1 {
+			t.Fatalf("%d rows, want the one finding on the firmware", len(rows))
+		}
+		if rows[0].SuppressedBy == nil {
+			t.Error("a statement naming the component's identifier does not answer it once the component is renamed")
+		}
+	})
+}
+
 func TestAFindingShowsNoClaimTheBuildHasWithdrawn(t *testing.T) {
 	// The zlib inside Y is closed by Acme's statement and named the build's
 	// claim when it closed. The build then stops making the claim.

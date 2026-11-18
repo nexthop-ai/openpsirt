@@ -647,12 +647,19 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	for _, name := range names {
 		lowered = append(lowered, folded(name))
 	}
+	// A statement is stored under the name its identifier gives, and the
+	// component under the name its first inventory gave it, which a later one
+	// may not repeat. Asked by both.
+	called := []string{folded(component)}
+	if own := folded(nameOf(purl)); own != "" && own != called[0] {
+		called = append(called, own)
+	}
 	var said []Statement
 	err := withWords(s.db.NewSelect().Model(&said)).
 		Where(`"ss"."product_id" = ?`, productID).
 		Where(`"superseded_at" IS NULL`).
 		Where(`"vulnerability" IN (?)`, bun.List(lowered)).
-		Where(`"component" = ?`, folded(component)).
+		Where(`"component" IN (?)`, bun.List(called)).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what publishers have said about this: %w", err)

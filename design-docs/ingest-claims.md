@@ -47,7 +47,8 @@ What each claim does to a finding is `design-docs/findings-closure.md`
 | A version reaches a component stating it beside an identifier naming none | |
 | An OpenVEX product with subcomponents claims the subcomponents, read only as package identifiers; one with none claims itself; one whose subcomponents are all of another kind claims nothing | A bare name covers every version and fork. This deployment's export states claims that way |
 | A source-tree claim matches a component of that name, or a fork | The build knows what came from its tree |
-| A tree is a bare name or a generic package identifier, matched alike; the generic one names its package by its last segment, comparing namespace only against a generic component carrying one | A distribution's namespace names the distribution |
+| A generic package identifier that is the component's own covers it at the version named, whatever name the component is stored under | A component keeps the name its first inventory gave it, and a later one may call it something else |
+| A tree is a bare name or another generic package identifier, matched alike; the generic one names its package by its last segment, comparing namespace only against a generic component carrying one | A distribution's namespace names the distribution |
 | A tree named with a version is matched on it, against the component's version and what it was built from | |
 | A claim is matched at every occurrence of its component in the product it names | |
 | A name or identifier holding its own release is matched as written, never by its identifying name | A statement about one release says nothing of the next (`design-docs/data-model-components.md` § The identifying name) |
