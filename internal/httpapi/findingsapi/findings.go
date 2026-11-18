@@ -421,6 +421,7 @@ type BuildClaimBody struct {
 	Status        string `json:"status" doc:"What the build says, in the VEX vocabulary"`
 	Justification string `json:"justification,omitempty" doc:"The VEX justification term it gave"`
 	Statement     string `json:"statement,omitempty" doc:"The words it gave: why the flaw does not apply, or the workaround where it does"`
+	Notes         string `json:"notes,omitempty" doc:"The status notes it gave, at any status: an OpenVEX statement's status_notes. Plain text, never markdown"`
 	Subject       string `json:"subject" doc:"The component the claim names"`
 	Version       string `json:"version,omitempty" doc:"The version of that component the claim names, where it names one"`
 	Within        string `json:"within,omitempty" doc:"The product of the build the claim names the component as shipping inside, where it names one. The claim applies beneath that product"`
@@ -759,7 +760,7 @@ func registerFindingDetail(api huma.API, in core.Deps) {
 				ID: one.ID, Publisher: one.Publisher,
 				Source: core.EvidenceSource(one.Source), Identifier: one.Identifier,
 				Status: one.Status, About: one.About,
-				Justification: one.Justification, Statement: one.Statement,
+				Justification: one.Justification, Statement: one.Statement, Notes: one.Notes,
 				Document: one.Document, At: one.UploadedAt.UTC().Format(time.DateOnly),
 				Offers:     core.OutcomeOffered(offers),
 				ForAnybody: one.Placement == finding.PlacedAnybody,
@@ -840,6 +841,7 @@ func evidenceBody(e finding.Evidence) EvidenceBody {
 	for _, decision := range e.Claimed {
 		body.Claimed = append(body.Claimed, BuildClaimBody{
 			Status: decision.Status, Justification: decision.Justification, Statement: decision.Statement,
+			Notes:   decision.Notes,
 			Subject: decision.Subject, Version: decision.Version,
 			Within: decision.Within, WithinVersion: decision.WithinVersion,
 			Pedigree: decision.Pedigree, Publisher: decision.Publisher, Document: decision.Document,

@@ -94,7 +94,9 @@ type SupplierSaid struct {
 	Product       string
 	Justification string
 	Statement     string
-	Document      string
+	// Notes is the status notes the supplier gave, empty where it gave none.
+	Notes    string
+	Document string
 }
 
 // Register is every known vulnerability in one build with its disposition .
@@ -281,6 +283,7 @@ type registerRow struct {
 	StatedIn                string     `bun:"stated_in"`
 	StatedWhy               string     `bun:"stated_why"`
 	StatedWords             string     `bun:"stated_words"`
+	StatedNotes             string     `bun:"stated_notes"`
 	StatedFile              string     `bun:"stated_file"`
 }
 
@@ -471,6 +474,7 @@ func (s *Store) registerQuery(productID int64,
 		// The supplier's statement answering the occurrence, where one does.
 		Join(`LEFT JOIN "received_vex_statement" AS "sr" ON "sr"."id" = "f"."stated_by"`).
 		Join(WordsJoin("sr")).
+		Join(NotesJoin("sr")).
 		ColumnExpr(`"v"."identifier" AS "vulnerability"`).
 		ColumnExpr(rating.EffectiveExpr + ` AS "severity"`).
 		Join(graph.StatedJoin("sn", `"f"."build_id"`, `"f"."component_id"`)).
@@ -522,6 +526,7 @@ func (s *Store) registerQuery(productID int64,
 		ColumnExpr(`COALESCE("sr"."within", "sr"."component", '') AS "stated_in"`).
 		ColumnExpr(`COALESCE("sr"."justification", '') AS "stated_why"`).
 		ColumnExpr(WordsColumn + ` AS "stated_words"`).
+		ColumnExpr(NotesColumn + ` AS "stated_notes"`).
 		ColumnExpr(`COALESCE("sr"."document", '') AS "stated_file"`).
 		OrderExpr(`"v"."identifier", "component", "f"."occurrence_identity"`)
 }
@@ -548,7 +553,7 @@ func disposedFrom(row registerRow) Disposed {
 	if row.StatedBy != nil {
 		one.Stated = &SupplierSaid{
 			Publisher: row.StatedWho, Product: row.StatedIn, Justification: row.StatedWhy,
-			Statement: row.StatedWords, Document: row.StatedFile,
+			Statement: row.StatedWords, Notes: row.StatedNotes, Document: row.StatedFile,
 		}
 	}
 	// The same four words the state filter uses, at the grain of one

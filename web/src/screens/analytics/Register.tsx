@@ -451,10 +451,12 @@ function statedLine(stated: {
   product: string;
   justification?: string;
   statement?: string;
+  notes?: string;
 }): string {
   const why = stated.justification ? ` (${stated.justification.replaceAll("_", " ")})` : "";
   const words = stated.statement ? `: ${stated.statement}` : "";
-  return `${stated.publisher} says ${stated.product} is not affected${why}${words}`;
+  const notes = stated.notes ? `. Notes: ${stated.notes}` : "";
+  return `${stated.publisher} says ${stated.product} is not affected${why}${words}${notes}`;
 }
 
 // A CVE record's line as the words a reader checks a closure against: the

@@ -325,6 +325,7 @@ type StatedBody struct {
 	Product       string `json:"product" doc:"The supplier's product the statement is about"`
 	Justification string `json:"justification,omitempty" doc:"The justification the supplier gave, in the exchange format's vocabulary"`
 	Statement     string `json:"statement,omitempty" doc:"What the supplier wrote alongside it"`
+	Notes         string `json:"notes,omitempty" doc:"The status notes the supplier gave. Plain text, never markdown"`
 	Document      string `json:"document" doc:"The file the statement arrived in"`
 }
 
@@ -339,6 +340,9 @@ func statedBy(said *StatedBody) string {
 	}
 	if said.Statement != "" {
 		cell += ". " + said.Statement
+	}
+	if said.Notes != "" {
+		cell += ". Notes: " + said.Notes
 	}
 	return cell
 }
@@ -388,7 +392,7 @@ func disposedBody(ctx context.Context, in core.Deps, row finding.Disposed) Dispo
 		body.Stated = &StatedBody{
 			Publisher: row.Stated.Publisher, Product: row.Stated.Product,
 			Justification: row.Stated.Justification, Statement: row.Stated.Statement,
-			Document: row.Stated.Document,
+			Notes: row.Stated.Notes, Document: row.Stated.Document,
 		}
 	}
 	if row.DueAt != nil {

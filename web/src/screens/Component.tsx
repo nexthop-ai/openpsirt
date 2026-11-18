@@ -435,7 +435,13 @@ function UpstreamStatements({ product, component }: { product: string; component
               <tr key={one.statement} className="row">
                 <td className="id">{one.issue.toUpperCase()}</td>
                 <td className="id">{one.version || "any"}</td>
-                <td title={one.reasoning || undefined}>
+                <td
+                  title={
+                    [one.reasoning, one.notes && `Notes: ${one.notes}`]
+                      .filter(Boolean)
+                      .join("\n") || undefined
+                  }
+                >
                   {one.publisher}: {one.status.replace("_", " ")}
                   {one.justification && (
                     <span className="hint"> · {one.justification.replaceAll("_", " ")}</span>

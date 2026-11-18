@@ -103,7 +103,7 @@ stated outright. A component nobody judged gets no statement.
 | Status | Stated where | Carries |
 |---|---|---|
 | Not affected | Every open occurrence of the component stands under an approved, live decision that it does not apply or the match was wrong | The reason, and what stops it where named |
-| Fixed | The same, for a decision that the fix is here, or a declared patch closed it | Nothing more |
+| Fixed | The same, for a decision that the fix is here, or a declared patch closed it | On a declared patch in the OpenVEX document, the status notes of the build's claim where it gave any (`design-docs/remediation-vex.md` § Statements) |
 | Affected | Every open occurrence stands under a decision in force that it applies, will be fixed, or will not be | What a holder can do where named; else that no fix is planned, where every decision says will not fix, or none is available yet |
 
 | Rule | Reason |
@@ -165,6 +165,7 @@ One document per issue per product, across every branch, tag and variant.
 | A value that is not a package identifier is not stated as one | The schema refuses it, failing the document |
 | A product identifier is `<product>:<branch>:<variant>` for a build, the package identifier for a component, joined by `\|` for a component within either | |
 | Every list is ordered here | The same state gives the same bytes |
+| A declared patch's status notes are not stated | CSAF has no note on one product's status: a vulnerability note speaks for every product, and a remediation is an action |
 
 ## The OpenVEX document
 
@@ -175,7 +176,7 @@ One document per branch or tag, across its variants, at each one's last scan.
 | A statement holding for anybody names the component alone as the product | |
 | A statement holding for this build names the build, by its inventory's package identifier or else its names, with the component beneath | |
 | A statement about one occurrence names its consumer, with it beneath | |
-| One statement however many variants say it, from when it was first true | |
+| One statement however many variants say it, from when it was first true; variants giving one patch different status notes state it once each | The notes are part of what is said |
 | Its identifier is its served address | A reader keeps documents by it |
 | `version`, `timestamp` and `last_updated` are the revision, the first revision's release, and this one's | |
 | A branch or tag with nothing stated has no document | |

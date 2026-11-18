@@ -356,6 +356,23 @@ func TestAStatementKeepsTheWordsItsStatusTakes(t *testing.T) {
 	}
 }
 
+// A statement's status notes are kept whatever its status, beside the words
+// its status takes and never in their place.
+func TestAStatementKeepsItsStatusNotesAtEveryStatus(t *testing.T) {
+	const notes = `"status_notes": "backported in 1.3-2"`
+	for _, status := range []string{"fixed", "under_investigation", "affected", "not_affected"} {
+		got := claims(t, statement(`{"vulnerability": {"name": "CVE-2026-1"}, "status": "`+status+`", `+
+			notes+`, "impact_statement": "the code is never reached", `+
+			`"products": [{"@id": "pkg:deb/debian/zlib@1.3"}]}`))
+		if got[0].Notes != "backported in 1.3-2" {
+			t.Errorf("%s kept the status notes as %q", status, got[0].Notes)
+		}
+		if got[0].Statement != "the code is never reached" {
+			t.Errorf("%s with status notes kept %q as its statement", status, got[0].Statement)
+		}
+	}
+}
+
 func TestASubcomponentNamedWithoutAPackageIdentifierCoversNothing(t *testing.T) {
 	// A bare name states no version, so read as a target it would cover
 	// every version of that name and every fork of it.

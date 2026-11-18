@@ -77,6 +77,10 @@ type Statement struct {
 	Justification string `bun:"justification"`
 	StatementID   *int64 `bun:"statement_id"`
 	Statement     string `bun:"statement,scanonly"`
+	// Notes is the status notes they gave, whatever the status, stored as the
+	// reasoning is and pointed at by NotesID; filled by withWords.
+	NotesID *int64 `bun:"notes_id"`
+	Notes   string `bun:"notes,scanonly"`
 	// Remediation is the CSAF remediation category the statement gave the
 	// affected products it names, such as none_available or no_fix_planned:
 	// what decides the outcome an affected statement offers. Empty where the
@@ -114,7 +118,8 @@ type Statement struct {
 // withWords reads every column of the statements a query selects, and the
 // reasoning each points at.
 func withWords(q *bun.SelectQuery) *bun.SelectQuery {
-	return q.ColumnExpr("?TableColumns").Join(WordsJoin("ss")).ColumnExpr(WordsColumn + ` AS "statement"`)
+	return q.ColumnExpr("?TableColumns").Join(WordsJoin("ss")).ColumnExpr(WordsColumn + ` AS "statement"`).
+		Join(NotesJoin("ss")).ColumnExpr(NotesColumn + ` AS "notes"`)
 }
 
 // StatementOf is one claim a document makes, about one of the components it
@@ -131,6 +136,7 @@ func StatementOf(claim sbom.Suppression, at sbom.Target) Statement {
 		Status:        string(claim.Status),
 		Justification: claim.Justification,
 		Statement:     claim.Statement,
+		Notes:         claim.Notes,
 		SaidAt:        claim.SaidAt,
 		Remediation:   at.Remediation,
 	}
@@ -429,6 +435,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			claims[i].WithinAbout = bound.HeadRunes(claims[i].WithinAbout, database.NameWidth)
 			claims[i].Justification = bound.HeadRunes(claims[i].Justification, database.NameWidth)
 			claims[i].Statement = WordsOf(claims[i].Statement)
+			claims[i].Notes = WordsOf(claims[i].Notes)
 			if claims[i].SaidAt == nil {
 				claims[i].SaidAt = from.SaidAt
 			}
@@ -449,6 +456,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
 				"within_about", "placement", "status", "justification", "remediation", "said_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
+			Join(NotesJoin("ss")).ColumnExpr(NotesColumn+` AS "notes"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
@@ -481,6 +489,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			Column("id", "vulnerability", "purl", "component", "about", "within_purl", "within",
 				"within_about", "placement", "status", "justification", "remediation", "said_at", "superseded_at").
 			Join(WordsJoin("ss")).ColumnExpr(WordsColumn+` AS "statement"`).
+			Join(NotesJoin("ss")).ColumnExpr(NotesColumn+` AS "notes"`).
 			Where(`"product_id" = ?`, productID).
 			Where(`"publisher" = ?`, publisher).
 			Where(`"source" = ?`, from.Source).
@@ -489,7 +498,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		if err := heldBy.Scan(ctx); err != nil {
 			return fmt.Errorf("ask what they said before: %w", err)
 		}
-		repeated, gone, fresh := pairRepeated(held, claims)
+		repeated, noted, gone, fresh := pairRepeated(held, claims)
 
 		// A claim the document no longer makes is set aside by its revision,
 		// overtaken or not, and nothing brings it back.
@@ -531,11 +540,14 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 			}
 			recorded += len(ids)
 		}
+		if err := takeNotes(ctx, tx, noted); err != nil {
+			return err
+		}
 
 		toInsert := fresh
-		words := make([]string, 0, len(toInsert))
+		words := make([]string, 0, 2*len(toInsert))
 		for _, one := range toInsert {
-			words = append(words, one.Statement)
+			words = append(words, one.Statement, one.Notes)
 		}
 		stored, err := internWords(ctx, tx, words)
 		if err != nil {
@@ -543,6 +555,7 @@ func (s *Store) RecordStatements(ctx context.Context, by access.Subject, product
 		}
 		for i := range toInsert {
 			toInsert[i].StatementID = wordsID(stored, toInsert[i].Statement)
+			toInsert[i].NotesID = wordsID(stored, toInsert[i].Notes)
 			// The store assigns identity, so a key on the way in is cleared
 			// rather than stated. The engine writes the key it assigned back
 			// into the value it inserted, so a key stated here would be one an
@@ -810,7 +823,7 @@ const (
 // its own on the next reading.
 func claimOf(one Statement) string {
 	return strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
-		one.About, one.Status, one.Justification, one.Statement}, "\x00")
+		one.About, one.Status, one.Justification, one.Statement, one.Notes}, "\x00")
 }
 
 // placementOf is where a statement places its supplier's product.
@@ -843,8 +856,14 @@ func (p placed) SaidAt() *time.Time {
 
 // pairRepeated pairs each claim a document makes with a standing row making
 // the same claim, and answers the repeated rows by where the document now
-// places them, the standing rows the document no longer makes, and the claims
-// it makes that nothing stands for.
+// places them, the repeated rows gaining status notes by those notes, the
+// standing rows the document no longer makes, and the claims it makes that
+// nothing stands for.
+//
+// A row holding no notes repeats a claim saying the same with notes, and takes
+// them in place: a statement stored before notes were kept keeps its row, its
+// decline and what cites it when its document is read again. A row holding
+// notes repeats only a claim with the same notes.
 //
 // A repeat is the same claim placing the supplier's product in the same place.
 // A claim moved to another release of the product is a different claim, and
@@ -853,7 +872,7 @@ func (p placed) SaidAt() *time.Time {
 // placed anywhere, once no exact repeat wants it. Rows are paired in a fixed
 // order on both sides, so two identical claims placed in two products each
 // keep one row.
-func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statement) {
+func pairRepeated(held, said []Statement) (map[placed][]int64, map[string][]int64, []int64, []Statement) {
 	sorted := slices.Clone(held)
 	slices.SortFunc(sorted, func(a, b Statement) int { return cmp.Compare(a.ID, b.ID) })
 	exactly := func(one Statement) string { return claimOf(one) + "\x00" + placementOf(one) }
@@ -889,12 +908,36 @@ func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statem
 		}
 		rest = append(rest, one)
 	}
-	var fresh []Statement
+	var unnoted []Statement
 	for _, one := range rest {
 		if rows := unplaced[claimOf(one)]; len(rows) > 0 {
 			keep(one, rows[0])
 			unplaced[claimOf(one)] = rows[1:]
 			continue
+		}
+		unnoted = append(unnoted, one)
+	}
+	// A claim with notes repeats a row holding none that says the rest of it,
+	// placed where it stood or recorded before products were read, and the
+	// row takes the notes.
+	noted := map[string][]int64{}
+	var fresh []Statement
+	for _, one := range unnoted {
+		bare := one
+		bare.Notes = ""
+		if one.Notes != "" {
+			if rows := exact[exactly(bare)]; len(rows) > 0 {
+				keep(one, rows[0])
+				noted[one.Notes] = append(noted[one.Notes], rows[0].ID)
+				exact[exactly(bare)] = rows[1:]
+				continue
+			}
+			if rows := unplaced[claimOf(bare)]; len(rows) > 0 {
+				keep(one, rows[0])
+				noted[one.Notes] = append(noted[one.Notes], rows[0].ID)
+				unplaced[claimOf(bare)] = rows[1:]
+				continue
+			}
 		}
 		fresh = append(fresh, one)
 	}
@@ -907,7 +950,36 @@ func pairRepeated(held, said []Statement) (map[placed][]int64, []int64, []Statem
 		}
 	}
 	slices.Sort(gone)
-	return repeated, gone, fresh
+	return repeated, noted, gone, fresh
+}
+
+// takeNotes points the rows given at the status notes each now repeats with,
+// storing the notes once each.
+func takeNotes(ctx context.Context, tx bun.IDB, noted map[string][]int64) error {
+	if len(noted) == 0 {
+		return nil
+	}
+	said := make([]string, 0, len(noted))
+	for notes := range noted {
+		said = append(said, notes)
+	}
+	stored, err := internWords(ctx, tx, said)
+	if err != nil {
+		return err
+	}
+	for notes, ids := range noted {
+		id := wordsID(stored, notes)
+		err := database.IDsInBatches(ctx, ids, func(ctx context.Context, batch []int64) error {
+			_, err := tx.NewUpdate().Model((*Statement)(nil)).
+				Set(`"notes_id" = ?`, id).
+				Where(`"id" IN (?)`, bun.List(batch)).Exec(ctx)
+			return err
+		})
+		if err != nil {
+			return fmt.Errorf("keep the notes they gave: %w", err)
+		}
+	}
+	return nil
 }
 
 // nullable is a value written as a null where it is empty, the way the
@@ -935,7 +1007,7 @@ func sameReading(held, said []Statement) bool {
 			}
 			out[i] = strings.Join([]string{one.Vulnerability, one.Purl, one.Component,
 				one.About, one.WithinPurl, one.Within, one.WithinAbout, one.Placement, one.Status,
-				one.Justification, one.Remediation, one.Statement, said}, "\x00")
+				one.Justification, one.Remediation, one.Statement, one.Notes, said}, "\x00")
 		}
 		slices.Sort(out)
 		return out

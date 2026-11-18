@@ -62,6 +62,16 @@ func WordsJoin(alias string) string {
 // the empty string where it gave none.
 const WordsColumn = `COALESCE("stw"."words", '')`
 
+// NotesJoin joins the stored status notes a row points at, under the alias
+// "stn". The notes are kept as the reasoning is, once each, in the same table.
+func NotesJoin(alias string) string {
+	return `LEFT JOIN "statement_text" AS "stn" ON "stn"."id" = "` + alias + `"."notes_id"`
+}
+
+// NotesColumn is the status notes a row points at, read through NotesJoin,
+// and the empty string where it gave none.
+const NotesColumn = `COALESCE("stn"."words", '')`
+
 // internWords is the stored copy of each of the reasoning given, writing the
 // ones not yet held.
 //

@@ -25,6 +25,7 @@ type SaidBody struct {
 	// Statement is the reasoning, which is the part worth having: the status
 	// is in the fix state already.
 	Statement string `json:"statement,omitempty" doc:"Their reasoning. What a triager otherwise types from memory"`
+	Notes     string `json:"notes,omitempty" doc:"The status notes they gave, at any status: an OpenVEX statement's status_notes. Plain text, never markdown"`
 	Document  string `json:"document" doc:"The document it came from"`
 	At        string `json:"at" doc:"The moment it was uploaded here"`
 	// Offers is the outcome this would prefill, where it offers one. A

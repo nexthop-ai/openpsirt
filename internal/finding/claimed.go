@@ -25,6 +25,8 @@ type BuildClaim struct {
 	Status        string
 	Justification string
 	Statement     string
+	// Notes is the claim's status notes, whatever its status.
+	Notes string
 	// Subject and Version are what the claim names, and Within the product
 	// it names the subject as shipping inside, with its version.
 	Subject       string
@@ -52,6 +54,7 @@ func claimedOn(ctx context.Context, db bun.IDB, ids []int64) ([]BuildClaim, erro
 		Status        string `bun:"status"`
 		Justification string `bun:"justification"`
 		Statement     string `bun:"statement"`
+		Notes         string `bun:"notes"`
 		Origin        string `bun:"origin"`
 		SubjectPurl   string `bun:"subject_purl"`
 		SubjectName   string `bun:"subject_name"`
@@ -67,10 +70,12 @@ func claimedOn(ctx context.Context, db bun.IDB, ids []int64) ([]BuildClaim, erro
 		TableExpr(`"suppression" AS "sup"`).
 		Join(`LEFT JOIN "received_vex_statement" AS "ss" ON "ss"."id" = "sup"."stated_by"`).
 		Join(WordsJoin("sup")).
+		Join(NotesJoin("sup")).
 		ColumnExpr(`"sup"."id" AS "id"`).
 		ColumnExpr(`"sup"."status" AS "status"`).
 		ColumnExpr(`COALESCE("sup"."justification", '') AS "justification"`).
 		ColumnExpr(WordsColumn+` AS "statement"`).
+		ColumnExpr(NotesColumn+` AS "notes"`).
 		ColumnExpr(`"sup"."origin" AS "origin"`).
 		ColumnExpr(`COALESCE("sup"."subject_purl", '') AS "subject_purl"`).
 		ColumnExpr(`COALESCE("sup"."subject_name", '') AS "subject_name"`).
@@ -93,8 +98,8 @@ func claimedOn(ctx context.Context, db bun.IDB, ids []int64) ([]BuildClaim, erro
 		subject := sbom.Target{Purl: row.SubjectPurl, Name: row.SubjectName, Version: row.Version}
 		claim := BuildClaim{
 			ID: row.ID, Status: row.Status, Justification: row.Justification,
-			Statement: row.Statement,
-			Subject:   subject.ComponentNamed(), Version: subject.VersionNamed(),
+			Statement: row.Statement, Notes: row.Notes,
+			Subject: subject.ComponentNamed(), Version: subject.VersionNamed(),
 			Pedigree:  row.Origin == string(sbom.FromPedigree),
 			Publisher: row.Publisher, Document: row.Document,
 		}

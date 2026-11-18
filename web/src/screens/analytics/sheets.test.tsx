@@ -118,6 +118,16 @@ describe("the disposition register", () => {
     expect(text()).toContain("met");
   });
 
+  it("states the closing statement's status notes as written", async () => {
+    const notes = "Audited <b>2026-09</b>";
+    await drawn(() => ({
+      data: { items: [{ ...row, stated: { ...row.stated, notes } }], total: 1 },
+    }));
+    expect(text()).toContain(
+      `acme says box is not affected (component not present). Notes: ${notes}`,
+    );
+  });
+
   it("says a page past the end holds nothing and keeps the way back", async () => {
     await drawn(() => ({ data: { items: [], total: 3 } }));
     expect(text()).toContain("Nothing on this page.");

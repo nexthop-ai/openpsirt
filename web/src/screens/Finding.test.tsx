@@ -102,3 +102,22 @@ describe("the decisions standing on a finding", () => {
     for (const n of many) expect(card(100 + n)?.textContent).toContain(`${n} occurrence`);
   });
 });
+
+describe("what the build says about a finding", () => {
+  it("shows a claim's status notes beside it, as written", async () => {
+    const notes = "Backported from 3.9 in **patch 12**; <i>not</i> a version bump";
+    serving({}, {
+      ...finding,
+      standing: [],
+      claimed: [{ status: "fixed", subject: "libnl", version: "3.8", notes }],
+    } as typeof finding);
+    mount.render(screen(<Finding />, ADDRESS, PATTERN));
+    await settle();
+    const says = Array.from(mount.host().querySelectorAll<HTMLElement>(".card")).find(
+      (each) => each.querySelector("h3")?.textContent === "Build says",
+    );
+    expect(says?.textContent).toContain("says fixed of libnl 3.8");
+    expect(says?.textContent).toContain(notes);
+    expect(says?.querySelector(".why i, .why strong")).toBeNull();
+  });
+});

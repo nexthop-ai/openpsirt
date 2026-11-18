@@ -52,6 +52,8 @@ a document is generated.
 | A decision not to fix is stated affected, its action what to do instead where named, else that no fix is planned | Nothing else tells a customer, and the format requires an action |
 | A decision not to fix carries reasoning, which is never published | Every decision is refused without reasoning and needs a second person; the reasoning is what they agreed to |
 | The mitigation's field follows the status: why on not affected, what to do on affected | |
+| A statement from a decision carries no status notes | A decision's only words past its mitigation are its reasoning |
+| A patch carries the status notes of the build's claim that closed the group's earliest finding, the finding that dates it | The build's explanation of a fixed claim is the one a reader lacks; the build's word stands without a decision here (REQ-11) |
 | Public findings only; undisclosed ones are a preview for a reader who may see them | |
 | A statement is about the build with the component beneath, or about the consumer when stated by occurrence | What somebody has is the image |
 | The build is named by the package identifier its inventory gave its root, else by its names | A scanner matches the product against the root |
@@ -67,6 +69,7 @@ a document is generated.
 |---|---|
 | Stated only while it stands, under a patch's guard: the component ships, no occurrence of its name and package identifier is open, the closing statement is not set aside, and nothing has been recorded at the occurrence since | An occurrence later patched is stated fixed |
 | Stated `not_affected`, with the supplier's justification where the format defines one, and an impact statement naming the publisher, the document and the product | A customer sees whose judgment it is |
+| The supplier's status notes are carried as the statement's status notes, prefixed with the publisher's name: "Per acme: confirmed by a code audit" | Unattributed, a note under this deployment's authorship reads as its own |
 | Only a statement saying not affected is passed on | An upstream's fixed statement closes occurrences (`design-docs/upstream.md`) without saying unaffected |
 | A component two suppliers' statements closed is stated by neither | The format names the component once |
 | An agreed decision and a supplier's statement never speak about one issue in one component | A decision needs an open occurrence, a supplier statement none |

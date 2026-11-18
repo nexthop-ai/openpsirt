@@ -175,7 +175,7 @@ not name an undisclosed issue.
 | The approaching notice says extending needs a second person and time | |
 | To administrators and to whoever holds it while they read undisclosed work in the product | An assignment outlives its role |
 | A VEX publisher revising a cited statement raises an alert | A dismissal was approved on that evidence |
-| A cited statement its publisher says again word for word, its reasoning included, in any of their documents of its kind, raises none; a change to the reasoning alone raises one | The newest statement overtaking it with the same claim leaves the evidence as it was |
+| A cited statement its publisher says again word for word, its reasoning and status notes included, in any of their documents of its kind, raises none; a change to the reasoning or the notes alone raises one. A cited statement holding no notes is said again by one gaining them | The newest statement overtaking it with the same claim leaves the evidence as it was; a row stored before notes were kept holds none |
 | "Cited" is recorded: a decision started from a statement carries which | Inferred, every nearby decision alerts |
 
 ## Response window notices

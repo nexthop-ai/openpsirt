@@ -30,3 +30,20 @@ func TestTheV0140UpgradeBuildsItsDeclarations(t *testing.T) {
 		leaveAtLatest(t, ctx, db)
 	})
 }
+
+// A start of the v0.14.0 upgrade that stopped after a build's own claims took
+// their status notes column, as MySQL and MariaDB leave one, finishes into
+// what v0.14.0 declares.
+func TestTheV0140UpgradeFinishesAStartThatStoppedAfterTheClaimNotes(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0130)
+		if err := migrations.StopV0140AfterClaimNotes(ctx, db); err != nil {
+			t.Fatal(err)
+		}
+		dbtest.MigrateTo(t, db, v0140)
+		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0140(db.Server.Engine))
+		leaveAtLatest(t, ctx, db)
+	})
+}

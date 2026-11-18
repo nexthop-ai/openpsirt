@@ -63,9 +63,10 @@ The finding is the working screen before a decision and after it.
 One entry per claim the build still makes covering an occurrence shown: whose it
 is (the build, or the publisher whose document named the build as its product),
 the status, the component and version it names, the product it names the
-component as shipped inside, the justification, and the build's words. Where it
-says the flaw applies, the words are labeled the workaround. The words are a
-third party's: shown, never rendered. The list's "Build says" filter asks for
+component as shipped inside, the justification, the build's words, and its
+status notes, labeled notes. Where it says the flaw applies, the words are
+labeled the workaround. The words and notes are a third party's: shown, never
+rendered. The list's "Build says" filter asks for
 these, and its "affected" gathers the workarounds.
 
 ### The dependency path

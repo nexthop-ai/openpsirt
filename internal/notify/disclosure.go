@@ -103,11 +103,13 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 		Where(`"de"."state" = ?`, triage.Approved).
 		// And the statement it cited is no longer what that publisher says.
 		Where(`"ss"."superseded_at" IS NOT NULL`).
-		// A statement its publisher says again, word for word, reasoning
-		// included, in a row in force is current again, and the ground under
-		// the decision has not moved: another document of theirs overtaking it
-		// with the same claim records a row of its own, as trusting an
-		// upstream once more does.
+		// A statement its publisher says again, word for word, reasoning and
+		// status notes included, in a row in force is current again, and the
+		// ground under the decision has not moved: another document of theirs
+		// overtaking it with the same claim records a row of its own, as
+		// trusting an upstream once more does. A cited statement holding no
+		// notes is said again by one gaining them, which is the cited row
+		// stored before notes were kept.
 		Where(`NOT EXISTS (SELECT 1 FROM "received_vex_statement" AS "sn"
 			WHERE "sn"."product_id" = "ss"."product_id" AND "sn"."publisher" = "ss"."publisher"
 			  AND "sn"."source" = "ss"."source" AND "sn"."vulnerability" = "ss"."vulnerability"
@@ -119,6 +121,7 @@ func (w *sweep) statementsRevised(ctx context.Context) (map[int64][]Holds, error
 			  AND "sn"."status" = "ss"."status"
 			  AND COALESCE("sn"."justification", '') = COALESCE("ss"."justification", '')
 			  AND COALESCE("sn"."statement_id", 0) = COALESCE("ss"."statement_id", 0)
+			  AND ("ss"."notes_id" IS NULL OR "sn"."notes_id" = "ss"."notes_id")
 			  AND "sn"."superseded_at" IS NULL)`).
 		// Whether it was set aside because the product stopped trusting its
 		// upstream, which is said as that rather than as the upstream

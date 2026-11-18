@@ -56,6 +56,9 @@ type Fact struct {
 	Justification string
 	Impact        string
 	Action        string
+	// Notes is the status notes of the build's own claim a declared patch
+	// is stated fixed on, and empty on every fact from a decision.
+	Notes string
 	// Scope is whom the statement holds for.
 	Scope triage.Scope
 	// Since is when the statement was first true: when the decision was made,
@@ -149,7 +152,7 @@ func (s *Store) Public(ctx context.Context, subject access.Subject, named *catal
 		built.Facts = append(built.Facts, Fact{
 			VulnerabilityID: row.VulnerabilityID, Issue: row.Identifier,
 			Aliases: alsoCalled[row.VulnerabilityID], Component: row.Component, Purl: row.Purl,
-			Status: Fixed, Scope: triage.BuildSpecific, Since: row.PatchedAt.UTC(),
+			Status: Fixed, Notes: row.Notes, Scope: triage.BuildSpecific, Since: row.PatchedAt.UTC(),
 		})
 	}
 	for _, row := range affected {

@@ -92,7 +92,8 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, buildID int64
 			row := Claim{
 				BuildID: buildID, Vulnerability: one.Vulnerability,
 				Status: one.Status, Justification: one.Justification,
-				StatementID: one.StatementID, Statement: one.Statement, Origin: Published,
+				StatementID: one.StatementID, Statement: one.Statement,
+				NotesID: one.NotesID, Notes: one.Notes, Origin: Published,
 				SubjectPurl: one.Purl, SubjectName: spelled(one),
 				SubjectFolded:  one.Component,
 				SubjectVersion: statedBeside(sbom.Target{Purl: one.Purl, Version: one.About}),
@@ -112,10 +113,18 @@ func publishedForBuild(ctx context.Context, tx bun.IDB, productID, buildID int64
 		Scan(ctx); err != nil {
 		return fmt.Errorf("read the build's claims taken from published statements: %w", err)
 	}
+	gained := gainingNotes(wanted, open)
+	if err := takeClaimNotes(ctx, tx, gained); err != nil {
+		return err
+	}
 	held := make(map[string]bool, len(open))
 	var closing []int64
 	for _, row := range open {
 		held[row.Identity] = true
+		if taken, ok := gained[row.ID]; ok {
+			held[taken.Identity] = true
+			continue
+		}
 		if _, still := wanted[row.Identity]; !still {
 			closing = append(closing, row.ID)
 		}

@@ -93,6 +93,14 @@ export function Priors({
                   <p style={{ whiteSpace: "pre-wrap" }}>{one.statement}</p>
                 </div>
               )}
+              {one.notes && (
+                <div className="why">
+                  <span className="hint" title="What they say about this status">
+                    Notes
+                  </span>
+                  <p style={{ whiteSpace: "pre-wrap" }}>{one.notes}</p>
+                </div>
+              )}
               {one.offers && (
                 <div className="actions">
                   <button
@@ -112,6 +120,7 @@ export function Priors({
                           `${one.publisher} says ${(one.status ?? "").replace("_", " ")}` +
                           (one.about ? ` of ${one.about}` : "") +
                           (one.statement ? `: ${one.statement}` : "") +
+                          (one.notes ? `\n${one.notes}` : "") +
                           "\n\n",
                       })
                     }

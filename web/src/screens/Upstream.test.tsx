@@ -146,6 +146,7 @@ describe("what upstreams offer for review", () => {
                   justification: "vulnerable_code_not_in_execute_path",
                   document: "https://psirt.example.org/doc.json",
                   document_id: "VEX-sonic-CVE-2026-1002",
+                  notes: "Built without the route socket, **see** <i>build.cfg</i>",
                 },
               ],
             },
@@ -154,6 +155,10 @@ describe("what upstreams offer for review", () => {
     );
     mount.render(screen(<UpstreamOffers />));
     await settle();
+    expect(mount.host().textContent).toContain(
+      "Built without the route socket, **see** <i>build.cfg</i>",
+    );
+    expect(mount.host().querySelector(".why i, .why strong")).toBeNull();
     expect(mount.host().textContent).toContain("Offered by an upstream");
     expect(mount.host().textContent).toContain("CVE-2026-1002 · libnl-3-200 3.7.0");
     expect(mount.host().textContent).toContain("upstream · for review");

@@ -196,7 +196,8 @@ func (v *suppressions) asCSAF(key string) error {
 // statement argues that something is not affected, and an action statement
 // says what to do about something that is. A statement carrying both keeps the
 // one its status takes, whichever the producer wrote first, and a statement
-// carrying only the other keeps that.
+// carrying only the other keeps that. The status notes apply to any status
+// and are kept beside them, never in their place.
 func (v *suppressions) statement() (Suppression, error) {
 	claim := Suppression{Origin: FromStatement}
 	var impact, action string
@@ -218,6 +219,10 @@ func (v *suppressions) statement() (Suppression, error) {
 		case "action_statement":
 			value, err := v.b.Str()
 			action = value
+			return err
+		case "status_notes":
+			value, err := v.b.Str()
+			claim.Notes = value
 			return err
 		case "products":
 			return v.products(&claim)

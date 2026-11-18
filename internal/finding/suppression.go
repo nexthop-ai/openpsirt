@@ -45,6 +45,11 @@ type Claim struct {
 	// and stored. A claim read back carries StatementID alone, and a reader
 	// wanting the words joins them.
 	Statement string `bun:"-"`
+	// NotesID is the stored copy of the status notes the claim gives, and nil
+	// where it gave none; Notes is the notes, carried on the way in as
+	// Statement is.
+	NotesID *int64 `bun:"notes_id"`
+	Notes   string `bun:"-"`
 	// Origin says whether this came attached to a component or in a document
 	// of its own, which is the difference between a claim that knows exactly
 	// what it is about and one that names something we have to match.
@@ -144,6 +149,11 @@ func claimIdentity(c Claim) string {
 	if c.Statement != "" {
 		parts = append(parts, "statement", c.Statement)
 	}
+	// Notes are part of what the claim says, and a claim giving none keys as
+	// it did before notes were stored.
+	if c.Notes != "" {
+		parts = append(parts, "notes", c.Notes)
+	}
 	basis := strings.Join(parts, "\x00")
 	sum := sha256.Sum256([]byte(basis))
 	return hex.EncodeToString(sum[:])
@@ -203,11 +213,12 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 			vulnerability := bound.HeadRunes(claim.Vulnerability, identifierLimit)
 			justification := bound.HeadRunes(claim.Justification, database.NameWidth)
 			words := WordsOf(claim.Statement)
+			notes := WordsOf(claim.Notes)
 			for _, subject := range claim.Targets {
 				row := Claim{
 					BuildID: buildID, Vulnerability: vulnerability,
 					Status: string(claim.Status), Justification: justification,
-					Statement: words, Origin: string(claim.Origin),
+					Statement: words, Notes: notes, Origin: string(claim.Origin),
 					SubjectPurl: subject.Purl, SubjectName: subject.Name,
 					SubjectFolded:  graph.Folded(subject.Name),
 					SubjectVersion: statedBeside(subject),
@@ -237,10 +248,18 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 		for _, row := range open {
 			held[row.Identity] = row.ID
 		}
+		gained := gainingNotes(wanted, open)
+		if err := takeClaimNotes(ctx, tx, gained); err != nil {
+			return err
+		}
+		taking := make(map[string]bool, len(gained))
+		for _, row := range gained {
+			taking[row.Identity] = true
+		}
 
 		var opening []Claim
 		for identity, row := range wanted {
-			if _, already := held[identity]; !already {
+			if _, already := held[identity]; !already && !taking[identity] {
 				opening = append(opening, row)
 			}
 		}
@@ -257,6 +276,9 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 		var closing []int64
 		for _, row := range open {
 			if _, still := wanted[row.Identity]; still {
+				continue
+			}
+			if _, kept := gained[row.ID]; kept {
 				continue
 			}
 			if !stated[sbom.Origin(row.Origin)] {
@@ -285,12 +307,68 @@ func RecordClaimsWithin(ctx context.Context, tx bun.IDB, buildID, scanID int64,
 	return applied, err
 }
 
-// pointAtWords stores the reasoning the claims give, once each, and points
-// every claim at its copy.
+// gainingNotes pairs each claim giving status notes that no open claim makes
+// with an open claim holding no notes that says the rest of it, by the open
+// claim's row. A claim stored before notes were kept takes them in place, so
+// it stays open and the findings it answers stay answered; closed and opened
+// again, every patch it declares drops out of the published documents until
+// the next scan of the build is applied.
+func gainingNotes(wanted map[string]Claim, open []Claim) map[int64]Claim {
+	held := make(map[string]bool, len(open))
+	bare := map[string]int64{}
+	for _, row := range open {
+		held[row.Identity] = true
+		if row.NotesID == nil {
+			bare[row.Identity] = row.ID
+		}
+	}
+	gained := map[int64]Claim{}
+	for identity, row := range wanted {
+		if row.Notes == "" || held[identity] {
+			continue
+		}
+		plain := row
+		plain.Notes = ""
+		if id, ok := bare[claimIdentity(plain)]; ok {
+			gained[id] = row
+			delete(bare, claimIdentity(plain))
+		}
+	}
+	return gained
+}
+
+// takeClaimNotes points each open claim given at the notes its claim now
+// gives, and keys it as that claim.
+func takeClaimNotes(ctx context.Context, tx bun.IDB, gained map[int64]Claim) error {
+	if len(gained) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(gained))
+	rows := make([]Claim, 0, len(gained))
+	for id, row := range gained {
+		ids = append(ids, id)
+		rows = append(rows, row)
+	}
+	if err := pointAtWords(ctx, tx, rows); err != nil {
+		return err
+	}
+	for i, id := range ids {
+		if _, err := tx.NewUpdate().Model((*Claim)(nil)).
+			Set(`"identity" = ?`, rows[i].Identity).
+			Set(`"notes_id" = ?`, rows[i].NotesID).
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
+			return fmt.Errorf("keep the notes the build gave: %w", err)
+		}
+	}
+	return nil
+}
+
+// pointAtWords stores the reasoning and the status notes the claims give,
+// once each, and points every claim at its copies.
 func pointAtWords(ctx context.Context, tx bun.IDB, claims []Claim) error {
-	said := make([]string, 0, len(claims))
+	said := make([]string, 0, 2*len(claims))
 	for _, claim := range claims {
-		said = append(said, claim.Statement)
+		said = append(said, claim.Statement, claim.Notes)
 	}
 	held, err := internWords(ctx, tx, said)
 	if err != nil {
@@ -298,6 +376,7 @@ func pointAtWords(ctx context.Context, tx bun.IDB, claims []Claim) error {
 	}
 	for i := range claims {
 		claims[i].StatementID = wordsID(held, claims[i].Statement)
+		claims[i].NotesID = wordsID(held, claims[i].Notes)
 	}
 	return nil
 }
@@ -334,10 +413,12 @@ type Carried struct {
 	// otherwise.
 	Version string
 	// Status is what the build claimed in the exchange format's own
-	// vocabulary, Justification the term it gave, and Statement the reasoning.
+	// vocabulary, Justification the term it gave, Statement the reasoning, and
+	// Notes the status notes.
 	Status        string
 	Justification string
 	Statement     string
+	Notes         string
 	// Within and WithinVersion are the product of the build the claim names
 	// its subject as shipping inside, where it names one: "zlib inside curl"
 	// and "zlib inside openssl" are two claims.
@@ -410,6 +491,7 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, buil
 		Status        string     `bun:"status"`
 		Justification string     `bun:"justification"`
 		Statement     string     `bun:"statement"`
+		Notes         string     `bun:"notes"`
 		Origin        string     `bun:"origin"`
 		WithinPurl    string     `bun:"within_purl"`
 		WithinName    string     `bun:"within_name"`
@@ -424,12 +506,14 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, buil
 		Join(`JOIN "scan" AS "opened" ON "opened"."id" = "sup"."opened_scan_id"`).
 		Join(`LEFT JOIN "scan" AS "closed" ON "closed"."id" = "sup"."closed_scan_id"`).
 		Join(WordsJoin("sup")).
+		Join(NotesJoin("sup")).
 		ColumnExpr(`"sup"."vulnerability" AS "vulnerability"`).
 		ColumnExpr(`COALESCE(NULLIF("sup"."subject_name", ''), "sup"."subject_purl") AS "subject"`).
 		ColumnExpr(`COALESCE("sup"."subject_version", '') AS "version"`).
 		ColumnExpr(`"sup"."status" AS "status"`).
 		ColumnExpr(`COALESCE("sup"."justification", '') AS "justification"`).
 		ColumnExpr(WordsColumn + ` AS "statement"`).
+		ColumnExpr(NotesColumn + ` AS "notes"`).
 		ColumnExpr(`"sup"."origin" AS "origin"`).
 		ColumnExpr(`COALESCE("sup"."within_purl", '') AS "within_purl"`).
 		ColumnExpr(`COALESCE("sup"."within_name", '') AS "within_name"`).
@@ -455,9 +539,9 @@ func (s *Store) CarriedPatches(ctx context.Context, subject access.Subject, buil
 			Within: within, WithinVersion: withinVersion,
 			Vulnerability: row.Vulnerability, Subject: row.Subject, Version: row.Version,
 			Status: row.Status, Justification: row.Justification,
-			Statement: row.Statement,
-			Pedigree:  sbom.Origin(row.Origin) == sbom.FromPedigree,
-			Since:     row.Since, Until: row.Until,
+			Statement: row.Statement, Notes: row.Notes,
+			Pedigree: sbom.Origin(row.Origin) == sbom.FromPedigree,
+			Since:    row.Since, Until: row.Until,
 			Suppresses: sbom.Status(row.Status).Suppresses(),
 		})
 	}

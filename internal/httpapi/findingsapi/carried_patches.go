@@ -23,6 +23,7 @@ type CarriedDecisionBody struct {
 	Status        string `json:"status" doc:"The claim, in the exchange format's own vocabulary"`
 	Justification string `json:"justification,omitempty"`
 	Statement     string `json:"statement,omitempty" doc:"The build's own reasoning, shown as written and never rendered"`
+	Notes         string `json:"notes,omitempty" doc:"The status notes the build gave, at any status, shown as written and never rendered"`
 	Within        string `json:"within,omitempty" doc:"The product of the build the claim names its subject as shipping inside, where it names one. The claim applies beneath that product"`
 	WithinVersion string `json:"within_version,omitempty" doc:"The version of that product"`
 	// Pedigree is the one that matters here: a claim attached to a component
@@ -90,7 +91,7 @@ func registerCarried(api huma.API, in core.Deps) {
 			body := CarriedDecisionBody{
 				Vulnerability: row.Vulnerability, Subject: row.Subject, Version: row.Version,
 				Status: row.Status, Justification: row.Justification,
-				Statement: row.Statement, Pedigree: row.Pedigree,
+				Statement: row.Statement, Notes: row.Notes, Pedigree: row.Pedigree,
 				Within: row.Within, WithinVersion: row.WithinVersion,
 				Suppresses: row.Suppresses,
 				Since:      row.Since.UTC().Format(time.DateOnly),

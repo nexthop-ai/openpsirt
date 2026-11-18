@@ -49,6 +49,7 @@ type OfferBody struct {
 	Status        string `json:"status" doc:"What the upstream says, in the VEX format's own words"`
 	Justification string `json:"justification,omitempty" doc:"The reason the upstream gives for a status of not affected"`
 	Reasoning     string `json:"reasoning,omitempty" doc:"The upstream's own words"`
+	Notes         string `json:"notes,omitempty" doc:"The status notes the upstream gave, at any status. Plain text, never markdown"`
 	Within        string `json:"within,omitempty" doc:"What of the upstream's the statement depends on: its build, or what pulls the component in there"`
 	Document      string `json:"document" doc:"The address of the document it is in"`
 	DocumentID    string `json:"document_id" doc:"The tracking identifier of that document"`
@@ -63,6 +64,7 @@ type UpstreamSaidBody struct {
 	Status        string `json:"status" doc:"What the upstream says, in the VEX format's own words"`
 	Justification string `json:"justification,omitempty" doc:"The reason the upstream gives for a status of not affected"`
 	Reasoning     string `json:"reasoning,omitempty" doc:"The upstream's own words"`
+	Notes         string `json:"notes,omitempty" doc:"The status notes the upstream gave, at any status. Plain text, never markdown"`
 	ForAnybody    bool   `json:"for_anybody" doc:"Whether it holds for anybody shipping the component, rather than depending on the upstream's own build"`
 	Declined      bool   `json:"declined" doc:"Whether somebody here declined it, so it closes nothing and is offered to nobody"`
 	Document      string `json:"document" doc:"The address of the document it is in"`
@@ -296,7 +298,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 				BranchOrTag: one.BranchOrTag, Variant: one.Variant,
 				Publisher: one.Publisher, Issue: one.Issue, Component: one.Component,
 				Version: one.Version, Status: one.Status, Justification: one.Justified,
-				Reasoning: one.Reasoning, Within: one.Within, Document: one.Document,
+				Reasoning: one.Reasoning, Notes: one.Notes, Within: one.Within, Document: one.Document,
 				DocumentID: one.Identifier,
 			})
 		}
@@ -336,7 +338,7 @@ func registerUpstream(api huma.API, in core.Deps) {
 			out.Body.Items = append(out.Body.Items, UpstreamSaidBody{
 				Statement: one.ID, Publisher: one.Publisher, Issue: one.Vulnerability,
 				Version: one.About, Status: one.Status, Justification: one.Justification,
-				Reasoning: one.Statement, ForAnybody: one.Placement == finding.PlacedAnybody,
+				Reasoning: one.Statement, Notes: one.Notes, ForAnybody: one.Placement == finding.PlacedAnybody,
 				Declined: one.DeclinedAt != nil, Document: one.Document, DocumentID: one.Identifier,
 			})
 		}

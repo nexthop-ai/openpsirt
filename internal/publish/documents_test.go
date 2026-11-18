@@ -856,3 +856,43 @@ func TestAnIssueFiledUnderAPlaceholderIsStatedUnderItsCVE(t *testing.T) {
 		}
 	})
 }
+
+// A declared patch is stated fixed with the status notes of the build's own
+// claim, and a statement from a decision made here carries none: a decision's
+// only words past its mitigation are its reasoning.
+func TestAPatchIsPublishedWithTheBuildsStatusNotes(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.shipped()
+		var scanID int64
+		if err := w.DB.DB.NewSelect().TableExpr(`"build"`).ColumnExpr(`"last_scan_id"`).
+			Where(`"id" = ?`, w.Build.ID).Scan(t.Context(), &scanID); err != nil {
+			t.Fatal(err)
+		}
+		const notes = "Backported from 3.0.15 as debian/patches/CVE-2026-1001.patch"
+		if _, err := finding.RecordClaimsWithin(t.Context(), w.DB.DB, w.Build.ID, scanID, []sbom.Suppression{{
+			Vulnerability: "CVE-2026-1001", Status: sbom.AlreadyFixed, Notes: notes,
+			Targets: []sbom.Target{{Purl: openssl.Purl, Name: openssl.Name}}, Origin: sbom.FromStatement,
+		}}, map[sbom.Origin]bool{sbom.FromStatement: true}); err != nil {
+			t.Fatal(err)
+		}
+		w.report(w.Build, reported{"CVE-2026-1001", openssl}, reported{"CVE-2026-1004", libnl})
+		w.decide(w.Build, "CVE-2026-1004", libnl, decision{outcome: triage.NotApplicable,
+			justification: triage.MitigationsExist, mitigation: "The module is not loaded."})
+		w.publishes(w.Product, true)
+		w.write()
+
+		stated := map[string]vex.Statement{}
+		for _, one := range w.openVEXAbout(w.Product, fixture.BranchName).Statements {
+			stated[one.Vulnerability.Name] = one
+		}
+		if fixed := stated["CVE-2026-1001"]; fixed.Status != vex.Fixed || fixed.StatusNotes != notes {
+			t.Errorf("the patch is stated %q with notes %q, want fixed with the build's notes",
+				fixed.Status, fixed.StatusNotes)
+		}
+		if decided := stated["CVE-2026-1004"]; decided.Status != vex.NotAffected || decided.StatusNotes != "" {
+			t.Errorf("the decision is stated %q with notes %q, want not affected with none",
+				decided.Status, decided.StatusNotes)
+		}
+	})
+}
