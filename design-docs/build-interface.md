@@ -35,6 +35,8 @@ Satisfies REQ-75.
 | The type check is `tsc -p` with `--incremental`, never `tsc -b` | One project with no references; build mode with `--noEmit` reused nothing, 10.7 s each run, against 1.2 s with the build information |
 | ESLint and Prettier cache per file by content | ESLint here is not type-aware, so a file's result depends on that file and the configuration alone: 14.6 s against 0.7 s, and 4.6 s against 0.6 s |
 | The three caches live in `web/.cache`, outside `node_modules`, and are emptied whenever the lockfile differs from the one they were made under | `npm ci` deletes `node_modules` every run; ESLint's results outlive a plugin moving under an unchanged configuration |
+| The API client generator's own YAML reader is held at js-yaml 4 by an override naming that package alone; everything else takes js-yaml 5 | `openapi-typescript` 7 reads OpenAPI through `@redocly/openapi-core` 1, which is written against js-yaml 4's schema API and fails to load under 5. An override for every package forces one version on both |
+| Code here imports js-yaml by named export | js-yaml 5 has no default export, and a named import reads the same under 4 and 5 |
 
 ## Web test runs
 
