@@ -129,8 +129,9 @@ all 11,435.
 
 ## Issue dates
 
-An issue's published and last-modified dates are read from OSV, asked in the
-background, because no scanner report carries either (REQ-82).
+An issue's published and last-modified dates, and its links to the change that
+fixes it, are read from OSV, asked in the background, because no scanner report
+carries either (REQ-82).
 
 | Rule | Reason |
 |---|---|
@@ -140,9 +141,15 @@ background, because no scanner report carries either (REQ-82).
 | On unless turned off, a setting read before every request | An identifier is public; an air-gapped deployment turns it off |
 | Only a published vulnerability, by the row it stands as | A flaw minted here and an analyzer's rule are known to nobody outside |
 | The issue's own identifier is asked first, then its CVE names, its GitHub names and the rest, five at most, until one answers | |
+| A not-found answer naming records that hold the name as an alias sends the pass to those records next; the first that answers is the issue's answer, publication date included | OSV files an issue under its publisher's name: curl publishes CVE-2026-86409 as CURL-CVE-2026-86409, and OSV answers the CVE with that name and no record |
+| An answer sends the pass to three names at most, each shaped as an advisory identifier; a record reached through an alias is not followed further, and no name is asked twice for one issue, so one issue is eight requests at most | Aliases naming each other, or one issue's own names, end |
 | A name is sent as OSV spells it: a GitHub advisory's suffix lower case, openSUSE's prefix mixed | Names are stored in capitals and OSV matches exactly |
 | A name that is no advisory identifier is never sent | |
-| Only the two dates are taken | Severity and fix state stay the scanner's |
+| Only the two dates and the record's fix links are taken | Severity and fix state stay the scanner's |
+| A record's references marked as a fix, then each fixed commit of its git ranges as a page on the repository's host, are the issue's patch links, a hundred at most per record (`design-docs/findings-patch-branches.md` § Commit pages) | Curl, the Go and Rust databases, PyPI, npm, OSS-Fuzz and the kernel publish fixes there, and a scanner's references often mark none |
+| A fix reference becomes a link only as an absolute `http` or `https` address naming a host, with no credentials, space, control character or invalid UTF-8, within 2,048 bytes; any other is dropped | A third party's address becomes a link |
+| A patch link from OSV is added like a report's reference and never removed; an address the issue already points at keeps its row and kind | A reference says where a fix is and claims nothing of a build: it opens, closes and widens no finding |
+| A patch link from OSV takes branch labels like any patch link (REQ-78) | |
 | An issue OSV does not know is recorded as asked with no date; a figure needing one says unknown | |
 | An empty answer keeps dates already held | A record OSV stops serving was still published when it said |
 | A first published date rewrites what a replaced inventory's check recorded of the issue undated, in the same transaction, after taking the issue's row (`design-docs/findings-closure.md` § Replaced inventories) | A check holding the row commits its matches first |

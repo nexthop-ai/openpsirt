@@ -28,11 +28,11 @@ import (
 // osvSays answers one date for every name, or none.
 type osvSays struct{ published time.Time }
 
-func (o osvSays) Dates(context.Context, string) (issuedate.Dates, error) {
+func (o osvSays) Ask(context.Context, string) (issuedate.Record, error) {
 	if o.published.IsZero() {
-		return issuedate.Dates{}, issuedate.ErrUnknown
+		return issuedate.Record{}, issuedate.ErrUnknown
 	}
-	return issuedate.Dates{Published: o.published}, nil
+	return issuedate.Record{Published: o.published}, nil
 }
 
 // undatedMatch records a check's match on an issue OSV was asked about and

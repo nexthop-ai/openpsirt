@@ -42,6 +42,10 @@ const MostPerPass = 200
 // then its other names, until one answers.
 const mostNames = 5
 
+// mostAsks bounds the requests for one issue: its names, and the records an
+// answer names as holding one of them as an alias.
+const mostAsks = mostNames + mostAliased
+
 // betweenAsks is the pause between one request and the next.
 const betweenAsks = 100 * time.Millisecond
 
@@ -51,7 +55,7 @@ const betweenCycles = time.Minute
 // Lease names the work of asking OSV, so one replica asks.
 const Lease = "issue.dates"
 
-// Pass asks OSV for the dates of the issues due an answer.
+// Pass asks OSV for the dates and patch links of the issues due an answer.
 type Pass struct {
 	db     bun.IDB
 	Asker  Asker
@@ -132,7 +136,7 @@ func (p *Pass) Once(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	answered := 0
-	// One issue is up to five requests, so the lease is renewed on the clock
+	// One issue is up to mostAsks requests, so the lease is renewed on the clock
 	// as well as on the count.
 	renewal := queue.NewRenewal(p.asking, queue.LeaseFor(p.interval), p.Now)
 	for _, issue := range due {
@@ -158,7 +162,7 @@ func (p *Pass) Once(ctx context.Context) (int, error) {
 		if err != nil {
 			return answered, err
 		}
-		dates, err := p.ask(ctx, names)
+		answer, err := p.ask(ctx, names)
 		switch {
 		case err == nil, errors.Is(err, ErrUnknown):
 		case ctx.Err() != nil:
@@ -169,7 +173,7 @@ func (p *Pass) Once(ctx context.Context) (int, error) {
 			p.logger.Warn("OSV did not answer", "issue", issue.Identifier, "error", err)
 			return answered, nil
 		}
-		if err := p.record(ctx, issue.ID, dates); err != nil {
+		if err := p.record(ctx, issue.ID, answer); err != nil {
 			return answered, err
 		}
 		answered++
@@ -179,25 +183,54 @@ func (p *Pass) Once(ctx context.Context) (int, error) {
 
 // ask asks each name in turn until OSV knows one, and answers no dates where
 // it knows none. A name OSV refuses is passed over like one it does not know.
-func (p *Pass) ask(ctx context.Context, names []string) (Dates, error) {
-	for i, name := range names {
-		if i > 0 {
+//
+// A name OSV holds as an alias of other records sends the pass to those
+// records next, and the first that answers is the issue's answer. A record
+// reached that way is not followed further, and no name is asked twice for
+// one issue, so an alias naming another, or naming itself, ends.
+func (p *Pass) ask(ctx context.Context, names []string) (Record, error) {
+	type asking struct {
+		name     string
+		followed bool
+	}
+	queue := make([]asking, 0, len(names))
+	for _, name := range names {
+		queue = append(queue, asking{name: name})
+	}
+	asked := map[string]bool{}
+	for requests := 0; len(queue) > 0 && requests < mostAsks; {
+		next := queue[0]
+		queue = queue[1:]
+		folded := strings.ToUpper(next.name)
+		if asked[folded] {
+			continue
+		}
+		asked[folded] = true
+		if requests > 0 {
 			background.Pause(ctx, p.Pause)
 		}
-		dates, err := p.Asker.Dates(ctx, name)
+		requests++
+		answer, err := p.Asker.Ask(ctx, next.name)
+		var aliased *Aliased
 		switch {
 		case err == nil:
 			background.Pause(ctx, p.Pause)
-			return dates, nil
+			return answer, nil
+		case errors.As(err, &aliased) && !next.followed:
+			named := make([]asking, 0, len(aliased.Names)+len(queue))
+			for _, name := range aliased.Names {
+				named = append(named, asking{name: name, followed: true})
+			}
+			queue = append(named, queue...)
 		case errors.Is(err, ErrUnknown):
 		case errors.Is(err, ErrUnaskable):
-			p.logger.Warn("OSV will not answer about this name", "name", name, "error", err)
+			p.logger.Warn("OSV will not answer about this name", "name", next.name, "error", err)
 		default:
-			return Dates{}, err
+			return Record{}, err
 		}
 	}
 	background.Pause(ctx, p.Pause)
-	return Dates{}, ErrUnknown
+	return Record{}, ErrUnknown
 }
 
 // due reads the issues whose answer is missing or old, never-asked first and
@@ -287,16 +320,17 @@ func ordered(own string, others []string) []string {
 	return out
 }
 
-// record writes when the issue was asked about, and the dates where OSV gave
-// them. An empty answer leaves dates already held: a record OSV stops serving
-// was still published when it said.
+// record writes when the issue was asked about, and the dates and patch links
+// where OSV gave them. An empty answer leaves dates already held: a record OSV
+// stops serving was still published when it said. Patch links are only ever
+// added, like every reference a report gives.
 //
 // A first date also rewrites what a replaced inventory's check recorded of the
 // issue without one, in the same transaction, so a match never reads as dated
 // while its stretch still assumes it was not. The issue's row is taken first,
 // by the write of when it was asked, so a check holding it commits its matches
 // before they are read, and a check arriving later waits and reads the date.
-func (p *Pass) record(ctx context.Context, id int64, dates Dates) error {
+func (p *Pass) record(ctx context.Context, id int64, answer Record) error {
 	asked := p.Now().UTC().Truncate(time.Microsecond)
 	var redated finding.Redated
 	err := database.Within(ctx, p.db, func(ctx context.Context, tx bun.IDB) error {
@@ -306,8 +340,11 @@ func (p *Pass) record(ctx context.Context, id int64, dates Dates) error {
 			Where(`"id" = ?`, id).Exec(ctx); err != nil {
 			return fmt.Errorf("record when OSV was asked about an issue: %w", err)
 		}
-		if dates.Published.IsZero() {
+		if answer.Published.IsZero() {
 			return nil
+		}
+		if err := finding.PatchLinks(ctx, tx, id, answer.Patches); err != nil {
+			return err
 		}
 		var held struct {
 			PublishedAt *time.Time `bun:"published_at"`
@@ -318,17 +355,17 @@ func (p *Pass) record(ctx context.Context, id int64, dates Dates) error {
 		}
 		if held.PublishedAt == nil {
 			var err error
-			if redated, err = finding.Redate(ctx, tx, id, dates.Published); err != nil {
+			if redated, err = finding.Redate(ctx, tx, id, answer.Published); err != nil {
 				return err
 			}
 		}
 		q := tx.NewUpdate().Table("vulnerability").
-			Set(`"published_at" = ?`, dates.Published.Truncate(time.Microsecond)).
+			Set(`"published_at" = ?`, answer.Published.Truncate(time.Microsecond)).
 			Where(`"id" = ?`, id)
-		if dates.Modified.IsZero() {
+		if answer.Modified.IsZero() {
 			q = q.Set(`"modified_at" = NULL`)
 		} else {
-			q = q.Set(`"modified_at" = ?`, dates.Modified.Truncate(time.Microsecond))
+			q = q.Set(`"modified_at" = ?`, answer.Modified.Truncate(time.Microsecond))
 		}
 		if _, err := q.Exec(ctx); err != nil {
 			return fmt.Errorf("record an issue's dates: %w", err)

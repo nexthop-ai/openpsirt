@@ -156,6 +156,7 @@ finding.LastScanned A background pass: when a scan last reached an inventory, as
 finding.MergesInto Not varying by reader: the merges into one issue. The issue route asks it only once the reader sees the issue somewhere, and withholds it where the record is out of reach.
 finding.MinimumSeverityFor Not varying by reader: the minimum severity a product states, or the deployment's.
 finding.OneFoldNamed A helper over a narrowed read: the writing form of FoldsNamed, over builds the assignment and occurrence writes resolved with a subject.
+finding.PatchLinks A background pass: the OSV pass adds a record's fix links to the issue it asked about.
 finding.RatingIn A helper over a narrowed read: what one product rates one issue, for the finding detail after it authorized the finding.
 finding.RatingsIn A helper over a narrowed read: what products rate issues, for rows the caller already read with a subject.
 finding.ReachedByName A helper over a narrowed read: which builds reach a component name, over builds its callers already resolved for a subject or a queued scope.

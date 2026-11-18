@@ -1034,15 +1034,18 @@ private modules and vendored forks, and they are the candidates to promote into
 ## Issue publication dates
 
 On unless an administrator turns it off, under Settings. A background pass asks
-OSV, at `api.osv.dev`, when each issue was published and last modified, and
-stores the two dates. What goes out is the issue's public identifier, one
+OSV, at `api.osv.dev`, when each issue was published and last modified and
+for its links to the change that fixes it, and stores the two dates, with the
+links as the issue's patch links. With [Patch branches](#patch-branches) on,
+those links also decide which repositories are copied. What goes out is the issue's public identifier, one
 request per name asked, and nothing about a build, a component or a product.
 
 | | |
 |---|---|
 | Asked | Each published vulnerability once, then again monthly. An issue OSV does not know is asked daily for its first two weeks here, then monthly |
-| Names | The issue's own identifier first, then its other names, until OSV knows one |
+| Names | The issue's own identifier first, then its other names, until OSV knows one. A name OSV holds as another record's alias is answered by that record |
 | Unknown | An issue OSV holds no record of has no date, and the issue page says so |
+| Patch links | A fix reference on the record, and each fixed commit on github.com, gitlab.com or git.kernel.org as a link to its commit page; added beside a report's links and never removed |
 | Turned off | Nothing is asked. A replaced inventory's check dates an issue never dated by when this deployment first saw it; dates already held stay |
 | Egress | Allow `api.osv.dev`. Nothing else is reached and a redirect is not followed. A pass that cannot reach it stops, and the issues stay due |
 
