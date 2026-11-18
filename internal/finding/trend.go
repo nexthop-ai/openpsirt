@@ -156,7 +156,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 		since = s.now().UTC().Add(-time.Duration(steps) * step)
 	}
 
-	narrow, err := s.trendNarrowing(ctx, subject, products, all, scope, within)
+	narrow, builds, err := s.trendNarrowing(ctx, subject, products, all, scope, within)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (s *Store) Trend(ctx context.Context, subject access.Subject, scope Scope, 
 	// the last step says an issue closed inside the window came back, which
 	// decides whether that closure is corrected. Every caller's window ends
 	// now, so cost follows its start.
-	rows, err := s.trendMoments(ctx, narrow, within, `("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
+	rows, err := s.trendMoments(ctx, narrow, within, builds, since)
 	if err != nil {
 		return nil, err
 	}
@@ -341,21 +341,28 @@ type trendNarrowing func(ctx context.Context, q *bun.SelectQuery, when string, a
 // the kinds a statistic counts, never what was never present, and the
 // component or subtree asked for. A record taken back as invalid, and a version
 // the issue's record states is unaffected, were never present.
+//
+// It also returns the builds the narrowing can reach, in order: those in the
+// scope, on a product the subject may read.
 func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, products []int64, all bool,
-	scope Scope, within Within) (trendNarrowing, error) {
+	scope Scope, within Within) (trendNarrowing, []int64, error) {
 
+	reached, err := s.readableBuilds(ctx, scope, products, all)
+	if err != nil {
+		return nil, nil, err
+	}
 	var buildID int64
 	var under []int64
 	var fromRoot bool
 	if len(within.Beneath) > 0 {
 		buildIDs, err := s.Builds(ctx, scope)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		// Refused rather than answered from whichever build sorted first,
 		// which is a chart of somewhere else and silent about it.
 		if len(buildIDs) != 1 {
-			return nil, refusal.Errorf("trend beneath a component: a subtree is a walk over one"+
+			return nil, nil, refusal.Errorf("trend beneath a component: a subtree is a walk over one"+
 				" build's edges, and %d builds are in scope", len(buildIDs))
 		}
 		buildID = buildIDs[0]
@@ -364,13 +371,13 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 		// present version of its name is.
 		replaced, err := graph.Replaced(ctx, s.db, buildID)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if under, err = graph.ReplacedWithin(ctx, s.db, buildID, within.Beneath, replaced); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if fromRoot, err = graph.RootAmong(ctx, s.db, buildID, within.Beneath); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	// The components a build stated under the name asked for, read once:
@@ -381,7 +388,7 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 		var err error
 		if stated, err = statedAs(ctx, s.db, products, all, `"n"."name_folded" = ?`,
 			graph.Folded(name)); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
@@ -416,7 +423,7 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 			q = q.Where(`"f"."component_id" IN (?)`, graph.WithinAnd(q.DB(), buildID, within.Beneath, held, fromRoot))
 		}
 		return q, nil
-	}, nil
+	}, reached, nil
 }
 
 // trendMoments is the reduced moments of the findings a trend reads.
@@ -426,9 +433,76 @@ func (s *Store) trendNarrowing(ctx context.Context, subject access.Subject, prod
 // image 367,000 rows in range are 15,000 distinct moments. A DISTINCT over the
 // joined rows reaches the same answer and is slower on PostgreSQL, because the
 // join runs before it.
-func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within Within,
-	when string, args ...any) ([]trendRow, error) {
-	moments := s.db.NewSelect().
+//
+// The builds are reduced in chunks (chunked), one branch of one statement
+// each, and the reductions are read once. A run is one build's, so a moment
+// never spans two builds unless it has no run, and those are merged after.
+// The group index holds every column read, so the engine reads the index
+// alone and groups a chunk in memory. Reduced across builds at once, 15 builds
+// of a real image grouped 3.6 million rows through a 232 MB sort on disk: 3.0
+// s against 0.46 s on PostgreSQL (design-docs/analytics-measurements.md § Many
+// builds). Only builds holding a finding open now or closed after the start
+// are read.
+func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within Within, builds []int64,
+	since time.Time) ([]trendRow, error) {
+	chunks, err := s.chunks(ctx, builds, `("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
+	if err != nil {
+		return nil, err
+	}
+	narrowed := make([]*bun.SelectQuery, 0, len(chunks))
+	for _, chunk := range chunks {
+		one, err := narrow(ctx, s.buildMoments(chunk),
+			`("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
+		if err != nil {
+			return nil, err
+		}
+		narrowed = append(narrowed, one)
+	}
+	var moments *bun.SelectQuery
+	for _, one := range narrowed {
+		if moments == nil {
+			moments = one
+		} else {
+			moments = moments.UnionAll(one)
+		}
+	}
+	if moments == nil {
+		return nil, nil
+	}
+	var rows []trendRow
+	if err := s.db.NewSelect().
+		TableExpr(`(?) AS "grouped"`, moments).
+		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
+		// This product's rating where it has stated one, folded to the words
+		// that rank, as on the release chart beside it. An issue with no
+		// published severity is stored as '' and a scanner's "unknown" is a
+		// word of its own; the browser draws one unrated rung for both.
+		Join(rating.For(rating.OnGrouped)).
+		ColumnExpr(`"grouped"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"grouped"."product_id" AS "product_id"`).
+		ColumnExpr(`"grouped"."build_id" AS "build_id"`).
+		ColumnExpr(`"grouped"."component_id" AS "component_id"`).
+		ColumnExpr(rating.BandExpr+` AS "severity"`).
+		ColumnExpr(`"grouped"."opened_at" AS "opened_at"`).
+		ColumnExpr(`"grouped"."opened_run_id" AS "opened_run_id"`).
+		ColumnExpr(`"grouped"."closed_at" AS "closed_at"`).
+		ColumnExpr(`"grouped"."closed_because" AS "closed_because"`).
+		ColumnExpr(`"grouped"."findings" AS "findings"`).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("read what changed over time: %w", err)
+	}
+	rows = mergedMoments(rows)
+	if err := s.nameComponents(ctx, rows); err != nil {
+		return nil, err
+	}
+	return chosen(rows, within), nil
+}
+
+// buildMoments is these builds' findings reduced to moments, before the
+// narrowing applies: an issue at a component in one product, opened and
+// closed at one moment each, by one run.
+func (s *Store) buildMoments(builds []int64) *bun.SelectQuery {
+	return s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
@@ -443,60 +517,112 @@ func (s *Store) trendMoments(ctx context.Context, narrow trendNarrowing, within 
 		// scan.
 		ColumnExpr(`"f"."opened_run_id" AS "opened_run_id"`).
 		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
-		ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
 		// Grouped on the stored reason: an absent and an empty reason fold to
-		// one word, so at worst one moment arrives twice, and the count reads
-		// it once.
+		// one word, and the merge across builds reads them as one moment.
+		ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
 		// The component, named below, because a version bump moves a finding
 		// to another component of the same name.
 		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		// The build, because a removal is an upload to one build. Read off the
-		// group rather than grouped on: a run is one build's, so the opening
-		// run already decides it. Grouped on, it took 1,230 ms against 630 ms
-		// for a product's trend on SQLite.
+		// The build, because a removal is an upload to one build.
 		ColumnExpr(`MIN("f"."build_id") AS "build_id"`).
 		ColumnExpr(`COUNT(*) AS "findings"`).
-		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "st"."product_id", "f"."opened_at", "f"."opened_run_id", "f"."closed_at", "f"."closed_because"`)
-	moments, err := narrow(ctx, moments, when, args...)
-	if err != nil {
-		return nil, err
+		Where(`"f"."build_id" IN (?)`, bun.List(builds)).
+		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "f"."opened_at", "f"."opened_run_id", "f"."closed_at", "f"."closed_because", "st"."product_id"`)
+}
+
+// mergedMoments is rows with one row per moment, where reductions of several
+// builds, or an absent and an empty reason, read one moment twice. The merged
+// row counts every finding of both and names the lower build, as one
+// reduction over both builds would.
+func mergedMoments(rows []trendRow) []trendRow {
+	type moment struct {
+		vulnerability, component, product int64
+		opened, run, closed               int64
+		isClosed                          bool
+		because                           string
 	}
-	var rows []trendRow
-	if err := s.db.NewSelect().
-		TableExpr(`(?) AS "grouped"`, moments).
-		Join(`JOIN "vulnerability" AS "v" ON "v"."id" = "grouped"."vulnerability_id"`).
-		// This product's rating where it has stated one, folded to the words
-		// that rank, as on the release chart beside it. An issue with no
-		// published severity is stored as '' and a scanner's "unknown" is a
-		// word of its own; the browser draws one unrated rung for both.
-		Join(rating.For(rating.OnGrouped)).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "grouped"."component_id"`).
-		ColumnExpr(`"grouped"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"c"."name_folded" AS "component"`).
-		ColumnExpr(`"c"."name" AS "name", "c"."version" AS "version"`).
-		ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
-		ColumnExpr(`"grouped"."product_id" AS "product_id"`).
-		ColumnExpr(`"grouped"."build_id" AS "build_id"`).
-		ColumnExpr(`"grouped"."component_id" AS "component_id"`).
-		ColumnExpr(rating.BandExpr+` AS "severity"`).
-		ColumnExpr(`"grouped"."opened_at" AS "opened_at"`).
-		ColumnExpr(`"grouped"."opened_run_id" AS "opened_run_id"`).
-		ColumnExpr(`"grouped"."closed_at" AS "closed_at"`).
-		ColumnExpr(`"grouped"."closed_because" AS "closed_because"`).
-		ColumnExpr(`"grouped"."findings" AS "findings"`).
-		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("read what changed over time: %w", err)
+	at := make(map[moment]int, len(rows))
+	out := rows[:0]
+	for _, row := range rows {
+		key := moment{vulnerability: row.VulnerabilityID, component: row.ComponentID, product: row.ProductID,
+			opened: row.OpenedAt.UnixNano(), run: -1, because: row.ClosedBecause}
+		if row.OpenedRunID != nil {
+			key.run = *row.OpenedRunID
+		}
+		if row.ClosedAt != nil {
+			key.closed, key.isClosed = row.ClosedAt.UnixNano(), true
+		}
+		if i, seen := at[key]; seen {
+			out[i].Findings += row.Findings
+			out[i].BuildID = min(out[i].BuildID, row.BuildID)
+			continue
+		}
+		at[key] = len(out)
+		out = append(out, row)
 	}
-	identify(rows)
-	return chosen(rows, within), nil
+	return out
 }
 
 // identify sets each row's identifying name.
 func identify(rows []trendRow) {
+	known := map[int64]string{}
 	for i := range rows {
 		r := &rows[i]
-		r.Identifying = graph.IdentifyingFolded(r.Component, r.Name, r.Version, r.Purl)
+		identifying, held := known[r.ComponentID]
+		if !held {
+			identifying = graph.IdentifyingFolded(r.Component, r.Name, r.Version, r.Purl)
+			known[r.ComponentID] = identifying
+		}
+		r.Identifying = identifying
 	}
+}
+
+// nameComponents puts on each row its component's names and identifying name,
+// read once per component. Moments repeat a component once per build and run,
+// 198,000 moments over 7,000 components for 15 builds of one image, and a
+// name joined to each moment was read, allocated and parsed per moment: 1.2 s
+// of a 1.9 s trend.
+func (s *Store) nameComponents(ctx context.Context, rows []trendRow) error {
+	seen := map[int64]bool{}
+	var ids []int64
+	for _, r := range rows {
+		if !seen[r.ComponentID] {
+			seen[r.ComponentID] = true
+			ids = append(ids, r.ComponentID)
+		}
+	}
+	type named struct {
+		ID          int64  `bun:"id"`
+		Component   string `bun:"component"`
+		Name        string `bun:"name"`
+		Version     string `bun:"version"`
+		Purl        string `bun:"purl"`
+		Identifying string `bun:"-"`
+	}
+	byID := make(map[int64]named, len(ids))
+	for start := 0; start < len(ids); start += database.BatchSize {
+		var read []named
+		if err := s.db.NewSelect().
+			TableExpr(`"component" AS "c"`).
+			ColumnExpr(`"c"."id" AS "id"`).
+			ColumnExpr(`"c"."name_folded" AS "component"`).
+			ColumnExpr(`"c"."name" AS "name", "c"."version" AS "version"`).
+			ColumnExpr(`COALESCE("c"."purl", '') AS "purl"`).
+			Where(`"c"."id" IN (?)`, bun.List(ids[start:min(start+database.BatchSize, len(ids))])).
+			Scan(ctx, &read); err != nil {
+			return fmt.Errorf("name the components over time: %w", err)
+		}
+		for _, c := range read {
+			c.Identifying = graph.IdentifyingFolded(c.Component, c.Name, c.Version, c.Purl)
+			byID[c.ID] = c
+		}
+	}
+	for i := range rows {
+		r := &rows[i]
+		c := byID[r.ComponentID]
+		r.Component, r.Name, r.Version, r.Purl, r.Identifying = c.Component, c.Name, c.Version, c.Purl, c.Identifying
+	}
+	return nil
 }
 
 // chosen is the rows on components the narrowing chooses by identifier.

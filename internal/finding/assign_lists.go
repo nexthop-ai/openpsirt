@@ -339,8 +339,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 			Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
 			Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 			Where(kinds, kindArgs...).
-			Where(`"f"."closed_at" IS NULL`).
-			Where(notRecordedAsFlaw)
+			Where(`"f"."closed_at" IS NULL`)
 		if since != nil {
 			q = q.Where(`"f"."opened_at" > ?`, *since)
 		}
@@ -395,41 +394,102 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 		Undisclosed     bool      `bun:"undisclosed"`
 		OpenedAt        time.Time `bun:"opened_at"`
 	}
-	err := narrow(s.db.NewSelect()).
-		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+	// Each chunk of builds grouped on its own first (chunked), then the
+	// partial groups grouped across chunks: one grouping over every build's
+	// occurrences sorts them all, and on 15 builds of one image that spilled
+	// 573 MB to disk. Every column folds exactly: a count is a sum of counts,
+	// a least or most the least or most of the partial ones, and the builds a
+	// piece of work is in are its partial groups, since a chunk groups each of
+	// its builds apart.
+	inScope, err := s.Builds(ctx, scope)
+	if err != nil {
+		return nil, 0, err
+	}
+	// Only builds holding open work of the list's: nobody's, or the holders'.
+	held, heldArgs := `"f"."closed_at" IS NULL AND "f"."assigned_to" IS NULL`, []any(nil)
+	if len(holders) > 0 {
+		held, heldArgs = `"f"."closed_at" IS NULL AND "f"."assigned_to" IN (?)`, []any{bun.List(holders)}
+	}
+	chunks, err := s.chunks(ctx, inScope, held, heldArgs...)
+	if err != nil {
+		return nil, 0, err
+	}
+	privateCount, privateArg := access.PrivateCountAs(access.FindingVisibility(), "private_places")
+	// Each chunk in two branches. A dependency finding is its component's
+	// piece of work and is never a flaw, since a flaw records a code finding's
+	// occurrence, so its branch reads only what the group index holds and
+	// reads no table. A code finding is its occurrence's piece of work, and
+	// its branch reads the occurrence and asks after the flaw.
+	part := func(builds []int64, code bool) *bun.SelectQuery {
+		q := narrow(s.db.NewSelect()).
+			Where(`"f"."build_id" IN (?)`, bun.List(builds)).
+			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+			ColumnExpr(`"st"."product_id" AS "product_id"`)
+		if code {
+			q = q.Where(`"f"."kind" = ?`, kind.Analysis).
+				Where(notRecordedAsFlaw).
+				ColumnExpr(`0 AS "piece_component"`).
+				ColumnExpr(`"f"."occurrence_identity" AS "place"`).
+				GroupExpr(`"f"."build_id", "f"."vulnerability_id", "st"."product_id", "f"."occurrence_identity"`)
+		} else {
+			q = q.Where(`"f"."kind" <> ?`, kind.Analysis).
+				ColumnExpr(`"f"."component_id" AS "piece_component"`).
+				ColumnExpr(`'' AS "place"`).
+				GroupExpr(`"f"."build_id", "f"."vulnerability_id", "st"."product_id", "f"."component_id"`)
+		}
+		return q.
+			ColumnExpr(`MIN("f"."component_id") AS "component_least"`).
+			ColumnExpr(`"f"."build_id" AS "build_id"`).
+			ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
+			ColumnExpr(exploitedAcross+` AS "exploited"`).
+			ColumnExpr(incidentAcross+` AS "incident"`).
+			ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
+			ColumnExpr(privateCount, privateArg).
+			ColumnExpr(`COUNT(*) AS "places"`)
+	}
+	parts := perChunk(chunks,
+		func(builds []int64) *bun.SelectQuery { return part(builds, false) },
+		func(builds []int64) *bun.SelectQuery { return part(builds, true) })
+	if parts == nil {
+		return nil, 0, nil
+	}
+	pieces := func() *bun.SelectQuery {
+		return s.db.NewSelect().
+			TableExpr(`(?) AS "p"`, parts).
+			GroupExpr(`"p"."vulnerability_id", "p"."product_id", "p"."piece_component", "p"."place"`)
+	}
+	err = pieces().
+		ColumnExpr(`"p"."vulnerability_id" AS "vulnerability_id"`).
 		// The lowest of a code finding's components, as one of its builds names it.
 		// Every other piece of work is one component.
-		ColumnExpr(`MIN("f"."component_id") AS "component_id"`).
-		ColumnExpr(`MAX(`+codeFindingOccurrence+`) AS "place"`).
-		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`MIN("p"."component_least") AS "component_id"`).
+		ColumnExpr(`"p"."place" AS "place"`).
+		ColumnExpr(`"p"."product_id" AS "product_id"`).
 		// One of the builds, and how many there are. The one is what a link
 		// and an action need somewhere to point; the count is what stops a
 		// screen presenting it as the only one. MIN rather than any other
 		// choice because it is stable: a row that named a different build
 		// between two reads would move under somebody.
-		ColumnExpr(`MIN("f"."build_id") AS "build_id"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."build_id") AS "builds"`).
-		ColumnExpr(`MAX("f"."urgency") AS "urgency"`).
-		ColumnExpr(exploitedAcross+` AS "exploited"`).
-		ColumnExpr(incidentAcross+` AS "incident"`).
+		ColumnExpr(`MIN("p"."build_id") AS "build_id"`).
+		ColumnExpr(`COUNT(*) AS "builds"`).
+		ColumnExpr(`MAX("p"."urgency") AS "urgency"`).
+		ColumnExpr(`MAX("p"."exploited") AS "exploited"`).
+		ColumnExpr(`MAX("p"."incident") AS "incident"`).
 		// The oldest occurrence decides, as it does everywhere else here: a
 		// group open for a month with one occurrence added yesterday has been
 		// somebody's problem for a month, and a maximum made it read as a day
 		// old — so the unassigned queue and the digest built on it sorted a
 		// six-week backlog item as new work.
-		ColumnExpr(`MIN("f"."opened_at") AS "opened_at"`).
-		// Any undisclosed row makes the group undisclosed. Written as a sum
-		// rather than a boolean aggregate: the four engines do not agree on
-		// one, and counting is the same question asked portably.
-		ColumnExpr(access.AnyPrivateAs(access.FindingVisibility(), "undisclosed")).
-		ColumnExpr(`COUNT(*) AS "places"`).
+		ColumnExpr(`MIN("p"."opened_at") AS "opened_at"`).
+		// Any undisclosed row makes the group undisclosed. Counted rather
+		// than a boolean aggregate: the four engines do not agree on one.
+		ColumnExpr(`(SUM("p"."private_places") > 0) AS "undisclosed"`).
+		ColumnExpr(`SUM("p"."places") AS "places"`).
 		// The total rides on the page, as the findings list's does: the
 		// groups the narrowing admits, counted after the grouping and before
 		// the limit, in the statement that groups them.
 		ColumnExpr(`COUNT(*) OVER () AS "total"`).
-		GroupExpr(pieceOfWork).
-		OrderExpr(`"urgency" DESC, "f"."vulnerability_id", MIN("f"."component_id"), "st"."product_id", `+
-			`MAX(`+codeFindingOccurrence+`)`).
+		OrderExpr(`"urgency" DESC, "p"."vulnerability_id", MIN("p"."component_least"), "p"."product_id", "p"."place"`).
 		Limit(int64(limit)).Offset(int64(offset)).
 		Scan(ctx, &heads)
 	if err != nil {
@@ -440,9 +500,7 @@ func (s *Store) workSince(ctx context.Context, c kind.Consumer, family kind.Fami
 		total = heads[0].Total
 	} else {
 		counted, err := s.db.NewSelect().
-			TableExpr(`(?) AS "grouped"`, narrow(s.db.NewSelect()).
-				ColumnExpr(`"f"."vulnerability_id"`).
-				GroupExpr(pieceOfWork)).
+			TableExpr(`(?) AS "grouped"`, pieces().ColumnExpr(`"p"."vulnerability_id"`)).
 			Count(ctx)
 		if err != nil {
 			return nil, 0, fmt.Errorf("count what nobody is dealing with: %w", err)

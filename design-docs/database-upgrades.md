@@ -12,6 +12,7 @@ Satisfies REQ-72.
 - [The v0.11.0 upgrade](#the-v0110-upgrade)
 - [The v0.12.0 upgrade](#the-v0120-upgrade)
 - [The v0.13.0 upgrade](#the-v0130-upgrade)
+- [The v0.14.0 upgrade](#the-v0140-upgrade)
 - [Limits](#limits)
 
 ## Release upgrades
@@ -273,6 +274,23 @@ brings together, one lapses.
 | A v0.12.0 database holding an issued advisory naming a credentialed identifier | The advisory rewritten, its settled digest the one the application takes from it, so it reads as unchanged |
 | The upgrade's copy of the settled digest rule, over real advisories and documents it refuses | Digests every document as the application does, and refuses the ones it refuses |
 | A v0.12.0 database holding a finding at `wont-fix` and one at none, and saved filters asking for `wont-fix` as a fix state and as an outcome | The finding and the fix-state filter at `unscheduled`, the finding at none and the outcome filter left |
+
+## The v0.14.0 upgrade
+
+Migration 48. Three indexes are made again, each holding one more column.
+
+| Table | Gains |
+|---|---|
+| `finding` | The group index holds the run that opened a finding, last, so it holds every column the trend and the burndown group one build by (`design-docs/analytics.md` § Computed on demand) |
+| `finding` | The opened-run and closed-run indexes hold why a finding closed, last, so what each upload changed is counted from them alone |
+
+Each index is dropped and made again, so an upgrade stopped between the two
+makes it.
+
+| Check, on each engine | What it holds |
+|---|---|
+| A v0.13.0 database | Upgraded, the table built as declared |
+| The same, upgraded and run again with its version unrecorded | Upgraded the same |
 
 ## Limits
 

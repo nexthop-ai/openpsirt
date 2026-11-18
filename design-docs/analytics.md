@@ -66,6 +66,15 @@ then the grain is one row per product per day, the grain access is granted at.
 | A count over findings groups the occurrences on their own columns first, then joins the issue, its rating and the catalog's names | One issue sits at many occurrences: the backlog trend answers in 0.25 s against 1.58 s (`design-docs/analytics-measurements.md` § Early grouping) |
 | Every narrowing applies before the grouping | Visibility, the selection and the minimum severity are conditions on an occurrence |
 | A DISTINCT over joined rows is not the reduction | The join still runs per occurrence, slower on PostgreSQL |
+| The trend, the burndown, the lists of held and unheld work, the product overview and the aging buckets group their occurrences in chunks of builds, each chunk a branch of one statement, and group the chunks' reductions once | A chunk groups in memory; grouped at once, 15 builds of a real image took the trend's moments 3.0 s against 0.46 s (`design-docs/analytics-measurements.md` § Many builds) |
+| A chunk holds builds in order until it reaches the larger of 100,000 findings and two 49ths of what the read counts; a build holding more is a chunk of its own | A third of one build of a real switch image; 1,000 builds of 24 findings are one chunk, and a branch per build cost in builds rather than rows (`design-docs/analytics-measurements.md` § Many small builds) |
+| So a read makes fewer than 50 chunks | SQLite refuses a compound of more than 500 branches, and the work lists read two branches a chunk |
+| Only builds holding a row the read can return are chunked: an open finding, or for the trend and the burndown one closed after the start, and for a work list open work nobody holds or the holders hold | Counted per build, at most 200 builds a statement, from an index leading with the build; a retired or empty build costs a read nothing, and a small deployment pays the count (`design-docs/analytics-measurements.md` § Many small builds) |
+| The trend, the burndown, the aging buckets and the dependency findings of the work lists read the group index alone | The overview reads each finding's deadline from the table, and a code finding of a work list its occurrence and whether it is a flaw |
+| A moment of the trend is one build's | A run is one build's; moments with no run are merged across builds after |
+| The decided occurrences of the overview (`design-docs/findings-queries.md` § Product totals) and the answered occurrences of the aging buckets (`design-docs/analytics-program.md` § Remediation metrics) are counted apart and added to each group after | A decision reaches few occurrences; joined to every open one, each was read from the table |
+| A dependency finding in the lists of held and unheld work is never asked whether it is a flaw | A flaw records a code finding's occurrence; asked of every finding, the occurrence was read from the table for each |
+| The trend and the burndown name each component once, after reducing | 198,198 moments over 7,137 components; named per moment, the names were 1.2 s of a 1.9 s trend |
 
 ## The period a report covers
 
@@ -133,3 +142,4 @@ estate permanently late.
 | Limit | Detail |
 |---|---|
 | Analytics owns no table | Every figure reads what the findings and decisions already hold |
+| Three reads over a product's every build still read the finding table | On 15 builds of a real image: planned upgrades 1.9 s, reading a table larger than the database's memory, which more memory answers; remediation's count of opened issues 0.72 s, whose check of a matched finding needs the finding's identity; the burndown's first opened finding 0.34 s |

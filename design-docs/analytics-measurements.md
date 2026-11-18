@@ -11,6 +11,8 @@ Benchmark runs behind the analytics rules.
 - [Burndown and component groups](#burndown-and-component-groups)
 - [Export snapshots](#export-snapshots)
 - [Counts by identifying name](#counts-by-identifying-name)
+- [Many builds](#many-builds)
+- [Many small builds](#many-small-builds)
 
 ## Early grouping
 
@@ -381,3 +383,93 @@ on throwaway servers on the shared development machine, one engine at a time.
 The release chart sends every issue at a component to be folded, so folding in
 Go scales with the open findings of every tag. The decision record's spread
 between runs of the same code exceeds any difference between the three.
+
+## Many builds
+
+Justifies `design-docs/analytics.md` § Computed on demand, the rule grouping
+occurrences in chunks of builds. A deployment of 15 builds of one product, each the
+full-size switch image from one of its two vendors, scanned once and then
+three nights each moving 40 packages: 3,678,051 findings, 3,594,873 open.
+PostgreSQL 16, warm, every read of the trend's moments over a 30-day window.
+
+| Read | Rows grouped | Time |
+|---|--:|--:|
+| Every build at once, as one grouping | 3,594,873 | 2.8 to 3.1 s |
+| Every build at once, with the index | 3,594,873 | 1.36 to 1.40 s |
+| Each build on its own, joined once | 3,594,873 | 1.5 s |
+| Each build on its own, joined once, with the index | 3,594,873 | 0.40 to 0.46 s; 0.92 s with no parallel workers |
+
+The index is the group index holding the run that opened a finding, last; it
+is 66 MB beside a 1,327 MB table.
+
+| Reading | Detail |
+|---|---|
+| Grouping every build at once sorts on disk | 198,198 moments from 3.6 million rows: a 232 MB external sort, 2.3 s of the 5.0 s a cold read took, after 2.1 s reading the table |
+| One build fits in memory | 13,204 moments from 364,493 rows of one build: an in-memory hash of 2.3 MB, 155 ms |
+| The index is read alone | Every column grouped on and filtered by is in it, so no table row is fetched |
+| A deployment's builds cost in proportion | The moments are one build's each; a read with no selection costs every build's |
+| The work nobody holds sorted 573 MB on disk | Every open occurrence grouped by piece of work at once: 5.19 s for the request. In chunks, dependency findings from the index alone: 1.27 s |
+| The overview spilled 147 MB | Every open occurrence joined to the decided ones and grouped at once: 2.56 s for the request. In chunks, decided occurrences apart: 1.07 s |
+| Each build of a real image is a chunk of its own | One holds about 240,000 open findings, past the 100,000 a chunk takes before the next starts |
+| Counting a chunk's builds apart sorts each group | A count of distinct builds per piece of work took the work nobody holds from 1.27 s to 1.96 s; a chunk groups each of its builds apart instead, and the builds are counted across chunks |
+| Which builds hold a row costs one count | 3.6 million open findings counted per build from an index in 85 ms |
+| What each upload changed read every finding it opened from the table | Telling a check's match apart from a record taken back reads why a finding closed. The page holding a build's first upload, which opened 379,136 findings: 0.43 s, and 0.11 s served with that column in the run indexes |
+| A second index leading with the build changes other plans | SQLite reached decided occurrences through an index ordered for the trend's grouping rather than by their identity, so the run is added to the group index |
+
+Each request, served, median of three, warm:
+
+| Request | One grouping over every build | In chunks |
+|---|--:|--:|
+| Trend, every build | 2.04 s | 1.49 s |
+| Trend, one build | 0.46 s | 0.10 s |
+| Burndown, every build | 2.60 s | 1.84 s |
+| Burndown, one build | 0.46 s | 0.12 s |
+| Work nobody holds | 5.19 s | 1.27 s |
+| Product overview | 2.56 s | 1.07 s |
+| Remediation | 1.41 s | 1.12 s |
+| Uploads of one build, page holding its first | 0.43 s | 0.11 s |
+| Components of the product, first page | 1.03 s | 0.79 s |
+| Planned upgrades | 2.30 s | 1.92 s |
+
+Two reads repeated within a minute differ by up to a tenth.
+
+The deployment it models measured 8 to 10 s for the trend and the burndown over
+all 15 builds, 2.3 to 3.5 s over one, and 0.2 s over one component.
+
+## Many small builds
+
+Justifies `design-docs/analytics.md` § Computed on demand, the bound on what a
+chunk holds and the builds left out. One product of 200 and of 1,000 builds,
+each 24 packages carrying one issue apiece, scanned once: 4,800 and 24,000 open
+findings, the findings of one build in ten held by the reader. PostgreSQL 16,
+MySQL 8.4 and MariaDB 11.4, median of five reads, main and the chunked reads
+measured in one session (`make measure`, `TestMeasureReadsAcrossManySmallBuilds`).
+
+| Read | Engine | 200 builds, one grouping | 200 builds, in chunks | 1,000 builds, one grouping | 1,000 builds, in chunks |
+|---|---|--:|--:|--:|--:|
+| Trend over 30 days | PostgreSQL | 23 ms | 36 ms | 95 ms | 101 ms |
+| Trend over 30 days | MySQL | 18 ms | 29 ms | 91 ms | 114 ms |
+| Trend over 30 days | MariaDB | 20 ms | 21 ms | 95 ms | 95 ms |
+| Burndown | PostgreSQL | 36 ms | 37 ms | 111 ms | 132 ms |
+| Burndown | MySQL | 21 ms | 28 ms | 100 ms | 120 ms |
+| Burndown | MariaDB | 22 ms | 27 ms | 94 ms | 96 ms |
+| Work nobody holds | PostgreSQL | 16 ms | 17 ms | 62 ms | 50 ms |
+| Work nobody holds | MySQL | 18 ms | 20 ms | 63 ms | 74 ms |
+| Work nobody holds | MariaDB | 12 ms | 18 ms | 61 ms | 57 ms |
+| Work somebody holds | PostgreSQL | 7 ms | 10 ms | 12 ms | 19 ms |
+| Work somebody holds | MySQL | 4 ms | 6 ms | 9 ms | 26 ms |
+| Work somebody holds | MariaDB | 3 ms | 6 ms | 7 ms | 25 ms |
+| Product overview | PostgreSQL | 15 ms | 20 ms | 45 ms | 62 ms |
+| Product overview | MySQL | 10 ms | 20 ms | 62 ms | 77 ms |
+| Product overview | MariaDB | 12 ms | 12 ms | 54 ms | 58 ms |
+| Remediation | PostgreSQL | 14 ms | 23 ms | 29 ms | 44 ms |
+| Remediation | MySQL | 8 ms | 15 ms | 41 ms | 65 ms |
+| Remediation | MariaDB | 9 ms | 12 ms | 36 ms | 44 ms |
+
+| Reading | Detail |
+|---|---|
+| Chunked reads cost a small deployment a statement | The count of what each build holds runs before the grouping: at 1,000 builds of 24 findings a read is up to 25 ms slower than one grouping, most on MySQL, and the work nobody holds is as fast or faster |
+| A branch per build costs in builds | One branch per build, 24 findings each: the work nobody holds 550 ms against 12 ms at 200 builds, and at 1,000 PostgreSQL refused it for want of shared memory; the trend 1.06 s against 87 ms, 451 ms of it planning |
+| Every build is one chunk | 24,000 findings are under the 100,000 a chunk holds, so the read is one grouping, as before chunking |
+| The count names at most 200 builds a statement | Past 200 values in a list MySQL 8.4 reads the list value by value rather than as ranges. Counting 1,000 builds' open findings: MySQL 40 ms at 500 a statement, 10 ms at 200, 16 ms at 150; PostgreSQL 5 ms, 6 ms and 7 ms; MariaDB 7 ms, 8 ms and 16 ms |
+| The count reads table rows where the condition is not in the index picked | For the work nobody holds, PostgreSQL scanned the table at 500 builds a statement, and at 200 read the index of open findings by build and took each holder from the table |

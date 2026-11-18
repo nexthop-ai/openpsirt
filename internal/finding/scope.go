@@ -71,6 +71,27 @@ func (s *Store) Builds(ctx context.Context, scope Scope) ([]int64, error) {
 	return s.buildsIn(ctx, s.db, scope, Workable{})
 }
 
+// readableBuilds is the builds a scope covers on the products a subject may
+// read, in a stable order: every product where all is true.
+func (s *Store) readableBuilds(ctx context.Context, scope Scope, products []int64, all bool) ([]int64, error) {
+	if !all && len(products) == 0 {
+		return nil, nil
+	}
+	var ids []int64
+	q := s.db.NewSelect().
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"b"."id"`).
+		OrderExpr(`"b"."id"`)
+	if !all {
+		q = q.Where(`"st"."product_id" IN (?)`, bun.List(products))
+	}
+	if err := scope.Narrow(q).Scan(ctx, &ids); err != nil {
+		return nil, fmt.Errorf("read which builds are in scope: %w", err)
+	}
+	return ids, nil
+}
+
 // buildsWorking is Builds narrowed to the releases work can land in.
 //
 // Applied here rather than as a condition on the rows, for the reason Builds

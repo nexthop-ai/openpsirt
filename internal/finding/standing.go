@@ -87,27 +87,33 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	anyDecision := decisionState{"any_claim", ` AND "de"."state" <> ?`, []any{StateWithdrawn}}
 	// One row per build, issue and component. The build rows count these
 	// directly, and the product's totals fold them again by issue and
-	// component, in one pass here. The table of decided occurrences is most of
-	// the cost of the reading, 0.7 s with 133,000 decision occurrences on
-	// PostgreSQL, and a second statement builds it a second time. Every column
-	// folds exactly — the occurrences and the decided occurrences are sums, the
-	// deadline a minimum and the exploitation flag a maximum.
+	// component, in one pass here. Every column folds exactly: the occurrences
+	// and the decided occurrences are sums, the deadline a minimum and the
+	// exploitation flag a maximum.
+	//
+	// Counted in chunks of builds (chunked), and the decided occurrences
+	// counted apart and added after. Joined to every open occurrence and
+	// grouped over the product at once, 3.6 million occurrences in 15 builds
+	// spilled 147 MB to disk on PostgreSQL, 2.56 s against 1.07 s; the decided
+	// occurrences are
+	// the few a decision reaches, read from the decision side. Only builds
+	// holding an open finding are read.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)
-	q := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		ColumnExpr(`"f"."build_id" AS "build_id"`).
-		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(`COUNT(*) AS "places"`).
-		ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
-		// The flag rather than the urgency's top bands, which answer
-		// "some exploitation". This total is the feed's word about the
-		// world, and a product recorded as attacked here is a different
-		// fact that would be counted under the wrong name.
-		ColumnExpr(exploitedAcross + ` AS "exploited"`).
-		ColumnExpr(occurrencesDecided(anyDecision)).
-		ColumnExpr(occurrencesDecided(decisionApproved))
-	var groups []struct {
+	var inProduct []int64
+	if err := s.db.NewSelect().
+		TableExpr(`"build" AS "b"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"b"."id"`).
+		Where(`"st"."product_id" = ?`, productID).
+		OrderExpr(`"b"."id"`).
+		Scan(ctx, &inProduct); err != nil {
+		return nil, whole, fmt.Errorf("read this product's builds: %w", err)
+	}
+	chunks, err := s.chunks(ctx, inProduct, `"f"."closed_at" IS NULL`)
+	if err != nil {
+		return nil, whole, err
+	}
+	type group struct {
 		BuildID         int64      `bun:"build_id"`
 		VulnerabilityID int64      `bun:"vulnerability_id"`
 		ComponentID     int64      `bun:"component_id"`
@@ -117,16 +123,58 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 		AnyDecision     int        `bun:"any_claim"`
 		Approved        int        `bun:"approved_here"`
 	}
-	err = q.Join(`LEFT JOIN (?) AS "dd" ON "dd"."finding_id" = "f"."id"`,
-		decisionsAtOccurrences(q, productID, anyDecision, decisionApproved)).
+	var groups []group
+	if counted := perChunk(chunks, func(builds []int64) *bun.SelectQuery {
+		return s.db.NewSelect().
+			TableExpr(`"finding" AS "f"`).
+			ColumnExpr(`"f"."build_id" AS "build_id"`).
+			ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+			ColumnExpr(`"f"."component_id" AS "component_id"`).
+			ColumnExpr(`COUNT(*) AS "places"`).
+			ColumnExpr(`MIN("f"."due_at") AS "due_at"`).
+			// The flag rather than the urgency's top bands, which answer
+			// "some exploitation". This total is the feed's word about the
+			// world, and a product recorded as attacked here is a different
+			// fact that would be counted under the wrong name.
+			ColumnExpr(exploitedAcross+` AS "exploited"`).
+			Where(`"f"."build_id" IN (?)`, bun.List(builds)).
+			Where(`"f"."closed_at" IS NULL`).
+			Where(`"f"."visibility" IN (?)`, bun.List(visible)).
+			Where(kinds, kindArgs...).
+			GroupExpr(`"f"."build_id", "f"."vulnerability_id", "f"."component_id"`)
+	}); counted != nil {
+		if err := counted.Scan(ctx, &groups); err != nil {
+			return nil, whole, fmt.Errorf("read how this product's builds stand: %w", err)
+		}
+	}
+	var decided []group
+	q := s.db.NewSelect()
+	if err := q.
+		TableExpr(`(?) AS "dd"`, decisionsAtOccurrences(q, productID, anyDecision, decisionApproved)).
+		Join(`JOIN "finding" AS "f" ON "f"."id" = "dd"."finding_id"`).
+		ColumnExpr(`"f"."build_id" AS "build_id"`).
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		ColumnExpr(occurrencesDecided(anyDecision)).
+		ColumnExpr(occurrencesDecided(decisionApproved)).
 		Where(inThisProductAs(`"f"."build_id"`), productID).
 		Where(`"f"."closed_at" IS NULL`).
 		Where(`"f"."visibility" IN (?)`, bun.List(visible)).
 		Where(kinds, kindArgs...).
 		GroupExpr(`"f"."build_id", "f"."vulnerability_id", "f"."component_id"`).
-		Scan(ctx, &groups)
-	if err != nil {
-		return nil, whole, fmt.Errorf("read how this product's builds stand: %w", err)
+		Scan(ctx, &decided); err != nil {
+		return nil, whole, fmt.Errorf("read what is decided in this product's builds: %w", err)
+	}
+	type place struct{ build, issue, component int64 }
+	at := make(map[place]int, len(groups))
+	for i, g := range groups {
+		at[place{g.BuildID, g.VulnerabilityID, g.ComponentID}] = i
+	}
+	for _, d := range decided {
+		if i, held := at[place{d.BuildID, d.VulnerabilityID, d.ComponentID}]; held {
+			groups[i].AnyDecision += d.AnyDecision
+			groups[i].Approved += d.Approved
+		}
 	}
 
 	// One thing somebody decides about, and how it stands, counted into a

@@ -540,6 +540,10 @@ type Store struct {
 	// package's occurrences, or zero for the shipped number. Carried on the store
 	// so a test can bring it down to a fixture.
 	binaryColumns int
+	// chunkRows is how many findings one chunk of builds holds before the next
+	// starts, or zero for the shipped number. Carried on the store so a test can
+	// bring it down to a fixture's few findings a build.
+	chunkRows int64
 	// draws is the source the identifiers this store issues are drawn from,
 	// or nothing for the unguessable one. Carried on the store so a test can
 	// fix the sequence a collision is drawn again from.

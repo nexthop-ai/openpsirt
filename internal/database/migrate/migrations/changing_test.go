@@ -70,8 +70,8 @@ func TestAnUpgradeHoldsTheLeaseToChangeTheSchemaFromBeforeItsFirstStatement(t *t
 			}
 			time.Sleep(20 * time.Millisecond)
 		}
-		if _, applied, err := look(); err != nil || applied != v0120 {
-			t.Errorf("as the lease was held to change the schema, the schema was at %d (%v), not %d", applied, err, v0120)
+		if _, applied, err := look(); err != nil || applied != expected-1 {
+			t.Errorf("as the lease was held to change the schema, the schema was at %d (%v), not %d", applied, err, expected-1)
 		}
 		// Every look while the upgrade runs, its statements included, sees
 		// the schema changing until the version is this build's.

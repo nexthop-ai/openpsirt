@@ -95,3 +95,7 @@ func StatedAs(ctx context.Context, db bun.IDB, products []int64, all bool,
 	condition string, args ...any) ([]int64, error) {
 	return statedAs(ctx, db, products, all, condition, args...)
 }
+
+// ChunkRows sets how many findings one chunk of builds holds, so a fixture of a
+// few findings a build spans several chunks.
+func (s *Store) ChunkRows(n int64) { s.chunkRows = n }
