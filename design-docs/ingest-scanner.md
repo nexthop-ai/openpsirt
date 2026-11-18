@@ -109,7 +109,7 @@ scanner's data and read whole (REQ-12, REQ-31); what a scan does with it is
 |---|---|
 | The CVE List | A repository whose hourly releases carry an archive of every record at a midnight |
 | The archive read | The day's from the newest release, else the day before's from the midnight release |
-| What is kept | Each record with an orderable unaffected line, whole: 22,481 of 402,541 on 2026-10-07, 534 KB |
+| What is kept | Each record with an orderable unaffected line or a list of files, whole: 27,661 of 408,322 on 2026-11-18, 1,307,790 bytes; 25,326 and 1,146,245 bytes for the unaffected lines alone |
 | What the snapshot describes | The newest update among records read, kept or not, withdrawn or not; a run records it |
 
 | Rule | Reason |
@@ -139,6 +139,21 @@ scanner's data and read whole (REQ-12, REQ-31); what a scan does with it is
 | Snapshot records | A million |
 | One snapshot record | 4 MiB as encoded |
 | Snapshot | 128 MiB decompressed, against 534 KB compressed on 2026-10-07; the bound is on what reading it holds in memory, and a carried bundle is a file from outside |
+
+### Program files
+
+A record's entries may list the source files the issue is in. A scan reads them
+for each issue it reports and records them on the issue, for a correction by
+source paths (`design-docs/triage-source-paths.md`).
+
+| Rule | Reason |
+|---|---|
+| The record read is the first held of the issue's own identifier and its aliases | As the record's ranges are read |
+| The files are every entry's, deduplicated, in byte order, each relative to the source's root | A file any entry names is one the issue may be in |
+| A list past 1,000 files, a path past 1,024 bytes, or a path leaving the root reads as listing none | A list read in part would answer a correction on the files it kept; at most 36 files and 179 bytes on 2026-11-18 |
+| A scan that read a snapshot replaces what the issue holds, emptying it where the record lists none | The record is the authority on its own list |
+| A scan with no snapshot leaves every issue's files | It knows nothing about any record |
+| Two names of one issue in one report join their files | |
 
 ## Limits
 

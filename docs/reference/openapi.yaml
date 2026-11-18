@@ -4270,6 +4270,7 @@ components:
             - bulk
             - extension
             - returned
+            - source
           type: string
         proposed_at:
           description: The moment the action was taken
@@ -13943,6 +13944,7 @@ components:
             - bulk
             - extension
             - returned
+            - source
           type: string
         needs_approval:
           type: boolean

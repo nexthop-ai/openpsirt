@@ -32,10 +32,14 @@ func upV0140(ctx context.Context, sqldb *sql.DB) error {
 //     no table row.
 //   - A build's own claims and received statements keep the status notes each
 //     gives.
+//   - A finding records the source package it was matched through, an issue
+//     the files its CVE record lists, and a correction by source paths is
+//     kept with what it answered and on which files.
 func upgradeV0140(ctx context.Context, tx bun.Tx) error {
 	for _, step := range []func(context.Context, bun.Tx) error{
 		findingIndexesV0140,
 		statementNotesV0140,
+		sourceCorrectionsV0140,
 	} {
 		if err := step(ctx, tx); err != nil {
 			return err

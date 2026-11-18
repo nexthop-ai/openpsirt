@@ -10413,7 +10413,7 @@ export interface components {
              * @description The sort of action: one decision about a finding, one about many issues at a component, an approved decision carried to a new issue, or occurrences set aside from a larger decision — by an approver agreeing to the rest, or by the author holding them back
              * @enum {string}
              */
-            kind: "finding" | "bulk" | "extension" | "returned";
+            kind: "finding" | "bulk" | "extension" | "returned" | "source";
             /** @description The moment the action was taken */
             proposed_at: string;
             /** @description The person who took it, by sign-in identity */
@@ -15930,7 +15930,7 @@ export interface components {
             /** @enum {string} */
             justification?: "component_not_present" | "vulnerable_code_not_present" | "vulnerable_code_not_in_execute_path" | "vulnerable_code_cannot_be_controlled_by_adversary" | "inline_mitigations_already_exist";
             /** @enum {string} */
-            kind: "finding" | "bulk" | "extension" | "returned";
+            kind: "finding" | "bulk" | "extension" | "returned" | "source";
             needs_approval?: boolean;
             /**
              * Format: int64

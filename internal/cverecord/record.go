@@ -7,9 +7,9 @@
 //
 // The records come from the CVE List, the published body of every CVE record.
 // Only the part this reads is kept: each record whose upstream entries carry
-// an ordered version line stating a version is unaffected. A record without
-// one can never narrow anything, so keeping it would cost memory and buy
-// nothing.
+// an ordered version line stating a version is unaffected, or list the files
+// the issue is in. A record with neither can never narrow a match or answer a
+// correction by source paths, so keeping it would cost memory and buy nothing.
 package cverecord
 
 import (
@@ -44,6 +44,10 @@ type Entry struct {
 	Repo          string   `json:"repo,omitempty"`
 	DefaultStatus string   `json:"defaultStatus,omitempty"`
 	Versions      []Line   `json:"versions,omitempty"`
+	// ProgramFiles is the source files the entry says the issue is in, as
+	// paths from the root of the entry's repository. The kernel's numbering
+	// authority lists them on nearly every record; most others list none.
+	ProgramFiles []string `json:"programFiles,omitempty"`
 }
 
 // Line is one version line of an entry, in the record format's own terms.

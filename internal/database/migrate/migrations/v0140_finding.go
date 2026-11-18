@@ -12,7 +12,8 @@ import (
 // findingV0140 is v0.14.0's declaration of the finding table, and the indexes
 // it makes.
 //
-// v0.11.0's, with three indexes holding one more column each, so the reads
+// v0.11.0's, with the source package a match was made through, and three
+// indexes holding one more column each, so the reads
 // they serve take no row from the table. Fifteen builds of a real image, 3.6
 // million findings, on PostgreSQL (design-docs/analytics-measurements.md
 // § Many builds):
@@ -30,7 +31,14 @@ import (
 // one ordered for the trend's grouping for the findings list's, and reached
 // decided occurrences through it rather than by their identity.
 func findingV0140(t *columnTypes) []string {
-	statements := withIndex(findingV0110(t), "finding_group_idx",
+	declared := findingV0110(t)
+	declared[0] = withColumn(declared[0], `"matched_range"    `+t.free+` NULL,`,
+		`-- The source package the scanner matched this through, in lower
+			-- case, where every detail of the match was through it. Null where
+			-- the match was on the package's own name or a CPE, which a
+			-- correction by source paths never answers.
+			"matched_through"  `+t.name+` NULL,`)
+	statements := withIndex(declared, "finding_group_idx",
 		`CREATE INDEX "finding_group_idx" ON "finding" ("build_id", "closed_at", "visibility", "kind", "vulnerability_id", "component_id", "urgency", "urgency_exploited", "urgency_incident", "opened_at", "closed_because", "assigned_to", "opened_run_id")`)
 	statements = withIndex(statements, "finding_opened_run_idx",
 		`CREATE INDEX "finding_opened_run_idx" ON "finding" ("build_id", "opened_run_id", "vulnerability_id", "component_id", "visibility", "kind", "closed_run_id", "closed_because")`)

@@ -148,6 +148,7 @@ naming for an unrelated project at every point release.
 | Withdrawing is the one way it ends | |
 | Published, it is not-affected with its reason | |
 | Curated correction data published elsewhere is not read | Its origin, regeneration and terms are unanswered |
+| One correction may answer every issue a package is matched through its source for, by the paths it is built from | `design-docs/triage-source-paths.md` |
 
 ### The standing set
 

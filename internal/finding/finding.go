@@ -383,6 +383,10 @@ type Finding struct {
 	// a version against a range needs an ordering per ecosystem, which is
 	// a different project.
 	MatchedRange string `bun:"matched_range"`
+	// MatchedThrough is the source package the scanner matched this through,
+	// in lower case, where every detail of the match was through it. Empty
+	// where the match was on the package's own name or a CPE.
+	MatchedThrough string `bun:"matched_through,nullzero"`
 	// DiscloseAt is when the embargo on this ends, on a finding nobody has
 	// announced. Nil on a disclosed one, which is already public.
 	//
@@ -455,10 +459,19 @@ type Reported struct {
 	MatchedFrom  string
 	MatchedIn    string
 	MatchedRange string
+	// MatchedThrough is the source package the scanner matched this through,
+	// in lower case, where every detail of the match was through that source.
+	// Empty where the match was on the package's own name or a CPE.
+	MatchedThrough string
 	// Unaffected is the CVE record lines stating that the component's
 	// upstream release is not affected, as JSON, where a record says so.
 	// Present means the run closes the finding rather than opening it.
 	Unaffected string
+	// RecordRead says the issue's CVE record was asked for its files, and
+	// RecordFiles is the files it lists. Unread, what is held about the
+	// issue's files is left as it is; read and empty, the issue lists none.
+	RecordRead  bool
+	RecordFiles []string
 }
 
 // Applied describes what a run changed.

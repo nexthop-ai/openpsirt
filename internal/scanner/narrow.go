@@ -13,7 +13,9 @@ import (
 )
 
 // narrow reads what each issue's CVE record says about the component it was
-// matched in, and marks a match the record excludes (REQ-31).
+// matched in, and marks a match the record excludes (REQ-31). It also carries
+// the files the record says the issue is in, which a correction by source
+// paths answers on.
 //
 // The component read is the inventory's, not the scanner's account of it: the
 // inventory carries the CPE and the upstream name and version a record is tied
@@ -40,6 +42,8 @@ func narrow(snapshot *cverecord.Snapshot, components []graph.Described, reported
 			continue
 		}
 		identifiers := append([]string{r.Issue.Identifier}, r.Issue.Aliases...)
+		listed := snapshot.Files(identifiers)
+		r.RecordRead, r.RecordFiles = listed.Held, listed.Files
 		verdict := snapshot.Decide(identifiers, component)
 		if verdict.Narrows() {
 			lines, err := json.Marshal(verdict.Unaffected)

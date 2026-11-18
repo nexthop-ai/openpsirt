@@ -74,6 +74,7 @@ distribution's package. The method is kept on the finding (REQ-13).
 | Unknown is not unconfirmed | Where a scanner said nothing, nothing is claimed |
 | Kept on the finding, never the issue | One issue reached through two ecosystems has two answers |
 | One answer per group | Every occurrence of an issue at a component comes from one report line |
+| The source package a match was made through is kept, where every detail of the match was through one source other than the package | A correction by source paths answers on it (`design-docs/triage-source-paths.md`); a CPE match or one on the package's own name is about the package |
 
 ## Declared dependency scope
 

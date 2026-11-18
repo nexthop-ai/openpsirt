@@ -244,7 +244,10 @@ func StatementsV0140(engine database.Engine) map[string][]string {
 	return map[string][]string{
 		"finding":                findingV0140(t),
 		"received_vex_statement": receivedStatementV0140(t),
+		"source_answer":          sourceAnswerV0140(t),
+		"source_correction":      sourceCorrectionV0140(t),
 		"suppression":            suppressionV0140(t),
+		"vulnerability":          vulnerabilityV0140(t),
 	}
 }
 

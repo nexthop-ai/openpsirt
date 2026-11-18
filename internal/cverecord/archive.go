@@ -310,7 +310,7 @@ func readRecord(member *zip.File) (Record, time.Time, bool, error) {
 	containers := append([]container{doc.Containers.CNA}, doc.Containers.ADP...)
 	for _, stated := range containers {
 		for _, entry := range stated.Affected {
-			if kept(&record, entry.Entry, entry.Versions) {
+			if kept(&record, entry.Entry, entry.Versions) || len(entry.ProgramFiles) > 0 {
 				keep = true
 			}
 		}
