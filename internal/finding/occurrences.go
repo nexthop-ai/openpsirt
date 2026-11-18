@@ -72,6 +72,93 @@ func (i inventory) why(gone graph.Component) (Closure, string) {
 	return Removed, ""
 }
 
+// pulledBy is what a build holds, by the identifying name of what pulls each
+// component in and then by the component's own identifying name. A component
+// nothing leads to sits under the empty name, as OccurrenceIdentity has it.
+// Each list is in component identifier order.
+type pulledBy map[string]map[string][]graph.Component
+
+// pulled indexes the inventory by what pulls each component in.
+func (i inventory) pulled(at consumers) pulledBy {
+	out := pulledBy{}
+	for _, id := range slices.Sorted(maps.Keys(i.byID)) {
+		c := i.byID[id]
+		name := c.IdentifyingName()
+		for _, consumerID := range at.of(id) {
+			consumer := i.nameOf(consumerID)
+			if out[consumer] == nil {
+				out[consumer] = map[string][]graph.Component{}
+			}
+			out[consumer][name] = append(out[consumer][name], c)
+		}
+	}
+	return out
+}
+
+// whyAt explains a finding no longer reported at its occurrence: the thing
+// that pulled the component in is asked what it pulls now under the
+// component's identifying name. A finding is a component at an occurrence, so
+// a version the same component keeps under another consumer explains nothing
+// here.
+//
+// A consumer of nothing is the product itself, and is answered across the
+// build, as why answers: a producer adding the edge that names what pulls a
+// component in moves it off the product without anything changing.
+//
+// Several components of the name under one consumer are read in identifier
+// order: the same component is unexplained, then the first at another
+// upstream version is an upgrade to it, then the first at another shipped
+// version is a revision to it.
+//
+// The same component now directly under the product, its consumer still
+// there, is unexplained: a producer that stops naming what pulls a component
+// in moves it onto the product with nothing changed, the mirror of the
+// product's own case. A component that was its own consumer is the exception,
+// since an edge from a component to itself places no occurrence.
+func (i inventory) whyAt(gone graph.Component, consumerID int64, consumer string, under pulledBy) (Closure, string) {
+	if consumerID == 0 {
+		return i.why(gone)
+	}
+	if len(i.byName[consumer]) == 0 {
+		return i.left(gone)
+	}
+	now := under[consumer][gone.IdentifyingName()]
+	for _, c := range now {
+		if c.ID == gone.ID {
+			return Unexplained, ""
+		}
+	}
+	for _, c := range now {
+		if upstreamOf(c) != upstreamOf(gone) {
+			return Upgraded, upstreamOf(c)
+		}
+	}
+	for _, c := range now {
+		if c.Version != gone.Version {
+			return Revised, c.Version
+		}
+	}
+	if len(now) > 0 {
+		return Unexplained, ""
+	}
+	if consumerID != gone.ID && slices.ContainsFunc(under[""][gone.IdentifyingName()],
+		func(c graph.Component) bool { return c.ID == gone.ID }) {
+		return Unexplained, ""
+	}
+	return i.left(gone)
+}
+
+// left explains a component nothing of its name is under its consumer any
+// more. Gone from the build with another version of its name in it, it was
+// upgraded or revised, since a release note saying it no longer ships would
+// be false; otherwise it left the occurrence.
+func (i inventory) left(gone graph.Component) (Closure, string) {
+	if reason, movedTo := i.why(gone); reason == Upgraded || reason == Revised {
+		return reason, movedTo
+	}
+	return Removed, ""
+}
+
 // upstreamOf is the version a vulnerability is actually matched against: what
 // a fork was made from, where there is one, and otherwise what shipped.
 func upstreamOf(c graph.Component) string {

@@ -69,13 +69,13 @@ statements, against 324,508 a finding at a time, and no row re-ranked twice.
 
 | Reason | Meaning |
 |---|---|
-| Removed | The component left the build |
-| Upgraded | Its upstream version moved |
-| Revised | The shipped version changed and the upstream version did not: a carried patch |
+| Removed | The component left the occurrence, and no other version of its name took its place in the build: what pulled it in left the build, or no longer pulls in anything of its name |
+| Upgraded | Its upstream version moved at the occurrence; or it left the occurrence and the build, and its name ships at another upstream version |
+| Revised | The shipped version changed at the occurrence, or across the build where it left the occurrence, and the upstream version did not: a carried patch |
 | Patched | The build declares a patch fixing it (§ Build-declared claims) |
 | Superseded | The upstream version moved and the issue came along: the same issue is open at the new version |
 | Fixed | A person declared a recorded flaw fixed here; the one closure a person writes |
-| Unexplained | The component is present and unchanged, and the scanner stopped reporting it |
+| Unexplained | The component is present and unchanged at the occurrence, or moved onto the product with its consumer still there, and the scanner stopped reporting it |
 | Invalid | The record should not have existed: never shipped, wrong product, a duplicate, or a check's match on an issue published after the replacement |
 | Unaffected | The issue's CVE record excludes the upstream release held (§ CVE record ranges) |
 | Disclaimed | A supplier says its product, at the shipped version, is unaffected and every route up runs through it (`design-docs/triage-evidence.md` § Evidence from publishers); or a trusted upstream says the component at the shipped version is unaffected or fixed (`design-docs/upstream.md` § Statements applied) |
@@ -87,7 +87,12 @@ statements, against 324,508 a finding at a time, and no row re-ranked twice.
 | "Exists but does not apply here" is a `not-applicable` decision with a second person, never a closure | A closure absorbing it routes dismissals around approval |
 | Disclaimed is no fix, and the release counts as having held the issue | Another party's judgment must not rewrite this deployment's release notes. It is applied as a build's own patch is (REQ-31, REQ-84); a decision at the occurrence overrides it there |
 | Unexplained is always reported, never suppressed; several in one scan add a scan-level warning, by count | A handful unexplained on a large image is not ordinary |
-| The reason is worked out from what the build now holds against what the finding was about, reading the departed component from the catalog | |
+| The reason is worked out at the occurrence: what pulled the component in, by identifying name, is asked what it pulls in now under the component's identifying name | A finding is a component at an occurrence (REQ-17); a version another consumer keeps explains nothing there |
+| A component that left its occurrence, what pulled it in gone or pulling in nothing of its name, is answered across the build: the component gone and another version of its name present is an upgrade or a revision to it, anything else removed | The component staying elsewhere does not make the closure a fault, and a release note saying an upgraded component no longer ships is false |
+| The same component now directly under the product, what pulled it in still in the build, is unexplained, unless it was its own consumer | A producer that stops naming what pulls a component in moves it onto the product with nothing changed; an edge from a component to itself places no occurrence |
+| A component the product pulls in directly is answered across the build: present and unchanged anywhere is unexplained, another version of its name anywhere an upgrade or a revision, nothing of its name removed | A producer naming what pulls a component in moves it off the product with nothing changed |
+| Several components of the name under one consumer are read in identifier order: the same component is unexplained, then the first at another upstream version is the upgrade, then the first at another shipped version the revision | One answer for one graph |
+| The departed component and what pulled it in are read from the catalog | Both are usually gone from the build |
 | What counts as a fix is one list (`design-docs/findings-issues.md` § Report contents) | |
 
 ## Closure by a person
@@ -323,3 +328,4 @@ The cost, measured in `design-docs/findings-measurements.md` § Replaced invento
 | A check that recorded nothing is still the one check | Data published to the scanner after the settle delay is not seen |
 | A settle delay changed between a check and its issue's first date moves the window that date is judged against | The window is worked out, never stored |
 | The outbound VEX document says nothing about an unaffected closure | Telling customers a release is unaffected is a decision, never a closure |
+| A recorded reason is never worked out again | A closure keeps the reason its run gave it, whatever a later rule would say |

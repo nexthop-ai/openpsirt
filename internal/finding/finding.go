@@ -91,9 +91,12 @@ func agreedFixedIn(least, most, fixedIn string) string {
 type Closure string
 
 const (
-	// Removed means the component is no longer in the build at all.
+	// Removed means the component left the occurrence, what pulled it in
+	// gone or pulling in nothing of its name, and no other version of its
+	// name took its place in the build.
 	Removed Closure = "removed"
-	// Upgraded means the component's upstream version moved.
+	// Upgraded means the component's upstream version moved at the
+	// occurrence.
 	Upgraded Closure = "upgraded"
 	// Revised means the shipped version changed while the upstream version did
 	// not, which is what a carried patch looks like from the outside.
@@ -106,8 +109,9 @@ const (
 	// fix, and the same issue would appear as fixed and as newly present in
 	// one release comparison — a document that goes to customers.
 	Superseded Closure = "superseded"
-	// Unexplained means the component is present and unchanged and the scanner
-	// stopped reporting it. It is always flagged and never suppressed.
+	// Unexplained means the component is present and unchanged at the
+	// occurrence and the scanner stopped reporting it. It is always flagged and
+	// never suppressed.
 	Unexplained Closure = "unexplained"
 	// Invalid means the record should not have existed: this build never
 	// shipped the thing, the entry named the wrong product, it duplicates an
@@ -462,7 +466,7 @@ type Applied struct {
 	Opened int
 	Closed int
 	// Unexplained counts findings that closed with the component present and
-	// unchanged. Always reported, never suppressed.
+	// unchanged at the occurrence. Always reported, never suppressed.
 	Unexplained int
 	// Updated counts findings that were already open and whose details moved —
 	// a fix becoming available, or the build answering them. Somebody waiting
