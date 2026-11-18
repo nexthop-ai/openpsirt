@@ -109,7 +109,7 @@ puts inside one step.
 | An inventory no scan reached before it was replaced is no point | Nothing ever judged it |
 | An issue at a component is open at a moment when one of its findings opened at or before it and closed after it, or not at all, as on the calendar trend | A point and a step ending at the same moment agree |
 | The unit, the severity split, the never-present closures and the narrowings to a component, a package identifier prefix or a subtree are the calendar trend's | One definition of open on one screen |
-| The findings are read once, from the earliest point's moment through now | Cost follows the oldest upload plotted |
+| The findings are read once, from the earliest point's moment through now | Cost follows the oldest upload plotted: twelve nightly uploads of a real image in 0.29 to 0.62 s, fifty in 0.38 to 1.48 s (`design-docs/analytics-measurements.md` § Uploads of one build) |
 | Home draws it beside the calendar trend where a whole build is picked and it holds two points; each point says its build date and the moment it was counted | One upload is no comparison |
 
 ## Subtree trends

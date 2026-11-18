@@ -13,6 +13,7 @@ Benchmark runs behind the analytics rules.
 - [Counts by identifying name](#counts-by-identifying-name)
 - [Many builds](#many-builds)
 - [Many small builds](#many-small-builds)
+- [Uploads of one build](#uploads-of-one-build)
 
 ## Early grouping
 
@@ -473,3 +474,25 @@ measured in one session (`make measure`, `TestMeasureReadsAcrossManySmallBuilds`
 | Every build is one chunk | 24,000 findings are under the 100,000 a chunk holds, so the read is one grouping, as before chunking |
 | The count names at most 200 builds a statement | Past 200 values in a list MySQL 8.4 reads the list value by value rather than as ranges. Counting 1,000 builds' open findings: MySQL 40 ms at 500 a statement, 10 ms at 200, 16 ms at 150; PostgreSQL 5 ms, 6 ms and 7 ms; MariaDB 7 ms, 8 ms and 16 ms |
 | The count reads table rows where the condition is not in the index picked | For the work nobody holds, PostgreSQL scanned the table at 500 builds a statement, and at 200 read the index of open findings by build and took each holder from the table |
+
+## Uploads of one build
+
+Justifies `design-docs/analytics-program.md` § Uploads of one build, the read
+from the earliest point's moment. One build of the full-size image, 6,843
+packages each carrying one issue and the kernel 3,000, uploaded and scanned
+nightly for 50 nights, each upload dropping one leaf package in thirty and
+restoring the night before's: 453,726 findings. Median of five reads, one
+engine at a time (`make measure`, `TestMeasureABuildTrendOverNightlyUploads`).
+
+| Engine | 2 uploads | 12 uploads | 50 uploads |
+|---|--:|--:|--:|
+| SQLite | 254 ms | 446 ms | 1.48 s |
+| PostgreSQL 16 | 197 ms | 303 ms | 385 ms |
+| MySQL 8.4 | 371 ms | 615 ms | 966 ms |
+| MariaDB 11.4 | 136 ms | 293 ms | 379 ms |
+
+| Reading | Detail |
+|---|---|
+| Cost follows the oldest upload plotted | Each point adds the findings opened since the one before; twelve uploads, the default, read in under two thirds of a second on every engine |
+| SQLite rises most with the points | 254 ms at 2 uploads to 1.48 s at 50, against 197 ms to 385 ms on PostgreSQL |
+| Two full images cost what the calendar trend costs | The demo's SQLite, September and November SONiC images per build, served: broadcom 2.30 s against 2.28 s for the same build's 30-day trend, mellanox 1.00 s; September broadcom's scan opened 373,331 findings |
