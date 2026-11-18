@@ -131,11 +131,12 @@ func TestARepositoryAtSeveralCommitsIsASubtreeOfEachCountedOnce(t *testing.T) {
 		shippedAtTwoCommits(t, r)
 		at := "product=mine&branch_or_tag=master&variant=broadcom&beneath_purl=" + repository
 		routes := map[string]string{
-			"list":            "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom&beneath_purl=" + repository,
-			"list's file":     "/v1/products/mine/findings.csv?branch_or_tag=master&variant=broadcom&beneath_purl=" + repository,
-			"trend":           "/v1/trend?days=7&" + at,
-			"burndown":        "/v1/burndown?" + at,
-			"burndown's file": "/v1/burndown.csv?" + at,
+			"list":             "/v1/products/mine/findings?branch_or_tag=master&variant=broadcom&beneath_purl=" + repository,
+			"list's file":      "/v1/products/mine/findings.csv?branch_or_tag=master&variant=broadcom&beneath_purl=" + repository,
+			"trend":            "/v1/trend?days=7&" + at,
+			"build date trend": "/v1/trend/built?" + at,
+			"burndown":         "/v1/burndown?" + at,
+			"burndown's file":  "/v1/burndown.csv?" + at,
 		}
 		for _, c := range []struct {
 			who        string

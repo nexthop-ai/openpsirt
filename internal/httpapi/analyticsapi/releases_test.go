@@ -75,6 +75,11 @@ func TestTheReleaseTrendRefusesARequestNamingNoProduct(t *testing.T) {
 func TestReleaseNotesLeadWithWhatTheLaterBuildWasMeasuredWith(t *testing.T) {
 	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
 		r.Scanned(t)
+		// The run left unfinished, as one still going.
+		if _, err := r.DB.DB.NewUpdate().Table("scan_run").Set(`"finished_at" = NULL`).
+			Where(`"build_id" = ?`, r.BuildOf(t, httpapitest.SeededBuild)).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
 		const notes = "/v1/products/mine/comparison/notes" +
 			"?from=master&from_variant=broadcom&to=master&to_variant=broadcom"
 		unfinished := httpapitest.AsPerson(t, r, "triager", http.MethodGet, notes, "")
