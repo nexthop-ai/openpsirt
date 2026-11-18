@@ -49,5 +49,12 @@ func TestChunksHoldTheirBoundAndAreNeverMoreThanTheMost(t *testing.T) {
 		if seen != len(rows) {
 			t.Errorf("the chunks hold %d builds, want every one of %d", seen, len(rows))
 		}
+		// Counts the share does not divide evenly, which a share of the total
+		// over mostChunks would split into more chunks than mostChunks.
+		for _, n := range []int{51, 99} {
+			if got := chunked(holding(slices.Repeat([]int64{7}, n)...), 1); len(got) > mostChunks {
+				t.Errorf("%d builds: %d chunks, want at most %d", n, len(got), mostChunks)
+			}
+		}
 	})
 }

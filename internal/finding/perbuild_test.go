@@ -55,6 +55,11 @@ func TestWorkSpreadOverChunksOfBuildsIsCountedOnce(t *testing.T) {
 		if len(rows) != builds {
 			t.Errorf("the overview has %d build rows, want %d", len(rows), builds)
 		}
+		for _, row := range rows {
+			if row.Open != 1 {
+				t.Errorf("build %d holds %d open in the overview, want 1", row.BuildID, row.Open)
+			}
+		}
 
 		now := time.Now().UTC()
 		read, err := f.store.Remediation(ctx, who, finding.Scope{}, now.Add(-90*24*time.Hour), now)

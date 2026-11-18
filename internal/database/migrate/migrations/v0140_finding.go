@@ -22,7 +22,7 @@ import (
 //     moments by: the moments in 0.46 s against 1.5 s without it.
 //   - The opened-run and closed-run indexes hold why a finding closed, which
 //     tells a check's match apart from a record taken back, so what each
-//     upload on a page changed is counted from them: 0.13 s against 0.40 s for
+//     upload on a page changed is counted from them: 0.11 s against 0.43 s for
 //     a page holding a build's first upload, which opened 379,136 findings.
 //
 // Widened rather than made beside them, because a second index leading with

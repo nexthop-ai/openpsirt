@@ -365,7 +365,7 @@ func (s *Store) aging(ctx context.Context, subject access.Subject, products []in
 	// Each bucket's occurrences are counted, and the answered ones among them
 	// counted apart: an issue is undecided in a bucket where the bucket holds
 	// more of its occurrences than answered ones. Counted in chunks of
-	// builds (chunked), so a chunk's occurrences are a range of the group index
+	// builds (chunked), so a chunk's occurrences are ranges of the group index
 	// and no table is read; joined to the answered occurrences, every open
 	// occurrence was read from the table, a scan of 1,327 MB for 15 builds of
 	// a real image. Only builds holding an open finding are read.

@@ -8,8 +8,6 @@ import (
 	"fmt"
 
 	"github.com/uptrace/bun"
-
-	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
 // Reads over every build of a product group the findings in chunks of builds,
@@ -26,10 +24,18 @@ const (
 	// starts: a third of one build of a real switch image, which groups in
 	// memory.
 	shippedChunkRows = 100_000
-	// mostChunks is the most chunks one read makes. A deployment holding more
-	// findings than this many chunks of shippedChunkRows has larger chunks,
-	// so no statement holds more than this many branches a part.
+	// mostChunks bounds the chunks one read makes: a chunk's bound is at
+	// least two mostChunks-1ths of what the read counts, and two neighboring
+	// chunks together pass it, so there are fewer than mostChunks, and no
+	// statement holds more than that many branches a part.
 	mostChunks = 50
+	// probeBatch is the most builds one count of what each build holds
+	// names. Past 200 values in a list MySQL 8.4 estimates the list from
+	// statistics and reads it value by value rather than as ranges: 1,000
+	// builds of 24 findings counted in 40 ms at 500 a statement against 10 ms
+	// at 200. PostgreSQL and MariaDB are within a few milliseconds at either,
+	// and every engine is slower at 150, from the round trips.
+	probeBatch = 200
 )
 
 // buildHolding is one build and how many findings it holds that a read can
@@ -43,18 +49,20 @@ type buildHolding struct {
 // with how many. A build holding none is left out, so a retired or empty build
 // costs a read nothing.
 //
-// The condition is on the columns the group index holds, so the count reads no
-// table row: 3.6 million open findings in 15 builds count in 85 ms on
-// PostgreSQL.
+// The count is answered from an index leading with the build: 3.6 million
+// open findings in 15 builds count in 85 ms on PostgreSQL, from that index
+// alone. Where the planner judges the table cheaper, or the condition names a
+// column the index it picks lacks, it reads table rows too
+// (design-docs/analytics-measurements.md § Many small builds).
 func (s *Store) holding(ctx context.Context, builds []int64, where string, args ...any) ([]buildHolding, error) {
 	var out []buildHolding
-	for start := 0; start < len(builds); start += database.BatchSize {
+	for start := 0; start < len(builds); start += probeBatch {
 		var read []buildHolding
 		q := s.db.NewSelect().
 			TableExpr(`"finding" AS "f"`).
 			ColumnExpr(`"f"."build_id" AS "build_id"`).
 			ColumnExpr(`COUNT(*) AS "rows"`).
-			Where(`"f"."build_id" IN (?)`, bun.List(builds[start:min(start+database.BatchSize, len(builds))])).
+			Where(`"f"."build_id" IN (?)`, bun.List(builds[start:min(start+probeBatch, len(builds))])).
 			Where(where, args...).
 			GroupExpr(`"f"."build_id"`).
 			OrderExpr(`"f"."build_id"`)
@@ -66,10 +74,11 @@ func (s *Store) holding(ctx context.Context, builds []int64, where string, args 
 	return out, nil
 }
 
-// chunked packs the builds, in order, into chunks of about chunkRows findings
-// each: a build holding more is a chunk of its own, and builds holding fewer
-// share one. Where the findings would make more than mostChunks chunks, each
-// chunk holds more, so there are never more than mostChunks.
+// chunked packs the builds, in order, into chunks holding up to the larger of
+// chunkRows findings and two mostChunks-1ths of the total: a build holding more
+// is a chunk of its own, and builds holding fewer share one. The share rises
+// past chunkRows at about 2.45 million findings, and keeps the chunks fewer
+// than mostChunks.
 func chunked(held []buildHolding, chunkRows int64) [][]int64 {
 	if chunkRows <= 0 {
 		chunkRows = shippedChunkRows

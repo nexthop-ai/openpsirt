@@ -94,7 +94,8 @@ func (s *Store) HowItStands(ctx context.Context, subject access.Subject,
 	// Counted in chunks of builds (chunked), and the decided occurrences
 	// counted apart and added after. Joined to every open occurrence and
 	// grouped over the product at once, 3.6 million occurrences in 15 builds
-	// spilled 147 MB to disk on PostgreSQL, 2.4 s; the decided occurrences are
+	// spilled 147 MB to disk on PostgreSQL, 2.56 s against 1.07 s; the decided
+	// occurrences are
 	// the few a decision reaches, read from the decision side. Only builds
 	// holding an open finding are read.
 	kinds, kindArgs := kind.Statistics.Where(`"f"."kind"`)

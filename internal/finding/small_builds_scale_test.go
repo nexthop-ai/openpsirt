@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/uptrace/bun"
+
 	"github.com/nexthop-ai/openpsirt/internal/access"
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
@@ -89,8 +91,21 @@ func measureSmallBuilds(t *testing.T, db *database.DB, builds int) {
 			t.Fatal(err)
 		}
 	}
+	// One build in ten has its findings held by the reader, so the work
+	// somebody holds is a list across many builds.
+	var heldBy []int64
+	for i, build := range ids {
+		if i%10 == 0 {
+			heldBy = append(heldBy, build)
+		}
+	}
+	if _, err := db.DB.NewUpdate().Table("finding").Set(`"assigned_to" = ?`, 1).
+		Where(`"build_id" IN (?)`, bun.List(heldBy)).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
 	dbtest.SettleStatistics(t, db)
-	t.Logf("%d builds of %d packages: seeded in %v", len(ids), smallPackages, time.Since(seeded).Round(time.Second))
+	t.Logf("%d builds of %d packages, the findings of %d held: seeded in %v",
+		len(ids), smallPackages, len(heldBy), time.Since(seeded).Round(time.Second))
 
 	who := access.NewPerson(1, "a reader", false,
 		map[int64][]access.Role{w.Product.ID: {access.PublicRead, access.PrivateRead}}, 0)
@@ -123,7 +138,10 @@ func measureSmallBuilds(t *testing.T, db *database.DB, builds int) {
 		return err
 	})
 	median("assigned to somebody", func() error {
-		_, _, err := store.AssignedTo(ctx, kind.Assignment, "", who, []int64{1}, everywhere, 25, 0)
+		work, _, err := store.AssignedTo(ctx, kind.Assignment, "", who, []int64{1}, everywhere, 25, 0)
+		if err == nil && len(work) == 0 {
+			err = fmt.Errorf("nothing held, so this times an empty list")
+		}
 		return err
 	})
 	median("overview", func() error {

@@ -94,7 +94,7 @@ row per build, issue and component, and adds them together:
 The rows are folded again for the totals. Every column folds exactly: sums, a
 minimum deadline, a maximum exploitation flag. Joined to every open occurrence
 and grouped over the product at once, 15 builds of a real image spilled 147 MB
-to disk, 2.4 s against 1.07 s (`design-docs/analytics-measurements.md` § Many
+to disk, 2.56 s against 1.07 s (`design-docs/analytics-measurements.md` § Many
 builds).
 
 ## Across products
