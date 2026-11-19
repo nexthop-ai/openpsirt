@@ -689,16 +689,9 @@ func fixStatePartV0130() partV0130 {
 	}}
 }
 
-// inventoriesV0120 is a v0.12.0 build with a replaced inventory and a current
-// one, and a way to receive another.
-type inventoriesV0120 struct {
-	replaced, current int64
-	scanned           func(t *testing.T, n int) int64
-}
-
-// seedReplacedV0120 seeds a v0.12.0 build with a replaced inventory and a
-// current one.
-func seedReplacedV0120(t *testing.T, db *database.DB) inventoriesV0120 {
+// seedScanV0120 seeds a v0.12.0 build with one inventory, and answers the
+// inventory's scan.
+func seedScanV0120(t *testing.T, db *database.DB) int64 {
 	t.Helper()
 	ctx := t.Context()
 	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
@@ -713,13 +706,8 @@ func seedReplacedV0120(t *testing.T, db *database.DB) inventoriesV0120 {
 	variant := id(t, `SELECT MAX("id") FROM "variant"`)
 	exec(t, `INSERT INTO "build" ("branch_or_tag_id", "variant_id", "created_at") VALUES (?, ?, ?)`, line, variant, at)
 	build := id(t, `SELECT MAX("id") FROM "build"`)
-	out := inventoriesV0120{scanned: func(t *testing.T, n int) int64 {
-		exec(t, `INSERT INTO "scan" ("build_id", "content_hash", "built_at", "received_at", "parser_version",
-			"status", "components") VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			build, fmt.Sprintf("hash-%d", n), at.Add(time.Duration(n)*time.Hour),
-			at.Add(time.Duration(n)*time.Hour), "test", "accepted", 1)
-		return id(t, `SELECT MAX("id") FROM "scan"`)
-	}}
-	out.replaced, out.current = out.scanned(t, 1), out.scanned(t, 2)
-	return out
+	exec(t, `INSERT INTO "scan" ("build_id", "content_hash", "built_at", "received_at", "parser_version",
+		"status", "components") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		build, "hash", at.Add(time.Hour), at.Add(time.Hour), "test", "accepted", 1)
+	return id(t, `SELECT MAX("id") FROM "scan"`)
 }

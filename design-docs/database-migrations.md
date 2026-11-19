@@ -100,7 +100,8 @@ follows. A fresh install applies it and every migration after it.
 | Rule | Reason |
 |---|---|
 | Each table is made by one declaration, beside the migration, grouped by area with the reasoning for its shape | The migration names every table after every table it points at |
-| v0.12.0's record of its schema holds the baseline | On each engine it builds exactly v0.12.0's columns, constraints and indexes, and the schema test fails on any line either side lacks |
+| v0.12.0's record of its schema holds the baseline | On each engine it builds exactly v0.12.0's columns, constraints and indexes, and the schema test fails on any line either side lacks. On SQLite a constraint's name lives only in its table's text, which the test does not read: the baseline names constraints as v0.11.0 declared them, and a database the v0.11.0 upgrade renamed keeps the names from before the renames |
+| Nothing reads a SQLite constraint by name | SQLite drops no constraint, and a duplicate is recognized by its error code. A rebuild takes every name from the release's declaration, so a table any later migration rebuilds carries the declared names whichever a database held (`design-docs/database-upgrades.md` § Release upgrades) |
 | Every statement a declaration holds is one the baseline makes | A test fails on a table or index made from anywhere else |
 | On PostgreSQL the baseline also sets the finding table's vacuum settings | They are storage settings, which no declaration holds (`design-docs/database-schema.md` § Indexes) |
 | A release's declaration may derive from a baseline declaration | Several of v0.13.0's tables are the baseline's with columns or indexes added |
@@ -206,7 +207,7 @@ inventories, so it runs locally, outside the gate.
 | The release's database | The release's image, built from its tag, runs its own demo targets unedited against the rehearsal's empty database: products, inventories, scans, a VEX document, decisions and an approval, an assignment, and a recorded flaw |
 | What it held | Open findings per build from its status report, and every table's row count with it stopped. A build with no count is not settled, and the wait refuses naming it |
 | The upgrade | This tree's image applies the migrations alone, reaching this tree's last migration |
-| The rows | A table holds what it held; a table only the upgrade holds is empty |
+| The rows | A table holds what it held and what the upgrade fills it with; a table only the upgrade holds holds only what it is filled with. A migration that fills a table from a release's other rows declares the fill, and the rehearsal works out its rows from the release's database before the upgrade, for every release before that migration |
 | Served | This tree's server, started with the release's demo configuration, reports the same open findings per build, and no GET in the API document answers 5xx. The sweep names the build that sorts first. A GET whose path parameter the seed has no name for is skipped |
 
 | Rule | Reason |

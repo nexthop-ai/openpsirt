@@ -21,8 +21,9 @@
 //
 //  1. The row count of every table, with the release stopped.
 //  2. The migrations, applied on their own, and the version they reach.
-//  3. The counts again: a table the release held keeps its count, and a
-//     table the upgrade adds is empty.
+//  3. The counts again: a table the release held keeps its count plus what
+//     the upgrade fills it with from the release's other rows, and a table
+//     the upgrade adds holds only what it is filled with.
 //  4. The server started on it with the configuration the release's demo
 //     started its own with, the open findings of every build against what
 //     the release showed, and every GET its API document lists asked once,
@@ -55,6 +56,7 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
@@ -184,7 +186,8 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 		}
 	}
 	// Read to refuse a release with no record, which has no schema to compare.
-	if _, err := released.Read(releases, r.from); err != nil {
+	record, err := released.Read(releases, r.from)
+	if err != nil {
 		return nil, fmt.Errorf("the release record for %s: %w", r.from, err)
 	}
 	current, err := schema.Expected()
@@ -257,6 +260,11 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 			r.from, strings.Join(empty, ", "))
 	}
 
+	filled, err := r.filled(ctx, record.Last)
+	if err != nil {
+		return nil, err
+	}
+
 	r.step("migrated to %d by this tree", current)
 	if err := r.migrate(ctx, "up"); err != nil {
 		return nil, err
@@ -273,7 +281,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	faults = append(faults, prefix("upgrade", Compare(held, upgraded))...)
+	faults = append(faults, prefix("upgrade", Compare(held, upgraded, filled))...)
 
 	r.step("served by this tree")
 	if err := r.serve(ctx); err != nil {
@@ -464,6 +472,56 @@ func (r *run) count(ctx context.Context, tables []string, required map[string]bo
 		err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+table+`"`).Scan(&n)
 		return n, err
 	}, r.log)
+}
+
+// fills is every table a migration writes from what a release held elsewhere,
+// with its rows worked out from the release's database.
+func fills(ctx context.Context, db *database.DB) []Fill {
+	return []Fill{{Migration: migrations.ComponentNamesV0140, Table: "component_name",
+		Rows: func() (int64, error) {
+			var n int64
+			err := each(ctx, db, `SELECT COALESCE("purl", ''), COALESCE("name_folded", '') FROM "component"`,
+				func(purl, folded string) { n += migrations.NamesV0140(purl, folded) })
+			return n, err
+		}}}
+}
+
+// filled is the rows the upgrade from a release whose last migration is given
+// writes into each table it fills, read from the release's database before the
+// upgrade runs.
+func (r *run) filled(ctx context.Context, fromLast int64) (Counts, error) {
+	db, err := connect(ctx, r.hostURL)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = db.Close() }()
+	out := Counts{}
+	for _, f := range Owed(fromLast, fills(ctx, db)) {
+		n, err := f.Rows()
+		if err != nil {
+			return nil, fmt.Errorf("work out what fills %s: %w", f.Table, err)
+		}
+		out[f.Table] += n
+		r.note("%s is filled with %d rows", f.Table, n)
+	}
+	return out, nil
+}
+
+// each runs a query of two text columns and hands every row to row.
+func each(ctx context.Context, db *database.DB, query string, row func(a, b string)) error {
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var a, b string
+		if err := rows.Scan(&a, &b); err != nil {
+			return err
+		}
+		row(a, b)
+	}
+	return rows.Err()
 }
 
 // container is what every run of this tree's image shares: the release's
@@ -801,8 +859,8 @@ func releaseCount(fromTables []string) (tables []string, required map[string]boo
 // version applied, and which of them must be counted, or the fault when it
 // fell short of current. A schema short of this tree's lacks tables this tree
 // declares, so counting them would bury the fault under a missing table. A
-// name only the release used is gone after the renames, so only this tree's
-// own tables are required.
+// name only the release used may be gone after the upgrade, so only this
+// tree's own tables are required.
 func upgradedCount(applied, current int64, fromTables, tree []string) (tables []string, required map[string]bool, fault string) {
 	if applied != current {
 		return nil, nil, fmt.Sprintf("the upgrade reached schema version %d, and this tree carries %d", applied, current)

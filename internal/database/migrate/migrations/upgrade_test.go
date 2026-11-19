@@ -63,3 +63,63 @@ func TestAnUpgradeLeavingADanglingReferenceIsRefused(t *testing.T) {
 		t.Error("foreign keys were left suspended after the upgrade")
 	}
 }
+
+// A SQLite rebuild names every constraint as the release declares it, whatever
+// the table it replaces held. A database the v0.11.0 upgrade renamed keeps the
+// constraint names from before the renames, while one the baseline made has
+// the declared names, so a later rebuild leaves both the same.
+func TestASQLiteRebuildTakesTheDeclaredConstraintNames(t *testing.T) {
+	target, err := database.ParseURL("sqlite://" + t.TempDir() + "/renamed.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := database.Open(t.Context(), target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	ctx := migrate.WithEngine(t.Context(), database.SQLite, quiet())
+	for _, stmt := range []string{
+		`CREATE TABLE "decision" ("id" INTEGER PRIMARY KEY, "build" INTEGER NOT NULL,
+			CONSTRAINT "claim_build_once" UNIQUE ("build"))`,
+		`INSERT INTO "decision" ("id", "build") VALUES (1, 7)`,
+	} {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	declaration := []string{`CREATE TABLE "decision" (
+		"id" INTEGER PRIMARY KEY,
+		"build" INTEGER NOT NULL,
+		"reviewed" INTEGER NOT NULL,
+		CONSTRAINT "decision_build_once" UNIQUE ("build")
+	)`}
+	err = inV020(ctx, db.DB.DB, func(ctx context.Context, tx bun.Tx) error {
+		u, err := upgraderIn(ctx, tx)
+		if err != nil {
+			return err
+		}
+		return u.change(declaration, change{table: "decision",
+			add: []added{{column: "reviewed", fill: "0"}}})
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var made string
+	if err := db.QueryRowContext(t.Context(),
+		`SELECT "sql" FROM "sqlite_master" WHERE "type" = 'table' AND "name" = 'decision'`).Scan(&made); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(made, `"decision_build_once"`) || strings.Contains(made, `"claim_build_once"`) {
+		t.Errorf("the rebuilt table is declared as %s", made)
+	}
+	var kept int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM "decision" WHERE "build" = 7`).Scan(&kept); err != nil {
+		t.Fatal(err)
+	}
+	if kept != 1 {
+		t.Errorf("the rebuild kept %d of the table's one row", kept)
+	}
+}

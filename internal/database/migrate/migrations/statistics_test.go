@@ -25,13 +25,13 @@ func TestAnUpgradeLeavesEveryIndexWithStatistics(t *testing.T) {
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v0120)
 		// A node of a build: the upgrade adds indexes to the node table.
-		inventories := seedReplacedV0120(t, db)
+		scan := seedScanV0120(t, db)
 		exec, id := seedSQL(ctx, db)
 		exec(t, `INSERT INTO "component" ("identity", "name", "version", "name_folded", "fold_key", "first_seen_at")
 			VALUES (?, ?, ?, ?, ?, ?)`, "c1", "openssl", "3.0.2", "openssl", "k1", time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC))
 		component := id(t, `SELECT MAX("id") FROM "component"`)
 		exec(t, `INSERT INTO "graph_node" ("build_id", "component_id", "is_root", "opened_scan_id")
-			SELECT "build_id", ?, ?, "id" FROM "scan" WHERE "id" = ?`, component, true, inventories.current)
+			SELECT "build_id", ?, ?, "id" FROM "scan" WHERE "id" = ?`, component, true, scan)
 		// What a start of the release left: statistics for its own schema.
 		if err := database.RefreshStatistics(ctx, db); err != nil {
 			t.Fatal(err)

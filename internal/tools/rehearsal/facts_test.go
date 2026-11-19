@@ -14,7 +14,7 @@ import (
 func TestAnUpgradeThatKeepsEveryRowIsNotReported(t *testing.T) {
 	before := Counts{"finding": 10, "advisory_issuance": 3}
 	after := Counts{"finding": 10, "advisory_issuance": 3, "told_place": 0}
-	if faults := Compare(before, after); len(faults) != 0 {
+	if faults := Compare(before, after, nil); len(faults) != 0 {
 		t.Errorf("a faithful upgrade was reported: %v", faults)
 	}
 }
@@ -27,7 +27,7 @@ func TestEveryRowAnUpgradeLosesOrInventsIsReported(t *testing.T) {
 		"told_place":        1, // a new table something filled
 		// scan is gone with no rule saying where its rows went
 	}
-	faults := Compare(before, after)
+	faults := Compare(before, after, nil)
 	for _, table := range []string{"finding", "told_place", "scan"} {
 		found := false
 		for _, fault := range faults {
@@ -54,6 +54,43 @@ func TestATotalThatMovesOrVanishesIsReported(t *testing.T) {
 	faults := CompareTotals("open", before, Totals{"sonic/master/broadcom": 4, "sonic/master/mellanox": 6, "x/y/z": 1})
 	if len(faults) != 3 {
 		t.Errorf("want a moved total, a missing build and a new one, got %v", faults)
+	}
+}
+
+func TestTheRowsAnUpgradeFillsATableWithAreNotReported(t *testing.T) {
+	before := Counts{"component": 7}
+	after := Counts{"component": 7, "component_name": 9}
+	if faults := Compare(before, after, Counts{"component_name": 9}); len(faults) != 0 {
+		t.Errorf("the rows a fill wrote were reported: %v", faults)
+	}
+}
+
+func TestARowNoFillAccountsForIsReported(t *testing.T) {
+	before := Counts{"component": 7}
+	after := Counts{"component": 7, "component_name": 10}
+	faults := Compare(before, after, Counts{"component_name": 9})
+	if len(faults) != 1 || !strings.HasPrefix(faults[0], "component_name") || !strings.Contains(faults[0], "fills it with 9") {
+		t.Errorf("a row beyond the fill was not reported against it: %v", faults)
+	}
+}
+
+func TestAFilledTableTheReleaseHeldKeepsItsRowsAndTheFill(t *testing.T) {
+	before := Counts{"component_name": 3}
+	if faults := Compare(before, Counts{"component_name": 5}, Counts{"component_name": 2}); len(faults) != 0 {
+		t.Errorf("a held table's rows and its fill were reported: %v", faults)
+	}
+	if faults := Compare(before, Counts{"component_name": 4}, Counts{"component_name": 2}); len(faults) != 1 {
+		t.Errorf("a held table short of its rows and its fill was not reported: %v", faults)
+	}
+}
+
+func TestOnlyAMigrationTheReleaseDidNotApplyFills(t *testing.T) {
+	fills := []Fill{{Migration: 48, Table: "component_name"}}
+	if owed := Owed(47, fills); len(owed) != 1 {
+		t.Errorf("a release before the fill owes %v, want the fill", owed)
+	}
+	if owed := Owed(48, fills); len(owed) != 0 {
+		t.Errorf("a release that applied the fill owes %v, want nothing", owed)
 	}
 }
 

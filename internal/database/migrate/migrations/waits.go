@@ -95,8 +95,8 @@ func waitOut(ctx context.Context, q database.Querier, attempt int, since time.Ti
 // execWaiting runs one statement of a migration with its wait for a lock
 // bounded, and on MySQL and MariaDB runs it again after each wait that ends.
 //
-// The bound is set for each statement: the v0.11.0 renames put PostgreSQL's
-// back to the server's default part way through their migration. On
+// The bound is set for each statement, since a statement of the migration
+// may put PostgreSQL's back to the server's default part way through. On
 // PostgreSQL it lasts the rest of the transaction, so a data step after a
 // bounded statement is bounded too, and a wait it ends runs the whole
 // upgrade again. On MySQL and MariaDB it belongs to the session and is
