@@ -512,8 +512,9 @@ func (d *placer) place(product sbom.Target) *placement {
 
 // isProduct reports whether a component is the supplier's product: by the
 // package identifier the statement names, where it names one of a package,
-// and otherwise by the identifier or by the component's own name. With
-// atVersion, at the version the statement names as well.
+// and otherwise by the identifier, or by the component's own name or the name
+// its package identifier gives. With atVersion, at the version the statement
+// names as well.
 //
 // Never by what the component was built from. A fork of the supplier's source
 // carries the supplier's name as the name it was built from, and a build of

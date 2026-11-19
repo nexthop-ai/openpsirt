@@ -46,7 +46,7 @@ recorded before the product was read, closes nothing.
 | A finding on the product itself stays evidence, a cycle included | A package identifier cannot tell the supplier's build from a rebuild |
 | A statement naming an ecosystem's package alone closes nothing | |
 | The product is matched exactly at the stated version; a version change reopens; no version stays evidence | |
-| Matched by the statement's package identifier or the component's name, never by what it was built from; a generic identifier is matched against identifier and name, namespace compared as for a source-tree claim | A fork carries the supplier's name as its source |
+| Matched by the statement's package identifier, or by the component's name or the name its package identifier gives, never by what it was built from; a generic identifier is matched against identifier and name, namespace compared as for a source-tree claim | A fork carries the supplier's name as its source |
 | Only `not_affected` closes, whatever the justification; an affected statement at most prefills (§ Statement display and filters) | |
 | The product must be a component of the build | A distribution's platform is in no build |
 | The build's patch and the CVE record are asked first | |

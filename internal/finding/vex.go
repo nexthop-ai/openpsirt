@@ -649,10 +649,21 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	}
 	// A statement is stored under the name its identifier gives, and the
 	// component under the name its first inventory gave it, which a later one
-	// may not repeat. Asked by both.
+	// may not repeat; the build names it as its own inventory does. Asked by
+	// the build's name and every name the component goes by.
 	called := []string{folded(component)}
 	if own := graph.Folded(graph.PartsOfPurl(purl).Name); own != "" && own != called[0] {
 		called = append(called, own)
+	}
+	var stored []string
+	if err := s.db.NewSelect().TableExpr(`"component_name"`).ColumnExpr(`"name_folded"`).
+		Where(`"component_id" = ?`, componentID).Scan(ctx, &stored); err != nil {
+		return nil, fmt.Errorf("read every name this component goes by: %w", err)
+	}
+	for _, name := range stored {
+		if !slices.Contains(called, name) {
+			called = append(called, name)
+		}
 	}
 	var said []Statement
 	err := withWords(s.db.NewSelect().Model(&said)).

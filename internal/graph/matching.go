@@ -56,13 +56,15 @@ var unpublished = map[string]bool{"oci": true, "github": true}
 // distribution release the identifier states.
 var distributions = map[string]bool{"deb": true, "rpm": true, "apk": true}
 
-// noCPE is the package types whose matcher the scanner runs without a CPE: a
-// language's or a distribution's, which answers from its own advisories by
-// the identifier alone. Every other type, Alpine's included, reaches a matcher
-// reading the CPE.
+// noCPE is the package types whose matcher reads no CPE and answers from its
+// own advisories by the identifier alone: a language's or a distribution's
+// matcher the scanner's default configuration runs without CPEs, and the
+// Arch, Portage and Bitnami matchers, which never read one. Every other type,
+// Alpine's and Gentoo's ebuild included, reaches a matcher reading the CPE.
 var noCPE = map[string]bool{
-	"deb": true, "rpm": true, "npm": true, "pypi": true, "gem": true, "cargo": true,
-	"golang": true, "maven": true, "nuget": true, "hex": true,
+	"deb": true, "rpm": true, "npm": true, "pypi": true, "gem": true, "cargo": true, "crate": true,
+	"golang": true, "maven": true, "nuget": true, "dotnet": true, "hex": true, "otp": true,
+	"alpm": true, "portage": true, "bitnami": true,
 }
 
 // Unmatchable reports why the scanner cannot match this component, or empty

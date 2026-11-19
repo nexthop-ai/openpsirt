@@ -300,14 +300,18 @@ all time, two runs each.
 
 Justifies matching a statement to a component through a row per name the
 component goes by (`design-docs/data-model-components.md` § Component
-identity, `design-docs/ingest-claims.md`). Model: the full-size image at six
-builds, 6,843 packages and 113,334 findings, one in ten components named apart
-from its package identifier. 3,585 statements from one publisher, each placed
-inside a product of its own, one in seven a package this product ships; and
-3,585 upstream statements awaiting review, one in six naming a shipped
-component at its version. Median of five reads as the administrator, on one
-quiet host, the servers holding their data in memory.
-`TestMeasureReadsMatchingStatementsToComponents` is the harness.
+identity, `design-docs/ingest-claims.md`). `TestMeasureReadsMatchingStatementsToComponents`
+builds the model:
+
+| Part | Built as |
+|---|---|
+| Product | One branch with six variants, each one build of the full-size image: 6,843 components with an identifier, a name and a version, 1,418 of them named apart from their package identifier |
+| Findings | One issue per component, `CVE-2026-` and its index, reported at every build: 113,334 findings |
+| Placed statements | The first 3,585 components, one `not_affected` statement each under the component's name and identifier, placed inside a product at 1.0 from publisher Measure. An even index names the shipped component at index `(i×7+1) mod 6,843`; an odd one `acme-platform-` and its index, which nothing ships |
+| Waiting statements | For the same 3,585 issues, one statement each from publisher Upstream at the component's version, made upstream and unplaced. Every sixth index names the component; the rest `absent-` and its index |
+| Reads | The findings list for the product narrowed to publisher Measure, and narrowed to `not_affected`, 50 groups a page; the product's offers for review. Each read once to warm, then five times timed, the figure the median, as a reader holding every role on the product, after statistics are taken |
+
+The servers held their data in memory on one quiet host.
 
 | Engine | Read | One column, own name alone | Either of two columns, an OR | Either of two columns, split | A row per name |
 |---|---|---:|---:|---:|---:|

@@ -267,7 +267,9 @@ func (s *Store) UpstreamSaid(ctx context.Context, subject access.Subject, produc
 		Join(`JOIN "build" AS "b" ON "b"."id" = "n"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		ColumnExpr(`"an"."name_folded"`).
-		Where(`"cn"."name_folded" = ?`, called[0]).
+		// The component's own names, or the name the build gave its node: the
+		// Component page is opened under the name the build states.
+		Where(`("cn"."name_folded" = ? OR "n"."name_folded" = ?)`, called[0], called[0]).
 		Where(`"an"."name_folded" <> ?`, called[0]).
 		Where(`"st"."product_id" = ?`, productID).
 		Where(`"n"."closed_scan_id" IS NULL`).

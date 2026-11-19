@@ -54,8 +54,8 @@ func TestTheV0140UpgradeFinishesAStartThatStoppedAfterTheClaimNotes(t *testing.T
 	})
 }
 
-// A start that stopped after the correction table was made and before its
-// index, which MySQL and MariaDB keep since they commit each schema
+// A start that stopped after the correction table or the component name table
+// was made and before its index, which MySQL and MariaDB keep since they commit each schema
 // statement, is finished by the next start.
 func TestTheV0140UpgradeMakesAnIndexAStoppedStartLeftUnmade(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
@@ -66,13 +66,17 @@ func TestTheV0140UpgradeMakesAnIndexAStoppedStartLeftUnmade(t *testing.T) {
 		// MySQL and MariaDB keep an index under every foreign key: a table
 		// made with no index of its own holds one named after the key, which
 		// a later index able to serve the key replaces.
-		drops := []string{`DROP INDEX "source_correction_product_idx"`}
+		drops := []string{`DROP INDEX "source_correction_product_idx"`, `DROP INDEX "component_name_component_idx"`}
 		if db.Server.Engine == database.MySQL || db.Server.Engine == database.MariaDB {
 			drops = []string{
 				`ALTER TABLE "source_correction" DROP FOREIGN KEY "source_correction_product_fk"`,
 				`DROP INDEX "source_correction_product_idx" ON "source_correction"`,
 				`ALTER TABLE "source_correction" ADD CONSTRAINT "source_correction_product_fk" ` +
 					`FOREIGN KEY ("product_id") REFERENCES "product"("id")`,
+				`ALTER TABLE "component_name" DROP FOREIGN KEY "component_name_component_fk"`,
+				`DROP INDEX "component_name_component_idx" ON "component_name"`,
+				`ALTER TABLE "component_name" ADD CONSTRAINT "component_name_component_fk" ` +
+					`FOREIGN KEY ("component_id") REFERENCES "component"("id")`,
 			}
 		}
 		for _, drop := range drops {

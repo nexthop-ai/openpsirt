@@ -457,6 +457,71 @@ func TestAnOfferReachesAComponentStoredUnderAnotherName(t *testing.T) {
 	})
 }
 
+// A build may name a component otherwise than the name its first inventory
+// stored, and a statement may be stored under either of those or under the
+// name its package identifier gives. The Component page, opened under the
+// build's name, and a finding's evidence each find a statement under any of
+// them.
+func TestWhatIsSaidIsFoundUnderEveryNameAComponentGoesBy(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		ctx := t.Context()
+		before, err := w.findings.UpstreamSaid(ctx, w.proposer, w.fork.ID, libnl.Name)
+		if err != nil || len(before) == 0 {
+			t.Fatalf("the upstream says %d things about %s (%v), so this asks nothing", len(before), libnl.Name, err)
+		}
+		var id int64
+		if err := w.DB.DB.NewSelect().Table("component").Column("id").
+			Where(`"purl" = ?`, libnl.Purl).Scan(ctx, &id); err != nil {
+			t.Fatal(err)
+		}
+		// Stored as its first inventory named it, and stated by this build
+		// as "netlink".
+		if _, err := w.DB.DB.NewUpdate().Table("component").
+			Set(`"name" = ?`, "Netlink library").Set(`"name_folded" = ?`, "netlink library").
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.DB.DB.NewInsert().Model(&graph.ComponentName{ComponentID: id,
+			NameFolded: "netlink library"}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.DB.DB.NewUpdate().Table("graph_node").Set(`"name" = ?`, "netlink").
+			Set(`"name_folded" = ?`, "netlink").Where(`"component_id" = ?`, id).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		said, err := w.findings.UpstreamSaid(ctx, w.proposer, w.fork.ID, "netlink")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(said) != len(before) {
+			t.Errorf("the page under the build's name holds %d statements, want the %d said under the package's name",
+				len(said), len(before))
+		}
+
+		// A statement under the stored name alone.
+		if _, err := w.DB.DB.NewUpdate().Table("received_vex_statement").
+			Set(`"component" = ?`, "netlink library").
+			Where(`"product_id" = ?`, w.fork.ID).Where(`"component" = ?`, "libnl-3-200").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		issue, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, ownBuild)
+		if err != nil {
+			t.Fatal(err)
+		}
+		evidence, err := w.findings.SaidAbout(ctx, w.proposer, w.fork.ID, issue, []string{ownBuild},
+			"netlink", libnl.Purl, w.forkBuild.ID, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(evidence) == 0 {
+			t.Error("the finding's evidence holds nothing, want the statement under the name the component is stored under")
+		}
+	})
+}
+
 // The offers of a product are refused to somebody who does not read it,
 // rather than answered as none.
 func TestTheOffersOfAProductTheReaderCannotSeeAreRefused(t *testing.T) {

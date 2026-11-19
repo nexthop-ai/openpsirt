@@ -104,7 +104,7 @@ them and links to the list, and the catalog carries it for a whole build.
 | One reason per component, the first in the order above | Counts sum to the total |
 | Worked out when asked | Reading a qualifier parses an identifier |
 | Each reason is a shape the scanner was measured matching nothing for, or matching only by guessing every advisory against the product | |
-| A component whose CPE states a version is matchable, whatever its package identifier says, unless the identifier is of a type the scanner matches without a CPE: deb, rpm, npm, pypi, gem, cargo, golang, maven, nuget and hex | Those types' matchers read the identifier alone, as the scanner's default configuration sets them and as OpenPSIRT runs it; every other type, apk included, reaches a matcher reading the CPE |
+| A component whose CPE states a version is matchable, whatever its package identifier says, unless the identifier is of a type the scanner matches without a CPE: deb, rpm, npm, pypi, gem, cargo, crate, golang, maven, nuget, dotnet, hex, otp, alpm, portage and bitnami | Those types' matchers read the identifier alone, by the scanner's default configuration as OpenPSIRT runs it or by their nature; every other type, apk and ebuild included, reaches a matcher reading the CPE |
 | A CPE stating any version (`*`), not applicable (`-`), or `UNKNOWN` leaves the component's reason as it was | Its matches are every advisory against the product, which is a guess |
 | The tree's count and this list are one function | |
 
@@ -143,13 +143,17 @@ per inventory, for a CPE beside each shape:
 | Debian `openssl` with no distribution, at a version or with none | 1.1.1n | 0: the Debian matcher reads no CPE |
 | Debian `openssl` with `distro=debian-12` at `UNKNOWN`, RPM `openssl` with `distro=rhel-9` and no version | 1.1.1n | 0 |
 | PyPI `django` at 9.9.9, or at `UNKNOWN` | 3.2.0 | 0: the Python matcher reads no CPE |
+| `openssl` at 0.0.1 as bitnami, dotnet, otp or portage, or alpm with no distribution | 1.1.1n | 0 |
+| `openssl` at 0.0.1 as alpm with `distro=arch`, or as crate | 1.1.1n | 18 and 2, none through the CPE |
+| `openssl` at 0.0.1 as conan, composer, swift or ebuild | 1.1.1n | 46, every one through the CPE |
 | Debian `openssl` with `distro=debian-12`, PyPI `django`, npm `lodash`, each with no version | Any, or none | 270, 157 and 3: every advisory against the package, which is a guess |
 | Generic `openssl` 1.1.1a with no CPE, GitHub `frr` at a commit with none | — | 0 |
 
 The scanner's default configuration runs the deb, rpm, npm, pypi, gem, cargo,
-golang, maven, nuget and hex types' matchers without CPEs, and OpenPSIRT sets
-none of its own. Alpine's matcher and the one every other type reaches read the
-CPE.
+crate, golang, maven, nuget, dotnet, hex and otp types' matchers without CPEs,
+and OpenPSIRT sets none of its own. The alpm, portage and bitnami types' matchers
+never read one. Alpine's matcher and the one every other type reaches read the
+CPE, `ebuild` included.
 
 A real SONiC broadcom inventory of 7,088 components reads as 3,268 matchable and
 3,820 not:
