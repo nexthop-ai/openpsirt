@@ -37,7 +37,7 @@ func jobBaseline(t *columnTypes) []string {
 		// leads with the kind, which this query does not name — so without
 		// this it scans every job the deployment has ever run, and nothing
 		// deletes a finished one.
-		`CREATE INDEX "job_set_aside_idx" ON "job" ("state", "updated_at", "id")`,
+		`CREATE INDEX "job_failed_idx" ON "job" ("state", "updated_at", "id")`,
 	}
 }
 
@@ -106,7 +106,7 @@ func upgradeBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "upgrade" (
 			"id"           ` + t.id + `,
-			"target_id"    ` + t.ref + ` NOT NULL,
+			"build_id"    ` + t.ref + ` NOT NULL,
 			-- What moves: the source package, at the version it was built at,
 			-- in the ecosystem and distribution it came from. See the fold in
 			-- design-docs/data-model-components.md.
@@ -129,15 +129,15 @@ func upgradeBaseline(t *columnTypes) []string {
 			-- No foreign key on the claim for the same reason the finding's
 			-- assignee has none: nothing is ever deleted from that table, and
 			-- the constraint would only order the two deletes in a test reset.
-			"claim_id"     ` + t.refNull + ` NULL,
+			"decision_id"     ` + t.refNull + ` NULL,
 			"declared_by"  ` + t.ref + ` NOT NULL,
 			"declared_at"  ` + t.timestamp + ` NOT NULL,
 			-- Reading a build's plan is how a release answers "what is this
 			-- waiting on", and the unique constraint leads with the build, so
 			-- it answers that lookup too. A second index on the build alone
 			-- would be a prefix of this one.
-			CONSTRAINT "upgrade_unique" UNIQUE ("target_id", "fold_key"),
-			CONSTRAINT "upgrade_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
+			CONSTRAINT "upgrade_unique" UNIQUE ("build_id", "fold_key"),
+			CONSTRAINT "upgrade_build_id_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
 			CONSTRAINT "upgrade_declared_by_fk" FOREIGN KEY ("declared_by") REFERENCES "person"("id")
 		)` + t.suffix,
 	}

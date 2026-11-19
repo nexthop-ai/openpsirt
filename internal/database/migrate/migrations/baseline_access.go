@@ -132,11 +132,15 @@ func accessBaseline(t *columnTypes) []string {
 		// A role is held against one product. What somebody may reach
 		// is the union of their grants, and a product they hold no
 		// grant on is not merely unreadable but invisible.
+		//
+		// A role's name is declared at a short identifier's width wherever
+		// it is held: a kind's width holds sixteen characters, and
+		// security-testing-triage is twenty-three.
 		`CREATE TABLE "role_grant" (
 			"id"         ` + t.id + `,
 			"person_id"  ` + t.ref + ` NOT NULL,
 			"product_id" ` + t.ref + ` NOT NULL,
-			"role"       ` + t.kind + ` NOT NULL,
+			"role"       ` + t.name + ` NOT NULL,
 			-- source says where a grant came from. A grant derived from group
 			-- membership is replaced wholesale at each sign-in, so losing the
 			-- group loses the role; one assigned by an administrator
@@ -177,7 +181,7 @@ func accessBaseline(t *columnTypes) []string {
 		`CREATE TABLE "role_grant_all" (
 			"id"         ` + t.id + `,
 			"person_id"  ` + t.ref + ` NOT NULL,
-			"role"       ` + t.kind + ` NOT NULL,
+			"role"       ` + t.name + ` NOT NULL,
 			"source"     ` + t.kind + ` NOT NULL,
 			"active"     ` + t.boolean + ` NOT NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
@@ -263,7 +267,7 @@ func accessBaseline(t *columnTypes) []string {
 			"name"         ` + t.name + ` NOT NULL,
 			"secret_hash"  ` + t.hash + ` NOT NULL,
 			"product_id"   ` + t.ref + ` NOT NULL,
-			"stream_id"    ` + t.refNull + ` NULL,
+			"branch_or_tag_id"    ` + t.refNull + ` NULL,
 			"variant_id"   ` + t.refNull + ` NULL,
 			"created_at"   ` + t.timestamp + ` NOT NULL,
 			"last_used_at" ` + t.timestamp + ` NULL,
@@ -276,7 +280,7 @@ func accessBaseline(t *columnTypes) []string {
 			-- the old one sent.
 			"live_name"    ` + t.name + ` NULL,
 			CONSTRAINT "api_key_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
-			CONSTRAINT "api_key_stream_fk" FOREIGN KEY ("stream_id") REFERENCES "stream"("id"),
+			CONSTRAINT "api_key_branch_or_tag_fk" FOREIGN KEY ("branch_or_tag_id") REFERENCES "branch_or_tag"("id"),
 			CONSTRAINT "api_key_variant_fk" FOREIGN KEY ("variant_id") REFERENCES "variant"("id"),
 			CONSTRAINT "api_key_secret_unique" UNIQUE ("secret_hash"),
 			CONSTRAINT "api_key_live_unique" UNIQUE ("live_name")
@@ -340,7 +344,7 @@ func accessBaseline(t *columnTypes) []string {
 			-- The product's name folded the way a product's name is, so it
 			-- matches the product whatever capitals configuration wrote.
 			"product_name" ` + t.name + ` NOT NULL,
-			"role"         ` + t.kind + ` NOT NULL,
+			"role"         ` + t.name + ` NOT NULL,
 			"created_at"   ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "group_role_unique" UNIQUE ("group_name", "product_name", "role")
 		)` + t.suffix,
@@ -352,7 +356,7 @@ func accessBaseline(t *columnTypes) []string {
 		`CREATE TABLE "group_role_all" (
 			"id"         ` + t.id + `,
 			"group_name" ` + t.name + ` NOT NULL,
-			"role"       ` + t.kind + ` NOT NULL,
+			"role"       ` + t.name + ` NOT NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
 			CONSTRAINT "group_role_all_unique" UNIQUE ("group_name", "role")
 		)` + t.suffix,

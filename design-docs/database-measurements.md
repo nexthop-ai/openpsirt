@@ -7,7 +7,6 @@ it and points here for the run.
 
 - [Statement preparation modes](#statement-preparation-modes)
 - [Bulk insert statements](#bulk-insert-statements)
-- [The v0.11.0 upgrade](#the-v0110-upgrade)
 - [Index reads](#index-reads)
 - [Statistics after an upgrade](#statistics-after-an-upgrade)
 - [Schema watch looks](#schema-watch-looks)
@@ -43,35 +42,6 @@ with one processor over a 1 ms, 100 Mbit link.
 | A list of rows, described, nothing read back | 55 µs |
 | Arrays, nothing read back | 42 to 43 µs |
 | Arrays, on the table without its four foreign keys | 17 to 20 µs |
-
-## The v0.11.0 upgrade
-
-Each phase at 1,000 and at 1,000,000 rows a table, each database holding the
-same 1,000 rows to rewrite. `design-docs/database-upgrades.md` § The v0.11.0
-upgrade holds the rules.
-
-| Engine | Renames | Stored values | Changes | Whole upgrade |
-|---|---|---|---|---|
-| PostgreSQL | 138 ms, 153 ms | 21 ms, 131 ms | 0.23 s, 2.3 s | 0.40 s, 2.6 s |
-| MySQL | 765 ms, 823 ms | 18 ms, 687 ms | 0.39 s, 4.9 s | 1.2 s, 6.4 s |
-| MariaDB | 141 ms, 263 ms | 14 ms, 566 ms | 0.08 s, 5.4 s | 0.24 s, 6.2 s |
-| SQLite | 214 ms, 3.5 s | 5 ms, 179 ms | 0.03 s, 3.8 s | 0.25 s, 8.4 s |
-
-A notification link matched by its prefix, `/decisions/`, over a million
-notifications, timed alone: 734 ms on MySQL, 575 ms on MariaDB, 114 ms on
-PostgreSQL.
-
-The component trimming of the changes phase alone, over 1,000, 100,000 and
-1,000,000 components, 1,000 of them stated with a trailing space, one engine at
-a time. It reads every row, about 1 to 2 µs a row; the 1,000 rewritten rows are
-most of the smallest run.
-
-| Engine | 1,000 | 100,000 | 1,000,000 |
-|---|---|---|---|
-| PostgreSQL | 191 ms | 688 ms | 2.19 s |
-| MySQL | 113 ms | 224 ms | 1.27 s |
-| MariaDB | 118 ms | 215 ms | 1.15 s |
-| SQLite | 14 ms | 190 ms | 1.95 s |
 
 ## Index reads
 

@@ -32,19 +32,3 @@ func seedSQL(ctx context.Context, db *database.DB) (
 	}
 	return exec, id
 }
-
-// seeding is seedSQL failing one test.
-func seeding(t *testing.T, ctx context.Context, db *database.DB) (
-	exec func(query string, args ...any), id func(query string, args ...any) int64) {
-
-	each, one := seedSQL(ctx, db)
-	exec = func(query string, args ...any) {
-		t.Helper()
-		each(t, query, args...)
-	}
-	id = func(query string, args ...any) int64 {
-		t.Helper()
-		return one(t, query, args...)
-	}
-	return exec, id
-}

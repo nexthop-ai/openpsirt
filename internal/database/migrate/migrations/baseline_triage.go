@@ -38,7 +38,7 @@ func triageBaseline(t *columnTypes) []string {
 		// claim an approver set some rows aside from when agreeing to
 		// the rest . Either way the link is what makes "how many
 		// claims rest on this argument" answerable.
-		`CREATE TABLE "claim" (
+		`CREATE TABLE "decision" (
 			"id"           ` + t.id + `,
 			"kind"         ` + t.kind + ` NOT NULL,
 			"proposed_by"  ` + t.ref + ` NOT NULL,
@@ -147,11 +147,11 @@ func triageBaseline(t *columnTypes) []string {
 			-- points back here, and neither engine that enforces order during
 			-- a bulk delete would accept the cycle.
 			"revision_id"    ` + t.refNull + ` NULL,
-			CONSTRAINT "claim_proposer_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id"),
-			CONSTRAINT "claim_derived_fk" FOREIGN KEY ("derived_from") REFERENCES "claim"("id")
+			CONSTRAINT "decision_proposer_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id"),
+			CONSTRAINT "decision_derived_fk" FOREIGN KEY ("derived_from") REFERENCES "decision"("id")
 		)` + t.suffix,
 
-		`CREATE INDEX "claim_derived_idx" ON "claim" ("derived_from")`,
+		`CREATE INDEX "decision_derived_idx" ON "decision" ("derived_from")`,
 
 		// One claim about one combination of code.
 		//
@@ -166,7 +166,7 @@ func triageBaseline(t *columnTypes) []string {
 		// consumer_upstream_version is absent where the thing above is
 		// the product itself, which is excluded from identity and from
 		// expiry because its version changes on every build.
-		`CREATE TABLE "decision" (
+		`CREATE TABLE "decision_occurrence" (
 			"id"                         ` + t.id + `,
 			-- The VEX statement this was started from, where one was.
 			-- A citation rather than an application: what the
@@ -178,10 +178,10 @@ func triageBaseline(t *columnTypes) []string {
 			"from_statement_id"          ` + t.refNull + ` NULL,
 			-- The action this row was written by. Every decision belongs to
 			-- one; the claim is what the queue lists and what is approved.
-			"claim_id"                   ` + t.ref + ` NOT NULL,
+			"decision_id"                   ` + t.ref + ` NOT NULL,
 			"product_id"                 ` + t.ref + ` NOT NULL,
 			"vulnerability_id"           ` + t.ref + ` NOT NULL,
-			"place_identity"             ` + t.hash + ` NOT NULL,
+			"occurrence_identity"             ` + t.hash + ` NOT NULL,
 			-- The finding's, carried here so that who may reach a decision is
 			-- answered by the row rather than by whoever built the query. A
 			-- finding nobody has disclosed is one only a private triager may
@@ -239,11 +239,11 @@ func triageBaseline(t *columnTypes) []string {
 			-- read-then-write check is exactly the shape two proposals
 			-- arriving at once both walk through.
 			"live_key"                   ` + t.hash + ` NULL,
-			CONSTRAINT "decision_live_unique" UNIQUE ("live_key"),
-			CONSTRAINT "decision_claim_fk" FOREIGN KEY ("claim_id") REFERENCES "claim"("id"),
-			CONSTRAINT "decision_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
-			CONSTRAINT "decision_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
-			CONSTRAINT "decision_proposer_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id")
+			CONSTRAINT "decision_occurrence_live_unique" UNIQUE ("live_key"),
+			CONSTRAINT "decision_occurrence_decision_fk" FOREIGN KEY ("decision_id") REFERENCES "decision"("id"),
+			CONSTRAINT "decision_occurrence_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "decision_occurrence_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "decision_occurrence_proposer_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
 		// Found two ways, and both are hot.
@@ -262,8 +262,8 @@ func triageBaseline(t *columnTypes) []string {
 		// fewer pages — turns on there being hundreds of thousands of rows to
 		// read, and there are thousands of decisions rather than a finding per
 		// place.
-		`CREATE INDEX "decision_applies_idx" ON "decision" ("product_id", "vulnerability_id", "place_identity", "component_upstream_version", "consumer_upstream_version")`,
-		`CREATE INDEX "decision_claim_idx" ON "decision" ("claim_id")`,
+		`CREATE INDEX "decision_occurrence_applies_idx" ON "decision_occurrence" ("product_id", "vulnerability_id", "occurrence_identity", "component_upstream_version", "consumer_upstream_version")`,
+		`CREATE INDEX "decision_occurrence_decision_idx" ON "decision_occurrence" ("decision_id")`,
 
 		// The decisions waiting for a second person, by claim. The review
 		// queue groups the waiting decisions by claim, and the waiting ones
@@ -271,7 +271,7 @@ func triageBaseline(t *columnTypes) []string {
 		// on PostgreSQL with one processor, 33,150 waiting among 133,549, with
 		// this index and without it: the queue's page 22 ms and 81 ms, and its
 		// count 22 ms and 40 ms.
-		`CREATE INDEX "decision_state_claim_idx" ON "decision" ("state", "claim_id")`,
+		`CREATE INDEX "decision_occurrence_state_decision_idx" ON "decision_occurrence" ("state", "decision_id")`,
 
 		// The reasoning, revised and never overwritten.
 		//
@@ -285,9 +285,9 @@ func triageBaseline(t *columnTypes) []string {
 		// of one sentence: revising one returned that row to the queue and
 		// left the other forty-three saying the old thing under a claim that
 		// read as agreed.
-		`CREATE TABLE "claim_revision" (
+		`CREATE TABLE "decision_revision" (
 			"id"          ` + t.id + `,
-			"claim_id"    ` + t.ref + ` NOT NULL,
+			"decision_id"    ` + t.ref + ` NOT NULL,
 			"ordinal"     ` + t.ref + ` NOT NULL,
 			-- The text as somebody wrote it. Stored as source and never as
 			-- rendered output: what is safe to render is a decision made when
@@ -296,9 +296,9 @@ func triageBaseline(t *columnTypes) []string {
 			"body"        ` + t.text + ` NOT NULL,
 			"written_by"  ` + t.ref + ` NOT NULL,
 			"written_at"  ` + t.timestamp + ` NOT NULL,
-			CONSTRAINT "claim_revision_claim_fk" FOREIGN KEY ("claim_id") REFERENCES "claim"("id"),
-			CONSTRAINT "claim_revision_author_fk" FOREIGN KEY ("written_by") REFERENCES "person"("id"),
-			CONSTRAINT "claim_revision_unique" UNIQUE ("claim_id", "ordinal")
+			CONSTRAINT "decision_revision_decision_fk" FOREIGN KEY ("decision_id") REFERENCES "decision"("id"),
+			CONSTRAINT "decision_revision_author_fk" FOREIGN KEY ("written_by") REFERENCES "person"("id"),
+			CONSTRAINT "decision_revision_unique" UNIQUE ("decision_id", "ordinal")
 		)` + t.suffix,
 
 		// Who agreed, and to what exactly.
@@ -306,9 +306,9 @@ func triageBaseline(t *columnTypes) []string {
 		// Kept rather than reduced to a flag on the decision, because an
 		// approval that was later withdrawn is part of the record: it says a
 		// second person did once agree, and to which words.
-		`CREATE TABLE "claim_approval" (
+		`CREATE TABLE "decision_approval" (
 			"id"           ` + t.id + `,
-			"claim_id"     ` + t.ref + ` NOT NULL,
+			"decision_id"     ` + t.ref + ` NOT NULL,
 			"revision_id"  ` + t.ref + ` NOT NULL,
 			"approved_by"  ` + t.ref + ` NOT NULL,
 			"approved_at"  ` + t.timestamp + ` NOT NULL,
@@ -360,16 +360,16 @@ func triageBaseline(t *columnTypes) []string {
 			-- — so the clause is reached only where a whole table is being
 			-- emptied, and there it is the difference between working on two
 			-- engines and four.
-			CONSTRAINT "claim_approval_carried_fk" FOREIGN KEY ("carried_from")
-				REFERENCES "claim_approval"("id") ON DELETE SET NULL,
-			CONSTRAINT "claim_approval_claim_fk" FOREIGN KEY ("claim_id") REFERENCES "claim"("id"),
-			CONSTRAINT "claim_approval_revision_fk" FOREIGN KEY ("revision_id") REFERENCES "claim_revision"("id"),
-			CONSTRAINT "claim_approval_approver_fk" FOREIGN KEY ("approved_by") REFERENCES "person"("id"),
-			CONSTRAINT "claim_approval_withdrawer_fk" FOREIGN KEY ("withdrawn_by") REFERENCES "person"("id")
+			CONSTRAINT "decision_approval_carried_fk" FOREIGN KEY ("carried_from")
+				REFERENCES "decision_approval"("id") ON DELETE SET NULL,
+			CONSTRAINT "decision_approval_decision_fk" FOREIGN KEY ("decision_id") REFERENCES "decision"("id"),
+			CONSTRAINT "decision_approval_revision_fk" FOREIGN KEY ("revision_id") REFERENCES "decision_revision"("id"),
+			CONSTRAINT "decision_approval_approver_fk" FOREIGN KEY ("approved_by") REFERENCES "person"("id"),
+			CONSTRAINT "decision_approval_withdrawer_fk" FOREIGN KEY ("withdrawn_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		`CREATE INDEX "claim_approval_claim_idx" ON "claim_approval" ("claim_id")`,
-		`CREATE INDEX "claim_approval_batch_idx" ON "claim_approval" ("batch")`,
+		`CREATE INDEX "decision_approval_decision_idx" ON "decision_approval" ("decision_id")`,
+		`CREATE INDEX "decision_approval_batch_idx" ON "decision_approval" ("batch")`,
 
 		// Discussion, which is not the reasoning.
 		//
@@ -384,29 +384,19 @@ func triageBaseline(t *columnTypes) []string {
 		// exception to keeping everything: discussion is not the record a
 		// decision rests on, and that record is the revisions and the
 		// approvals, which are kept in full.
-		`CREATE TABLE "claim_comment" (
+		`CREATE TABLE "decision_comment" (
 			"id"          ` + t.id + `,
-			"claim_id"    ` + t.ref + ` NOT NULL,
+			"decision_id"    ` + t.ref + ` NOT NULL,
 			"body"        ` + t.text + ` NOT NULL,
 			"written_by"  ` + t.ref + ` NOT NULL,
 			"written_at"  ` + t.timestamp + ` NOT NULL,
 			"edited_at"   ` + t.timestamp + ` NULL,
-			CONSTRAINT "claim_comment_claim_fk" FOREIGN KEY ("claim_id") REFERENCES "claim"("id"),
-			CONSTRAINT "claim_comment_author_fk" FOREIGN KEY ("written_by") REFERENCES "person"("id")
+			CONSTRAINT "decision_comment_decision_fk" FOREIGN KEY ("decision_id") REFERENCES "decision"("id"),
+			CONSTRAINT "decision_comment_author_fk" FOREIGN KEY ("written_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
-		`CREATE INDEX "claim_comment_claim_idx" ON "claim_comment" ("claim_id")`,
+		`CREATE INDEX "decision_comment_decision_idx" ON "decision_comment" ("decision_id")`,
 	}
-}
-
-// decisionV080 is the baseline's declaration of the decision table, and the
-// indexes it makes, under the name v0.11.0's declaration of the table reads.
-func decisionV080(t *columnTypes) []string {
-	made, indexes, err := pick(triageBaseline(t), "decision")
-	if err != nil {
-		panic(err)
-	}
-	return append([]string{made}, indexes...)
 }
 
 // What a comment said before it was changed.
@@ -423,7 +413,7 @@ func decisionV080(t *columnTypes) []string {
 // this holds what it stopped saying, which is the part an overwrite loses.
 func commentHistoryBaseline(t *columnTypes) []string {
 	return []string{
-		`CREATE TABLE "claim_comment_revision" (
+		`CREATE TABLE "decision_comment_revision" (
 			"id"         ` + t.id + `,
 			"comment_id" ` + t.ref + ` NOT NULL,
 			-- Which version this was, counting from one. The current text is
@@ -436,8 +426,8 @@ func commentHistoryBaseline(t *columnTypes) []string {
 			-- When it stopped saying that. Who wrote it is on the comment: only
 			-- its author may change one, so a revision has no separate author.
 			"replaced_at" ` + t.timestamp + ` NOT NULL,
-			CONSTRAINT "claim_comment_revision_fk" FOREIGN KEY ("comment_id") REFERENCES "claim_comment"("id"),
-			CONSTRAINT "claim_comment_revision_once" UNIQUE ("comment_id", "ordinal")
+			CONSTRAINT "decision_comment_revision_fk" FOREIGN KEY ("comment_id") REFERENCES "decision_comment"("id"),
+			CONSTRAINT "decision_comment_revision_once" UNIQUE ("comment_id", "ordinal")
 		)` + t.suffix,
 	}
 }
@@ -505,13 +495,13 @@ func collaboratorBaseline(t *columnTypes) []string {
 // the claim reaches by lookup is never recorded.
 func claimBuildBaseline(t *columnTypes) []string {
 	return []string{
-		`CREATE TABLE "claim_build" (
+		`CREATE TABLE "decision_build" (
 			"id"        ` + t.id + `,
-			"claim_id"  ` + t.ref + ` NOT NULL,
-			"target_id" ` + t.ref + ` NOT NULL,
-			CONSTRAINT "claim_build_once" UNIQUE ("claim_id", "target_id"),
-			CONSTRAINT "claim_build_claim_fk" FOREIGN KEY ("claim_id") REFERENCES "claim"("id"),
-			CONSTRAINT "claim_build_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
+			"decision_id"  ` + t.ref + ` NOT NULL,
+			"build_id" ` + t.ref + ` NOT NULL,
+			CONSTRAINT "decision_build_once" UNIQUE ("decision_id", "build_id"),
+			CONSTRAINT "decision_build_decision_fk" FOREIGN KEY ("decision_id") REFERENCES "decision"("id"),
+			CONSTRAINT "decision_build_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id")
 		)` + t.suffix,
 	}
 }
@@ -538,12 +528,26 @@ func statementTextBaseline(t *columnTypes) []string {
 	}
 }
 
-// claimV0100 is the baseline's declaration of the claim table, under the name
-// v0.11.0's declaration of it reads.
-func claimV0100(t *columnTypes) []string {
-	made, indexes, err := pick(triageBaseline(t), "claim")
-	if err != nil {
-		panic(err)
+// decisionStampBaseline declares the stamp each decision's
+// writers match on.
+func decisionStampBaseline(t *columnTypes) []string {
+	return []string{
+		// Changed by a code finding's flaw record resting on the decision, and by
+		// revising, withdrawing, approving, setting aside, sending back or
+		// undoing the approval of it, each matching the value it read. A write
+		// matching none lost a race with another and is taken again, so a
+		// flaw record and a withdrawal of the decision it rests on cannot both
+		// commit. A decision with no row here holds the stamp zero.
+		//
+		// A row of its own, which no foreign key points at: InnoDB locks
+		// the parent row of every child it checks, so a stamp on the decision
+		// row waits on any transaction that inserted a row naming the
+		// decision.
+		`CREATE TABLE "decision_stamp" (
+			"decision_id"    ` + t.ref + ` NOT NULL,
+			"stamp"          INTEGER NOT NULL,
+			CONSTRAINT "decision_stamp_pk" PRIMARY KEY ("decision_id"),
+			CONSTRAINT "decision_stamp_decision_fk" FOREIGN KEY ("decision_id") REFERENCES "decision"("id")
+		)` + t.suffix,
 	}
-	return append([]string{made}, indexes...)
 }

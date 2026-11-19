@@ -4,17 +4,14 @@
 // Command rehearsal carries a database a tagged release built through an
 // upgrade to this tree, and checks what arrives.
 //
-//	rehearsal -from v0.10.2 -engine postgres -dir .demo/rehearsal
+//	rehearsal -from v0.12.0 -engine postgres -dir .demo/rehearsal
 //
 // A server engine's URL is read from OPENPSIRT_TEST_<ENGINE>_URL, the variable
 // the test suite reads, so the password is never on the command line.
 //
 // The release seeds its own database: its image is built from its own tag,
 // and its own demo targets declare the products, upload the inventories, let
-// the scans land and record the VEX document, the judgments and the flaw. Below
-// v0.11.0 the rehearsal then acknowledges every report through the release's
-// API, since migration 45 turns each acknowledgement into a message sent and
-// no release's seed acknowledges one. That
+// the scans land and record the VEX document, the judgments and the flaw. That
 // is the data a deployment of that release actually holds, which no fixture
 // written today can stand in for. The tag's targets run unedited; only the
 // docker command they call is wrapped, so its containers, network and ports
@@ -44,7 +41,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -100,7 +96,7 @@ func main() {
 	r := run{client: proxyClient()}
 	var dir string
 	var keep bool
-	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.10.2")
+	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.12.0")
 	flag.StringVar(&r.engine, "engine", "", "sqlite, postgres, mysql or mariadb")
 	flag.StringVar(&dir, "dir", ".demo/rehearsal", "where the run keeps what it makes")
 	flag.StringVar(&r.grype, "grype", "", "the scanner's database directory, shared between runs")
@@ -230,17 +226,11 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err := r.cmd(ctx, r.tag, env, "make", append([]string{"demo-up", "demo-seed"}, overrides...)...); err != nil {
 		return nil, err
 	}
-	seeded, err := r.settle(ctx, overrides, env)
-	if err != nil {
+	if _, err := r.settle(ctx, overrides, env); err != nil {
 		return nil, err
 	}
 	if err := r.cmd(ctx, r.tag, env, "make", append([]string{"demo-vex", "demo-triage", "demo-flaw"}, overrides...)...); err != nil {
 		return nil, err
-	}
-	if record.Last < renamesV0110 {
-		if err := r.answer(ctx, seeded); err != nil {
-			return nil, err
-		}
 	}
 	before, err := r.settle(ctx, overrides, env)
 	if err != nil {
@@ -261,22 +251,18 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var acknowledged int64
-	if record.Last < renamesV0110 {
-		if acknowledged, err = r.acknowledged(ctx); err != nil {
-			return nil, err
-		}
-	}
-	filled := FilledV0110(record.Last, acknowledged)
-	// Every count below is under the name this tree gives its table.
-	held = AsRenamed(record.Last, held, migrations.TablesRenamedV0110())
 	r.note("%d tables, %d findings, %d decisions, %d decision occurrences", len(held), held["finding"],
 		held["decision"], held["decision_occurrence"])
 	// An upgrade of an empty database passes every check here, so a seed
 	// that filled nothing is a failed rehearsal rather than a clean one.
-	if empty := Unseeded(record.Last, held, acknowledged); len(empty) > 0 {
+	if empty := Unseeded(held); len(empty) > 0 {
 		return nil, fmt.Errorf("%s's seed left nothing in %s, so an upgrade of it would check nothing",
 			r.from, strings.Join(empty, ", "))
+	}
+
+	filled, err := r.filled(ctx, record.Last)
+	if err != nil {
+		return nil, err
 	}
 
 	r.step("migrated to %d by this tree", current)
@@ -488,65 +474,54 @@ func (r *run) count(ctx context.Context, tables []string, required map[string]bo
 	}, r.log)
 }
 
-// answer acknowledges every report the release holds against a product it
-// reported a build of, through the release's own API as the administrator.
-func (r *run) answer(ctx context.Context, builds Totals) error {
-	products := map[string]bool{}
-	for build := range builds {
-		products[strings.SplitN(build, "/", 2)[0]] = true
-	}
-	answered := 0
-	for _, product := range slices.Sorted(maps.Keys(products)) {
-		at := "/v1/products/" + url.PathEscape(product) + "/reports"
-		status, body, err := r.do(ctx, http.MethodGet, at+"?limit=200")
-		if err != nil {
-			return err
-		}
-		if status != http.StatusOK {
-			return fmt.Errorf("%s's reports for %s: %d %s", r.from, product, status, head(body))
-		}
-		var page struct {
-			Items []struct {
-				Reference    string `json:"reference"`
-				Acknowledged string `json:"acknowledged"`
-			} `json:"items"`
-		}
-		if err := json.Unmarshal(body, &page); err != nil {
-			return fmt.Errorf("%s's reports for %s: %w", r.from, product, err)
-		}
-		for _, report := range page.Items {
-			if report.Acknowledged != "" {
-				continue
-			}
-			status, body, err := r.do(ctx, http.MethodPost, at+"/"+url.PathEscape(report.Reference)+"/acknowledgement")
-			if err != nil {
-				return err
-			}
-			if status != http.StatusNoContent {
-				return fmt.Errorf("acknowledge %s in %s: %d %s", report.Reference, product, status, head(body))
-			}
-			answered++
-		}
-	}
-	r.note("acknowledged %d reports", answered)
-	return nil
+// fills is every table a migration writes from what a release held elsewhere,
+// with its rows worked out from the release's database.
+func fills(ctx context.Context, db *database.DB) []Fill {
+	return []Fill{{Migration: migrations.ComponentNamesV0140, Table: "component_name",
+		Rows: func() (int64, error) {
+			var n int64
+			err := each(ctx, db, `SELECT COALESCE("purl", ''), COALESCE("name_folded", '') FROM "component"`,
+				func(purl, folded string) { n += migrations.NamesV0140(purl, folded) })
+			return n, err
+		}}}
 }
 
-// acknowledged reads how many reports a release before v0.11.0 recorded as
-// acknowledged, each of which the upgrade writes as a message sent. A stamp
-// missing who made it is stepped over by the upgrade, and here.
-func (r *run) acknowledged(ctx context.Context) (int64, error) {
+// filled is the rows the upgrade from a release whose last migration is given
+// writes into each table it fills, read from the release's database before the
+// upgrade runs.
+func (r *run) filled(ctx context.Context, fromLast int64) (Counts, error) {
 	db, err := connect(ctx, r.hostURL)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer func() { _ = db.Close() }()
-	var n int64
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "flaw_report"
-		WHERE "acknowledged_at" IS NOT NULL AND "acknowledged_by" IS NOT NULL`).Scan(&n); err != nil {
-		return 0, fmt.Errorf("count the acknowledged reports: %w", err)
+	out := Counts{}
+	for _, f := range Owed(fromLast, fills(ctx, db)) {
+		n, err := f.Rows()
+		if err != nil {
+			return nil, fmt.Errorf("work out what fills %s: %w", f.Table, err)
+		}
+		out[f.Table] += n
+		r.note("%s is filled with %d rows", f.Table, n)
 	}
-	return n, nil
+	return out, nil
+}
+
+// each runs a query of two text columns and hands every row to row.
+func each(ctx context.Context, db *database.DB, query string, row func(a, b string)) error {
+	rows, err := db.QueryContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var a, b string
+		if err := rows.Scan(&a, &b); err != nil {
+			return err
+		}
+		row(a, b)
+	}
+	return rows.Err()
 }
 
 // container is what every run of this tree's image shares: the release's
@@ -884,8 +859,8 @@ func releaseCount(fromTables []string) (tables []string, required map[string]boo
 // version applied, and which of them must be counted, or the fault when it
 // fell short of current. A schema short of this tree's lacks tables this tree
 // declares, so counting them would bury the fault under a missing table. A
-// name only the release used is gone after the renames, so only this tree's
-// own tables are required.
+// name only the release used may be gone after the upgrade, so only this
+// tree's own tables are required.
 func upgradedCount(applied, current int64, fromTables, tree []string) (tables []string, required map[string]bool, fault string) {
 	if applied != current {
 		return nil, nil, fmt.Sprintf("the upgrade reached schema version %d, and this tree carries %d", applied, current)

@@ -230,7 +230,7 @@ func advisoryJudgmentBaseline(t *columnTypes) []string {
 			"product_id"       ` + t.ref + ` NOT NULL,
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
 			-- The release, as the stream and the variant it was built from.
-			"stream_id"        ` + t.ref + ` NOT NULL,
+			"branch_or_tag_id"        ` + t.ref + ` NOT NULL,
 			"variant_id"       ` + t.ref + ` NOT NULL,
 			"set_at"           ` + t.timestamp + ` NOT NULL,
 			"set_by"           ` + t.ref + ` NOT NULL,
@@ -240,15 +240,15 @@ func advisoryJudgmentBaseline(t *columnTypes) []string {
 			"removed_at"       ` + t.timestamp + ` NULL,
 			"removed_by"       ` + t.refNull + ` NULL,
 			CONSTRAINT "advisory_override_once" UNIQUE
-				("advisory_id", "product_id", "vulnerability_id", "stream_id", "variant_id"),
+				("advisory_id", "product_id", "vulnerability_id", "branch_or_tag_id", "variant_id"),
 			CONSTRAINT "advisory_override_advisory_fk"
 				FOREIGN KEY ("advisory_id") REFERENCES "advisory"("id"),
 			CONSTRAINT "advisory_override_product_fk"
 				FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "advisory_override_vulnerability_fk"
 				FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
-			CONSTRAINT "advisory_override_stream_fk"
-				FOREIGN KEY ("stream_id") REFERENCES "stream"("id"),
+			CONSTRAINT "advisory_override_branch_or_tag_fk"
+				FOREIGN KEY ("branch_or_tag_id") REFERENCES "branch_or_tag"("id"),
 			CONSTRAINT "advisory_override_variant_fk"
 				FOREIGN KEY ("variant_id") REFERENCES "variant"("id"),
 			CONSTRAINT "advisory_override_by_fk"
@@ -266,7 +266,7 @@ func advisoryJudgmentBaseline(t *columnTypes) []string {
 			"approval_id"      ` + t.ref + ` NOT NULL,
 			"product_id"       ` + t.ref + ` NOT NULL,
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
-			"stream_id"        ` + t.ref + ` NOT NULL,
+			"branch_or_tag_id"        ` + t.ref + ` NOT NULL,
 			"variant_id"       ` + t.ref + ` NOT NULL,
 			-- The standard's word for it: known_affected, known_not_affected
 			-- or fixed.
@@ -277,8 +277,8 @@ func advisoryJudgmentBaseline(t *columnTypes) []string {
 				FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "advisory_agreed_status_vulnerability_fk"
 				FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
-			CONSTRAINT "advisory_agreed_status_stream_fk"
-				FOREIGN KEY ("stream_id") REFERENCES "stream"("id"),
+			CONSTRAINT "advisory_agreed_status_branch_or_tag_fk"
+				FOREIGN KEY ("branch_or_tag_id") REFERENCES "branch_or_tag"("id"),
 			CONSTRAINT "advisory_agreed_status_variant_fk"
 				FOREIGN KEY ("variant_id") REFERENCES "variant"("id")
 		)` + t.suffix,
@@ -306,7 +306,7 @@ func advisoryJudgmentBaseline(t *columnTypes) []string {
 // to a row rather than a different supplier.
 func advisorySourceBaseline(t *columnTypes) []string {
 	return []string{
-		`CREATE TABLE "advisory_source" (
+		`CREATE TABLE "supplier_advisory_feed" (
 			"id"           ` + t.id + `,
 			"product_id"   ` + t.ref + ` NOT NULL,
 			-- What it is called, lowered, which is what a name typed here is
@@ -352,10 +352,10 @@ func advisorySourceBaseline(t *columnTypes) []string {
 			-- what was taken from where is a question asked afterwards, and
 			-- the claims already recorded name this publisher.
 			"retired_at"   ` + t.timestamp + ` NULL,
-			CONSTRAINT "advisory_source_named_once" UNIQUE ("product_id", "name"),
-			CONSTRAINT "advisory_source_product_fk" FOREIGN KEY ("product_id")
+			CONSTRAINT "supplier_advisory_feed_named_once" UNIQUE ("product_id", "name"),
+			CONSTRAINT "supplier_advisory_feed_product_fk" FOREIGN KEY ("product_id")
 				REFERENCES "product"("id"),
-			CONSTRAINT "advisory_source_by_fk" FOREIGN KEY ("created_by")
+			CONSTRAINT "supplier_advisory_feed_by_fk" FOREIGN KEY ("created_by")
 				REFERENCES "person"("id")
 		)` + t.suffix,
 
@@ -363,7 +363,7 @@ func advisorySourceBaseline(t *columnTypes) []string {
 		// product, the one longest untried first. Without it that is a scan of
 		// the table on every cycle, over a table whose size is the number of
 		// products an estate holds times the publishers each reads from.
-		`CREATE INDEX "advisory_source_due_idx" ON "advisory_source"
+		`CREATE INDEX "supplier_advisory_feed_due_idx" ON "supplier_advisory_feed"
 			("retired_at", "fetched_at")`,
 	}
 }
@@ -397,7 +397,7 @@ func advisorySourceBaseline(t *columnTypes) []string {
 // dismissal somebody approved, and a digest is how that is seen at all.
 func vexBaseline(t *columnTypes) []string {
 	return []string{
-		`CREATE TABLE "vex_statement" (
+		`CREATE TABLE "received_vex_statement" (
 			"id"          ` + t.id + `,
 			"product_id"  ` + t.ref + ` NOT NULL,
 			-- Who published it, as the document's author names itself,
@@ -499,14 +499,14 @@ func vexBaseline(t *columnTypes) []string {
 			-- nobody declined.
 			"declined_at" ` + t.timestamp + ` NULL,
 			"declined_by" ` + t.refNull + ` NULL,
-			CONSTRAINT "vex_statement_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
-			CONSTRAINT "vex_statement_by_fk" FOREIGN KEY ("uploaded_by") REFERENCES "person"("id")
+			CONSTRAINT "received_vex_statement_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "received_vex_statement_by_fk" FOREIGN KEY ("uploaded_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
 		// The key a finding looks one up by: the product, the issue's name and
 		// the component's. Only what still stands, which is the common read.
-		`CREATE INDEX "vex_statement_about_idx"
-			ON "vex_statement" ("product_id", "vulnerability", "component", "superseded_at")`,
+		`CREATE INDEX "received_vex_statement_about_idx"
+			ON "received_vex_statement" ("product_id", "vulnerability", "component", "superseded_at")`,
 
 		// The key an upload sets aside what it replaces by, and asks what it
 		// already holds by. The index above shares only its first column, so
@@ -516,15 +516,9 @@ func vexBaseline(t *columnTypes) []string {
 		// triagers reading at the same time. A publisher issues one statement
 		// set and hundreds of advisories, so that read is the ordinary
 		// operation rather than a rare one.
-		`CREATE INDEX "vex_statement_from_idx"
-			ON "vex_statement" ("product_id", "publisher", "source", "document_id", "superseded_at")`,
+		`CREATE INDEX "received_vex_statement_from_idx"
+			ON "received_vex_statement" ("product_id", "publisher", "source", "document_id", "superseded_at")`,
 	}
-}
-
-// vexStatementV0100 is the baseline's declaration of a supplier's statements,
-// under the name v0.11.0's declaration of the table reads.
-func vexStatementV0100(t *columnTypes) []string {
-	return vexBaseline(t)
 }
 
 // A generated VEX document going out.
@@ -547,13 +541,13 @@ func vexStatementV0100(t *columnTypes) []string {
 // yes or no.
 func vexIssuanceBaseline(t *columnTypes) []string {
 	return []string{
-		`CREATE TABLE "vex_issuance" (
+		`CREATE TABLE "published_vex" (
 			"id"        ` + t.id + `,
 			-- The build the document is about, which is what its identifier
 			-- names: one release built one way. A document about a second
 			-- build is a different document rather than a revision of this
 			-- one.
-			"target_id" ` + t.ref + ` NOT NULL,
+			"build_id" ` + t.ref + ` NOT NULL,
 			-- Which document about the build went out: what this deployment
 			-- agreed to, or that with what suppliers state about their own
 			-- products beside it. Each is a document of its own, so a reader
@@ -574,10 +568,10 @@ func vexIssuanceBaseline(t *columnTypes) []string {
 			"document"  ` + t.free + ` NOT NULL,
 			"issued_by" ` + t.ref + ` NOT NULL,
 			"issued_at" ` + t.timestamp + ` NOT NULL,
-			CONSTRAINT "vex_issuance_once_per_kind" UNIQUE ("target_id", "kind", "ordinal"),
-			CONSTRAINT "vex_issuance_target_fk"
-				FOREIGN KEY ("target_id") REFERENCES "target"("id"),
-			CONSTRAINT "vex_issuance_by_fk" FOREIGN KEY ("issued_by") REFERENCES "person"("id")
+			CONSTRAINT "published_vex_once_per_kind" UNIQUE ("build_id", "kind", "ordinal"),
+			CONSTRAINT "published_vex_build_fk"
+				FOREIGN KEY ("build_id") REFERENCES "build"("id"),
+			CONSTRAINT "published_vex_by_fk" FOREIGN KEY ("issued_by") REFERENCES "person"("id")
 		)` + t.suffix,
 	}
 }

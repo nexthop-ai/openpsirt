@@ -124,6 +124,7 @@ func TestTheV0140UpgradeKeepsEveryNameAComponentGoesBy(t *testing.T) {
 		}
 		dbtest.MigrateTo(t, db, v0140)
 		held()
+		countedAsWritten(t, db)
 		if _, err := db.ExecContext(ctx, `DELETE FROM "component_name" WHERE "component_id" IN (?)`,
 			bun.List([]int64{renamed, scoped})); err != nil {
 			t.Fatal(err)
@@ -133,6 +134,31 @@ func TestTheV0140UpgradeKeepsEveryNameAComponentGoesBy(t *testing.T) {
 		held()
 		leaveAtLatest(t, ctx, db)
 	})
+}
+
+// countedAsWritten fails unless the names a rehearsal works out from the
+// components match the rows the upgrade wrote, since a rehearsal holds the
+// upgrade's fill to that count.
+func countedAsWritten(t *testing.T, db *database.DB) {
+	t.Helper()
+	var components []struct {
+		Purl   string `bun:"purl"`
+		Folded string `bun:"name_folded"`
+	}
+	if err := db.DB.NewRaw(`SELECT COALESCE("purl", '') AS "purl", COALESCE("name_folded", '') AS "name_folded" FROM "component"`).
+		Scan(t.Context(), &components); err != nil {
+		t.Fatal(err)
+	}
+	var counted, written int64
+	for _, c := range components {
+		counted += migrations.NamesV0140(c.Purl, c.Folded)
+	}
+	if err := db.DB.NewRaw(`SELECT COUNT(*) FROM "component_name"`).Scan(t.Context(), &written); err != nil {
+		t.Fatal(err)
+	}
+	if counted != written {
+		t.Errorf("a rehearsal counts %d names for the components, and the upgrade wrote %d", counted, written)
+	}
 }
 
 // The upgrade carries its own copy of the rule naming a component's package,

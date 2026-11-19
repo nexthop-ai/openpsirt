@@ -18,7 +18,7 @@ func TestPostgresVacuumsFindingsAfterAFiftiethChanges(t *testing.T) {
 	dbtest.Only(t, database.Postgres, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0100)
+		dbtest.MigrateTo(t, db, v0120)
 
 		var options []string
 		rows, err := db.QueryContext(ctx, `SELECT unnest("c"."reloptions")

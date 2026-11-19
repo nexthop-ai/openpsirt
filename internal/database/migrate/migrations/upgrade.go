@@ -233,37 +233,6 @@ func (u *upgrader) change(statements []string, c change) error {
 	return u.run(stmts)
 }
 
-// widen gives an existing table's column the wider type the release declares
-// it at, keeping whether it takes a null. Declaring the same type again changes
-// nothing, so a start that stopped after it runs it again safely. SQLite bounds
-// no text, so there the table stands as it is.
-func (u *upgrader) widen(statements []string, table, column string) error {
-	made, _, err := pick(statements, table)
-	if err != nil {
-		return err
-	}
-	items, err := declared(made)
-	if err != nil {
-		return err
-	}
-	def, err := items.column(column)
-	if err != nil {
-		return err
-	}
-	switch u.engine {
-	case database.SQLite:
-		return nil
-	case database.Postgres:
-		fields := strings.Fields(def)
-		if len(fields) < 2 {
-			return fmt.Errorf("no type is declared for %s on %s", column, table)
-		}
-		return u.run([]string{`ALTER TABLE "` + table + `" ALTER COLUMN "` + column + `" TYPE ` + fields[1]})
-	default:
-		return u.run([]string{`ALTER TABLE "` + table + `" MODIFY COLUMN ` + def})
-	}
-}
-
 // index makes the named indexes on a table as the release declares them. An
 // index of that name the table already has is replaced. The table is left
 // where it stands on every engine, SQLite included: an index is made and
@@ -546,26 +515,6 @@ func (u *upgrader) hasColumn(table, column string) (bool, error) {
 	return exists(u.ctx, u.tx, fmt.Sprintf("%s has column %s", table, column), query, table, column)
 }
 
-// dropDefault drops a column's default on the three servers where it holds
-// one, and changes nothing where it holds none, so a start that stopped after
-// it runs it again safely. A column declared NOT NULL with no default reports
-// a null default on each. SQLite cannot drop a default where a table stands,
-// and fills a column in a rebuild declaring none, so there it is never asked.
-func (u *upgrader) dropDefault(table, column string) error {
-	if u.engine == database.SQLite {
-		return nil
-	}
-	query := postgresColumnProbe + ` AND "column_default" IS NOT NULL`
-	if u.engine != database.Postgres {
-		query = mysqlColumnProbe + ` AND "COLUMN_DEFAULT" IS NOT NULL`
-	}
-	held, err := exists(u.ctx, u.tx, fmt.Sprintf("%s.%s has a default", table, column), query, table, column)
-	if err != nil || !held {
-		return err
-	}
-	return u.run([]string{`ALTER TABLE "` + table + `" ALTER COLUMN "` + column + `" DROP DEFAULT`})
-}
-
 // releaseUpgrade runs a release's upgrade to version as inV020 does, and
 // writes the record of the change in the same transaction. Every release's
 // migration from v0.13.0's on runs through it.
@@ -607,4 +556,33 @@ func changeRecorded(ctx context.Context, tx bun.Tx, version int64) error {
 		return fmt.Errorf("record the schema change: %w", err)
 	}
 	return nil
+}
+
+// hasForeignKey reports whether a table holds a foreign key of this name. A
+// key on SQLite is part of the table and has no name the catalog answers, so
+// it is asked only of the server engines.
+func (u *upgrader) hasForeignKey(table, name string) (bool, error) {
+	query := `SELECT 1 FROM "information_schema"."TABLE_CONSTRAINTS"
+		WHERE "CONSTRAINT_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "CONSTRAINT_NAME" = ?
+		  AND "CONSTRAINT_TYPE" = 'FOREIGN KEY' LIMIT 1`
+	if u.engine == database.Postgres {
+		query = `SELECT 1 FROM "information_schema"."table_constraints"
+			WHERE "constraint_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "constraint_name" = ?
+			  AND "constraint_type" = 'FOREIGN KEY'`
+	}
+	return exists(u.ctx, u.tx, fmt.Sprintf("%s has foreign key %s", table, name), query, table, name)
+}
+
+// hasTable reports whether a table of this name is there.
+func (u *upgrader) hasTable(table string) (bool, error) {
+	query := `SELECT 1 FROM "information_schema"."TABLES"
+		WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? LIMIT 1`
+	switch u.engine {
+	case database.Postgres:
+		query = `SELECT 1 FROM "information_schema"."tables"
+			WHERE "table_schema" = CURRENT_SCHEMA() AND "table_name" = ?`
+	case database.SQLite:
+		query = `SELECT 1 FROM "sqlite_master" WHERE "type" = 'table' AND "name" = ?`
+	}
+	return exists(u.ctx, u.tx, "there is a table "+table, query, table)
 }

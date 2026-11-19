@@ -18,19 +18,19 @@ func init() {
 	goose.AddMigrationContext(upBaseline, nil)
 }
 
-// Baseline is the migration that makes v0.10.0's schema, the version a
-// database v0.10.x built records.
-const Baseline = 44
+// Baseline is the migration that makes v0.12.0's schema, the version a
+// database v0.12.0 built records.
+const Baseline = 46
 
-// The schema v0.10.0 built, made directly on an empty database.
+// The schema v0.12.0 built, made directly on an empty database.
 //
-// Numbered as v0.10.0's last migration, so a database v0.10.x built has it
+// Numbered as v0.12.0's last migration, so a database v0.12.0 built has it
 // recorded already and applies only what follows. A database an earlier
 // release built records a version below it, and is refused before anything
 // runs (design-docs/database-migrations.md § The baseline).
 //
 // The baseline files beside this one hold each table's declaration, with the
-// reasoning for its shape. v0.10.0's record of the schema it built on each
+// reasoning for its shape. v0.12.0's record of the schema it built on each
 // engine is what holds them to it.
 //
 // Its statements are bounded in their wait for a lock as every migration's
@@ -90,9 +90,11 @@ var baseline = []baselineTable{
 
 	// What is built, and who may see it.
 	{"product", catalogBaseline},
-	{"stream", catalogBaseline},
+	{"branch_or_tag", catalogBaseline},
 	{"variant", catalogBaseline},
-	{"target", catalogBaseline},
+	{"build", catalogBaseline},
+	{"repository_host", repositoryBaseline},
+	{"repository_path", repositoryBaseline},
 	{"party", accessBaseline},
 	{"person", accessBaseline},
 	{"person_identity", accessBaseline},
@@ -106,6 +108,7 @@ var baseline = []baselineTable{
 	{"role_grant_all", accessBaseline},
 	{"team", teamBaseline},
 	{"team_member", teamBaseline},
+	{"assignment_rule", routingBaseline},
 	{"admin_change", trailBaseline},
 	{"upgrade", upgradeBaseline},
 
@@ -118,6 +121,14 @@ var baseline = []baselineTable{
 	{"graph_node", graphNodeBaseline},
 	{"graph_edge", graphEdgeBaseline},
 	{"image_version", imageVersionBaseline},
+
+	// What an analyzer said, run by run.
+	{"series", seriesBaseline},
+	{"series_run", seriesBaseline},
+	{"series_document", seriesBaseline},
+	{"series_document_chunk", seriesBaseline},
+	{"series_module", seriesBaseline},
+	{"series_refusal", seriesBaseline},
 
 	// The issues, and what is known about them.
 	{"vulnerability", vulnerabilityBaseline},
@@ -132,40 +143,58 @@ var baseline = []baselineTable{
 
 	// Findings, and the judgments about them.
 	{"scan_run", issueBaseline},
-	{"claim", triageBaseline},
-	{"claim_revision", triageBaseline},
-	{"claim_approval", triageBaseline},
-	{"claim_comment", triageBaseline},
-	{"claim_comment_revision", commentHistoryBaseline},
-	{"claim_build", claimBuildBaseline},
 	{"decision", triageBaseline},
+	{"decision_revision", triageBaseline},
+	{"decision_approval", triageBaseline},
+	{"decision_comment", triageBaseline},
+	{"decision_comment_revision", commentHistoryBaseline},
+	{"decision_build", claimBuildBaseline},
+	{"decision_occurrence", triageBaseline},
+	{"decision_stamp", decisionStampBaseline},
 	{"statement_text", statementTextBaseline},
 	{"suppression", suppressionBaseline},
 	{"finding", findingBaseline},
-	{"finding_tag", tagBaseline},
+	{"finding_label", tagBaseline},
 	{"assessment", assessmentBaseline},
 	{"vulnerability_merge", mergeBaseline},
-	{"decision_superseded", mergeBaseline},
+	{"decision_occurrence_superseded", mergeBaseline},
 	{"case_collaborator", collaboratorBaseline},
+	{"sighting", seriesBaseline},
+	{"analysis_result", analysisBaseline},
+	{"analysis_location", analysisBaseline},
+	{"suppression_rule", codeFindingBaseline},
+	{"rule_rating", codeFindingBaseline},
+	{"rule_family", codeFindingBaseline},
+	{"code_finding_flaw", codeFindingBaseline},
+	{"flaw_code_finding", codeFindingBaseline},
+	{"flaw_code_finding_build", codeFindingBaseline},
+	{"code_finding_component", codeFindingBaseline},
+	{"code_finding_collaborator", codeFindingBaseline},
 
 	// Flaws reported here, and what answers them.
 	{"report_ruling", rulingBaseline},
 	{"flaw_report", flawReportBaseline},
+	{"flaw_report_revision", flawReportBaseline},
+	{"report_note", flawReportBaseline},
+	{"report_note_revision", flawReportBaseline},
+	{"report_message", flawReportBaseline},
+	{"report_assignment", flawReportBaseline},
 	{"report_ruled", rulingBaseline},
 	{"attachment", attachmentBaseline},
 	{"disclosure_movement", disclosureMovementBaseline},
-	{"obligation_window", obligationBaseline},
-	{"obligation_window_product", obligationBaseline},
-	{"exploited_here", obligationBaseline},
+	{"response_window", obligationBaseline},
+	{"response_window_product", obligationBaseline},
+	{"incident", obligationBaseline},
 	{"told_outside", obligationBaseline},
 	{"told_place", obligationBaseline},
-	{"exploited_fix", obligationBaseline},
+	{"incident_fix", obligationBaseline},
 	{"patch_repository", patchBranchBaseline},
 	{"patch_commit", patchBranchBaseline},
 	{"patch_commit_branch", patchBranchBaseline},
 
 	// What is published.
-	{"advisory_source", advisorySourceBaseline},
+	{"supplier_advisory_feed", advisorySourceBaseline},
+	{"document_upload", documentUploadBaseline},
 	{"advisory", advisoryBaseline},
 	{"advisory_edition", advisoryBaseline},
 	{"advisory_approval", advisoryBaseline},
@@ -173,18 +202,33 @@ var baseline = []baselineTable{
 	{"advisory_issue", advisoryBaseline},
 	{"advisory_override", advisoryJudgmentBaseline},
 	{"advisory_agreed_status", advisoryJudgmentBaseline},
-	{"vex_statement", vexBaseline},
-	{"vex_issuance", vexIssuanceBaseline},
+	{"received_vex_statement", vexBaseline},
+	{"published_vex", vexIssuanceBaseline},
 	{"published_document", publishedDocumentBaseline},
 	{"upstream", upstreamBaseline},
 	{"upstream_document", upstreamBaseline},
 
 	// Who is told, and how.
 	{"notification", notificationBaseline},
-	{"routing_rule", routingBaseline},
 	{"outbound", outboundBaseline},
 	{"outbound_delivery", outboundDeliveryBaseline},
 	{"chat_preference", chatBaseline},
 	{"chat_delivery", chatBaseline},
 	{"saved_filter", savedFilterBaseline},
+}
+
+// declaredV0110 is the baseline's declaration of one table and the indexes it
+// makes, under the name the v0.13.0 and v0.14.0 upgrades read it by.
+func declaredV0110(t *columnTypes, table string) []string {
+	for _, each := range baseline {
+		if each.table != table {
+			continue
+		}
+		made, indexes, err := pick(each.declared(t), table)
+		if err != nil {
+			panic(err)
+		}
+		return append([]string{made}, indexes...)
+	}
+	panic("the baseline makes no table " + table)
 }

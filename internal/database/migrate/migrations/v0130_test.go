@@ -688,3 +688,26 @@ func fixStatePartV0130() partV0130 {
 		}
 	}}
 }
+
+// seedScanV0120 seeds a v0.12.0 build with one inventory, and answers the
+// inventory's scan.
+func seedScanV0120(t *testing.T, db *database.DB) int64 {
+	t.Helper()
+	ctx := t.Context()
+	at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
+	exec, id := seedSQL(ctx, db)
+	exec(t, `INSERT INTO "product" ("name", "display_name", "created_at") VALUES (?, ?, ?)`, "p", "P", at)
+	product := id(t, `SELECT MAX("id") FROM "product"`)
+	exec(t, `INSERT INTO "branch_or_tag" ("product_id", "name", "display_name", "kind", "created_at")
+		VALUES (?, ?, ?, ?, ?)`, product, "main", "main", "branch", at)
+	line := id(t, `SELECT MAX("id") FROM "branch_or_tag"`)
+	exec(t, `INSERT INTO "variant" ("product_id", "name", "display_name", "customer_facing", "created_at")
+		VALUES (?, ?, ?, ?, ?)`, product, "image", "Image", true, at)
+	variant := id(t, `SELECT MAX("id") FROM "variant"`)
+	exec(t, `INSERT INTO "build" ("branch_or_tag_id", "variant_id", "created_at") VALUES (?, ?, ?)`, line, variant, at)
+	build := id(t, `SELECT MAX("id") FROM "build"`)
+	exec(t, `INSERT INTO "scan" ("build_id", "content_hash", "built_at", "received_at", "parser_version",
+		"status", "components") VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		build, "hash", at.Add(time.Hour), at.Add(time.Hour), "test", "accepted", 1)
+	return id(t, `SELECT MAX("id") FROM "scan"`)
+}

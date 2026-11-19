@@ -123,7 +123,7 @@ func graphNodeBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "graph_node" (
 			"id"             ` + t.id + `,
-			"target_id"      ` + t.ref + ` NOT NULL,
+			"build_id"      ` + t.ref + ` NOT NULL,
 			"component_id"   ` + t.ref + ` NOT NULL,
 			"is_root"        ` + t.boolean + ` NOT NULL,
 			"opened_scan_id" ` + t.ref + ` NOT NULL,
@@ -143,20 +143,21 @@ func graphNodeBaseline(t *columnTypes) []string {
 			-- A scanner is given these.
 			"upstream_name"    ` + t.free + ` NULL,
 			"upstream_version" ` + t.free + ` NULL,
-			CONSTRAINT "graph_node_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
+			-- The version-control address this build stated the component is
+			-- built from, without credentials. An analyzer's result in that
+			-- repository is placed on the component.
+			"repository"       ` + t.free + ` NULL,
+			CONSTRAINT "graph_node_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
 			CONSTRAINT "graph_node_component_fk" FOREIGN KEY ("component_id") REFERENCES "component"("id"),
 			CONSTRAINT "graph_node_opened_fk" FOREIGN KEY ("opened_scan_id") REFERENCES "scan"("id"),
 			CONSTRAINT "graph_node_closed_fk" FOREIGN KEY ("closed_scan_id") REFERENCES "scan"("id")
 		)` + t.suffix,
 
-		`CREATE INDEX "graph_node_current_idx" ON "graph_node" ("target_id", "closed_scan_id", "component_id")`,
+		`CREATE INDEX "graph_node_current_idx" ON "graph_node" ("build_id", "closed_scan_id", "component_id")`,
+		// Every root a build has had, live or closed. A node is never
+		// deleted, so without it that read walks the build's whole history.
+		`CREATE INDEX "graph_node_root_idx" ON "graph_node" ("build_id", "is_root", "component_id", "closed_scan_id")`,
 	}
-}
-
-// graphNodeV090 is the baseline's declaration of the graph node table, under
-// the name v0.11.0's declaration of it reads.
-func graphNodeV090(t *columnTypes) []string {
-	return graphNodeBaseline(t)
 }
 
 // The dependency graph, and the components in it.
@@ -174,7 +175,7 @@ func graphEdgeBaseline(t *columnTypes) []string {
 
 		`CREATE TABLE "graph_edge" (
 			"id"             ` + t.id + `,
-			"target_id"      ` + t.ref + ` NOT NULL,
+			"build_id"      ` + t.ref + ` NOT NULL,
 			"parent_id"      ` + t.ref + ` NOT NULL,
 			"child_id"       ` + t.ref + ` NOT NULL,
 			-- What the producer said this dependency's scope is, in its own
@@ -195,13 +196,13 @@ func graphEdgeBaseline(t *columnTypes) []string {
 			"kind"           ` + t.kind + ` NOT NULL,
 			"opened_scan_id" ` + t.ref + ` NOT NULL,
 			"closed_scan_id" ` + t.refNull + ` NULL,
-			CONSTRAINT "graph_edge_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
+			CONSTRAINT "graph_edge_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
 			CONSTRAINT "graph_edge_parent_fk" FOREIGN KEY ("parent_id") REFERENCES "graph_node"("id"),
 			CONSTRAINT "graph_edge_child_fk" FOREIGN KEY ("child_id") REFERENCES "graph_node"("id"),
 			CONSTRAINT "graph_edge_opened_fk" FOREIGN KEY ("opened_scan_id") REFERENCES "scan"("id"),
 			CONSTRAINT "graph_edge_closed_fk" FOREIGN KEY ("closed_scan_id") REFERENCES "scan"("id")
 		)` + t.suffix,
-		`CREATE INDEX "graph_edge_current_idx" ON "graph_edge" ("target_id", "closed_scan_id", "parent_id", "child_id")`,
+		`CREATE INDEX "graph_edge_current_idx" ON "graph_edge" ("build_id", "closed_scan_id", "parent_id", "child_id")`,
 		`CREATE INDEX "graph_edge_child_idx" ON "graph_edge" ("child_id", "closed_scan_id")`,
 	}
 }
@@ -233,4 +234,10 @@ func imageVersionBaseline(t *columnTypes) []string {
 		// apply reads the open rows of a build's images, through the node.
 		`CREATE INDEX "image_version_node_idx" ON "image_version" ("node_id", "closed_scan_id")`,
 	}
+}
+
+// graphNodeV0110 is the baseline's declaration of the graph node table, under
+// the name the v0.13.0 upgrade reads it by.
+func graphNodeV0110(t *columnTypes) []string {
+	return graphNodeBaseline(t)
 }

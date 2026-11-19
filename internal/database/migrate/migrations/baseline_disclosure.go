@@ -82,7 +82,7 @@ func disclosureMovementBaseline(t *columnTypes) []string {
 func obligationBaseline(t *columnTypes) []string {
 	return []string{
 
-		`CREATE TABLE "exploited_here" (
+		`CREATE TABLE "incident" (
 			"id"               ` + t.id + `,
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
 			-- The product that was attacked. Recording one and clearing one
@@ -123,29 +123,34 @@ func obligationBaseline(t *columnTypes) []string {
 			-- one, and this column is the mechanism that holds the rule
 			-- rather than a second reference to the issue.
 			"live_vulnerability_id" ` + t.refNull + ` NULL,
-			CONSTRAINT "exploited_here_live_unique" UNIQUE ("live_vulnerability_id", "product_id"),
-			CONSTRAINT "exploited_here_vulnerability_fk" FOREIGN KEY ("vulnerability_id")
+			-- A fresh value written by a transaction taking the row to wait
+			-- out another writer of it. It means nothing; a write of a value
+			-- already held is skipped on MySQL and MariaDB, and a cluster
+			-- never certifies it.
+			"taken_by" ` + t.free + ` NULL,
+			CONSTRAINT "incident_live_unique" UNIQUE ("live_vulnerability_id", "product_id"),
+			CONSTRAINT "incident_vulnerability_fk" FOREIGN KEY ("vulnerability_id")
 				REFERENCES "vulnerability"("id"),
-			CONSTRAINT "exploited_here_product_fk" FOREIGN KEY ("product_id")
+			CONSTRAINT "incident_product_fk" FOREIGN KEY ("product_id")
 				REFERENCES "product"("id"),
-			CONSTRAINT "exploited_here_recorder_fk" FOREIGN KEY ("recorded_by")
+			CONSTRAINT "incident_recorder_fk" FOREIGN KEY ("recorded_by")
 				REFERENCES "person"("id"),
-			CONSTRAINT "exploited_here_clearer_fk" FOREIGN KEY ("cleared_by")
+			CONSTRAINT "incident_clearer_fk" FOREIGN KEY ("cleared_by")
 				REFERENCES "person"("id")
 		)` + t.suffix,
 
 		// Reading a product's records newest first, and reading whether one
 		// stands against an issue there. The rule that only one stands is
 		// held by the unique constraint above, not this.
-		`CREATE INDEX "exploited_here_product_idx" ON "exploited_here" ("product_id", "recorded_at")`,
-		`CREATE INDEX "exploited_here_issue_idx" ON "exploited_here" ("vulnerability_id", "product_id")`,
+		`CREATE INDEX "incident_product_idx" ON "incident" ("product_id", "recorded_at")`,
+		`CREATE INDEX "incident_issue_idx" ON "incident" ("vulnerability_id", "product_id")`,
 
 		// A window a deployment says it is under, counted from the moment
 		// an attack became known, from the first notice naming another
 		// window, or from the release of the fix. None ships: a window here
 		// is an interpretation of somebody's rules, and the deployment is the
 		// one holding them.
-		`CREATE TABLE "obligation_window" (
+		`CREATE TABLE "response_window" (
 			"id"    ` + t.id + `,
 			-- What the window is called, as it was typed. Matched without
 			-- regard to capitals through live_name, which holds it folded.
@@ -173,24 +178,29 @@ func obligationBaseline(t *columnTypes) []string {
 			-- Never true beside from_window_id: a window counts from one
 			-- moment.
 			"from_fix" ` + t.boolean + ` NOT NULL,
-			CONSTRAINT "obligation_window_live_unique" UNIQUE ("live_name"),
-			CONSTRAINT "obligation_window_declarer_fk" FOREIGN KEY ("declared_by")
+			-- A fresh value written by a transaction taking the row to wait
+			-- out another writer of it. It means nothing; a write of a value
+			-- already held is skipped on MySQL and MariaDB, and a cluster
+			-- never certifies it.
+			"taken_by" ` + t.free + ` NULL,
+			CONSTRAINT "response_window_live_unique" UNIQUE ("live_name"),
+			CONSTRAINT "response_window_declarer_fk" FOREIGN KEY ("declared_by")
 				REFERENCES "person"("id"),
-			CONSTRAINT "obligation_window_from_fk" FOREIGN KEY ("from_window_id")
-				REFERENCES "obligation_window"("id")
+			CONSTRAINT "response_window_from_fk" FOREIGN KEY ("from_window_id")
+				REFERENCES "response_window"("id")
 		)` + t.suffix,
 
 		// The products a window is limited to. None is every product: a
 		// window is declared once for the deployment and narrowed where the
 		// administrator says it applies, which is their statement rather
 		// than anything worked out here.
-		`CREATE TABLE "obligation_window_product" (
+		`CREATE TABLE "response_window_product" (
 			"window_id"  ` + t.ref + ` NOT NULL,
 			"product_id" ` + t.ref + ` NOT NULL,
-			CONSTRAINT "obligation_window_product_pk" PRIMARY KEY ("window_id", "product_id"),
-			CONSTRAINT "obligation_window_product_window_fk" FOREIGN KEY ("window_id")
-				REFERENCES "obligation_window"("id"),
-			CONSTRAINT "obligation_window_product_product_fk" FOREIGN KEY ("product_id")
+			CONSTRAINT "response_window_product_pk" PRIMARY KEY ("window_id", "product_id"),
+			CONSTRAINT "response_window_product_window_fk" FOREIGN KEY ("window_id")
+				REFERENCES "response_window"("id"),
+			CONSTRAINT "response_window_product_product_fk" FOREIGN KEY ("product_id")
 				REFERENCES "product"("id")
 		)` + t.suffix,
 
@@ -201,7 +211,7 @@ func obligationBaseline(t *columnTypes) []string {
 		// editing a row.
 		`CREATE TABLE "told_outside" (
 			"id"               ` + t.id + `,
-			"exploited_here_id" ` + t.ref + ` NOT NULL,
+			"incident_id" ` + t.ref + ` NOT NULL,
 			-- The window this notice answers, where the person recording it
 			-- said so. Their statement rather than a computation: nothing
 			-- here decides whether a notice met anything.
@@ -221,16 +231,16 @@ func obligationBaseline(t *columnTypes) []string {
 			-- What the notice said about whether the attack was malicious:
 			-- 'yes', 'no' or 'unknown'. Null where it said nothing.
 			"suspected_malicious" ` + t.kind + ` NULL,
-			CONSTRAINT "told_outside_record_fk" FOREIGN KEY ("exploited_here_id")
-				REFERENCES "exploited_here"("id"),
+			CONSTRAINT "told_outside_incident_fk" FOREIGN KEY ("incident_id")
+				REFERENCES "incident"("id"),
 			CONSTRAINT "told_outside_window_fk" FOREIGN KEY ("window_id")
-				REFERENCES "obligation_window"("id"),
+				REFERENCES "response_window"("id"),
 			CONSTRAINT "told_outside_recorder_fk" FOREIGN KEY ("recorded_by")
 				REFERENCES "person"("id")
 		)` + t.suffix,
 
 		// A record's notices, read for every record the shelf shows.
-		`CREATE INDEX "told_outside_record_idx" ON "told_outside" ("exploited_here_id", "told_at")`,
+		`CREATE INDEX "told_outside_incident_idx" ON "told_outside" ("incident_id", "told_at")`,
 
 		// The places a notice named, in the order they were given. Free
 		// text: which places a deployment names is its own business, and
@@ -248,10 +258,10 @@ func obligationBaseline(t *columnTypes) []string {
 		// is a tag of the record's product, often one declared before any
 		// scan of it. Withdrawn rather than deleted, so a release named in
 		// error stays readable with who took it back.
-		`CREATE TABLE "exploited_fix" (
+		`CREATE TABLE "incident_fix" (
 			"id"                ` + t.id + `,
-			"exploited_here_id" ` + t.ref + ` NOT NULL,
-			"stream_id"         ` + t.ref + ` NOT NULL,
+			"incident_id" ` + t.ref + ` NOT NULL,
+			"branch_or_tag_id"         ` + t.ref + ` NOT NULL,
 			"named_by"          ` + t.ref + ` NOT NULL,
 			"named_at"          ` + t.timestamp + ` NOT NULL,
 			"withdrawn_by"      ` + t.refNull + ` NULL,
@@ -260,15 +270,15 @@ func obligationBaseline(t *columnTypes) []string {
 			-- withdrawn, so a record names a release once at a time and a
 			-- withdrawn naming does not hold it back. The same mechanism a
 			-- standing record of being exploited uses.
-			"live_stream_id"    ` + t.refNull + ` NULL,
-			CONSTRAINT "exploited_fix_live_unique" UNIQUE ("exploited_here_id", "live_stream_id"),
-			CONSTRAINT "exploited_fix_record_fk" FOREIGN KEY ("exploited_here_id")
-				REFERENCES "exploited_here"("id"),
-			CONSTRAINT "exploited_fix_stream_fk" FOREIGN KEY ("stream_id")
-				REFERENCES "stream"("id"),
-			CONSTRAINT "exploited_fix_namer_fk" FOREIGN KEY ("named_by")
+			"live_branch_or_tag_id"    ` + t.refNull + ` NULL,
+			CONSTRAINT "incident_fix_live_unique" UNIQUE ("incident_id", "live_branch_or_tag_id"),
+			CONSTRAINT "incident_fix_incident_fk" FOREIGN KEY ("incident_id")
+				REFERENCES "incident"("id"),
+			CONSTRAINT "incident_fix_branch_or_tag_fk" FOREIGN KEY ("branch_or_tag_id")
+				REFERENCES "branch_or_tag"("id"),
+			CONSTRAINT "incident_fix_namer_fk" FOREIGN KEY ("named_by")
 				REFERENCES "person"("id"),
-			CONSTRAINT "exploited_fix_withdrawer_fk" FOREIGN KEY ("withdrawn_by")
+			CONSTRAINT "incident_fix_withdrawer_fk" FOREIGN KEY ("withdrawn_by")
 				REFERENCES "person"("id")
 		)` + t.suffix,
 	}

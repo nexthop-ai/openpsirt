@@ -15,18 +15,13 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
 )
 
 // Each tagged release's migrations still build, on every engine, the schema
-// they built when the release was tagged. The ladder also holds the upgrade
-// from v0.11.0 to v0.12.0, from a database nothing stopped, to v0.12.0's
-// declarations, as a subtest under the name of the test it was. It follows
-// the last rung, and its own clean-up is all that holds it, since a scratch
-// table a declaration is built under fails a rung.
+// they built when the release was tagged.
 func TestEachReleaseBuildsTheSchemaItTagged(t *testing.T) {
 	tagged, err := released.All(records)
 	if err != nil {
@@ -42,10 +37,6 @@ func TestEachReleaseBuildsTheSchemaItTagged(t *testing.T) {
 			dbtest.MigrateTo(t, db, r.Last)
 			taggedSchema(t, r.Version, db.Server.Engine, describe(t, ctx, db))
 		}
-		dbtest.MigrateTo(t, db, v0120)
-		t.Run("AV0110DatabaseUpgradesToV0120", func(t *testing.T) {
-			declarationsAreBuilt(t, ctx, db, migrations.StatementsV0120(db.Server.Engine))
-		})
 		leaveAtLatest(t, ctx, db)
 	})
 }

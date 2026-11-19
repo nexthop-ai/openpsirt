@@ -3,19 +3,13 @@
 
 package migrations
 
-import (
-	"context"
-
-	"github.com/uptrace/bun"
-)
-
-// seriesV0110 is v0.11.0's declaration of the tables results sent per series
+// seriesBaseline declares the tables results sent per series
 // arrive in: the series, each run of it against a build, the documents a run
 // arrived as, and the repositories a run's checkout held.
 //
 // Kept apart from the scan tables. Every reader of those asks which inventory
 // a build holds, and a run of an analyzer is not one.
-func seriesV0110(t *columnTypes) []string {
+func seriesBaseline(t *columnTypes) []string {
 	return []string{
 		// One analysis a product runs the same way on every build: a tool and
 		// its configuration, such as clang-sa/default.
@@ -194,9 +188,9 @@ func seriesV0110(t *columnTypes) []string {
 	}
 }
 
-// analysisV0110 is v0.11.0's declaration of what an analyzer said about each
+// analysisBaseline declares what an analyzer said about each
 // finding of the analysis kind, as the newest run that saw it said it.
-func analysisV0110(t *columnTypes) []string {
+func analysisBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "analysis_result" (
 			"id"            ` + t.id + `,
@@ -278,39 +272,4 @@ func analysisV0110(t *columnTypes) []string {
 			CONSTRAINT "analysis_location_finding_fk" FOREIGN KEY ("finding_id") REFERENCES "finding"("id")
 		)` + t.suffix,
 	}
-}
-
-// createSeriesV0110 makes the series, run, sighting and analysis tables,
-// stepped over where they are already there.
-func createSeriesV0110(ctx context.Context, tx bun.Tx) error {
-	u, err := upgraderIn(ctx, tx)
-	if err != nil {
-		return err
-	}
-	for _, table := range []struct {
-		name string
-		made func(*columnTypes) []string
-	}{
-		{"series", seriesV0110},
-		{"series_run", seriesV0110},
-		{"series_document", seriesV0110},
-		{"series_document_chunk", seriesV0110},
-		{"series_module", seriesV0110},
-		{"sighting", seriesV0110},
-		{"series_refusal", seriesV0110},
-		{"analysis_result", analysisV0110},
-		{"analysis_location", analysisV0110},
-	} {
-		present, err := u.hasColumn(table.name, "id")
-		if err != nil {
-			return err
-		}
-		if present {
-			continue
-		}
-		if err := u.create(table.made(u.t), table.name); err != nil {
-			return err
-		}
-	}
-	return nil
 }

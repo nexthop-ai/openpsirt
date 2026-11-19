@@ -3,16 +3,10 @@
 
 package migrations
 
-import (
-	"context"
-
-	"github.com/uptrace/bun"
-)
-
-// repositoryV0110 is v0.11.0's declaration of what a product says about the
+// repositoryBaseline declares what a product says about the
 // repositories its builds are made from: where a location may link to, and
 // whose source it keeps.
-func repositoryV0110(t *columnTypes) []string {
+func repositoryBaseline(t *columnTypes) []string {
 	return []string{
 		// A repository host a product's links may point at. A remote on no
 		// host here is shown as text.
@@ -62,26 +56,4 @@ func repositoryV0110(t *columnTypes) []string {
 			CONSTRAINT "repository_path_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id")
 		)` + t.suffix,
 	}
-}
-
-// createRepositoryV0110 makes the repository tables, stepped over where they
-// are already there.
-func createRepositoryV0110(ctx context.Context, tx bun.Tx) error {
-	u, err := upgraderIn(ctx, tx)
-	if err != nil {
-		return err
-	}
-	for _, table := range []string{"repository_host", "repository_path"} {
-		present, err := u.hasColumn(table, "id")
-		if err != nil {
-			return err
-		}
-		if present {
-			continue
-		}
-		if err := u.create(repositoryV0110(u.t), table); err != nil {
-			return err
-		}
-	}
-	return nil
 }

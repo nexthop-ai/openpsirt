@@ -14,7 +14,7 @@ import (
 func TestAnUpgradeThatKeepsEveryRowIsNotReported(t *testing.T) {
 	before := Counts{"finding": 10, "advisory_issuance": 3}
 	after := Counts{"finding": 10, "advisory_issuance": 3, "told_place": 0}
-	if faults := Compare(before, after, Counts{}); len(faults) != 0 {
+	if faults := Compare(before, after, nil); len(faults) != 0 {
 		t.Errorf("a faithful upgrade was reported: %v", faults)
 	}
 }
@@ -27,7 +27,7 @@ func TestEveryRowAnUpgradeLosesOrInventsIsReported(t *testing.T) {
 		"told_place":        1, // a new table something filled
 		// scan is gone with no rule saying where its rows went
 	}
-	faults := Compare(before, after, Counts{})
+	faults := Compare(before, after, nil)
 	for _, table := range []string{"finding", "told_place", "scan"} {
 		found := false
 		for _, fault := range faults {
@@ -57,71 +57,51 @@ func TestATotalThatMovesOrVanishesIsReported(t *testing.T) {
 	}
 }
 
-func TestARenamedTableKeepsItsRowsUnderItsNewName(t *testing.T) {
-	renamed := map[string]string{"decision": "decision_occurrence", "claim": "decision"}
-	held := Counts{"decision": 12, "claim": 5, "finding": 40}
-	after := Counts{"decision_occurrence": 12, "decision": 5, "finding": 40}
-	if faults := Compare(AsRenamed(renamesV0110-1, held, renamed), after, Counts{}); len(faults) != 0 {
-		t.Errorf("a rename that kept every row was reported: %v", faults)
-	}
-	if faults := Compare(AsRenamed(renamesV0110-1, held, renamed), Counts{"decision_occurrence": 11, "decision": 5,
-		"finding": 40}, Counts{}); len(faults) != 1 || !strings.HasPrefix(faults[0], "decision_occurrence") {
-		t.Errorf("a row lost from a renamed table was not reported under its new name: %v", faults)
+func TestTheRowsAnUpgradeFillsATableWithAreNotReported(t *testing.T) {
+	before := Counts{"component": 7}
+	after := Counts{"component": 7, "component_name": 9}
+	if faults := Compare(before, after, Counts{"component_name": 9}); len(faults) != 0 {
+		t.Errorf("the rows a fill wrote were reported: %v", faults)
 	}
 }
 
-func TestATableIsRenamedOnlyByAnUpgradeThatRenamesIt(t *testing.T) {
-	held := Counts{"decision": 12}
-	got := AsRenamed(renamesV0110, held, map[string]string{"decision": "decision_occurrence"})
-	if got["decision"] != 12 || len(got) != 1 {
-		t.Errorf("a release already past the renames had its tables renamed: %v", got)
+func TestARowNoFillAccountsForIsReported(t *testing.T) {
+	before := Counts{"component": 7}
+	after := Counts{"component": 7, "component_name": 10}
+	faults := Compare(before, after, Counts{"component_name": 9})
+	if len(faults) != 1 || !strings.HasPrefix(faults[0], "component_name") || !strings.Contains(faults[0], "fills it with 9") {
+		t.Errorf("a row beyond the fill was not reported against it: %v", faults)
 	}
 }
 
-func TestTheMessagesTheUpgradeWritesFromAcknowledgementsAreNotReported(t *testing.T) {
-	before := Counts{"flaw_report": 7}
-	after := Counts{"flaw_report": 7, "report_message": 4}
-	if faults := Compare(before, after, FilledV0110(renamesV0110-1, 4)); len(faults) != 0 {
-		t.Errorf("a message written for each acknowledgement was reported: %v", faults)
+func TestAFilledTableTheReleaseHeldKeepsItsRowsAndTheFill(t *testing.T) {
+	before := Counts{"component_name": 3}
+	if faults := Compare(before, Counts{"component_name": 5}, Counts{"component_name": 2}); len(faults) != 0 {
+		t.Errorf("a held table's rows and its fill were reported: %v", faults)
+	}
+	if faults := Compare(before, Counts{"component_name": 4}, Counts{"component_name": 2}); len(faults) != 1 {
+		t.Errorf("a held table short of its rows and its fill was not reported: %v", faults)
 	}
 }
 
-func TestAMessageNoAcknowledgementAccountsForIsReported(t *testing.T) {
-	before := Counts{"flaw_report": 7}
-	after := Counts{"flaw_report": 7, "report_message": 5}
-	faults := Compare(before, after, FilledV0110(renamesV0110-1, 4))
-	if len(faults) != 1 || !strings.HasPrefix(faults[0], "report_message") {
-		t.Errorf("a message beyond the acknowledgements was not reported: %v", faults)
+func TestOnlyAMigrationTheReleaseDidNotApplyFills(t *testing.T) {
+	fills := []Fill{{Migration: 48, Table: "component_name"}}
+	if owed := Owed(47, fills); len(owed) != 1 {
+		t.Errorf("a release before the fill owes %v, want the fill", owed)
 	}
-}
-
-func TestAReleasePastTheUpgradeKeepsItsMessages(t *testing.T) {
-	before := Counts{"flaw_report": 7, "report_message": 9}
-	after := Counts{"flaw_report": 7, "report_message": 13}
-	faults := Compare(before, after, FilledV0110(renamesV0110, 4))
-	if len(faults) != 1 || !strings.HasPrefix(faults[0], "report_message") {
-		t.Errorf("messages a later release held were counted as filled again: %v", faults)
+	if owed := Owed(48, fills); len(owed) != 0 {
+		t.Errorf("a release that applied the fill owes %v, want nothing", owed)
 	}
 }
 
 func TestASeedThatLeftATableEmptyIsRefused(t *testing.T) {
 	held := Counts{"finding": 3, "decision": 2, "decision_occurrence": 2, "received_vex_statement": 1, "flaw_report": 1}
-	if empty := Unseeded(renamesV0110, held, 0); len(empty) != 0 {
+	if empty := Unseeded(held); len(empty) != 0 {
 		t.Errorf("a full seed was refused: %v", empty)
 	}
 	delete(held, "received_vex_statement")
-	if empty := Unseeded(renamesV0110, held, 0); !slices.Equal(empty, []string{"received_vex_statement"}) {
+	if empty := Unseeded(held); !slices.Equal(empty, []string{"received_vex_statement"}) {
 		t.Errorf("want received_vex_statement reported, got %v", empty)
-	}
-}
-
-func TestASeedBelowTheRenamesWithNoAcknowledgedReportIsRefused(t *testing.T) {
-	held := Counts{"finding": 3, "decision": 2, "decision_occurrence": 2, "received_vex_statement": 1, "flaw_report": 1}
-	if empty := Unseeded(renamesV0110-1, held, 1); len(empty) != 0 {
-		t.Errorf("a seed with an acknowledged report was refused: %v", empty)
-	}
-	if empty := Unseeded(renamesV0110-1, held, 0); len(empty) != 1 {
-		t.Errorf("want the missing acknowledgement reported, got %v", empty)
 	}
 }
 
