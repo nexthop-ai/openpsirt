@@ -163,17 +163,27 @@ func NotAhead(ctx context.Context, db *database.DB) error {
 	return nil
 }
 
+// newest is the release that upgrades a database v0.10.x or v0.11.0 built. It
+// is the last release whose baseline makes v0.10.0's schema, and it leaves a
+// schema this build upgrades.
+const newest = "v0.13.0"
+
+// newestBaseline is v0.13.0's baseline migration, the first version v0.13.0
+// upgrades.
+const newestBaseline = 44
+
 // last is the release that upgrades a database v0.9.0 built. It is the last
-// release whose baseline makes v0.9.0's schema.
+// release whose baseline makes v0.9.0's schema, and it leaves v0.12.0's
+// schema, which this build's baseline makes.
 const last = "v0.12.0"
 
 // lastBaseline is v0.12.0's baseline migration, the first version v0.12.0
 // upgrades.
 const lastBaseline = 43
 
-// through is the release that upgrades a database v0.7.0 or v0.8.0 built. It
-// is the last release whose baseline makes v0.7.0's schema, and it leaves
-// v0.10.0's schema, which this build's baseline makes.
+// through is the release that upgrades a database v0.7.0 or v0.8.0 built
+// into one v0.13.0 upgrades. It is the last release whose baseline makes
+// v0.7.0's schema, and it leaves v0.10.0's schema.
 const through = "v0.10.2"
 
 // throughBaseline is v0.10.2's baseline migration, the first version v0.10.2
@@ -194,9 +204,9 @@ const earlierBaseline = 39
 // baseline makes v0.5.0's schema at once.
 const earliest = "v0.6.0"
 
-// NotBeforeTheBaseline refuses a database a release before v0.10.0 built.
+// NotBeforeTheBaseline refuses a database a release before v0.12.0 built.
 //
-// This build makes v0.10.0's schema in one migration and carries none of the
+// This build makes v0.12.0's schema in one migration and carries none of the
 // ones before it, so it has no way to upgrade an earlier schema.
 func NotBeforeTheBaseline(ctx context.Context, db *database.DB) error {
 	applied, err := Version(ctx, db)
@@ -204,8 +214,8 @@ func NotBeforeTheBaseline(ctx context.Context, db *database.DB) error {
 		return err
 	}
 	if BeforeTheBaseline(applied) {
-		return fmt.Errorf("the database is at schema version %d, which a release before v0.10.0 "+
-			"built, and this build upgrades a database v0.10.0 or a later release built: take a "+
+		return fmt.Errorf("the database is at schema version %d, which a release before v0.12.0 "+
+			"built, and this build upgrades a database v0.12.0 or a later release built: take a "+
 			"backup, run openpsirt migrate up with %s, and deploy this build", applied, UpgradeWith(applied))
 	}
 	return nil
@@ -216,17 +226,19 @@ func NotBeforeTheBaseline(ctx context.Context, db *database.DB) error {
 func UpgradeWith(applied int64) string {
 	switch {
 	case applied < earlierBaseline:
-		return earliest + ", " + earlier + " and then " + through
+		return earliest + ", " + earlier + ", " + through + " and then " + newest
 	case applied < throughBaseline:
-		return earlier + " and then " + through
+		return earlier + ", " + through + " and then " + newest
 	case applied < lastBaseline:
-		return through
+		return through + " and then " + newest
+	case applied < newestBaseline:
+		return last
 	}
-	return last
+	return newest
 }
 
 // BeforeTheBaseline reports whether a schema version is one a release before
-// v0.10.0 built. Zero is an empty database, which the baseline makes from
+// v0.12.0 built. Zero is an empty database, which the baseline makes from
 // nothing.
 func BeforeTheBaseline(applied int64) bool {
 	return applied > 0 && applied < migrations.Baseline

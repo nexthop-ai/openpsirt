@@ -14,6 +14,11 @@ func vulnerabilityBaseline(t *columnTypes) []string {
 			-- compares two columns rather than a function of one. Unique,
 			-- which is what keeps one name one row.
 			"identifier_folded" ` + t.name + ` NOT NULL,
+			-- What sort of issue this is: a published vulnerability, a flaw
+			-- minted here, or an analyzer's rule. A name is resolved among
+			-- issues of the sorts its producer files under, so a rule never
+			-- merges with a CVE.
+			"kind"          ` + t.kind + ` NOT NULL,
 			-- What the world says. What we say instead belongs to one
 			-- product and lives in "issue_rating".
 			"severity"      ` + t.kind + ` NULL,
@@ -36,6 +41,18 @@ func vulnerabilityBaseline(t *columnTypes) []string {
 			"score_source"    ` + t.free + ` NULL,
 			"score_kind"      ` + t.free + ` NULL,
 			"first_seen_at" ` + t.timestamp + ` NOT NULL,
+			-- When the issue was published and last modified, as a public
+			-- vulnerability database states. Null where it was never asked or
+			-- does not know the issue; the moment of asking tells the two
+			-- apart.
+			"published_at"   ` + t.timestamp + ` NULL,
+			"modified_at"    ` + t.timestamp + ` NULL,
+			"dates_asked_at" ` + t.timestamp + ` NULL,
+			-- A fresh value written by a transaction taking the row to wait
+			-- out another: a replaced inventory's check and the pass dating
+			-- the issue. It means nothing; a write of a value already held is
+			-- skipped on MySQL and MariaDB, and a cluster never certifies it.
+			"taken_by"       ` + t.free + ` NULL,
 			-- The issue this row is read as: its own identifier, or the
 			-- issue it was merged into. Always the issue that stands rather
 			-- than a chain, so a row merged twice is one step from the issue
@@ -127,21 +144,21 @@ func mergeBaseline(t *columnTypes) []string {
 		//
 		// The decision itself lapses the way any decision does. This is why:
 		// which merge did it, and which decision stands in its place.
-		`CREATE TABLE "decision_superseded" (
+		`CREATE TABLE "decision_occurrence_superseded" (
 			"id"          ` + t.id + `,
-			"decision_id" ` + t.ref + ` NOT NULL,
+			"decision_occurrence_id" ` + t.ref + ` NOT NULL,
 			"standing_id" ` + t.ref + ` NOT NULL,
 			"merge_id"    ` + t.ref + ` NOT NULL,
 			-- Whether the two said different things. Only a disagreement is
 			-- told to anybody: two decisions saying the same thing collapse
 			-- to one and nothing about the place changes.
 			"disagreed"   ` + t.boolean + ` NOT NULL,
-			CONSTRAINT "decision_superseded_once" UNIQUE ("decision_id"),
-			CONSTRAINT "decision_superseded_decision_fk" FOREIGN KEY ("decision_id")
-				REFERENCES "decision"("id"),
-			CONSTRAINT "decision_superseded_standing_fk" FOREIGN KEY ("standing_id")
-				REFERENCES "decision"("id"),
-			CONSTRAINT "decision_superseded_merge_fk" FOREIGN KEY ("merge_id")
+			CONSTRAINT "decision_occurrence_superseded_once" UNIQUE ("decision_occurrence_id"),
+			CONSTRAINT "decision_occurrence_superseded_occurrence_fk" FOREIGN KEY ("decision_occurrence_id")
+				REFERENCES "decision_occurrence"("id"),
+			CONSTRAINT "decision_occurrence_superseded_standing_fk" FOREIGN KEY ("standing_id")
+				REFERENCES "decision_occurrence"("id"),
+			CONSTRAINT "decision_occurrence_superseded_merge_fk" FOREIGN KEY ("merge_id")
 				REFERENCES "vulnerability_merge"("id")
 		)` + t.suffix,
 	}
@@ -254,7 +271,7 @@ func issueBaseline(t *columnTypes) []string {
 		// scanners without saying so is worse than no report.
 		`CREATE TABLE "scan_run" (
 			"id"               ` + t.id + `,
-			"target_id"        ` + t.ref + ` NOT NULL,
+			"build_id"        ` + t.ref + ` NOT NULL,
 			-- What the scanner calls itself and what it was reading, both
 			-- taken verbatim from its output and bounded by nothing on the
 			-- way in — so they are the producer-supplied slot rather than
@@ -279,8 +296,16 @@ func issueBaseline(t *columnTypes) []string {
 			-- snapshot describes. Null where it read none, which narrows
 			-- nothing.
 			"records_version"  ` + t.free + ` NULL,
-			CONSTRAINT "scan_run_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id")
+			-- The replaced inventory this run checked against issues published
+			-- while it was current. Null on a run over what the build holds.
+			"checked_scan_id"  ` + t.refNull + ` NULL,
+			CONSTRAINT "scan_run_build_id_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
+			CONSTRAINT "scan_run_checked_scan_fk" FOREIGN KEY ("checked_scan_id") REFERENCES "scan"("id")
 		)` + t.suffix,
+
+		// Whether an inventory's check is done, asked of every replaced
+		// inventory by the pass that queues them.
+		`CREATE INDEX "scan_run_checked_idx" ON "scan_run" ("checked_scan_id")`,
 	}
 }
 
@@ -438,4 +463,10 @@ func recordedRatingBaseline(t *columnTypes) []string {
 				REFERENCES "product"("id")
 		)` + t.suffix,
 	}
+}
+
+// vulnerabilityV0120 is the baseline's declaration of the vulnerability table,
+// under the name the v0.14.0 upgrade reads it by.
+func vulnerabilityV0120(t *columnTypes) []string {
+	return vulnerabilityBaseline(t)
 }

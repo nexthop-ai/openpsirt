@@ -3,16 +3,10 @@
 
 package migrations
 
-import (
-	"context"
-
-	"github.com/uptrace/bun"
-)
-
-// codeFindingV0110 is v0.11.0's declaration of what a code finding's triage keeps beside it:
+// codeFindingBaseline declares what a code finding's triage keeps beside it:
 // suppression rules, analyzer rule ratings and families, flaw records, the
 // components a flaw record confirmed, and collaborators.
-func codeFindingV0110(t *columnTypes) []string {
+func codeFindingBaseline(t *columnTypes) []string {
 	return []string{
 		// A suppression rule dismissing every code finding of an analyzer rule, every
 		// code finding under a path, or both. It covers nothing until somebody other
@@ -207,28 +201,4 @@ func codeFindingV0110(t *columnTypes) []string {
 		)` + t.suffix,
 		`CREATE INDEX "code_finding_collaborator_person_idx" ON "code_finding_collaborator" ("person_id")`,
 	}
-}
-
-// createCodeFindingV0110 makes the suppression rule, rule rating, rule family,
-// flaw record, component and collaborator tables, stepped over where they are
-// already there.
-func createCodeFindingV0110(ctx context.Context, tx bun.Tx) error {
-	u, err := upgraderIn(ctx, tx)
-	if err != nil {
-		return err
-	}
-	for _, table := range []string{"suppression_rule", "rule_rating", "rule_family",
-		"code_finding_flaw", "flaw_code_finding", "flaw_code_finding_build", "code_finding_component", "code_finding_collaborator"} {
-		present, err := u.hasColumn(table, "id")
-		if err != nil {
-			return err
-		}
-		if present {
-			continue
-		}
-		if err := u.create(codeFindingV0110(u.t), table); err != nil {
-			return err
-		}
-	}
-	return nil
 }

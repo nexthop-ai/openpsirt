@@ -23,17 +23,15 @@ func TestAnUpgradeLeavesEveryIndexWithStatistics(t *testing.T) {
 	dbtest.Only(t, database.SQLite, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0100)
-		at := time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC)
-		for _, statement := range []string{
-			`INSERT INTO "product" ("name", "display_name", "created_at") VALUES ('router', 'Router', ?)`,
-			`INSERT INTO "stream" ("product_id", "name", "display_name", "kind", "created_at")
-				SELECT "id", 'main', 'main', 'branch', ? FROM "product"`,
-		} {
-			if _, err := db.ExecContext(ctx, statement, at); err != nil {
-				t.Fatalf("%v\n%s", err, statement)
-			}
-		}
+		dbtest.MigrateTo(t, db, v0120)
+		// A node of a build: the upgrade adds indexes to the node table.
+		inventories := seedReplacedV0120(t, db)
+		exec, id := seedSQL(ctx, db)
+		exec(t, `INSERT INTO "component" ("identity", "name", "version", "name_folded", "fold_key", "first_seen_at")
+			VALUES (?, ?, ?, ?, ?, ?)`, "c1", "openssl", "3.0.2", "openssl", "k1", time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC))
+		component := id(t, `SELECT MAX("id") FROM "component"`)
+		exec(t, `INSERT INTO "graph_node" ("build_id", "component_id", "is_root", "opened_scan_id")
+			SELECT "build_id", ?, ?, "id" FROM "scan" WHERE "id" = ?`, component, true, inventories.current)
 		// What a start of the release left: statistics for its own schema.
 		if err := database.RefreshStatistics(ctx, db); err != nil {
 			t.Fatal(err)

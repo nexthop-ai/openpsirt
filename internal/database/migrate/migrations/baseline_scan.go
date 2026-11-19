@@ -15,7 +15,7 @@ func scanBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "scan" (
 			"id"             ` + t.id + `,
-			"target_id"      ` + t.ref + ` NOT NULL,
+			"build_id"      ` + t.ref + ` NOT NULL,
 			"content_hash"   ` + t.hash + ` NOT NULL,
 			-- The identity the document carries for itself. It is what joins a
 			-- vulnerability report to the inventory it was produced from, once
@@ -49,6 +49,10 @@ func scanBaseline(t *columnTypes) []string {
 			-- "not known" rather than as zero.
 			"components"     INTEGER NULL,
 			"placed"         INTEGER NULL,
+			-- True on an inventory already replaced when this deployment began
+			-- checking replaced inventories: it owes no check, since its
+			-- history would be checked only against today's data.
+			"replaced_unchecked" ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			-- What the document called the thing it is about, in its own
 			-- spelling, and empty where it named no component of its own.
 			--
@@ -59,19 +63,19 @@ func scanBaseline(t *columnTypes) []string {
 			-- about one document rather than an identity, so it belongs beside
 			-- the serial and what the inventory was made of.
 			"root_identifier" ` + t.text + ` NULL,
-			CONSTRAINT "scan_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
-			CONSTRAINT "scan_content_unique" UNIQUE ("target_id", "content_hash")
+			CONSTRAINT "scan_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
+			CONSTRAINT "scan_content_unique" UNIQUE ("build_id", "content_hash")
 		)` + t.suffix,
 
 		// Answering "what is the newest accepted scan for this variant" is on
 		// the path of every ingest, so it gets its own index rather than a
 		// scan of everything ever received.
-		`CREATE INDEX "scan_newest_idx" ON "scan" ("target_id", "status", "built_at")`,
+		`CREATE INDEX "scan_newest_idx" ON "scan" ("build_id", "status", "built_at")`,
 
 		// A build's newest arrival, one seek to the end of the range. The
 		// front page, the scans screen, the check for a build gone quiet and
 		// the product list each ask it for every declared build at once.
-		`CREATE INDEX "scan_recency_idx" ON "scan" ("target_id", "received_at")`,
+		`CREATE INDEX "scan_recency_idx" ON "scan" ("build_id", "received_at")`,
 
 		// An upload refused before it became a scan.
 		//
@@ -92,7 +96,7 @@ func scanBaseline(t *columnTypes) []string {
 		// anybody reads is the most recent.
 		`CREATE TABLE "scan_refusal" (
 			"id"           ` + t.id + `,
-			"target_id"    ` + t.ref + ` NOT NULL,
+			"build_id"    ` + t.ref + ` NOT NULL,
 			"at"           ` + t.timestamp + ` NOT NULL,
 			-- Why it was turned away, in the words the producer was given, so
 			-- the two ends of the conversation say the same thing.
@@ -106,10 +110,10 @@ func scanBaseline(t *columnTypes) []string {
 			-- this is the useful field.
 			"built_at"     ` + t.timestamp + ` NULL,
 			"content_hash" ` + t.hash + ` NULL,
-			CONSTRAINT "scan_refusal_target_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
+			CONSTRAINT "scan_refusal_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
 			-- One per target. A refusal replaces the one before it, because
 			-- what a report asks is whether this build is being refused now.
-			CONSTRAINT "scan_refusal_target_unique" UNIQUE ("target_id")
+			CONSTRAINT "scan_refusal_build_unique" UNIQUE ("build_id")
 		)` + t.suffix,
 	}
 }

@@ -41,7 +41,7 @@ func catalogBaseline(t *columnTypes) []string {
 			-- own line applies, which is the ordinary case and is why this is not NOT NULL
 			-- — a product with no opinion should not have to state the default, or it
 			-- would stop following it when the default changes.
-			"triage_floor" ` + t.kind + ` NULL,
+			"minimum_severity" ` + t.kind + ` NULL,
 			-- The two thresholds past which one pair agreeing to each other's
 			-- work is raised: a percentage of the product's agreements and the
 			-- fewest people who may approve. Null follows the deployment, for
@@ -59,12 +59,17 @@ func catalogBaseline(t *columnTypes) []string {
 			-- auditor asks about a product long after it stops being
 			-- supported. This says the product is not tracked here.
 			"retired_at"   ` + t.timestamp + ` NULL,
+			-- A fresh value written by a transaction taking the row to wait
+			-- out another writer of it. It means nothing; a write of a value
+			-- already held is skipped on MySQL and MariaDB, and a cluster
+			-- never certifies it.
+			"taken_by" ` + t.free + ` NULL,
 			CONSTRAINT "product_name_unique" UNIQUE ("name")
 		)` + t.suffix,
 
 		// kind is 'branch' or 'tag'. parent_id is the branch a tag was cut
 		// from, when that is known.
-		`CREATE TABLE "stream" (
+		`CREATE TABLE "branch_or_tag" (
 			"id"         ` + t.id + `,
 			"product_id" ` + t.ref + ` NOT NULL,
 			"name"         ` + t.name + ` NOT NULL,
@@ -85,9 +90,14 @@ func catalogBaseline(t *columnTypes) []string {
 			-- auditor asks about a release long after it stops being
 			-- supported. This says the release is not tracked here.
 			"retired_at" ` + t.timestamp + ` NULL,
-			CONSTRAINT "stream_name_unique" UNIQUE ("product_id", "name"),
-			CONSTRAINT "stream_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
-			CONSTRAINT "stream_parent_fk" FOREIGN KEY ("parent_id") REFERENCES "stream"("id")
+			-- A fresh value written by a transaction taking the row to wait
+			-- out another writer of it. It means nothing; a write of a value
+			-- already held is skipped on MySQL and MariaDB, and a cluster
+			-- never certifies it.
+			"taken_by" ` + t.free + ` NULL,
+			CONSTRAINT "branch_or_tag_name_unique" UNIQUE ("product_id", "name"),
+			CONSTRAINT "branch_or_tag_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "branch_or_tag_parent_fk" FOREIGN KEY ("parent_id") REFERENCES "branch_or_tag"("id")
 		)` + t.suffix,
 
 		// A variant is a way the product is built — a chip, an
@@ -114,6 +124,11 @@ func catalogBaseline(t *columnTypes) []string {
 			"customer_facing" ` + t.boolean + ` NOT NULL,
 			"created_at"      ` + t.timestamp + ` NOT NULL,
 			"retired_at"      ` + t.timestamp + ` NULL,
+			-- A fresh value written by a transaction taking the row to wait
+			-- out another writer of it. It means nothing; a write of a value
+			-- already held is skipped on MySQL and MariaDB, and a cluster
+			-- never certifies it.
+			"taken_by" ` + t.free + ` NULL,
 			CONSTRAINT "variant_name_unique" UNIQUE ("product_id", "name"),
 			CONSTRAINT "variant_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id")
 		)` + t.suffix,
@@ -128,9 +143,9 @@ func catalogBaseline(t *columnTypes) []string {
 		// creating something a typo could invent. It is also what keeps a
 		// variant introduced later out of earlier releases: they simply have
 		// no row for it.
-		`CREATE TABLE "target" (
+		`CREATE TABLE "build" (
 			"id"         ` + t.id + `,
-			"stream_id"  ` + t.ref + ` NOT NULL,
+			"branch_or_tag_id"  ` + t.ref + ` NOT NULL,
 			"variant_id" ` + t.ref + ` NOT NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
 			-- Which scan last wrote here. Two workers applying two scans of
@@ -143,21 +158,16 @@ func catalogBaseline(t *columnTypes) []string {
 			-- found is a second pass over the same target, run by the same
 			-- queue, with the same two-workers-at-once problem.
 			"last_run_id" ` + t.refNull + ` NULL,
-			CONSTRAINT "target_unique" UNIQUE ("stream_id", "variant_id"),
-			CONSTRAINT "target_stream_fk" FOREIGN KEY ("stream_id") REFERENCES "stream"("id"),
-			CONSTRAINT "target_variant_fk" FOREIGN KEY ("variant_id") REFERENCES "variant"("id")
+			-- A fresh value written by a transaction taking the build to wait
+			-- out a scan of it without being its last run. It means nothing; a
+			-- write of a value already held is skipped on MySQL and MariaDB,
+			-- and a cluster never certifies it.
+			"taken_by"    ` + t.free + ` NULL,
+			CONSTRAINT "build_unique" UNIQUE ("branch_or_tag_id", "variant_id"),
+			CONSTRAINT "build_branch_or_tag_fk" FOREIGN KEY ("branch_or_tag_id") REFERENCES "branch_or_tag"("id"),
+			CONSTRAINT "build_variant_fk" FOREIGN KEY ("variant_id") REFERENCES "variant"("id")
 		)` + t.suffix,
 
-		`CREATE INDEX "target_variant_idx" ON "target" ("variant_id")`,
+		`CREATE INDEX "build_variant_idx" ON "build" ("variant_id")`,
 	}
-}
-
-// productV0100 is the baseline's declaration of the product table, under the
-// name v0.11.0's declaration of it reads.
-func productV0100(t *columnTypes) []string {
-	made, indexes, err := pick(catalogBaseline(t), "product")
-	if err != nil {
-		panic(err)
-	}
-	return append([]string{made}, indexes...)
 }

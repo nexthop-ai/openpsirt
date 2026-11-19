@@ -16,7 +16,7 @@ func findingBaseline(t *columnTypes) []string {
 		// graph of every variant it might apply to.
 		`CREATE TABLE "finding" (
 			"id"               ` + t.id + `,
-			"target_id"        ` + t.ref + ` NOT NULL,
+			"build_id"        ` + t.ref + ` NOT NULL,
 			"kind"             ` + t.kind + ` NOT NULL,
 			-- Whether this has been disclosed. Not who may read it: every
 			-- request is authenticated either way. Anything unrecognized
@@ -26,7 +26,7 @@ func findingBaseline(t *columnTypes) []string {
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
 			"component_id"     ` + t.ref + ` NOT NULL,
 			"consumer_id"      ` + t.refNull + ` NULL,
-			"place_identity"   ` + t.hash + ` NOT NULL,
+			"occurrence_identity"   ` + t.hash + ` NOT NULL,
 			"fix_state"        ` + t.kind + ` NULL,
 			-- A scanner reports every version that fixes an issue, and for a
 			-- kernel that is a long list.
@@ -65,7 +65,7 @@ func findingBaseline(t *columnTypes) []string {
 			-- findings are exploited reads the column it means rather than
 			-- the packed number, whose top bands both answer "above the
 			-- line".
-			"urgency_exploited_here" ` + t.boolean + ` NOT NULL,
+			"urgency_incident" ` + t.boolean + ` NOT NULL,
 			-- When exploitation was learned, which is what an exploited
 			-- deadline is counted from.
 			--
@@ -113,7 +113,7 @@ func findingBaseline(t *columnTypes) []string {
 			-- this fan-out there will be thousands of them. No foreign key,
 			-- for the reason above: the table is declared later, and a rule is
 			-- retired rather than deleted.
-			"routed_by"        ` + t.refNull + ` NULL,
+			"assigned_by_rule"        ` + t.refNull + ` NULL,
 			-- How the scanner reached this, and where that match came from.
 			--
 			-- A distribution backports fixes without moving the upstream
@@ -212,7 +212,7 @@ func findingBaseline(t *columnTypes) []string {
 			-- carries the workaround the build published. A plain reference
 			-- without a foreign key, for the reason the one above it gives.
 			"claimed_by"       ` + t.refNull + ` NULL,
-			CONSTRAINT "finding_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
+			CONSTRAINT "finding_build_id_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
 			CONSTRAINT "finding_vulnerability_id_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
 			CONSTRAINT "finding_component_id_fk" FOREIGN KEY ("component_id") REFERENCES "component"("id"),
 			CONSTRAINT "finding_consumer_id_fk" FOREIGN KEY ("consumer_id") REFERENCES "component"("id"),
@@ -227,7 +227,7 @@ func findingBaseline(t *columnTypes) []string {
 		// fetched. Measured on PostgreSQL with one processor, a build of
 		// 183,788 open findings in a deployment of 367,577: 256 ms a page
 		// through the deployment-wide deadline index, 205 ms through this one.
-		`CREATE INDEX "finding_open_idx" ON "finding" ("target_id", "closed_at", "due_at")`,
+		`CREATE INDEX "finding_open_idx" ON "finding" ("build_id", "closed_at", "due_at")`,
 
 		// Open findings per component under one target, which the dependency
 		// graph walk counts for every component one step below the current
@@ -238,7 +238,7 @@ func findingBaseline(t *columnTypes) []string {
 		// are in the order the query binds them: the target is always known,
 		// the component is the correlation, and a null close is what open
 		// means.
-		`CREATE INDEX "finding_component_idx" ON "finding" ("target_id", "component_id", "closed_at")`,
+		`CREATE INDEX "finding_component_idx" ON "finding" ("build_id", "component_id", "closed_at")`,
 
 		// Deadlines running out, off an index rather than a scan. It leads with
 		// the two columns always compared — a finding that is closed or
@@ -256,8 +256,10 @@ func findingBaseline(t *columnTypes) []string {
 		// image carries every one of the kernel's 4,900 issues, so a lookup by
 		// place read 4,900 rows to find the one the decision meant. With the
 		// issue beside it the lookup is exact. The prefix still serves what
-		// asks by place alone.
-		`CREATE INDEX "finding_place_idx" ON "finding" ("place_identity", "vulnerability_id")`,
+		// asks by place alone. The build, the kind and the row follow, so the
+		// rows of one build after a given row at an occurrence are one range
+		// of it, however many builds hold the occurrence.
+		`CREATE INDEX "finding_occurrence_idx" ON "finding" ("occurrence_identity", "vulnerability_id", "build_id", "kind", "id")`,
 
 		// Both directions are asked constantly: what one person holds, and what
 		// nobody holds. The second is the one that matters and the one a plain
@@ -275,10 +277,12 @@ func findingBaseline(t *columnTypes) []string {
 		// from 0.33 s to 0.05 s, and the count from 0.32 s to 0.04 s.
 		//
 		// The column order is the portable shape: equality columns first
-		// (target, open, visibility), then the grouping key, then what the
+		// (build, open, visibility, kind), then the grouping key, then what the
 		// aggregates read. Every engine here can answer the grouping from the
 		// index alone in that order; a narrower index on urgency was tried
 		// first, and it still cost a table lookup per row for the group key.
+		// Every read of findings names the kinds it includes, so an index
+		// without the kind costs a table row per finding read.
 		//
 		// The two exploitation flags are in it because the lists read them
 		// rather than the packed number: the number carries both in bands of
@@ -294,7 +298,7 @@ func findingBaseline(t *columnTypes) []string {
 		// grouped in the database 88 ms and 172 ms, and the index 4.6 MB and
 		// 4.2 MB. The holder is read by every list asking who holds a group,
 		// and last because nothing narrows on it through this index.
-		`CREATE INDEX "finding_group_idx" ON "finding" ("target_id", "closed_at", "visibility", "vulnerability_id", "component_id", "urgency", "urgency_exploited", "urgency_exploited_here", "opened_at", "closed_because", "assigned_to")`,
+		`CREATE INDEX "finding_group_idx" ON "finding" ("build_id", "closed_at", "visibility", "kind", "vulnerability_id", "component_id", "urgency", "urgency_exploited", "urgency_incident", "opened_at", "closed_because", "assigned_to")`,
 		// What a run opened, and what it closed, counted per page of receipts.
 		// Each count is the distinct issues at components among a build's
 		// findings naming the run, at the visibilities a reader may see,
@@ -308,15 +312,13 @@ func findingBaseline(t *columnTypes) []string {
 		// the page of fifty receipts took 510 ms without them, reading every
 		// finding of the build, and 74 ms with them. Each index is 21 to 29 MB
 		// beside a 306 MB table and takes 0.7 s to build.
-		`CREATE INDEX "finding_opened_run_idx" ON "finding" ("target_id", "opened_run_id", "vulnerability_id", "component_id", "visibility", "closed_run_id")`,
-		`CREATE INDEX "finding_closed_run_idx" ON "finding" ("target_id", "closed_run_id", "vulnerability_id", "component_id", "visibility", "opened_run_id")`,
+		`CREATE INDEX "finding_opened_run_idx" ON "finding" ("build_id", "opened_run_id", "vulnerability_id", "component_id", "visibility", "kind", "closed_run_id")`,
+		`CREATE INDEX "finding_closed_run_idx" ON "finding" ("build_id", "closed_run_id", "vulnerability_id", "component_id", "visibility", "kind", "opened_run_id")`,
+		// Whether an issue has a flaw recorded here, from the few rows of that
+		// kind; through the issue index every finding of the issue is read for
+		// its kind.
+		`CREATE INDEX "finding_kind_idx" ON "finding" ("kind", "vulnerability_id")`,
 	}
-}
-
-// findingV0100 is the baseline's declaration of the finding table, under the
-// name v0.11.0's declaration of it reads.
-func findingV0100(t *columnTypes) []string {
-	return findingBaseline(t)
 }
 
 // suppressionBaseline declares a build's own claims, with the subject's name
@@ -326,7 +328,7 @@ func suppressionBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "suppression" (
 			"id"             ` + t.id + `,
-			"target_id"      ` + t.ref + ` NOT NULL,
+			"build_id"      ` + t.ref + ` NOT NULL,
 			"identity"       ` + t.hash + ` NOT NULL,
 			"vulnerability"  ` + t.free + ` NOT NULL,
 			-- The status vocabulary is the exchange format's, not ours, and
@@ -368,19 +370,13 @@ func suppressionBaseline(t *columnTypes) []string {
 			"stated_by"      ` + t.refNull + ` NULL,
 			"opened_scan_id" ` + t.ref + ` NOT NULL,
 			"closed_scan_id" ` + t.refNull + ` NULL,
-			CONSTRAINT "suppression_target_id_fk" FOREIGN KEY ("target_id") REFERENCES "target"("id"),
+			CONSTRAINT "suppression_build_id_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
 			CONSTRAINT "suppression_opened_scan_id_fk" FOREIGN KEY ("opened_scan_id") REFERENCES "scan"("id"),
 			CONSTRAINT "suppression_closed_scan_id_fk" FOREIGN KEY ("closed_scan_id") REFERENCES "scan"("id")
 		)` + t.suffix,
 
-		`CREATE INDEX "suppression_open_idx" ON "suppression" ("target_id", "closed_scan_id")`,
+		`CREATE INDEX "suppression_open_idx" ON "suppression" ("build_id", "closed_scan_id")`,
 	}
-}
-
-// suppressionV090 is the baseline's declaration of a build's own claims, under
-// the name v0.11.0's declaration of the table reads.
-func suppressionV090(t *columnTypes) []string {
-	return suppressionBaseline(t)
 }
 
 // assessmentBaseline declares the assessment table, with the reason a claim was
@@ -468,7 +464,7 @@ func assessmentBaseline(t *columnTypes) []string {
 // about a release.
 func tagBaseline(t *columnTypes) []string {
 	return []string{
-		`CREATE TABLE "finding_tag" (
+		`CREATE TABLE "finding_label" (
 			"id"               ` + t.id + `,
 			"product_id"       ` + t.ref + ` NOT NULL,
 			"vulnerability_id" ` + t.ref + ` NOT NULL,
@@ -477,19 +473,25 @@ func tagBaseline(t *columnTypes) []string {
 			-- way every other name people type is: "Waiting" and
 			-- "waiting" are one tag, and a filter that treated them as two
 			-- would quietly answer half the question.
-			"tag"              ` + t.name + ` NOT NULL,
+			"label"              ` + t.name + ` NOT NULL,
 			-- The spelling somebody typed, which is what is shown back.
 			"typed"            ` + t.free + ` NOT NULL,
 			"added_by"         ` + t.ref + ` NOT NULL,
 			"added_at"         ` + t.timestamp + ` NOT NULL,
-			CONSTRAINT "finding_tag_once" UNIQUE ("product_id", "vulnerability_id", "component_id", "tag"),
-			CONSTRAINT "finding_tag_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
-			CONSTRAINT "finding_tag_issue_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
-			CONSTRAINT "finding_tag_component_fk" FOREIGN KEY ("component_id") REFERENCES "component"("id"),
-			CONSTRAINT "finding_tag_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id")
+			CONSTRAINT "finding_label_once" UNIQUE ("product_id", "vulnerability_id", "component_id", "label"),
+			CONSTRAINT "finding_label_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "finding_label_issue_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
+			CONSTRAINT "finding_label_component_fk" FOREIGN KEY ("component_id") REFERENCES "component"("id"),
+			CONSTRAINT "finding_label_by_fk" FOREIGN KEY ("added_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
 		// What the list filters on: everything in a product carrying a tag.
-		`CREATE INDEX "finding_tag_named_idx" ON "finding_tag" ("product_id", "tag")`,
+		`CREATE INDEX "finding_label_named_idx" ON "finding_label" ("product_id", "label")`,
 	}
+}
+
+// findingV0110 is the baseline's declaration of the finding table, under the
+// name the v0.14.0 upgrade reads it by.
+func findingV0110(t *columnTypes) []string {
+	return findingBaseline(t)
 }

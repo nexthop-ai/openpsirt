@@ -44,6 +44,10 @@ func notificationBaseline(t *columnTypes) []string {
 			-- but a link; the area inside it is unaffected, because
 			-- reaching that is already the visibility check.
 			"private"   ` + t.boolean + ` NOT NULL,
+			-- Whether a withheld notification is about security testing work,
+			-- an analyzer's code findings, which a reader of security testing
+			-- findings reads and a reader of undisclosed work does not.
+			"security_testing" ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			-- Which product this is about, and which issue, where it is
 			-- about either.
 			--
@@ -144,17 +148,6 @@ func notificationBaseline(t *columnTypes) []string {
 		// kind once 2.9 s and 18 ms on MySQL.
 		`CREATE INDEX "notification_kind_open_idx" ON "notification" ("kind", "cleared_at", "person_id")`,
 	}
-}
-
-// notificationV080 is the baseline's declaration of the notification table,
-// and the indexes it makes, under the name v0.11.0's declaration of the table
-// reads.
-func notificationV080(t *columnTypes) []string {
-	made, indexes, err := pick(notificationBaseline(t), "notification")
-	if err != nil {
-		panic(err)
-	}
-	return append([]string{made}, indexes...)
 }
 
 // outboundBaseline declares where this deployment sends what it has to say. A
@@ -328,7 +321,7 @@ func chatBaseline(t *columnTypes) []string {
 // fan-out there will be thousands of them.
 func routingBaseline(t *columnTypes) []string {
 	return []string{
-		`CREATE TABLE "routing_rule" (
+		`CREATE TABLE "assignment_rule" (
 			"id"         ` + t.id + `,
 			"product_id" ` + t.ref + ` NOT NULL,
 			-- Where work lands. A team rather than a person, because what a
@@ -348,20 +341,24 @@ func routingBaseline(t *columnTypes) []string {
 			-- thing people want.
 			"upstream"   ` + t.name + ` NULL,
 			"beneath"    ` + t.name + ` NULL,
+			-- Whether this rule places the product's vulnerability reports
+			-- rather than findings. A report sits at no component, so a rule
+			-- placing reports names neither key.
+			"reports"    ` + t.boolean + ` DEFAULT FALSE NOT NULL,
 			"created_by" ` + t.ref + ` NOT NULL,
 			"created_at" ` + t.timestamp + ` NOT NULL,
 			-- Retired rather than deleted, for the reason a team is: a finding
 			-- says which rule placed it, and that has to keep resolving to
 			-- something a screen can name.
 			"retired_at" ` + t.timestamp + ` NULL,
-			CONSTRAINT "routing_rule_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
-			CONSTRAINT "routing_rule_team_fk" FOREIGN KEY ("team_id") REFERENCES "team"("id"),
-			CONSTRAINT "routing_rule_by_fk" FOREIGN KEY ("created_by") REFERENCES "person"("id")
+			CONSTRAINT "assignment_rule_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
+			CONSTRAINT "assignment_rule_team_fk" FOREIGN KEY ("team_id") REFERENCES "team"("id"),
+			CONSTRAINT "assignment_rule_by_fk" FOREIGN KEY ("created_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
 		// The rules of one product, in the order they are tried.
-		`CREATE INDEX "routing_rule_order_idx"
-			ON "routing_rule" ("product_id", "retired_at", "ordinal")`,
+		`CREATE INDEX "assignment_rule_order_idx"
+			ON "assignment_rule" ("product_id", "retired_at", "ordinal")`,
 	}
 }
 

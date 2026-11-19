@@ -4,17 +4,14 @@
 // Command rehearsal carries a database a tagged release built through an
 // upgrade to this tree, and checks what arrives.
 //
-//	rehearsal -from v0.10.2 -engine postgres -dir .demo/rehearsal
+//	rehearsal -from v0.12.0 -engine postgres -dir .demo/rehearsal
 //
 // A server engine's URL is read from OPENPSIRT_TEST_<ENGINE>_URL, the variable
 // the test suite reads, so the password is never on the command line.
 //
 // The release seeds its own database: its image is built from its own tag,
 // and its own demo targets declare the products, upload the inventories, let
-// the scans land and record the VEX document, the judgments and the flaw. Below
-// v0.11.0 the rehearsal then acknowledges every report through the release's
-// API, since migration 45 turns each acknowledgement into a message sent and
-// no release's seed acknowledges one. That
+// the scans land and record the VEX document, the judgments and the flaw. That
 // is the data a deployment of that release actually holds, which no fixture
 // written today can stand in for. The tag's targets run unedited; only the
 // docker command they call is wrapped, so its containers, network and ports
@@ -24,9 +21,8 @@
 //
 //  1. The row count of every table, with the release stopped.
 //  2. The migrations, applied on their own, and the version they reach.
-//  3. The counts again: a table the release held keeps its count plus what
-//     the upgrade fills it with from the release's other rows, and a table
-//     the upgrade adds holds only what it is filled with.
+//  3. The counts again: a table the release held keeps its count, and a
+//     table the upgrade adds is empty.
 //  4. The server started on it with the configuration the release's demo
 //     started its own with, the open findings of every build against what
 //     the release showed, and every GET its API document lists asked once,
@@ -44,7 +40,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -60,7 +55,6 @@ import (
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
-	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/released"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/schema"
@@ -100,7 +94,7 @@ func main() {
 	r := run{client: proxyClient()}
 	var dir string
 	var keep bool
-	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.10.2")
+	flag.StringVar(&r.from, "from", "", "the release to upgrade from, as v0.12.0")
 	flag.StringVar(&r.engine, "engine", "", "sqlite, postgres, mysql or mariadb")
 	flag.StringVar(&dir, "dir", ".demo/rehearsal", "where the run keeps what it makes")
 	flag.StringVar(&r.grype, "grype", "", "the scanner's database directory, shared between runs")
@@ -190,8 +184,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 		}
 	}
 	// Read to refuse a release with no record, which has no schema to compare.
-	record, err := released.Read(releases, r.from)
-	if err != nil {
+	if _, err := released.Read(releases, r.from); err != nil {
 		return nil, fmt.Errorf("the release record for %s: %w", r.from, err)
 	}
 	current, err := schema.Expected()
@@ -230,17 +223,11 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err := r.cmd(ctx, r.tag, env, "make", append([]string{"demo-up", "demo-seed"}, overrides...)...); err != nil {
 		return nil, err
 	}
-	seeded, err := r.settle(ctx, overrides, env)
-	if err != nil {
+	if _, err := r.settle(ctx, overrides, env); err != nil {
 		return nil, err
 	}
 	if err := r.cmd(ctx, r.tag, env, "make", append([]string{"demo-vex", "demo-triage", "demo-flaw"}, overrides...)...); err != nil {
 		return nil, err
-	}
-	if record.Last < renamesV0110 {
-		if err := r.answer(ctx, seeded); err != nil {
-			return nil, err
-		}
 	}
 	before, err := r.settle(ctx, overrides, env)
 	if err != nil {
@@ -261,20 +248,11 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var acknowledged int64
-	if record.Last < renamesV0110 {
-		if acknowledged, err = r.acknowledged(ctx); err != nil {
-			return nil, err
-		}
-	}
-	filled := FilledV0110(record.Last, acknowledged)
-	// Every count below is under the name this tree gives its table.
-	held = AsRenamed(record.Last, held, migrations.TablesRenamedV0110())
 	r.note("%d tables, %d findings, %d decisions, %d decision occurrences", len(held), held["finding"],
 		held["decision"], held["decision_occurrence"])
 	// An upgrade of an empty database passes every check here, so a seed
 	// that filled nothing is a failed rehearsal rather than a clean one.
-	if empty := Unseeded(record.Last, held, acknowledged); len(empty) > 0 {
+	if empty := Unseeded(held); len(empty) > 0 {
 		return nil, fmt.Errorf("%s's seed left nothing in %s, so an upgrade of it would check nothing",
 			r.from, strings.Join(empty, ", "))
 	}
@@ -295,7 +273,7 @@ func (r *run) rehearse(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	faults = append(faults, prefix("upgrade", Compare(held, upgraded, filled))...)
+	faults = append(faults, prefix("upgrade", Compare(held, upgraded))...)
 
 	r.step("served by this tree")
 	if err := r.serve(ctx); err != nil {
@@ -486,67 +464,6 @@ func (r *run) count(ctx context.Context, tables []string, required map[string]bo
 		err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "`+table+`"`).Scan(&n)
 		return n, err
 	}, r.log)
-}
-
-// answer acknowledges every report the release holds against a product it
-// reported a build of, through the release's own API as the administrator.
-func (r *run) answer(ctx context.Context, builds Totals) error {
-	products := map[string]bool{}
-	for build := range builds {
-		products[strings.SplitN(build, "/", 2)[0]] = true
-	}
-	answered := 0
-	for _, product := range slices.Sorted(maps.Keys(products)) {
-		at := "/v1/products/" + url.PathEscape(product) + "/reports"
-		status, body, err := r.do(ctx, http.MethodGet, at+"?limit=200")
-		if err != nil {
-			return err
-		}
-		if status != http.StatusOK {
-			return fmt.Errorf("%s's reports for %s: %d %s", r.from, product, status, head(body))
-		}
-		var page struct {
-			Items []struct {
-				Reference    string `json:"reference"`
-				Acknowledged string `json:"acknowledged"`
-			} `json:"items"`
-		}
-		if err := json.Unmarshal(body, &page); err != nil {
-			return fmt.Errorf("%s's reports for %s: %w", r.from, product, err)
-		}
-		for _, report := range page.Items {
-			if report.Acknowledged != "" {
-				continue
-			}
-			status, body, err := r.do(ctx, http.MethodPost, at+"/"+url.PathEscape(report.Reference)+"/acknowledgement")
-			if err != nil {
-				return err
-			}
-			if status != http.StatusNoContent {
-				return fmt.Errorf("acknowledge %s in %s: %d %s", report.Reference, product, status, head(body))
-			}
-			answered++
-		}
-	}
-	r.note("acknowledged %d reports", answered)
-	return nil
-}
-
-// acknowledged reads how many reports a release before v0.11.0 recorded as
-// acknowledged, each of which the upgrade writes as a message sent. A stamp
-// missing who made it is stepped over by the upgrade, and here.
-func (r *run) acknowledged(ctx context.Context) (int64, error) {
-	db, err := connect(ctx, r.hostURL)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = db.Close() }()
-	var n int64
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM "flaw_report"
-		WHERE "acknowledged_at" IS NOT NULL AND "acknowledged_by" IS NOT NULL`).Scan(&n); err != nil {
-		return 0, fmt.Errorf("count the acknowledged reports: %w", err)
-	}
-	return n, nil
 }
 
 // container is what every run of this tree's image shares: the release's

@@ -9,9 +9,14 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/database"
 )
 
-// flawReportBaseline declares the report table and its indexes, with whether the
-// flaw was found here. A flaw found here has a report like one from outside, so
-// a later claim about the same flaw can be ruled a duplicate of it.
+// flawReportBaseline declares the report table and the tables that make a
+// report a case: its revisions, its notes, its correspondence and
+// who has held it.
+//
+// A flaw found here has a report like one from outside, so a later claim
+// about the same flaw can be ruled a duplicate of it. A report has a title
+// and a holder, and no acknowledged stamp: the first message sent to the
+// reporter is the acknowledgement.
 func flawReportBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "flaw_report" (
@@ -19,82 +24,53 @@ func flawReportBaseline(t *columnTypes) []string {
 			-- The name this report is reached by, and the one somebody
 			-- quotes back to a reporter. Drawn at random rather than
 			-- counted: a sequence tells anybody who may ask how many
-			-- claims this product has received and when the last one
-			-- arrived, which is a disclosure made by the name alone.
-			--
-			-- Composed rather than a name: it is a product's name and
-			-- twelve more characters, and a product may be named at the
-			-- full width of one. Sized as a name, a long enough product
-			-- minted a reference two engines refuse and SQLite stores,
-			-- so the quick loop would never see it.
+			-- reports this product has received and when the last one
+			-- arrived. Composed of a product's name and twelve more
+			-- characters, so it is sized as a composed value.
 			"reference"        VARCHAR(` + strconv.Itoa(database.ComposedWidth) + `) NOT NULL,
-			-- The product it was reported against.
-			--
-			-- It is what decides who may read the reporter's name, address
-			-- and received date. An issue's identity spans its aliases, so
-			-- the same issue turns up in other products the moment a shared
-			-- CVE is recorded — and keyed on the issue alone, all of that
-			-- was readable by anybody holding triage rights in any of them.
+			-- A line naming the reported problem, as somebody here wrote it.
+			-- Optional: the reported problem is what is evaluated and
+			-- answered.
+			"title"            ` + t.free + ` NULL,
+			-- The product it was reported against, which decides who may
+			-- read it.
 			"product_id"       ` + t.ref + ` NOT NULL,
-			-- The issue it turned out to be, where somebody has judged it.
-			-- Null is a claim nobody has judged yet, which is the state
-			-- every report arrives in and the state a slop report stays in.
+			-- The issue it turned out to be, where somebody accepted it as
+			-- one. Null is a report nobody has judged, and one a ruling
+			-- answers.
 			"vulnerability_id" ` + t.refNull + ` NULL,
-			-- What was claimed, in the words it was claimed in. It is the
-			-- whole substance of a report with no issue: the issue's own
-			-- description is where the claim lives once there is one.
-			"summary"          ` + t.text + ` NULL,
-			-- Who found it, as they gave their name, and how to reach them.
-			-- Free text: a reporter is somebody outside this deployment and
-			-- has no account here, which is the whole shape of the thing.
+			-- The reported problem, as it stands now. What it said before an
+			-- edit is in the revisions.
+			"reported_problem" ` + t.text + ` NULL,
+			-- Who sent it, how to reach them and how they wish to be
+			-- credited. Free text: a reporter has no account here.
 			"reported_by"      ` + t.free + ` NULL,
 			"contact"          ` + t.free + ` NULL,
-			-- How they wish to be credited, which is what the advisory's
-			-- acknowledgments section says. Kept apart from the name they
-			-- reported under: "anonymous" is a real answer, and so is a
-			-- handle that is not the name on the mail.
 			"credit"           ` + t.free + ` NULL,
-			-- When it arrived, which is what the embargo clock runs from.
-			-- A date rather than a moment: the reporter is counting
-			-- in days and so are we.
+			-- The day it arrived, which the embargo runs from.
 			"received_on"      ` + t.date + ` NULL,
-			-- When somebody answered them, and who. Null is the condition
-			-- an unacknowledged report reports: prompt acknowledgment is the part of
-			-- coordinated disclosure a reporter actually judges, and it is
-			-- the step that costs nothing and is missed by being nobody's job.
-			"acknowledged_at"  ` + t.timestamp + ` NULL,
-			"acknowledged_by"  ` + t.refNull + ` NULL,
-			-- When somebody judged the claim, and who. The person who
-			-- transcribes a mail is not the person who decides what it is
-			-- worth, and a record that cannot tell them apart cannot
-			-- evidence either.
+			-- When somebody judged the report, and who.
 			"evaluated_at"     ` + t.timestamp + ` NULL,
 			"evaluated_by"     ` + t.refNull + ` NULL,
 			"recorded_by"      ` + t.ref + ` NOT NULL,
 			"recorded_at"      ` + t.timestamp + ` NOT NULL,
-			-- The ruling that answers it, waiting or in force. One at a
-			-- time: a report under a ruling cannot be put under a second
-			-- one, or accepted as an issue, until the first is withdrawn.
+			-- The ruling that answers it, waiting or in force.
 			"ruling_id"        ` + t.refNull + ` NULL,
-			-- Whether the flaw was found here rather than sent in. Only one
-			-- sent in carries a disclosure date, because only then is
-			-- somebody outside counting down to a publication (REQ-37). A
-			-- default rather than a fill: a report is from outside unless
-			-- somebody says otherwise.
+			-- Whether the flaw was found here rather than sent in.
 			"found_here"       ` + t.boolean + ` DEFAULT FALSE NOT NULL,
+			-- The party holding it: a person, or a team whose queue it sits
+			-- in. Null is a report nobody holds.
+			"assigned_to"      ` + t.refNull + ` NULL,
+			"assigned_at"      ` + t.timestamp + ` NULL,
 			CONSTRAINT "flaw_report_reference_unique" UNIQUE ("reference"),
 			CONSTRAINT "flaw_report_issue_unique" UNIQUE ("vulnerability_id"),
 			CONSTRAINT "flaw_report_issue_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
 			CONSTRAINT "flaw_report_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "flaw_report_by_fk" FOREIGN KEY ("recorded_by") REFERENCES "person"("id"),
-			CONSTRAINT "flaw_report_answered_by_fk" FOREIGN KEY ("acknowledged_by") REFERENCES "person"("id"),
 			CONSTRAINT "flaw_report_judged_by_fk" FOREIGN KEY ("evaluated_by") REFERENCES "person"("id"),
-			CONSTRAINT "flaw_report_ruling_fk" FOREIGN KEY ("ruling_id") REFERENCES "report_ruling"("id")
+			CONSTRAINT "flaw_report_ruling_fk" FOREIGN KEY ("ruling_id") REFERENCES "report_ruling"("id"),
+			CONSTRAINT "flaw_report_holder_fk" FOREIGN KEY ("assigned_to") REFERENCES "party"("id")
 		)` + t.suffix,
-
-		// The unacknowledged sweep's index: the reports nobody has answered.
-		`CREATE INDEX "flaw_report_unanswered_idx"
-			ON "flaw_report" ("acknowledged_at", "received_on")`,
 
 		// One product's reports, newest first, which is the list somebody
 		// works through.
@@ -103,6 +79,116 @@ func flawReportBaseline(t *columnTypes) []string {
 
 		`CREATE INDEX "flaw_report_ruling_idx"
 			ON "flaw_report" ("ruling_id")`,
+
+		// What one party holds and what nobody holds, product by product.
+		`CREATE INDEX "flaw_report_holder_idx"
+			ON "flaw_report" ("assigned_to", "product_id")`,
+
+		// What a report said before each edit. The report row holds what it
+		// says now; each row here holds what one edit replaced.
+		`CREATE TABLE "flaw_report_revision" (
+			"id"             ` + t.id + `,
+			"flaw_report_id" ` + t.ref + ` NOT NULL,
+			-- Which version this was, counting from one. The report as it
+			-- stands is one past the highest here, and version one is the
+			-- report as it was first recorded.
+			"ordinal"        ` + t.ref + ` NOT NULL,
+			"title"            ` + t.free + ` NULL,
+			"reported_problem" ` + t.text + ` NULL,
+			"reported_by"    ` + t.free + ` NULL,
+			"contact"        ` + t.free + ` NULL,
+			"credit"         ` + t.free + ` NULL,
+			"received_on"    ` + t.date + ` NULL,
+			-- Who replaced it, and when.
+			"replaced_by"    ` + t.ref + ` NOT NULL,
+			"replaced_at"    ` + t.timestamp + ` NOT NULL,
+			CONSTRAINT "flaw_report_revision_report_fk" FOREIGN KEY ("flaw_report_id")
+				REFERENCES "flaw_report"("id"),
+			CONSTRAINT "flaw_report_revision_by_fk" FOREIGN KEY ("replaced_by")
+				REFERENCES "person"("id"),
+			CONSTRAINT "flaw_report_revision_once" UNIQUE ("flaw_report_id", "ordinal")
+		)` + t.suffix,
+
+		// A note somebody here wrote on a report, which says something to
+		// whoever works it and records no judgment.
+		`CREATE TABLE "report_note" (
+			"id"             ` + t.id + `,
+			"flaw_report_id" ` + t.ref + ` NOT NULL,
+			"body"           ` + t.text + ` NOT NULL,
+			"written_by"     ` + t.ref + ` NOT NULL,
+			"written_at"     ` + t.timestamp + ` NOT NULL,
+			-- When its author last changed it. What it said before is in the
+			-- note's revisions.
+			"edited_at"      ` + t.timestamp + ` NULL,
+			CONSTRAINT "report_note_report_fk" FOREIGN KEY ("flaw_report_id")
+				REFERENCES "flaw_report"("id"),
+			CONSTRAINT "report_note_author_fk" FOREIGN KEY ("written_by")
+				REFERENCES "person"("id")
+		)` + t.suffix,
+		`CREATE INDEX "report_note_thread_idx" ON "report_note" ("flaw_report_id", "id")`,
+
+		// What a note said before it was changed. Only its author changes
+		// one, so a revision has no author of its own.
+		`CREATE TABLE "report_note_revision" (
+			"id"          ` + t.id + `,
+			"note_id"     ` + t.ref + ` NOT NULL,
+			"ordinal"     ` + t.ref + ` NOT NULL,
+			"body"        ` + t.text + ` NOT NULL,
+			"replaced_at" ` + t.timestamp + ` NOT NULL,
+			CONSTRAINT "report_note_revision_fk" FOREIGN KEY ("note_id")
+				REFERENCES "report_note"("id"),
+			CONSTRAINT "report_note_revision_once" UNIQUE ("note_id", "ordinal")
+		)` + t.suffix,
+
+		// One message between this deployment and the reporter, as somebody
+		// here recorded it. Nothing is sent from here: the row records a
+		// message somebody sent or received elsewhere.
+		`CREATE TABLE "report_message" (
+			"id"             ` + t.id + `,
+			"flaw_report_id" ` + t.ref + ` NOT NULL,
+			-- sent or received.
+			"direction"      ` + t.kind + ` NOT NULL,
+			-- The day the message was sent or received.
+			"dated"          ` + t.date + ` NOT NULL,
+			-- The message, pasted or summarized, as markdown. Null on the
+			-- acknowledgement a v0.10.0 database recorded, which held no
+			-- text.
+			"body"           ` + t.text + ` NULL,
+			"logged_by"      ` + t.ref + ` NOT NULL,
+			"logged_at"      ` + t.timestamp + ` NOT NULL,
+			CONSTRAINT "report_message_report_fk" FOREIGN KEY ("flaw_report_id")
+				REFERENCES "flaw_report"("id"),
+			CONSTRAINT "report_message_by_fk" FOREIGN KEY ("logged_by")
+				REFERENCES "person"("id")
+		)` + t.suffix,
+		// A report's log in order, and whether anything was sent, which is
+		// what the unanswered condition asks.
+		`CREATE INDEX "report_message_log_idx"
+			ON "report_message" ("flaw_report_id", "direction", "dated")`,
+
+		// Every change of who holds a report, for its history. The report row
+		// holds the holder now.
+		`CREATE TABLE "report_assignment" (
+			"id"             ` + t.id + `,
+			"flaw_report_id" ` + t.ref + ` NOT NULL,
+			-- The party it went to. Null is handed back to nobody.
+			"assigned_to"    ` + t.refNull + ` NULL,
+			-- The person who did it. Null where a standing rule placed it.
+			"assigned_by"    ` + t.refNull + ` NULL,
+			-- The standing rule that placed it, where one did.
+			"assigned_by_rule" ` + t.refNull + ` NULL,
+			"assigned_at"    ` + t.timestamp + ` NOT NULL,
+			CONSTRAINT "report_assignment_report_fk" FOREIGN KEY ("flaw_report_id")
+				REFERENCES "flaw_report"("id"),
+			CONSTRAINT "report_assignment_party_fk" FOREIGN KEY ("assigned_to")
+				REFERENCES "party"("id"),
+			CONSTRAINT "report_assignment_by_fk" FOREIGN KEY ("assigned_by")
+				REFERENCES "person"("id"),
+			CONSTRAINT "report_assignment_rule_fk" FOREIGN KEY ("assigned_by_rule")
+				REFERENCES "assignment_rule"("id")
+		)` + t.suffix,
+		`CREATE INDEX "report_assignment_report_idx"
+			ON "report_assignment" ("flaw_report_id", "assigned_at")`,
 	}
 }
 

@@ -3,15 +3,9 @@
 
 package migrations
 
-import (
-	"context"
-
-	"github.com/uptrace/bun"
-)
-
-// documentUploadV0110 is v0.11.0's declaration of the record of each VEX
+// documentUploadBaseline declares the record of each VEX
 // document and supplier advisory that arrived for a product.
-func documentUploadV0110(t *columnTypes) []string {
+func documentUploadBaseline(t *columnTypes) []string {
 	return []string{
 		// One row per arrival, taken or turned away, and never replaced. An
 		// administrator uploads by hand, and a feed steps past a document
@@ -62,19 +56,4 @@ func documentUploadV0110(t *columnTypes) []string {
 		// What a feed fetched, for the foreign key.
 		`CREATE INDEX "document_upload_feed_idx" ON "document_upload" ("supplier_advisory_feed_id")`,
 	}
-}
-
-// createDocumentUploadV0110 makes the record of VEX document and supplier
-// advisory uploads, stepped over where it is already there. v0.10.0 kept no
-// such record, so it starts empty: what arrived before the upgrade is in the
-// statements and the history of administrative changes.
-func createDocumentUploadV0110(ctx context.Context, tx bun.Tx) error {
-	u, err := upgraderIn(ctx, tx)
-	if err != nil {
-		return err
-	}
-	if present, err := u.hasColumn("document_upload", "id"); err != nil || present {
-		return err
-	}
-	return u.create(documentUploadV0110(u.t), "document_upload")
 }

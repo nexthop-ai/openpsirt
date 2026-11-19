@@ -34,9 +34,6 @@ Satisfies REQ-24, REQ-27, REQ-28, REQ-37, REQ-85.
 | The acknowledgement is the first message recorded as sent; its day and recorder are the acknowledged date and who | Derived, so they cannot disagree. The unanswered condition fires at once and clears when one is recorded |
 | The reported problem goes through the submission policy (REQ-67) | It is outsider text rendered as markdown |
 
-The upgrade gives every report v0.10.0 left empty on a flaw recorded here that
-flaw's summary; any other empty report stays empty.
-
 ## Report references
 
 The product, `R`, the year and six random digits. The `R` keeps references and

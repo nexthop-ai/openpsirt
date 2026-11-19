@@ -12,65 +12,25 @@ import (
 // Counts is how many rows each table holds.
 type Counts map[string]int64
 
-// renamesV0110 is the migration that gives tables the names the interface
-// uses.
-const renamesV0110 = 45
-
-// AsRenamed is the counts a release held, each under the name the upgrade
-// from a release whose last migration is given leaves its table with. renamed
-// maps a table's name before the upgrade to its name after; a table it does
-// not name keeps its name, and no name is renamed twice.
-func AsRenamed(fromLast int64, held Counts, renamed map[string]string) Counts {
-	if fromLast >= renamesV0110 {
-		return held
-	}
-	out := make(Counts, len(held))
-	for name, n := range held {
-		if to, ok := renamed[name]; ok {
-			name = to
-		}
-		out[name] = n
-	}
-	return out
-}
-
-// FilledV0110 is the rows the upgrade from a release whose last migration is
-// given writes from what the release held: each acknowledgement it recorded
-// becomes a report's first message sent. A release already past that upgrade
-// has its messages and is filled with nothing.
-func FilledV0110(fromLast, acknowledged int64) Counts {
-	if fromLast >= renamesV0110 {
-		return Counts{}
-	}
-	return Counts{"report_message": acknowledged}
-}
-
 // seededTables are the tables a release's seed has to leave rows in for an
 // upgrade of it to check anything.
 var seededTables = []string{"finding", "decision", "decision_occurrence", "received_vex_statement", "flaw_report"}
 
-// Unseeded is every table a release's seed left empty, and the acknowledged
-// reports below the upgrade that turns them into messages sent, since
-// migration 45's fill of none checks nothing.
-func Unseeded(fromLast int64, held Counts, acknowledged int64) []string {
+// Unseeded is every table a release's seed left empty.
+func Unseeded(held Counts) []string {
 	var empty []string
 	for _, table := range seededTables {
 		if held[table] == 0 {
 			empty = append(empty, table)
 		}
 	}
-	if fromLast < renamesV0110 && acknowledged == 0 {
-		empty = append(empty, "an acknowledged report")
-	}
 	return empty
 }
 
 // Compare reports every table whose count moved across an upgrade. before is
-// what the release held, after is what the upgrade left, and filled is the
-// rows the upgrade writes into a table from what the release held elsewhere. A
-// table holds what it held and what it is filled with, and a table only the
-// upgrade holds starts with what it is filled with and nothing more.
-func Compare(before, after, filled Counts) []string {
+// what the release held and after is what the upgrade left. A table holds
+// what it held, and a table only the upgrade holds is empty.
+func Compare(before, after Counts) []string {
 	var faults []string
 	names := map[string]bool{}
 	for name := range before {
@@ -91,12 +51,10 @@ func Compare(before, after, filled Counts) []string {
 		switch {
 		case held && !holds:
 			faults = append(faults, fmt.Sprintf("%s held %d rows and is gone, and nothing says where they went", name, was))
-		case held && is != was+filled[name]:
-			faults = append(faults, fmt.Sprintf("%s held %d rows, is filled with %d, and holds %d", name, was, filled[name], is))
-		case !held && is != filled[name] && filled[name] == 0:
+		case held && is != was:
+			faults = append(faults, fmt.Sprintf("%s held %d rows and holds %d", name, was, is))
+		case !held && is != 0:
 			faults = append(faults, fmt.Sprintf("%s is new and holds %d rows, and nothing the release held fills it", name, is))
-		case !held && is != filled[name]:
-			faults = append(faults, fmt.Sprintf("%s is new and holds %d rows, and what the release held fills it with %d", name, is, filled[name]))
 		}
 	}
 	return faults

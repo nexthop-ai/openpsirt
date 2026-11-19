@@ -4,11 +4,13 @@
 package migrations_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -39,7 +41,6 @@ func TestAMigrationWaitsOutAHolderWithoutStallingOtherSessions(t *testing.T) {
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, migrations.Baseline)
 		noConnectionCarriesTheBound(t, db)
-		dbtest.MigrateTo(t, db, v0120)
 		if db.Server.Engine == database.SQLite {
 			// SQLite's attempt is its busy timeout, a minute from the URL,
 			// shortened here on the harness's one connection.
@@ -256,4 +257,22 @@ func holdTable(t *testing.T, db *database.DB) (*sql.Tx, *sql.DB, string) {
 		t.Fatal(err)
 	}
 	return tx, pool, fmt.Sprint(id)
+}
+
+// lockedBuffer is a log written by one goroutine and read by another.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }

@@ -16,7 +16,7 @@ import (
 func seedNodeV0120(t *testing.T, db *database.DB) int64 {
 	t.Helper()
 	ctx := t.Context()
-	scan := seedReplacedV0110(t, db).current
+	scan := seedReplacedV0120(t, db).current
 	var build int64
 	if err := db.DB.NewRaw(`SELECT "build_id" FROM "scan" WHERE "id" = ?`, scan).Scan(ctx, &build); err != nil {
 		t.Fatal(err)
