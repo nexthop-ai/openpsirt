@@ -206,27 +206,33 @@ func (t Target) Covers(d graph.Described) bool {
 		// covers every version of the name.
 		return coversNamed(t.Name, version, d)
 	}
+	componentBase, componentVersion := graph.PackageOf(d.Purl)
+	if componentBase == base && (version == "" || version == versionOf(componentVersion, d)) {
+		return true
+	}
 	if strings.HasPrefix(base, "pkg:generic/") {
-		// The same question, asked of a claim that spells the source tree as
-		// an identifier rather than as a bare name: the package name is the
-		// last segment, and a namespace is compared where the component's
-		// own generic identifier carries one.
+		// A generic identifier that is not the component's own, at its
+		// version, names a source tree: the package name is the last segment,
+		// and a namespace is compared where the component's own generic
+		// identifier carries one. The component's own identifier is compared
+		// first because the name a component is stored under is the one its
+		// first inventory gave it, and a later inventory may call it something
+		// else.
 		if !GenericNamespaceAgrees(base, d.Purl) {
 			return false
 		}
 		return coversNamed(nameOf(base), version, d)
 	}
-	componentBase, componentVersion := graph.PackageOf(d.Purl)
-	if componentBase != base {
-		return false
+	return false
+}
+
+// versionOf is the version a component's identifier states, and the version
+// stated beside it where the identifier states none.
+func versionOf(stated string, d graph.Described) string {
+	if stated == "" {
+		return d.Version
 	}
-	if version == "" {
-		return true
-	}
-	if componentVersion == "" {
-		componentVersion = d.Version
-	}
-	return version == componentVersion
+	return stated
 }
 
 // coversNamed answers a claim that names a source tree rather than a package.

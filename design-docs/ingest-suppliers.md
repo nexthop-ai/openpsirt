@@ -28,7 +28,7 @@ own (`design-docs/remediation.md`). Choosing the publisher is the deliberate act
 | A supplier's name is stored lowered and matched without regard to capitals | |
 | A product out of use takes no supplier | Nothing lists it to withdraw one |
 | A claim is recorded as the administrator who configured the supplier | That configuration is the one decision made |
-| Only claims naming a component the product ships are recorded | A feed covers a whole catalog |
+| Only claims naming a component the product ships are recorded, by the component's name or the name its package identifier gives | A feed covers a whole catalog; a component keeps the name its first inventory gave it |
 | A new supplier is read from a window, a year unless set otherwise; older documents are uploaded | A distribution's feed is tens of thousands of documents |
 | Taken up again at the same address, a supplier resumes where it stopped, no further back than the window; at another address it starts afresh | |
 | Red Hat, SUSE, Cisco, Siemens and NCSC-NL are presets filling name and address, none configured; one the product reads by name or address is not offered | |

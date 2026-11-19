@@ -47,7 +47,8 @@ What each claim does to a finding is `design-docs/findings-closure.md`
 | A version reaches a component stating it beside an identifier naming none | |
 | An OpenVEX product with subcomponents claims the subcomponents, read only as package identifiers; one with none claims itself; one whose subcomponents are all of another kind claims nothing | A bare name covers every version and fork. This deployment's export states claims that way |
 | A source-tree claim matches a component of that name, or a fork | The build knows what came from its tree |
-| A tree is a bare name or a generic package identifier, matched alike; the generic one names its package by its last segment, comparing namespace only against a generic component carrying one | A distribution's namespace names the distribution |
+| A generic package identifier that is the component's own covers it at the version named, whatever name the component is stored under | A component keeps the name its first inventory gave it, and a later one may call it something else |
+| A tree is a bare name or another generic package identifier, matched alike; the generic one names its package by its last segment, comparing namespace only against a generic component carrying one | A distribution's namespace names the distribution |
 | A tree named with a version is matched on it, against the component's version and what it was built from | |
 | A claim is matched at every occurrence of its component in the product it names | |
 | A name or identifier holding its own release is matched as written, never by its identifying name | A statement about one release says nothing of the next (`design-docs/data-model-components.md` § The identifying name) |
@@ -98,6 +99,7 @@ one claim shape.
 | The same bytes uploaded again record the times the document states where the rows hold none | |
 | The same bytes again write nothing where they read as what stands, and replace it where the reader now derives differently | |
 | A statement is stored against the package's decoded name, without namespace, version, qualifiers or subpath | `pkg:deb/debian/frr?arch=amd64` is `frr` |
+| A statement, and the product it names, reach a component by the component's name or by the name its package identifier gives, in every read that matches them | A component keeps the name its first inventory gave it (`design-docs/data-model-components.md` § Component identity) |
 | A shipping-inside product is stored as package identifier, folded name and version | |
 | What a statement names its supplier's product as is stored: inside a named product, a product named alone, or nothing; only the first two place anything | |
 | A claim repeated word for word, placed where it stood, keeps its row and takes the new digest and moment; a row stored before products were read takes its new placement | A superseded claim tells citing approvals the publisher changed their word |

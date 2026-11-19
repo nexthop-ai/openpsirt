@@ -647,12 +647,30 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 	for _, name := range names {
 		lowered = append(lowered, folded(name))
 	}
+	// A statement is stored under the name its identifier gives, and the
+	// component under the name its first inventory gave it, which a later one
+	// may not repeat; the build names it as its own inventory does. Asked by
+	// the build's name and every name the component goes by.
+	called := []string{folded(component)}
+	if own := graph.Folded(graph.PartsOfPurl(purl).Name); own != "" && own != called[0] {
+		called = append(called, own)
+	}
+	var stored []string
+	if err := s.db.NewSelect().TableExpr(`"component_name"`).ColumnExpr(`"name_folded"`).
+		Where(`"component_id" = ?`, componentID).Scan(ctx, &stored); err != nil {
+		return nil, fmt.Errorf("read every name this component goes by: %w", err)
+	}
+	for _, name := range stored {
+		if !slices.Contains(called, name) {
+			called = append(called, name)
+		}
+	}
 	var said []Statement
 	err := withWords(s.db.NewSelect().Model(&said)).
 		Where(`"ss"."product_id" = ?`, productID).
 		Where(`"superseded_at" IS NULL`).
 		Where(`"vulnerability" IN (?)`, bun.List(lowered)).
-		Where(`"component" = ?`, folded(component)).
+		Where(`"component" IN (?)`, bun.List(called)).
 		Scan(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read what publishers have said about this: %w", err)
@@ -680,6 +698,9 @@ func (s *Store) SaidAbout(ctx context.Context, subject access.Subject, productID
 		aboveNames := make([]string, 0, len(above))
 		for _, c := range above {
 			aboveNames = append(aboveNames, folded(c.Name))
+			if apart := graph.PackageFolded(c.Purl); apart != "" && apart != folded(c.Name) {
+				aboveNames = append(aboveNames, apart)
+			}
 		}
 		var beneath []Statement
 		err := withWords(s.db.NewSelect().Model(&beneath)).
@@ -725,9 +746,9 @@ func (s *Store) shipsProducts(ctx context.Context, productID int64,
 	var rows []string
 	err := s.db.NewSelect().
 		Distinct().
-		TableExpr(`"component" AS "pc"`).
+		TableExpr(`"component_name" AS "pc"`).
 		ColumnExpr(`"pc"."name_folded"`).
-		Join(`JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."id"`).
+		Join(`JOIN "graph_node" AS "pn" ON "pn"."component_id" = "pc"."component_id"`).
 		Join(`JOIN "build" AS "pt" ON "pt"."id" = "pn"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "ps" ON "ps"."id" = "pt"."branch_or_tag_id"`).
 		Where(`"ps"."product_id" = ?`, productID).

@@ -20,6 +20,7 @@ import (
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest/fixture"
 	"github.com/nexthop-ai/openpsirt/internal/finding"
+	"github.com/nexthop-ai/openpsirt/internal/graph"
 	"github.com/nexthop-ai/openpsirt/internal/notify"
 	"github.com/nexthop-ai/openpsirt/internal/publish"
 	"github.com/nexthop-ai/openpsirt/internal/queue"
@@ -406,6 +407,117 @@ func TestDecliningAStatementThatIsNotAnUpstreamsIsRefused(t *testing.T) {
 		}
 		if declined != nil {
 			t.Errorf("the supplier's statement was declined at %s", declined)
+		}
+	})
+}
+
+// A component keeps the name its first inventory gave it, and an upstream's
+// statement is stored under the name its package identifier gives, so an
+// offer is found by either.
+func TestAnOfferReachesAComponentStoredUnderAnotherName(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		// As the rows stand where the first inventory named it so: its own
+		// name, and the package's name its identifier gives beside it.
+		before, err := w.findings.UpstreamSaid(t.Context(), w.proposer, w.fork.ID, libnl.Name)
+		if err != nil || len(before) == 0 {
+			t.Fatalf("the upstream says %d things about %s (%v), so this asks nothing", len(before), libnl.Name, err)
+		}
+		var id int64
+		if err := w.DB.DB.NewSelect().Table("component").Column("id").
+			Where(`"purl" = ?`, libnl.Purl).Scan(t.Context(), &id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.DB.DB.NewUpdate().Table("component").
+			Set(`"name" = ?`, "Netlink library").Set(`"name_folded" = ?`, "netlink library").
+			Where(`"id" = ?`, id).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.DB.DB.NewInsert().Model(&graph.ComponentName{ComponentID: id,
+			NameFolded: "netlink library"}).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		offers, err := w.findings.Offers(t.Context(), w.proposer, w.fork.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(offers) != 2 {
+			t.Errorf("offered %d, want the upstream's own-build statement at both of the fork's builds", len(offers))
+		}
+		said, err := w.findings.UpstreamSaid(t.Context(), w.proposer, w.fork.ID, "Netlink library")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(said) != len(before) {
+			t.Errorf("the upstream says %d things about the component by its other name, want the %d it says by its package's",
+				len(said), len(before))
+		}
+	})
+}
+
+// A build may name a component otherwise than the name its first inventory
+// stored, and a statement may be stored under either of those or under the
+// name its package identifier gives. The Component page, opened under the
+// build's name, and a finding's evidence each find a statement under any of
+// them.
+func TestWhatIsSaidIsFoundUnderEveryNameAComponentGoesBy(t *testing.T) {
+	fixture.Each(t, func(t *testing.T, f *fixture.World) {
+		w := newWorld(t, f)
+		w.trust()
+		w.read()
+		ctx := t.Context()
+		before, err := w.findings.UpstreamSaid(ctx, w.proposer, w.fork.ID, libnl.Name)
+		if err != nil || len(before) == 0 {
+			t.Fatalf("the upstream says %d things about %s (%v), so this asks nothing", len(before), libnl.Name, err)
+		}
+		var id int64
+		if err := w.DB.DB.NewSelect().Table("component").Column("id").
+			Where(`"purl" = ?`, libnl.Purl).Scan(ctx, &id); err != nil {
+			t.Fatal(err)
+		}
+		// Stored as its first inventory named it, and stated by this build
+		// as "netlink".
+		if _, err := w.DB.DB.NewUpdate().Table("component").
+			Set(`"name" = ?`, "Netlink library").Set(`"name_folded" = ?`, "netlink library").
+			Where(`"id" = ?`, id).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.DB.DB.NewInsert().Model(&graph.ComponentName{ComponentID: id,
+			NameFolded: "netlink library"}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.DB.DB.NewUpdate().Table("graph_node").Set(`"name" = ?`, "netlink").
+			Set(`"name_folded" = ?`, "netlink").Where(`"component_id" = ?`, id).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		said, err := w.findings.UpstreamSaid(ctx, w.proposer, w.fork.ID, "netlink")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(said) != len(before) {
+			t.Errorf("the page under the build's name holds %d statements, want the %d said under the package's name",
+				len(said), len(before))
+		}
+
+		// A statement under the stored name alone.
+		if _, err := w.DB.DB.NewUpdate().Table("received_vex_statement").
+			Set(`"component" = ?`, "netlink library").
+			Where(`"product_id" = ?`, w.fork.ID).Where(`"component" = ?`, "libnl-3-200").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		issue, err := finding.NewVulnerabilities(w.DB.DB).ByName(ctx, ownBuild)
+		if err != nil {
+			t.Fatal(err)
+		}
+		evidence, err := w.findings.SaidAbout(ctx, w.proposer, w.fork.ID, issue, []string{ownBuild},
+			"netlink", libnl.Purl, w.forkBuild.ID, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(evidence) == 0 {
+			t.Error("the finding's evidence holds nothing, want the statement under the name the component is stored under")
 		}
 	})
 }

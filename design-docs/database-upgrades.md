@@ -278,7 +278,7 @@ brings together, one lapses.
 ## The v0.14.0 upgrade
 
 Migration 48. Three indexes are made again, each holding one more column,
-five tables gain a column, and two tables are made.
+five tables gain a column, and three tables are made.
 
 | Table | Gains |
 |---|---|
@@ -290,12 +290,15 @@ five tables gain a column, and two tables are made.
 | `vulnerability` | The files its record lists, null for every issue stored before until its next scan (`design-docs/ingest-scanner.md` § Program files) |
 | `source_correction`, `source_answer` | Made: a correction by source paths, and what it answered on which files (`design-docs/triage.md` § Corrections) |
 | `component` | What the inventory says the component is, null for every component stored before (`design-docs/findings-components.md` § Inventory descriptions) |
+| `component_name` | Made: every name a component goes by (`design-docs/data-model-components.md` § Component identity). Filled in Go, 5,000 components a read in order of identifier: each component's folded name, and the name its package identifier gives where that differs, by a copy the upgrade holds of the application's rule; a test holds the copy to the application's. A component whose identifier is not a package identifier gets its own name alone. A name already held is kept. The whole upgrade of 100,000 `pkg:deb` components, one in ten named apart from its identifier, takes 12 s on PostgreSQL, 1.4 s on MySQL, 1.1 s on MariaDB and 0.6 s on SQLite |
 
 A statement or claim the upgrade leaves without notes takes them in place when
 its document or the build's next inventory gives them: the row stays, with its
 decline, what cites it and the findings it answers, and no alert is raised
 (`design-docs/ingest-claims.md` § Status notes). A component the upgrade leaves
-without a description takes one from the next inventory stating it.
+without a description takes one from the next inventory stating it. A name a
+component goes by that is already held is kept, so a start that stopped part
+way fills what it left.
 
 Each index is dropped and made again, so an upgrade stopped between the two
 makes it. Each column is added where the table lacks it, so a start that
@@ -306,6 +309,9 @@ stopped after the first, as MySQL and MariaDB leave one, adds the second.
 | A v0.13.0 database | Upgraded, the tables built as declared |
 | The same, upgraded and run again with its version unrecorded | Upgraded the same |
 | A v0.13.0 database whose claims already gained the notes column | Upgraded, the tables built as declared |
+| A v0.13.0 database holding components named apart from their package identifier, one namespaced and escaped, one named as its identifier, one with none, and one with an address that is not one | The first two go by their own name and the name their identifier gives, folded and decoded; the others by their own name alone |
+| The same, upgraded, two components' names removed, and upgraded again with its version unrecorded | The names put back, the others left |
+| The upgrade's package name rule against the application's, over identifiers escaped, malformed, holding control characters and holding none | The same name for each |
 
 ## Limits
 

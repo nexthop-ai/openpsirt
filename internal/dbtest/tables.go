@@ -231,6 +231,7 @@ var tables = []string{
 	// Before graph_node, which it points at.
 	"image_version",
 	"graph_node",
+	"component_name",
 	"component",
 	"job",
 	"scan_refusal",

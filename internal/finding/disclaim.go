@@ -512,8 +512,9 @@ func (d *placer) place(product sbom.Target) *placement {
 
 // isProduct reports whether a component is the supplier's product: by the
 // package identifier the statement names, where it names one of a package,
-// and otherwise by the identifier or by the component's own name. With
-// atVersion, at the version the statement names as well.
+// and otherwise by the identifier, or by the component's own name or the name
+// its package identifier gives. With atVersion, at the version the statement
+// names as well.
 //
 // Never by what the component was built from. A fork of the supplier's source
 // carries the supplier's name as the name it was built from, and a build of
@@ -538,7 +539,10 @@ func isProduct(product sbom.Target, c graph.Component, atVersion bool) bool {
 		// pkg:generic/sonic-utilities beside "SONiC utilities".
 	case base != "" && !sbom.GenericNamespaceAgrees(base, c.Purl):
 		return false
-	case product.Name == "" || !strings.EqualFold(product.Name, c.Name):
+	case product.Name == "" || !strings.EqualFold(product.Name, c.Name) &&
+		!strings.EqualFold(product.Name, graph.PartsOfPurl(c.Purl).Name):
+		// By the component's name, or the name its package identifier
+		// gives: a component keeps the name its first inventory gave it.
 		return false
 	}
 	return !atVersion || (version != "" && version == heldVersion)

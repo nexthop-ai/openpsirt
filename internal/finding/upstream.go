@@ -193,7 +193,11 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 	var out []Offer
 	q := s.db.NewSelect().
 		TableExpr(`"received_vex_statement" AS "ss"`).
-		Join(`JOIN "component" AS "c" ON "c"."name_folded" = "ss"."component" AND "c"."version" = "ss"."about"`).
+		// By every name a component goes by: a component keeps the name its
+		// first inventory gave it, and an upstream names it by the name its
+		// package identifier gives.
+		Join(`JOIN "component_name" AS "cn" ON "cn"."name_folded" = "ss"."component"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "cn"."component_id" AND "c"."version" = "ss"."about"`).
 		Join(`JOIN `+named+` AS "names" ON "names"."folded" = "ss"."vulnerability"`).
 		Join(`JOIN "finding" AS "f" ON "f"."vulnerability_id" = "names"."issue_id" AND "f"."component_id" = "c"."id"`).
 		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
@@ -245,18 +249,39 @@ func (s *Store) Offers(ctx context.Context, subject access.Subject, productID in
 
 // UpstreamSaid is what an upstream this product trusts says about a component
 // of one name, standing statements only, declined ones included, newest
-// first.
+// first. Asked by every name a component of that name this product ships goes
+// by, so a statement naming the package a component's first inventory called
+// something else is found.
 func (s *Store) UpstreamSaid(ctx context.Context, subject access.Subject, productID int64,
 	component string) ([]Statement, error) {
 
 	if !subject.Reads(access.Public, productID) {
 		return nil, access.Denied("read what an upstream says")
 	}
+	called := []string{folded(component)}
+	var also []string
+	if err := s.db.NewSelect().Distinct().
+		TableExpr(`"component_name" AS "cn"`).
+		Join(`JOIN "component_name" AS "an" ON "an"."component_id" = "cn"."component_id"`).
+		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "cn"."component_id"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "n"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		ColumnExpr(`"an"."name_folded"`).
+		// The component's own names, or the name the build gave its node: the
+		// Component page is opened under the name the build states.
+		Where(`("cn"."name_folded" = ? OR "n"."name_folded" = ?)`, called[0], called[0]).
+		Where(`"an"."name_folded" <> ?`, called[0]).
+		Where(`"st"."product_id" = ?`, productID).
+		Where(`"n"."closed_scan_id" IS NULL`).
+		Scan(ctx, &also); err != nil {
+		return nil, fmt.Errorf("read every name a component of this name goes by: %w", err)
+	}
+	called = append(called, also...)
 	var said []Statement
 	err := withWords(s.db.NewSelect().Model(&said)).
 		Where(`"ss"."product_id" = ?`, productID).
 		Where(`"ss"."source" = ?`, FromUpstream).
-		Where(`"ss"."component" = ?`, folded(component)).
+		Where(`"ss"."component" IN (?)`, bun.List(called)).
 		Where(`"ss"."superseded_at" IS NULL`).
 		OrderExpr(`"ss"."id" DESC`).
 		Limit(MostOffers).

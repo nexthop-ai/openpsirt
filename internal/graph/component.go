@@ -695,6 +695,18 @@ func (c *Components) Intern(ctx context.Context, described []Described) (map[str
 			return nil, fmt.Errorf("recorded %d new components and %d came back",
 				len(written), len(found))
 		}
+		// Every name each goes by. A component another writer recorded has
+		// its names recorded by that writer as well, and keeping theirs loses
+		// nothing: the names are the row's.
+		var names []ComponentName
+		for _, added := range missing {
+			for _, name := range namesOf(added) {
+				names = append(names, ComponentName{ComponentID: found[added.Identity], NameFolded: name})
+			}
+		}
+		if err := database.InBatchesKeeping(ctx, c.db, names); err != nil {
+			return nil, fmt.Errorf("record the names %d new components go by: %w", len(missing), err)
+		}
 	}
 	return known, nil
 }
@@ -980,6 +992,37 @@ func (d Described) Source() (name, version string) {
 		version = d.Version
 	}
 	return name, version
+}
+
+// PackageFolded is the name a package identifier gives its package, folded,
+// and empty where the identifier is not a package identifier.
+func PackageFolded(purl string) string {
+	return Folded(PartsOfPurl(purl).Name)
+}
+
+// ComponentName is one name a component goes by, folded: its own, and the
+// name its package identifier gives where that differs. A component keeps
+// the name its first inventory gave it, and a statement is stored under the
+// name its identifier gives, so a statement reaches a component through these
+// rows by one indexed equality whichever name it used.
+type ComponentName struct {
+	bun.BaseModel `bun:"table:component_name,alias:cn"`
+
+	ID          int64  `bun:"id,pk,autoincrement"`
+	ComponentID int64  `bun:"component_id,notnull"`
+	NameFolded  string `bun:"name_folded,notnull"`
+}
+
+// namesOf is every name a component goes by, folded, once each.
+func namesOf(c Component) []string {
+	var names []string
+	if c.NameFolded != "" {
+		names = append(names, c.NameFolded)
+	}
+	if apart := PackageFolded(c.Purl); apart != "" && apart != c.NameFolded {
+		names = append(names, apart)
+	}
+	return names
 }
 
 // Folded is how a name is stored so that every engine compares it alike.

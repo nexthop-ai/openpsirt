@@ -173,6 +173,34 @@ func TestAStatementAboutOnePackageIsNotShownAgainstAnotherOfTheSameName(t *testi
 	})
 }
 
+func TestAStatementNamingAComponentsIdentifierIsShownWhateverTheComponentIsCalled(t *testing.T) {
+	// The component is stored under the name its first inventory gave it, and
+	// the statement under the name its identifier gives.
+	each(t, func(t *testing.T, f *fixture) {
+		ctx := t.Context()
+		who := f.planner(t, access.PublicTriage, access.PrivateTriage)
+		issue := f.issueNamed(t, "CVE-2021-45970")
+
+		if _, _, err := f.store.RecordStatements(ctx, who, f.productID,
+			finding.Supplied{Source: finding.FromVex, Publisher: "Insyde",
+				Document: "insyde.json", Digest: "sha256:one"}, []finding.Statement{{
+				Vulnerability: "CVE-2021-45970", Component: "insydeh2o",
+				Purl:   "pkg:generic/repro/insydeh2o@05.47.45.0027",
+				Status: "not_affected",
+			}}); err != nil {
+			t.Fatal(err)
+		}
+		said, err := f.store.SaidAbout(ctx, who, f.productID, issue, []string{"CVE-2021-45970"},
+			"Repro Platform", "pkg:generic/repro/insydeh2o@05.47.45.0027", f.build, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(said) != 1 {
+			t.Errorf("%d statements, want the one naming the component's identifier", len(said))
+		}
+	})
+}
+
 func TestASourceTreeClaimIsShownHoweverItWasNamed(t *testing.T) {
 	// The claim against a source tree, which the name is all there is of.
 	// Dropping it would silently lose every statement a publisher made the

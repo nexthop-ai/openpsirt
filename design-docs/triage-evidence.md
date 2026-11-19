@@ -46,7 +46,7 @@ recorded before the product was read, closes nothing.
 | A finding on the product itself stays evidence, a cycle included | A package identifier cannot tell the supplier's build from a rebuild |
 | A statement naming an ecosystem's package alone closes nothing | |
 | The product is matched exactly at the stated version; a version change reopens; no version stays evidence | |
-| Matched by the statement's package identifier or the component's name, never by what it was built from; a generic identifier is matched against identifier and name, namespace compared as for a source-tree claim | A fork carries the supplier's name as its source |
+| Matched by the statement's package identifier, or by the component's name or the name its package identifier gives, never by what it was built from; a generic identifier is matched against identifier and name, namespace compared as for a source-tree claim | A fork carries the supplier's name as its source |
 | Only `not_affected` closes, whatever the justification; an affected statement at most prefills (§ Statement display and filters) | |
 | The product must be a component of the build | A distribution's platform is in no build |
 | The build's patch and the CVE record are asked first | |
@@ -104,6 +104,7 @@ rejecting the absence of a fix as a signal.
 | A later upload sets aside its own kind: a VEX document its earlier revision, an advisory the advisory of its name, and either the publisher's older statements about a product and issue it states newer (`design-docs/ingest-claims.md` § Administrator-supplied VEX, § Supplier advisories) | |
 | The same bytes again change nothing | Supersession notifies holders of approvals citing it |
 | Shown against the package named, type and namespace compared, never the version | A short name such as `parser` is many packages |
+| Found by the component's name and by the name its package identifier gives | A component keeps the name its first inventory gave it |
 | The version a statement was made about is stored and shown beside it | A supplier names the fixing version; some state it only as a branch |
 | A statement's status notes are shown beneath its reasoning, labeled notes, as written and never rendered, and "Start from this" carries them into the reasoning on the line after the publisher's words (`design-docs/ingest-claims.md` § Status notes) | The notes are the explanation a `fixed` or `under_investigation` statement has |
 | A source-tree claim shows however named | Bare name and generic identifier are one claim |

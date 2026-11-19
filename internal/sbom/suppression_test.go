@@ -194,6 +194,37 @@ func TestANamespacedSourceTreeClaimCoversThePackageItNames(t *testing.T) {
 	}
 }
 
+// A generic identifier that is the component's own covers it whatever name the
+// component is stored under, which is the name its first inventory gave it.
+// One that is not falls back to the name, so a claim about a source tree still
+// covers what was built from it.
+func TestAGenericClaimCoversTheComponentItsIdentifierNames(t *testing.T) {
+	got := claims(t, statement(`{"vulnerability": {"name": "CVE-2021-45970"}, "status": "not_affected",
+	 "products": [{"@id": "pkg:generic/repro/insydeh2o@05.47.45.0027"}]}`))
+	for _, each := range []struct {
+		why    string
+		held   graph.Described
+		covers bool
+	}{
+		{"the component, stored under the name an earlier inventory gave it",
+			graph.Described{Purl: "pkg:generic/repro/insydeh2o@05.47.45.0027?arch=x86_64#bin",
+				Name: "Repro Platform", Version: "05.47.45.0027"}, true},
+		{"the component at another version",
+			graph.Described{Purl: "pkg:generic/repro/insydeh2o@05.47.46.0001",
+				Name: "Repro Platform", Version: "05.47.46.0001"}, false},
+		{"another generic package under that name",
+			graph.Described{Purl: "pkg:generic/repro/bios@05.47.45.0027",
+				Name: "Repro Platform", Version: "05.47.45.0027"}, false},
+		{"a source tree's build by its name",
+			graph.Described{Purl: "pkg:deb/repro/insydeh2o-tools@1.0", Name: "insydeh2o-tools",
+				Version: "1.0", UpstreamName: "insydeh2o", UpstreamVersion: "05.47.45.0027"}, true},
+	} {
+		if coversAny(got[0], each.held) != each.covers {
+			t.Errorf("%s: covered %v, wanted %v", each.why, !each.covers, each.covers)
+		}
+	}
+}
+
 func TestAClaimMatchesThePackageHoweverEitherSideSpellsIt(t *testing.T) {
 	// Identity decodes escapes and lowercases the type, because one real image
 	// carries the same package spelled both ways. A claim compared as written

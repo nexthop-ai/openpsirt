@@ -16,6 +16,7 @@ justifies. `make measure` re-runs the harness-driven ones.
 - [Replaced inventory check](#replaced-inventory-check)
 - [Remediation beside a check](#remediation-beside-a-check)
 - [Time to fix from publication](#time-to-fix-from-publication)
+- [Statements matched by name](#statements-matched-by-name)
 
 ## Fan-out cost
 
@@ -294,3 +295,43 @@ all time, two runs each.
 |---|---|
 | The difference | Inside run-to-run noise: the date is one column of the issue row the statement already joins |
 | MySQL and MariaDB | Not measured; SQLite and PostgreSQL show no cost |
+
+## Statements matched by name
+
+Justifies matching a statement to a component through a row per name the
+component goes by (`design-docs/data-model-components.md` § Component
+identity, `design-docs/ingest-claims.md`). `TestMeasureReadsMatchingStatementsToComponents`
+builds the model:
+
+| Part | Built as |
+|---|---|
+| Product | One branch with six variants, each one build of the full-size image: 6,843 components with an identifier, a name and a version, 1,418 of them named apart from their package identifier |
+| Findings | One issue per component, `CVE-2026-` and its index, reported at every build: 113,334 findings |
+| Placed statements | The first 3,585 components, one `not_affected` statement each under the component's name and identifier, placed inside a product at 1.0 from publisher Measure. An even index names the shipped component at index `(i×7+1) mod 6,843`; an odd one `acme-platform-` and its index, which nothing ships |
+| Waiting statements | For the same 3,585 issues, one statement each from publisher Upstream at the component's version, made upstream and unplaced. Every sixth index names the component; the rest `absent-` and its index |
+| Reads | The findings list for the product narrowed to publisher Measure, and narrowed to `not_affected`, 50 groups a page; the product's offers for review. Each read once to warm, then five times timed, the figure the median, as a reader holding every role on the product, after statistics are taken |
+
+The servers held their data in memory on one quiet host.
+
+| Engine | Read | One column, own name alone | Either of two columns, an OR | Either of two columns, split | A row per name |
+|---|---|---:|---:|---:|---:|
+| SQLite | Narrowed by publisher | 363 ms | 336 ms | 393 ms | 390 ms |
+| SQLite | Narrowed by what was said | 392 ms | | 412 ms | 366 ms |
+| SQLite | Offers for review | 109 ms | 16 ms | 555 ms | 112 ms |
+| PostgreSQL 16 | Narrowed by publisher | 331 ms | | 908 ms | 284 ms |
+| PostgreSQL 16 | Narrowed by what was said | 797 ms | | 8,715 ms | 512 ms |
+| PostgreSQL 16 | Offers for review | 122 ms | | 158 ms | 128 ms |
+| MySQL 8.4 | Narrowed by publisher | 319 ms | 720 ms | 490 ms | 363 ms |
+| MySQL 8.4 | Narrowed by what was said | 347 ms | | 557 ms | 347 ms |
+| MySQL 8.4 | Offers for review | 109 ms | 251 ms | 110 ms | 110 ms |
+| MariaDB 11.4 | Narrowed by publisher | 417 ms | 1,132 ms | 759 ms | 511 ms |
+| MariaDB 11.4 | Narrowed by what was said | 408 ms | | 795 ms | 504 ms |
+| MariaDB 11.4 | Offers for review | 97 ms | 279 ms | 293 ms | 80 ms |
+
+| Reading | Detail |
+|---|---|
+| A row per name | Within run-to-run noise of the component's own name alone on every engine: each match stays one indexed equality on one column |
+| Either of two columns | Two columns compared, by an OR or as two probes, lose the single index every engine starts the placed-alone test and the pairs from; PostgreSQL narrowed by what was said took 8.7 s |
+| The two middle columns | Earlier runs on the same model; a blank cell was not measured |
+| The OR on a second model | 19 s on MySQL and 17 s on MariaDB narrowed by publisher, against 18 to 135 ms with one column |
+

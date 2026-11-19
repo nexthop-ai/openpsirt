@@ -57,3 +57,11 @@ it is read as 117 ms on SQLite, and both 270 ms on PostgreSQL, each still
 reading a finding through the index on its issue. On
 SQLite, without the analysis an upgrade makes, both forms run past 120 s
 (`design-docs/database-measurements.md` § Statistics after an upgrade).
+
+A component is reached by every name it goes by through a row per name, one
+indexed equality. On the full-size image at six builds with 3,585
+upstream statements waiting, one in six naming a shipped component at its
+version, the median of five reads was 112 ms on SQLite, 128 ms on PostgreSQL,
+110 ms on MySQL and 80 ms on MariaDB, against 109, 122, 109 and 97 ms matching
+the component's own name alone (`design-docs/findings-measurements.md`
+§ Statements matched by name).

@@ -465,6 +465,40 @@ func TestWhatAPublisherSaysIsFixedDecidesNothingHere(t *testing.T) {
 	})
 }
 
+func TestAnAdvisoryNamingAShippedIdentifierIsRecordedWhateverTheComponentIsCalled(t *testing.T) {
+	// A component is stored under the name its first inventory gave it, and
+	// an advisory names it by its identifier.
+	shipping(t, func(t *testing.T, f *ships) {
+		ctx := t.Context()
+		// As the rows stand where the first inventory named it so: its own
+		// name, and the package's name its identifier gives beside it.
+		if _, err := f.db.DB.NewUpdate().Table("component").
+			Set(`"name" = ?`, "Netlink library").Set(`"name_folded" = ?`, "netlink library").
+			Where(`"purl" = ?`, "pkg:deb/debian/libnl-3-200@3.7.0").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewUpdate().Table("component_name").Set(`"name_folded" = ?`, "netlink library").
+			Where(`"name_folded" = ?`, "libnl-3-200").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.db.DB.NewInsert().Model(&graph.ComponentName{NameFolded: "libnl-3-200",
+			ComponentID: f.componentID(t, "pkg:deb/debian/libnl-3-200@3.7.0")}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		p := serving(t)
+		p.publishes("/2026/EL-3.json", "2026-09-20T00:00:00Z",
+			advisory("EL-2026-0003", "libnl-3-200", "3.7.1", "CVE-2026-3333"))
+
+		took, err := fetching(t, f, p).From(ctx, f.by, from(t, f, p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if took.Recorded != 1 {
+			t.Errorf("%d claims recorded, want the one naming the shipped identifier", took.Recorded)
+		}
+	})
+}
+
 func TestAnAdvisoryAboutNothingThisProductShipsIsNotRecorded(t *testing.T) {
 	// A publisher's feed is about their whole catalog. One real advisory about
 	// a kernel carries 95,139 claims, so a deployment taking them whole would
@@ -707,4 +741,15 @@ func TestAListingWithMisshapedFieldsNobodyReadsIsStillRead(t *testing.T) {
 			t.Fatalf("the pass read %d documents and recorded %d claims", took.Documents, took.Recorded)
 		}
 	})
+}
+
+// componentID is the component holding the identifier given.
+func (f *ships) componentID(t *testing.T, purl string) int64 {
+	t.Helper()
+	var id int64
+	if err := f.db.DB.NewSelect().Table("component").Column("id").
+		Where(`"purl" = ?`, purl).Scan(t.Context(), &id); err != nil {
+		t.Fatal(err)
+	}
+	return id
 }

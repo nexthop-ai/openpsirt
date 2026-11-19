@@ -23,7 +23,7 @@ type UnmatchedBody struct {
 	CPE       string           `json:"cpe,omitempty" doc:"The platform enumeration the scanner is given, where there is one"`
 	Ecosystem string           `json:"ecosystem,omitempty" doc:"The kind of package this is, as its identifier spells it"`
 	Namespace string           `json:"namespace,omitempty" doc:"The namespace its package identifier names, where it names one"`
-	Reason    core.Unmatchable `json:"reason" doc:"Why the scanner cannot match it. no-identifier: no package identifier, and a CPE alone matches nothing. unpublished-kind: a package type no vulnerability data is published against, such as a container image or a source repository. no-version: no version, or one reading unknown. no-distribution: a distribution's package that does not name the distribution release it was built for. generic-without-cpe: a generic package with no CPE"`
+	Reason    core.Unmatchable `json:"reason" doc:"Why the scanner cannot match it. A component whose CPE states a version is matchable, unless its package identifier is of a type the scanner matches by the identifier alone: deb, rpm, npm, pypi, gem, cargo, crate, golang, maven, nuget, dotnet, hex, otp, alpm, portage or bitnami. no-identifier: no package identifier. unpublished-kind: a package type no vulnerability data is published against, such as a container image or a source repository. no-version: no version, or one reading unknown. no-distribution: a distribution's package that does not name the distribution release it was built for. generic-without-cpe: a generic package with no CPE"`
 }
 
 // ReasonCountBody is how many of a build's components one reason covers.

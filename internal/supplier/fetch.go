@@ -1000,7 +1000,10 @@ func ours(advisory sbom.Advisory, ships map[string]bool) []finding.Statement {
 	return statements
 }
 
-// shipped is every component name this product holds, folded.
+// shipped is every name a component this product holds goes by, folded: its
+// own, and the name its package identifier gives. A statement is stored under
+// the name its identifier gives, and a component under the name its first
+// inventory gave it, which a later one may not repeat.
 //
 // One statement for the product rather than one per build: a product with
 // forty builds shares nearly all of its components between them, and asking
@@ -1009,9 +1012,9 @@ func (f *Fetcher) shipped(ctx context.Context, productID int64) (map[string]bool
 	var names []string
 	err := f.db.NewSelect().
 		Distinct().
-		TableExpr(`"component" AS "c"`).
-		ColumnExpr(`"c"."name_folded"`).
-		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "c"."id"`).
+		TableExpr(`"component_name" AS "cn"`).
+		ColumnExpr(`"cn"."name_folded"`).
+		Join(`JOIN "graph_node" AS "n" ON "n"."component_id" = "cn"."component_id"`).
 		Join(`JOIN "build" AS "b" ON "b"."id" = "n"."build_id"`).
 		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
 		Where(`"st"."product_id" = ?`, productID).
