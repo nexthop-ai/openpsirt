@@ -4,6 +4,7 @@
 package finding_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -81,7 +82,7 @@ func (f *fixture) dismissed(t *testing.T, d dismissal) {
 			occurrence.Consumer = &consumer
 		}
 		if d.ended == nil {
-			occurrence.Key = d.issue + string(rune('a'+i))
+			occurrence.Key = fmt.Sprintf("%s-%d", d.issue, i)
 		}
 		f.decision(t, occurrence)
 		if d.oneOccurrence {

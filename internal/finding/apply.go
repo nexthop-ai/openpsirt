@@ -520,9 +520,9 @@ type applyPlan struct {
 // departure is an open finding closing because it is no longer reported.
 type departure struct {
 	f heldFinding
-	// superseded says the same issue is still wanted at the same occurrence on
-	// another component: the row is being superseded by one against a new
-	// version rather than resolved.
+	// superseded says the same issue is still wanted at the same occurrence: the
+	// row is being superseded by one against a new version rather than
+	// resolved.
 	superseded bool
 }
 
@@ -543,8 +543,9 @@ type place struct {
 // deadline and assignment with it. A wanted finding held at the same key is
 // paired with that row. The rest are paired within their place: open findings
 // by identifier and wanted ones by consumer identifier, both ascending, so one
-// graph gets one answer. Only a finding a scan leaves open continues; one it
-// closes is closed where it stands.
+// graph gets one answer. A finding the scan closes as patched, unaffected or
+// disclaimed is paired as well, so it closes once, under the consumer the
+// occurrence holds now.
 func paired(want wantedSet, held map[key]heldFinding) (map[key]heldFinding, map[int64]bool) {
 	matched := make(map[key]heldFinding, len(want.findings))
 	kept := make(map[int64]bool, len(held))
@@ -553,12 +554,6 @@ func paired(want wantedSet, held map[key]heldFinding) (map[key]heldFinding, map[
 		if already, open := held[k]; open {
 			matched[k] = already
 			kept[already.ID] = true
-			continue
-		}
-		if want.patched[k] || want.cleared[k] != "" {
-			continue
-		}
-		if _, answered := want.disclaimed[k]; answered {
 			continue
 		}
 		where := place{k.vulnerabilityID, k.occurrence.componentID, f.OccurrenceIdentity}
@@ -602,9 +597,24 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 		disclaiming: map[int64][]int64{},
 	}
 	matched, kept := paired(want, held)
+	// A row closing that continues takes its consumer first, so it closes under
+	// the consumer the occurrence holds now and a later scan finds it there.
+	takesConsumer := func(already heldFinding, f Finding) {
+		if value(already.ConsumerID) == value(f.ConsumerID) {
+			return
+		}
+		change := moving{f: f, consumerMoved: true}
+		group, grouped := plan.updates[change.key()]
+		if !grouped {
+			group = &change
+			plan.updates[change.key()] = group
+		}
+		group.add(already.ID, f.Urgency)
+	}
 	for k, f := range want.findings {
 		if want.patched[k] {
 			if already, open := matched[k]; open {
+				takesConsumer(already, f)
 				plan.patching[*f.SuppressedBy] = append(plan.patching[*f.SuppressedBy], already.ID)
 			} else {
 				plan.arrivedPatched = append(plan.arrivedPatched, k)
@@ -613,6 +623,7 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 		}
 		if lines := want.cleared[k]; lines != "" {
 			if already, open := matched[k]; open {
+				takesConsumer(already, f)
 				plan.clearing[lines] = append(plan.clearing[lines], already.ID)
 			} else {
 				plan.arrivedCleared = append(plan.arrivedCleared, k)
@@ -621,6 +632,7 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 		}
 		if statement, answered := want.disclaimed[k]; answered {
 			if already, open := matched[k]; open {
+				takesConsumer(already, f)
 				plan.disclaiming[statement] = append(plan.disclaiming[statement], already.ID)
 			} else {
 				plan.arrivedDisclaimed = append(plan.arrivedDisclaimed, k)
@@ -687,11 +699,6 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 	// With the same issue still wanted at the same occurrence, a row closing is
 	// being superseded by one against a new version rather than resolved.
 	wantedAt := map[at]bool{}
-	// Unless it is still wanted on the same component: a row left over where
-	// a consumer's versions paired fewer than were open. No version of the
-	// component moved, so the row closes for what explains it at its
-	// occurrence.
-	wantedOn := map[place]bool{}
 	// And where what is wanted at that occurrence is patched, the row closes as
 	// patched: the version moved and the issue did not come with it.
 	patchedAt := map[at]int64{}
@@ -711,7 +718,6 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 			continue
 		}
 		wantedAt[at{f.VulnerabilityID, f.OccurrenceIdentity}] = true
-		wantedOn[place{f.VulnerabilityID, f.ComponentID, f.OccurrenceIdentity}] = true
 		if want.patched[k] {
 			patchedAt[at{f.VulnerabilityID, f.OccurrenceIdentity}] = *f.SuppressedBy
 		}
@@ -729,8 +735,7 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 			plan.disclaiming[statement] = append(plan.disclaiming[statement], f.ID)
 			continue
 		}
-		plan.departing = append(plan.departing, departure{f: f,
-			superseded: wantedAt[where] && !wantedOn[place{f.VulnerabilityID, f.ComponentID, f.OccurrenceIdentity}]})
+		plan.departing = append(plan.departing, departure{f: f, superseded: wantedAt[where]})
 	}
 	return plan
 }

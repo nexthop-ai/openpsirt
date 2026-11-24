@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -595,7 +596,10 @@ func (a heldSpans) lastLeft(opened, end time.Time, findings int, open bool) time
 //
 // A dismissal is matched to a finding as the deadline matches one: the
 // product, the issue under any name it merged into, the occurrence, and the
-// versions the finding holds, a wrong match at any version.
+// versions the finding holds, a wrong match at any version. A finding
+// continues across its consumer's version, so a dismissal keyed on a
+// consumer version is matched over the spans the build's edges say the
+// finding sat under that version, whatever version it holds now.
 func (s *Store) dismissedSpans(ctx context.Context, narrow trendNarrowing, since time.Time,
 	rows []trendRow, now time.Time) (map[momentKey]heldSpans, error) {
 
@@ -607,65 +611,24 @@ func (s *Store) dismissedSpans(ctx context.Context, narrow trendNarrowing, since
 	for _, row := range rows {
 		wanted[row.moment()] = true
 	}
-	var read []struct {
-		VulnerabilityID int64      `bun:"vulnerability_id"`
-		ComponentID     int64      `bun:"component_id"`
-		ProductID       int64      `bun:"product_id"`
-		OpenedAt        time.Time  `bun:"opened_at"`
-		OpenedRunID     *int64     `bun:"opened_run_id"`
-		ClosedAt        *time.Time `bun:"closed_at"`
-		ClosedBecause   string     `bun:"closed_because"`
-		DecisionID      int64      `bun:"decision_id"`
-		ProposedAt      time.Time  `bun:"proposed_at"`
-		EndedAt         *time.Time `bun:"ended_at"`
-		State           string     `bun:"state"`
-		NeedsApproval   bool       `bun:"needs_approval"`
-		SentBack        int        `bun:"sent_back"`
-		Findings        int        `bun:"findings"`
-	}
-	q := s.db.NewSelect().
-		TableExpr(`"finding" AS "f"`).
-		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
-		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
-		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
-		// The consumer, for the version a decision is keyed on.
-		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
-		Join(`JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt(`"st"."product_id"`)).
-		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
-		Where(`"cl"."outcome" IN (?)`, bun.List(Dismissing)).
-		Where(KeyMatches).
-		// Ended rows held something while they stood; only those never in
-		// force are left out, below.
-		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
-		ColumnExpr(`"f"."component_id" AS "component_id"`).
-		ColumnExpr(`"st"."product_id" AS "product_id"`).
-		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
-		ColumnExpr(`"f"."opened_run_id" AS "opened_run_id"`).
-		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
-		ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
-		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
-		ColumnExpr(`"de"."proposed_at" AS "proposed_at"`).
-		ColumnExpr(`"de"."ended_at" AS "ended_at"`).
-		ColumnExpr(`"de"."state" AS "state"`).
-		ColumnExpr(`"de"."needs_approval" AS "needs_approval"`).
-		ColumnExpr(`CASE WHEN "de"."sent_back_at" IS NULL THEN 0 ELSE 1 END AS "sent_back"`).
-		ColumnExpr(`COUNT(DISTINCT "f"."id") AS "findings"`).
-		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "st"."product_id", "f"."opened_at", "f"."opened_run_id", ` +
-			`"f"."closed_at", "f"."closed_because", "de"."decision_id", "de"."proposed_at", "de"."ended_at", ` +
-			`"de"."state", "de"."needs_approval", "de"."sent_back_at"`)
-	q, err := narrow(ctx, q, `("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
+	read, err := s.dismissals(ctx, narrow, since, `(`+KeyMatches+`) AND NOT (`+consumerKeyed+`)`, false)
 	if err != nil {
 		return nil, err
 	}
-	if err := q.Scan(ctx, &read); err != nil {
-		return nil, fmt.Errorf("read the dismissals over the backlog: %w", err)
+	moved, err := s.dismissals(ctx, narrow, since, consumerKeyed, true)
+	if err != nil {
+		return nil, err
+	}
+	held, err := s.consumersHeld(ctx, moved)
+	if err != nil {
+		return nil, err
 	}
 
 	// The agreements each decision needing one was in force under.
 	agreed := map[int64][]heldSpan{}
 	var asked []int64
 	seen := map[int64]bool{}
-	for _, r := range read {
+	for _, r := range append(append([]dismissalRow{}, read...), moved...) {
 		if r.NeedsApproval && !seen[r.DecisionID] {
 			seen[r.DecisionID] = true
 			asked = append(asked, r.DecisionID)
@@ -690,46 +653,260 @@ func (s *Store) dismissedSpans(ctx context.Context, narrow trendNarrowing, since
 	}
 
 	for _, r := range read {
-		key := momentOf(r.VulnerabilityID, r.ComponentID, r.ProductID, r.OpenedAt, r.ClosedAt, r.OpenedRunID,
-			r.ClosedBecause)
+		key := r.moment()
 		if !wanted[key] {
 			continue
 		}
-		standing := StandsInForce(r.State, r.NeedsApproval, r.SentBack != 0)
-		var spans []heldSpan
-		switch {
-		case !r.NeedsApproval:
-			// In force from its proposal, unless it was sent back, which takes
-			// it out until it is revised; the record keeps only that it is.
-			if r.SentBack == 0 {
-				spans = []heldSpan{{from: r.ProposedAt}}
-			}
-		default:
-			for _, a := range agreed[r.DecisionID] {
-				// An agreement still open on a row no longer agreed was taken
-				// back by setting the row aside, which writes no withdrawal.
-				if a.to == nil && !standing && r.EndedAt == nil {
-					continue
+		out[key] = append(out[key], r.spans(agreed[r.DecisionID], now)...)
+	}
+	for _, r := range moved {
+		key := r.moment()
+		if !wanted[key] {
+			continue
+		}
+		under := held[r.consumer()]
+		for _, span := range r.spans(agreed[r.DecisionID], now) {
+			for _, sat := range under {
+				if one, overlap := span.within(sat); overlap {
+					out[key] = append(out[key], one)
 				}
-				spans = append(spans, a)
 			}
 		}
-		for _, span := range spans {
-			from := span.from
-			if from.Before(r.ProposedAt) {
-				from = r.ProposedAt
-			}
-			to := span.to
-			if r.EndedAt != nil && (to == nil || r.EndedAt.Before(*to)) {
-				to = r.EndedAt
-			}
-			if to != nil && !to.After(from) {
+	}
+	return out, nil
+}
+
+// consumerKeyed says a decision occurrence `de` is keyed on a version of a
+// finding `f`'s consumer `uc`, and on the version its component `c` holds. The
+// row holds its consumer now and no earlier one, so whether the versions
+// matched over a span is the build's edges to answer.
+const consumerKeyed = `"cl"."outcome" NOT IN (` + anyVersionList + `) AND ` + componentMatches +
+	` AND "uc"."id" IS NOT NULL AND COALESCE("de"."consumer_upstream_version", '') <> ''`
+
+// dismissalRow is one group of findings a dismissal matched, as dismissals
+// reads it: the moment the findings belong to and the decision's record. Under
+// a consumer it also names the build, the consumer's identifying name and the
+// consumer version the decision was keyed on.
+type dismissalRow struct {
+	VulnerabilityID int64      `bun:"vulnerability_id"`
+	ComponentID     int64      `bun:"component_id"`
+	ProductID       int64      `bun:"product_id"`
+	OpenedAt        time.Time  `bun:"opened_at"`
+	OpenedRunID     *int64     `bun:"opened_run_id"`
+	ClosedAt        *time.Time `bun:"closed_at"`
+	ClosedBecause   string     `bun:"closed_because"`
+	DecisionID      int64      `bun:"decision_id"`
+	ProposedAt      time.Time  `bun:"proposed_at"`
+	EndedAt         *time.Time `bun:"ended_at"`
+	State           string     `bun:"state"`
+	NeedsApproval   bool       `bun:"needs_approval"`
+	SentBack        int        `bun:"sent_back"`
+	Findings        int        `bun:"findings"`
+	BuildID         int64      `bun:"build_id"`
+	ConsumerName    string     `bun:"consumer_name"`
+	ConsumerVersion string     `bun:"consumer_version"`
+}
+
+func (r dismissalRow) moment() momentKey {
+	return momentOf(r.VulnerabilityID, r.ComponentID, r.ProductID, r.OpenedAt, r.ClosedAt, r.OpenedRunID,
+		r.ClosedBecause)
+}
+
+// consumer is where in a build the row's findings sat under the consumer
+// version the decision was keyed on.
+func (r dismissalRow) consumer() consumerAt {
+	return consumerAt{r.BuildID, r.ComponentID, r.ConsumerName, r.ConsumerVersion}
+}
+
+// spans is when the dismissal was in force over the row's findings, given
+// the agreements its decision was in force under.
+func (r dismissalRow) spans(agreed []heldSpan, now time.Time) []heldSpan {
+	standing := StandsInForce(r.State, r.NeedsApproval, r.SentBack != 0)
+	var spans []heldSpan
+	switch {
+	case !r.NeedsApproval:
+		// In force from its proposal, unless it was sent back, which takes it
+		// out until it is revised; the record keeps only that it is.
+		if r.SentBack == 0 {
+			spans = []heldSpan{{from: r.ProposedAt}}
+		}
+	default:
+		for _, a := range agreed {
+			// An agreement still open on a row no longer agreed was taken back
+			// by setting the row aside, which writes no withdrawal.
+			if a.to == nil && !standing && r.EndedAt == nil {
 				continue
 			}
-			if from.After(now) {
-				continue
+			spans = append(spans, a)
+		}
+	}
+	var out []heldSpan
+	for _, span := range spans {
+		from := span.from
+		if from.Before(r.ProposedAt) {
+			from = r.ProposedAt
+		}
+		to := span.to
+		if r.EndedAt != nil && (to == nil || r.EndedAt.Before(*to)) {
+			to = r.EndedAt
+		}
+		if to != nil && !to.After(from) {
+			continue
+		}
+		if from.After(now) {
+			continue
+		}
+		out = append(out, heldSpan{from: from, to: to, findings: r.Findings})
+	}
+	return out
+}
+
+// within is the part of a span inside another, and whether there is one. The
+// findings counted are the span's own.
+func (a heldSpan) within(b heldSpan) (heldSpan, bool) {
+	from := a.from
+	if b.from.After(from) {
+		from = b.from
+	}
+	to := a.to
+	if b.to != nil && (to == nil || b.to.Before(*to)) {
+		to = b.to
+	}
+	if to != nil && !to.After(from) {
+		return heldSpan{}, false
+	}
+	return heldSpan{from: from, to: to, findings: a.findings}, true
+}
+
+// dismissals reads the groups of findings dismissals matched under a
+// condition on the decision occurrence `de`, the finding `f`, its component
+// `c` and its consumer `uc`. Under a consumer, each group is also one build,
+// one consumer name and one consumer version decided about.
+func (s *Store) dismissals(ctx context.Context, narrow trendNarrowing, since time.Time,
+	matching string, underConsumer bool) ([]dismissalRow, error) {
+
+	q := s.db.NewSelect().
+		TableExpr(`"finding" AS "f"`).
+		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
+		Join(`JOIN "branch_or_tag" AS "st" ON "st"."id" = "b"."branch_or_tag_id"`).
+		Join(`JOIN "component" AS "c" ON "c"."id" = "f"."component_id"`).
+		// The consumer, for the version a decision is keyed on.
+		Join(`LEFT JOIN "component" AS "uc" ON "uc"."id" = "f"."consumer_id"`).
+		Join(`JOIN (`+DecisionOccurrences+`) ON `+DecisionOccurrenceAt(`"st"."product_id"`)).
+		Join(`JOIN "decision" AS "cl" ON "cl"."id" = "de"."decision_id"`).
+		Where(`"cl"."outcome" IN (?)`, bun.List(Dismissing)).
+		Where(matching).
+		// Ended rows held something while they stood; only those never in
+		// force are left out, below.
+		ColumnExpr(`"f"."vulnerability_id" AS "vulnerability_id"`).
+		ColumnExpr(`"f"."component_id" AS "component_id"`).
+		ColumnExpr(`"st"."product_id" AS "product_id"`).
+		ColumnExpr(`"f"."opened_at" AS "opened_at"`).
+		ColumnExpr(`"f"."opened_run_id" AS "opened_run_id"`).
+		ColumnExpr(`"f"."closed_at" AS "closed_at"`).
+		ColumnExpr(`COALESCE("f"."closed_because", '') AS "closed_because"`).
+		ColumnExpr(`"de"."decision_id" AS "decision_id"`).
+		ColumnExpr(`"de"."proposed_at" AS "proposed_at"`).
+		ColumnExpr(`"de"."ended_at" AS "ended_at"`).
+		ColumnExpr(`"de"."state" AS "state"`).
+		ColumnExpr(`"de"."needs_approval" AS "needs_approval"`).
+		ColumnExpr(`CASE WHEN "de"."sent_back_at" IS NULL THEN 0 ELSE 1 END AS "sent_back"`).
+		ColumnExpr(`COUNT(DISTINCT "f"."id") AS "findings"`).
+		GroupExpr(`"f"."vulnerability_id", "f"."component_id", "st"."product_id", "f"."opened_at", "f"."opened_run_id", ` +
+			`"f"."closed_at", "f"."closed_because", "de"."decision_id", "de"."proposed_at", "de"."ended_at", ` +
+			`"de"."state", "de"."needs_approval", "de"."sent_back_at"`)
+	if underConsumer {
+		q = q.ColumnExpr(`"f"."build_id" AS "build_id"`).
+			ColumnExpr(graph.IdentifyingExpr("uc") + ` AS "consumer_name"`).
+			ColumnExpr(`"de"."consumer_upstream_version" AS "consumer_version"`).
+			GroupExpr(`"f"."build_id", ` + graph.IdentifyingExpr("uc") + `, "de"."consumer_upstream_version"`)
+	}
+	q, err := narrow(ctx, q, `("f"."closed_at" IS NULL OR "f"."closed_at" > ?)`, since)
+	if err != nil {
+		return nil, err
+	}
+	var read []dismissalRow
+	if err := q.Scan(ctx, &read); err != nil {
+		return nil, fmt.Errorf("read the dismissals over the backlog: %w", err)
+	}
+	return read, nil
+}
+
+// consumerAt is a component in a build under one version of a consumer,
+// named by its identifying name.
+type consumerAt struct {
+	buildID, componentID int64
+	name, version        string
+}
+
+// consumerUpstreamOfParent is the version a decision is keyed on, read of a
+// parent component `pc` the way ConsumerUpstreamExpr reads a finding's
+// consumer.
+var consumerUpstreamOfParent = strings.ReplaceAll(ConsumerUpstreamExpr, `"uc".`, `"pc".`)
+
+// consumersHeld reads, for each place the rows name, the spans the build's
+// edges held the component under that consumer version. A span opens at the
+// first run after the scan that opened the edge and closes at the first run
+// after the scan that closed it, because a run is what moves a finding onto
+// another consumer. An edge whose closing scan no run has read yet is still
+// held.
+func (s *Store) consumersHeld(ctx context.Context, rows []dismissalRow) (map[consumerAt][]heldSpan, error) {
+	out := map[consumerAt][]heldSpan{}
+	if len(rows) == 0 {
+		return out, nil
+	}
+	asked := map[consumerAt]bool{}
+	byBuild := map[int64][]int64{}
+	for _, r := range rows {
+		at := r.consumer()
+		if !asked[at] {
+			if !slices.Contains(byBuild[r.BuildID], r.ComponentID) {
+				byBuild[r.BuildID] = append(byBuild[r.BuildID], r.ComponentID)
 			}
-			out[key] = append(out[key], heldSpan{from: from, to: to, findings: r.Findings})
+		}
+		asked[at] = true
+	}
+	firstRunAfter := func(scan string) string {
+		return `(SELECT MIN("r"."started_at") FROM "scan_run" AS "r"
+			WHERE "r"."build_id" = "e"."build_id" AND "r"."checked_scan_id" IS NULL
+			  AND "r"."started_at" >= ` + scan + `."received_at")`
+	}
+	for buildID, components := range byBuild {
+		err := database.IDsInBatches(ctx, components, func(ctx context.Context, batch []int64) error {
+			var edges []struct {
+				ComponentID int64      `bun:"component_id"`
+				Name        string     `bun:"consumer_name"`
+				Version     string     `bun:"consumer_version"`
+				HeldFrom    *time.Time `bun:"held_from"`
+				HeldTo      *time.Time `bun:"held_to"`
+			}
+			if err := s.db.NewSelect().TableExpr(`"graph_edge" AS "e"`).
+				Join(`JOIN "graph_node" AS "pn" ON "pn"."id" = "e"."parent_id"`).
+				Join(`JOIN "graph_node" AS "cn" ON "cn"."id" = "e"."child_id"`).
+				Join(`JOIN "component" AS "pc" ON "pc"."id" = "pn"."component_id"`).
+				Join(`JOIN "scan" AS "so" ON "so"."id" = "e"."opened_scan_id"`).
+				Join(`LEFT JOIN "scan" AS "sc" ON "sc"."id" = "e"."closed_scan_id"`).
+				ColumnExpr(`"cn"."component_id" AS "component_id"`).
+				ColumnExpr(graph.IdentifyingExpr("pc")+` AS "consumer_name"`).
+				ColumnExpr(consumerUpstreamOfParent+` AS "consumer_version"`).
+				ColumnExpr(firstRunAfter(`"so"`)+` AS "held_from"`).
+				ColumnExpr(firstRunAfter(`"sc"`)+` AS "held_to"`).
+				Where(`"e"."build_id" = ?`, buildID).
+				Where(`"cn"."component_id" IN (?)`, bun.List(batch)).
+				Scan(ctx, &edges); err != nil {
+				return err
+			}
+			for _, e := range edges {
+				at := consumerAt{buildID, e.ComponentID, e.Name, e.Version}
+				if !asked[at] || e.HeldFrom == nil {
+					continue
+				}
+				out[at] = append(out[at], heldSpan{from: *e.HeldFrom, to: e.HeldTo})
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("read which consumers the dismissed findings sat under: %w", err)
 		}
 	}
 	return out, nil

@@ -57,8 +57,8 @@ row.
 | The consumer is written with the update, and rows moving to one consumer are one write | § Interval storage |
 | A component at a new version still supersedes (§ Closure reasons) | The issue at a new version is a new finding |
 | A decision keyed on the consumer's old version lapses as the row takes the new one (`design-docs/triage.md` § Expiry) | Decisions are keyed on both upstream versions |
-| The edge intervals keep which consumer version a row sat under | They are the change record |
-| Only a row a scan leaves open continues; one it closes as patched, unaffected or disclaimed closes where it stands | |
+| The edge intervals keep which consumer versions held the component at the occurrence, and a burndown reads a dismissal against them (`design-docs/analytics-program.md` § Answered by a dismissal) | They are the change record; the row holds only its consumer now |
+| A row the scan closes as patched, unaffected or disclaimed is paired too: it takes the new consumer and closes under it, once | A later scan finds the closure at the occurrence's consumer and writes nothing |
 
 One consumer name at two versions at once gives two rows at one occurrence
 identity on one component (`design-docs/findings.md` § Work across builds).
@@ -66,14 +66,14 @@ Rows are paired within each issue, component and occurrence identity:
 
 1. A wanted row and an open row at the same consumer pair first.
 2. The open rows left, by finding identifier ascending, pair with the wanted rows left, by consumer component identifier ascending.
-3. Each pair continues. A wanted row left over opens. An open row left over closes for what explains it at its occurrence, never as superseded, since no version of the component moved.
+3. Each pair continues. A wanted row left over opens. An open row left over closes as superseded, since the issue is still open at its occurrence.
 
 | Case | Outcome |
 |---|---|
 | One version held, a second arrives | The held row stays on its consumer; the second opens |
 | One version held, two new ones replace it | The held row continues under the lower consumer identifier; the other opens |
-| Two versions held, one leaves | The row on the version staying is unchanged; the other closes unexplained |
-| Two versions held, a third replaces both | The lower finding identifier continues under the third; the other closes unexplained |
+| Two versions held, one leaves | The row on the version staying is unchanged; the other closes superseded |
+| Two versions held, a third replaces both | The lower finding identifier continues under the third; the other closes superseded |
 
 ## Interval storage
 
@@ -86,7 +86,7 @@ person and their reason (REQ-20). A run finding the same things writes nothing.
 | Every index answering "is this open" carries the moment, never the run | A finding no run will close must still close |
 | The run is recorded where there is one, and counts what a run changed | |
 | One writer per build: recording a run starts by taking the build row | Two runs would both write the same difference. A test overlaps two applications and fails on all three server engines with the hold removed |
-| An open finding still moves: fix state, upstream scheduling no fix, the build's answer, its consumer, each stamped when it moved | Only those parts are compared; the rest is what makes it that finding |
+| An open finding still moves: fix state, upstream scheduling no fix and the build's answer, each stamped when it moved, and its consumer, unstamped | Only those parts are compared; the rest is what makes it that finding |
 | Findings moving to the same values are one write, grouped by every written value except the order | Each row gets what it would alone |
 | The order is chosen per finding inside the statement | Likelihood is close to unique per issue |
 | Fix, match, the build's answer and the consumer are written only where one moved | |
@@ -106,7 +106,7 @@ statements, against 324,508 a finding at a time, and no row re-ranked twice.
 | Upgraded | Its upstream version moved at the occurrence; or it left the occurrence and the build, and its name ships at another upstream version |
 | Revised | The shipped version changed at the occurrence, or across the build where it left the occurrence, and the upstream version did not: a carried patch |
 | Patched | The build declares a patch fixing it (§ Build-declared claims) |
-| Superseded | The component's upstream version moved and the issue came along: the same issue is open at the new version. A consumer's version moving supersedes nothing (§ Continued findings) |
+| Superseded | The component's upstream version moved and the issue came along: the same issue is open at the new version. Also a row left over where one consumer name held two versions of the occurrence (§ Continued findings) |
 | Fixed | A person declared a recorded flaw fixed here; the one closure a person writes |
 | Unexplained | The component is present and unchanged at the occurrence, or moved onto the product with its consumer still there, and the scanner stopped reporting it |
 | Invalid | The record should not have existed: never shipped, wrong product, a duplicate, or a check's match on an issue published after the replacement |

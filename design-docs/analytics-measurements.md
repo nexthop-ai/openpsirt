@@ -264,6 +264,7 @@ the median of five reads after a warm one, each engine run alone.
 | Beneath the root is the dearest read on SQLite and PostgreSQL | The walk added to the product's read: 1,970 ms and 832 ms |
 | The kernel by its name is the dearest read on MySQL and MariaDB | 1,799 ms and 1,265 ms: its 3,295 issues at one component are read through the name |
 | A repository row costs its walk | 45 repositories reaching the whole image in 361 ms on PostgreSQL |
+| Reading a consumer-keyed dismissal against the build's edges costs a tenth more | The product's burndown, its 50 dismissals agreed four weeks back, in 243 ms on PostgreSQL against 219 ms matched on the finding's consumer alone, and beneath the root 644 ms against 588; SQLite unchanged within noise, 438 ms against 416 |
 
 A repository shipped at several commits is read from every one of them. The
 widest in the image is `pkg:github/sonic-net/saibcm-modules`, two commits above
