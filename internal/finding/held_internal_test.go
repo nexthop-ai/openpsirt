@@ -30,7 +30,7 @@ func TestFindingsShareAnUpdateOnlyWhereEveryValueWrittenIsTheSame(t *testing.T) 
 		return moving{f: Finding{
 			FixState: FixedUpstream, FixedIn: "1.0", FixedAt: &at,
 			Matched: "exact", MatchedFrom: "a", MatchedIn: "b", MatchedRange: "< 1.0",
-			SuppressedBy: &one, StatedBy: &one, ClaimedBy: &one,
+			SuppressedBy: &one, StatedBy: &one, ClaimedBy: &one, ConsumerID: &one,
 			Urgency: 10, RankExploited: false, RankShipped: false, DueAt: &at,
 		}, learned: &at}
 	}
@@ -61,12 +61,15 @@ func TestFindingsShareAnUpdateOnlyWhereEveryValueWrittenIsTheSame(t *testing.T) 
 		{"urgency_shipped", "moved", func(m *moving) { m.f.RankShipped = true }},
 		{"exploited_learned_at", "exploitationMoved", func(m *moving) { m.learned = &later }},
 		{"due_at", "clockMoved", func(m *moving) { m.f.DueAt = &later }},
+		{"consumer_id", "consumerMoved", func(m *moving) { m.f.ConsumerID = &two }},
+		{"consumer_id", "consumerMoved", func(m *moving) { m.f.ConsumerID = nil }},
 	}
 	flags := map[string]func(m *moving, on bool){
 		"described":         func(m *moving, on bool) { m.described = on },
 		"moved":             func(m *moving, on bool) { m.moved = on },
 		"exploitationMoved": func(m *moving, on bool) { m.exploitationMoved = on },
 		"clockMoved":        func(m *moving, on bool) { m.clockMoved = on },
+		"consumerMoved":     func(m *moving, on bool) { m.consumerMoved = on },
 	}
 	covered := map[string]bool{}
 	for _, c := range cases {

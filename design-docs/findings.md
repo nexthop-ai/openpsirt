@@ -26,6 +26,7 @@ inventory's edges describe.
 | One issue at a shared library under two consumers is two findings (REQ-17) | |
 | A component nothing leads to has one occurrence: itself | It ships, and an incomplete graph is normal |
 | An occurrence directly under the product records no consumer | The root's name differs per variant, and a key somebody has to remember to ignore gets forgotten |
+| A consumer at a new version, the component unchanged, continues the finding beneath it (`design-docs/findings-closure.md` § Continued findings) | The consumer's version is no part of the finding |
 | A report against a component this deployment does not hold is counted and reported, never dropped | The two documents describe different builds |
 
 `design-docs/findings-measurements.md` § Fan-out cost has the 335,021-finding image.

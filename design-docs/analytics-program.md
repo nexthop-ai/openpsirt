@@ -185,6 +185,8 @@ trend's identity rules (§ Counts by identity).
 |---|---|
 | The dismissals are not applicable, wrong match, will not fix and already fixed (`design-docs/analytics-controls.md` § Dismissals and last uploads) | A dismissal is part of the work |
 | A dismissal answers a finding where the deadline's test matches it: the product, the issue under any name it merged into, the occurrence, and the versions the finding holds, a wrong match at any version | One test for what a decision answers |
+| A dismissal keyed on a consumer version answers a finding over the spans the build's edges held the component under that version, from the first run after the scan opening the edge to the first run after the scan closing it | A finding continues across its consumer's version (`design-docs/findings-closure.md` § Continued findings), so the edge intervals record the consumer it sat under |
+| With one consumer name at two versions at one occurrence, a dismissal keyed on either version answers every row there over its edge's spans | The edges record the versions that held the component and name no row |
 | One needing a second person is in force from each agreement to its withdrawal; one needing nobody from its proposal; either until the decision stopped applying | The deadline stops for a decision in force and for nothing else |
 | A waiting proposal, a deferral, a planned upgrade and a promised patch answer nothing | A promise is not the fix |
 | An issue at a component is answered only where every finding of it open at the moment is | Answered at one occurrence and open at another is not done (REQ-17) |

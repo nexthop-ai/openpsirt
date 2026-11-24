@@ -61,7 +61,10 @@ type moving struct {
 	exploitationMoved bool
 	learned           *time.Time
 	clockMoved        bool
-	ids               []int64
+	// consumerMoved is whether the finding continues under its consumer at
+	// another version.
+	consumerMoved bool
+	ids           []int64
 	// urgencies is the order each of ids takes, where moved.
 	urgencies []int64
 }
@@ -87,6 +90,8 @@ type changeKey struct {
 	learned                              string
 	clockMoved                           bool
 	dueAt                                string
+	consumerMoved                        bool
+	consumer                             reference
 }
 
 // reference is an identifier that may be absent, in a form that compares.
@@ -118,6 +123,7 @@ func (m moving) key() changeKey {
 		moved:             m.moved,
 		exploitationMoved: m.exploitationMoved,
 		clockMoved:        m.clockMoved,
+		consumerMoved:     m.consumerMoved,
 	}
 	if m.described {
 		k.fixState, k.fixedIn, k.fixedAt = m.f.FixState, m.f.FixedIn, instantOf(m.f.FixedAt)
@@ -134,6 +140,9 @@ func (m moving) key() changeKey {
 	}
 	if m.clockMoved {
 		k.dueAt = instantOf(m.f.DueAt)
+	}
+	if m.consumerMoved {
+		k.consumer = referenceOf(m.f.ConsumerID)
 	}
 	return k
 }
@@ -188,6 +197,9 @@ func (m moving) update(tx bun.IDB, first, last int) *bun.UpdateQuery {
 	}
 	if m.clockMoved {
 		update = update.Set(`"due_at" = ?`, f.DueAt)
+	}
+	if m.consumerMoved {
+		update = update.Set(`"consumer_id" = ?`, f.ConsumerID)
 	}
 	return update.Where(`"id" IN (?)`, bun.List(m.ids[first:last]))
 }
