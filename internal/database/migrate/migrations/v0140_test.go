@@ -12,6 +12,7 @@ import (
 	"github.com/uptrace/bun"
 
 	"github.com/nexthop-ai/openpsirt/internal/database"
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate"
 	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
 	"github.com/nexthop-ai/openpsirt/internal/dbtest"
 	"github.com/nexthop-ai/openpsirt/internal/graph"
@@ -33,6 +34,48 @@ func TestTheV0140UpgradeBuildsItsDeclarations(t *testing.T) {
 		unrecordAt(t, db, v0140)
 		dbtest.MigrateTo(t, db, v0140)
 		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0140(db.Server.Engine))
+		leaveAtLatest(t, ctx, db)
+	})
+}
+
+// A start of the v0.14.0 upgrade that fails part way leaves the schema, the
+// record of the version applied included, as v0.13.0 built it on PostgreSQL
+// and SQLite, which run the whole upgrade in one transaction. The failure is
+// at its last step, after every other has run: a component's name is kept in
+// a table of that name already standing without the columns the step writes.
+// What the migration runner makes before any migration, its lease, is there
+// before and after.
+func TestAStoppedV0140StartLeavesTheV0130Schema(t *testing.T) {
+	dbtest.Each(t, func(t *testing.T, db *database.DB) {
+		if db.Server.Engine == database.MySQL || db.Server.Engine == database.MariaDB {
+			t.Skipf("%s commits each schema statement as it runs", db.Server.Engine)
+		}
+		ctx := t.Context()
+		dbtest.Empty(t, db)
+		dbtest.MigrateTo(t, db, v0130)
+		s := &seederV0130{t: t, db: db, at: time.Date(2026, 11, 18, 2, 0, 0, 0, time.UTC)}
+		s.component("openssl", "3.0.11", "pkg:deb/debian/openssl@3.0.11")
+		before := describe(t, ctx, db)
+		if _, err := db.ExecContext(ctx, `CREATE TABLE "component_name" ("in_the_way" INTEGER)`); err != nil {
+			t.Fatal(err)
+		}
+		if err := migrate.UpTo(ctx, db, quiet(), v0140, 0); err == nil {
+			t.Fatal("the upgrade ran past a table in the way of its last step")
+		}
+		if _, err := db.ExecContext(ctx, `DROP TABLE "component_name"`); err != nil {
+			t.Fatal(err)
+		}
+		var version int64
+		if err := db.DB.NewRaw(`SELECT MAX("version_id") FROM "`+migrate.VersionTable+`" WHERE "is_applied" = ?`,
+			true).Scan(ctx, &version); err != nil {
+			t.Fatal(err)
+		}
+		if version != v0130 {
+			t.Errorf("the stopped start left the version at %d, want %d", version, v0130)
+		}
+		if diff := setDiff(before, describe(t, ctx, db)); diff != "" {
+			t.Errorf("the stopped start left the schema changed from v0.13.0's:\n%s", diff)
+		}
 		leaveAtLatest(t, ctx, db)
 	})
 }
@@ -100,7 +143,7 @@ func TestTheV0140UpgradeKeepsEveryNameAComponentGoesBy(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v0130)
-		s := &seederV0120{t: t, db: db, at: time.Date(2026, 11, 18, 2, 0, 0, 0, time.UTC)}
+		s := &seederV0130{t: t, db: db, at: time.Date(2026, 11, 18, 2, 0, 0, 0, time.UTC)}
 		renamed := s.component("Repro Platform", "05.47.45.0027",
 			"pkg:generic/repro/InsydeH2O@05.47.45.0027?arch=x86_64#bin")
 		scoped := s.component("core", "7.0.0", "pkg:npm/%40babel/core%2Bx@7.0.0")

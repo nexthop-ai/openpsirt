@@ -218,6 +218,9 @@ func triageBaseline(t *columnTypes) []string {
 			-- else recorded one — an approval's withdrawn_at only exists
 			-- where somebody had agreed.
 			"ended_at"                   ` + t.timestamp + ` NULL,
+			-- Who withdrew this row. Null while it stands, where it lapsed, and
+			-- on every row withdrawn before v0.13.0 recorded it.
+			"ended_by"                   ` + t.refNull + ` NULL,
 			-- How the set this claim was part of was narrowed, where it was
 			-- one of many recorded in a single action. Kept because "how were
 			-- these chosen" is the question asked of a bulk judgment months
@@ -243,7 +246,8 @@ func triageBaseline(t *columnTypes) []string {
 			CONSTRAINT "decision_occurrence_decision_fk" FOREIGN KEY ("decision_id") REFERENCES "decision"("id"),
 			CONSTRAINT "decision_occurrence_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "decision_occurrence_vulnerability_fk" FOREIGN KEY ("vulnerability_id") REFERENCES "vulnerability"("id"),
-			CONSTRAINT "decision_occurrence_proposer_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id")
+			CONSTRAINT "decision_occurrence_proposer_fk" FOREIGN KEY ("proposed_by") REFERENCES "person"("id"),
+			CONSTRAINT "decision_occurrence_ender_fk" FOREIGN KEY ("ended_by") REFERENCES "person"("id")
 		)` + t.suffix,
 
 		// Found two ways, and both are hot.

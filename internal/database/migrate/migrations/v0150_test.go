@@ -37,7 +37,7 @@ func TestTheV0150UpgradeCountsNoEarlierRunAsRecordingSources(t *testing.T) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
 		dbtest.MigrateTo(t, db, v0140)
-		s := seedRowsV0120(t, db)
+		s := seedRowsV0130(t, db)
 		s.exec(`INSERT INTO "scan_run" ("build_id", "scanner", "ran_here", "started_at") VALUES (?, ?, ?, ?)`,
 			s.build, "grype", true, s.at)
 		dbtest.MigrateTo(t, db, v0150)

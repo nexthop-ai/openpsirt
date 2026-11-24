@@ -22,8 +22,7 @@ import (
 // shape the release declares. Each release's migration supplies the order,
 // the rows and its declarations, and calls these.
 
-// inV020 runs a release's upgrade in one transaction. Migrations 45 and 46
-// call it by this name, and tagged releases froze those files.
+// inV020 runs a release's upgrade in one transaction.
 //
 // On PostgreSQL and SQLite a failure leaves the schema as it was. On MySQL and
 // MariaDB every data-definition statement commits as it runs, so a failure
@@ -517,7 +516,7 @@ func (u *upgrader) hasColumn(table, column string) (bool, error) {
 
 // releaseUpgrade runs a release's upgrade to version as inV020 does, and
 // writes the record of the change in the same transaction. Every release's
-// migration from v0.13.0's on runs through it.
+// upgrade migration runs through it.
 func releaseUpgrade(ctx context.Context, sqldb *sql.DB, version int64,
 	run func(context.Context, bun.Tx) error) error {
 	return inV020(ctx, sqldb, func(ctx context.Context, tx bun.Tx) error {
@@ -538,39 +537,16 @@ func upgraderIn(ctx context.Context, tx bun.Tx) (*upgrader, error) {
 }
 
 // changeRecorded writes, in a release's upgrade transaction, the record of
-// the change to version, where the database has the table for it. It commits
-// with the schema and rolls back with it, so a process killed after the
-// commit and before the migration library records the version leaves a
-// record that keeps every serving instance paused; the upgrade that records
-// the version removes it.
+// the change to version. It commits with the schema and rolls back with it,
+// so a process killed after the commit and before the migration library
+// records the version leaves a record that keeps every serving instance
+// paused; the upgrade that records the version removes it.
 func changeRecorded(ctx context.Context, tx bun.Tx, version int64) error {
-	u, err := upgraderIn(ctx, tx)
-	if err != nil {
-		return err
-	}
-	if present, err := u.hasTable("schema_change"); err != nil || !present {
-		return err
-	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO "schema_change" ("started_at", "started_by", "target_version")
 		VALUES (?, ?, ?)`, time.Now().UTC(), fmt.Sprintf("the migration to version %d", version), version); err != nil {
 		return fmt.Errorf("record the schema change: %w", err)
 	}
 	return nil
-}
-
-// hasForeignKey reports whether a table holds a foreign key of this name. A
-// key on SQLite is part of the table and has no name the catalog answers, so
-// it is asked only of the server engines.
-func (u *upgrader) hasForeignKey(table, name string) (bool, error) {
-	query := `SELECT 1 FROM "information_schema"."TABLE_CONSTRAINTS"
-		WHERE "CONSTRAINT_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "CONSTRAINT_NAME" = ?
-		  AND "CONSTRAINT_TYPE" = 'FOREIGN KEY' LIMIT 1`
-	if u.engine == database.Postgres {
-		query = `SELECT 1 FROM "information_schema"."table_constraints"
-			WHERE "constraint_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "constraint_name" = ?
-			  AND "constraint_type" = 'FOREIGN KEY'`
-	}
-	return exists(u.ctx, u.tx, fmt.Sprintf("%s has foreign key %s", table, name), query, table, name)
 }
 
 // hasTable reports whether a table of this name is there.

@@ -9,11 +9,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-)
 
-// firstRecorded is the first migration that writes the record of its change
-// in its own transaction, the one that made the record.
-const firstRecorded = 47
+	"github.com/nexthop-ai/openpsirt/internal/database/migrate/migrations"
+)
 
 // migrationFile is a migration's file name, with its version.
 var migrationFile = regexp.MustCompile(`^(\d{5})_[a-z0-9_]+\.go$`)
@@ -30,10 +28,10 @@ func unrecorded(source string, version int) bool {
 	return m == nil || m[1] != strconv.Itoa(version) || strings.Contains(source, "inV020(")
 }
 
-// Every release's migration from the one that made the record of schema
-// changes on writes that record in its own transaction, so a process killed
-// between the commit and the migration library recording the version leaves
-// serving instances paused on every engine.
+// Every release's migration after the baseline, which makes the record of
+// schema changes, writes that record in its own transaction, so a process
+// killed between the commit and the migration library recording the version
+// leaves serving instances paused on every engine.
 func TestEveryReleaseMigrationRecordsItsChange(t *testing.T) {
 	if !unrecorded("return inV020(ctx, sqldb, upgradeV0140)", 48) {
 		t.Error("a migration calling inV020 directly was not reported")
@@ -55,7 +53,7 @@ func TestEveryReleaseMigrationRecordsItsChange(t *testing.T) {
 			continue
 		}
 		version, err := strconv.Atoi(m[1])
-		if err != nil || version < firstRecorded {
+		if err != nil || version <= migrations.Baseline {
 			continue
 		}
 		examined++
@@ -69,6 +67,6 @@ func TestEveryReleaseMigrationRecordsItsChange(t *testing.T) {
 		}
 	}
 	if examined == 0 {
-		t.Fatal("no migration from the first that records its change was found, so this checked nothing")
+		t.Fatal("no migration after the baseline was found, so this checked nothing")
 	}
 }

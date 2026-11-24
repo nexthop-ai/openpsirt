@@ -62,7 +62,7 @@ func TestAMigrationWaitsOutAHolderWithoutStallingOtherSessions(t *testing.T) {
 		done, finished := make(chan error, 1), make(chan struct{})
 		go func() {
 			defer close(finished)
-			done <- migrate.UpTo(migrating, db, slog.New(slog.NewTextHandler(log, nil)), v0130, notice)
+			done <- migrate.UpTo(migrating, db, slog.New(slog.NewTextHandler(log, nil)), v0140, notice)
 		}()
 		t.Cleanup(func() { <-finished })
 		if sqlite {
@@ -202,8 +202,8 @@ func noConnectionCarriesTheBound(t *testing.T, db *database.DB) {
 	}
 }
 
-// held is the table a test holds: one the v0.13.0 upgrade alters.
-const held = "advisory_issue"
+// held is the table a test holds: one the v0.14.0 upgrade alters.
+const held = "component"
 
 // holdTable holds that table in a transaction on a connection of its own, as a
 // paged export's snapshot does on a server, or as a writer does on SQLite,
@@ -229,7 +229,7 @@ func holdTable(t *testing.T, db *database.DB) (*sql.Tx, *sql.DB, string) {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() { _ = tx.Rollback() })
-		if _, err := tx.ExecContext(ctx, `UPDATE "`+held+`" SET "added_at" = "added_at"`); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE "`+held+`" SET "first_seen_at" = "first_seen_at"`); err != nil {
 			t.Fatal(err)
 		}
 		return tx, requests, ""

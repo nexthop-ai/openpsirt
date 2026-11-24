@@ -213,8 +213,8 @@ func TestAnUpgradeCommittedWithoutItsVersionKeepsInstancesPaused(t *testing.T) {
 	dbtest.Each(t, func(t *testing.T, db *database.DB) {
 		ctx := t.Context()
 		dbtest.Empty(t, db)
-		dbtest.MigrateTo(t, db, v0120)
-		if err := migrations.RunV0130Unrecorded(ctx, db); err != nil {
+		dbtest.MigrateTo(t, db, v0130)
+		if err := migrations.RunV0140Unrecorded(ctx, db); err != nil {
 			t.Fatal(err)
 		}
 		observer := migrate.NewObserver(servingBeside(t, db))
@@ -226,7 +226,7 @@ func TestAnUpgradeCommittedWithoutItsVersionKeepsInstancesPaused(t *testing.T) {
 			}
 			return change == migrate.Recorded, applied
 		}
-		if changing, applied := look(); !changing || applied != v0120 {
+		if changing, applied := look(); !changing || applied != v0130 {
 			t.Errorf("after the upgrade committed unrecorded a serving instance saw changing %v at %d", changing, applied)
 		}
 		if err := migrate.Up(ctx, db, quiet(), 0); err != nil {

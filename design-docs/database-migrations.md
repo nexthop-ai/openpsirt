@@ -75,8 +75,7 @@ The chain is the baseline, then one migration per release.
 
 | Migration | What it is |
 |---|---|
-| 46 | The baseline: v0.12.0's schema, made at once on an empty database (§ The baseline) |
-| 47 | v0.12.0's schema into v0.13.0's |
+| 47 | The baseline: v0.13.0's schema, made at once on an empty database (§ The baseline) |
 | 48 | v0.13.0's schema into v0.14.0's |
 | 49 | v0.14.0's schema into v0.15.0's |
 
@@ -94,20 +93,20 @@ first.
 
 ## The baseline
 
-Migration 46 makes v0.12.0's schema directly. It is numbered as v0.12.0's last
-migration, so a database v0.12.0 built has it recorded and applies only what
+Migration 47 makes v0.13.0's schema directly. It is numbered as v0.13.0's last
+migration, so a database v0.13.0 built has it recorded and applies only what
 follows. A fresh install applies it and every migration after it.
 
 | Rule | Reason |
 |---|---|
 | Each table is made by one declaration, beside the migration, grouped by area with the reasoning for its shape | The migration names every table after every table it points at |
-| v0.12.0's record of its schema holds the baseline | On each engine it builds exactly v0.12.0's columns, constraints and indexes, and the schema test fails on any line either side lacks. On SQLite a constraint's name lives only in its table's text, which the test does not read: the baseline names constraints as v0.11.0 declared them, and a database the v0.11.0 upgrade renamed keeps the names from before the renames |
+| v0.13.0's record of its schema holds the baseline | On each engine it builds exactly v0.13.0's columns, constraints and indexes, and the schema test fails on any line either side lacks. On SQLite a constraint's name lives only in its table's text, which the test does not read: the baseline names constraints as v0.11.0 declared them, and a database the v0.11.0 upgrade renamed keeps the names from before the renames |
 | Nothing reads a SQLite constraint by name | SQLite drops no constraint, and a duplicate is recognized by its error code. A rebuild takes every name from the release's declaration, so a table any later migration rebuilds carries the declared names whichever a database held (`design-docs/database-upgrades.md` § Release upgrades) |
 | Every statement a declaration holds is one the baseline makes | A test fails on a table or index made from anywhere else |
 | On PostgreSQL the baseline also sets the finding table's vacuum settings | They are storage settings, which no declaration holds (`design-docs/database-schema.md` § Indexes) |
-| A release's declaration may derive from a baseline declaration | Several of v0.13.0's tables are the baseline's with columns or indexes added |
-| A baseline declaration a later migration reads keeps its name, and each table a later migration picks from it keeps its statements | Migrations from 47 on read baseline declarations, some by the names v0.11.0 and v0.12.0 gave them, and get v0.12.0's statements byte for byte for every table they pick |
-| A database at versions 1 to 45 is refused | A release before v0.12.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.13.0 upgrades 44 and 45, which v0.10.x and v0.11.0 built; v0.12.0 upgrades 43, which v0.9.0 built, to v0.12.0's schema; v0.10.2 upgrades 41 and 42 into one v0.13.0 upgrades; v0.8.0 upgrades 39 and 40 into one v0.10.2 upgrades, and below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
+| A release's declaration may derive from a baseline declaration | Several of v0.14.0's tables are the baseline's with columns or indexes added |
+| A baseline declaration a later migration reads keeps its name, and each table a later migration picks from it keeps its statements | Migrations from 48 on read baseline declarations, some by the names v0.11.0, v0.12.0 and v0.13.0 gave them, and get v0.13.0's statements byte for byte for every table they pick |
+| A database at versions 1 to 46 is refused | A release before v0.13.0 built it. Start and `openpsirt migrate up` refuse before anything runs, naming its version and the releases that upgrade it; `openpsirt migrate status` reports it as before the baseline with the same releases. v0.14.0 upgrades 46, which v0.12.0 built; v0.13.0 upgrades 44 and 45, which v0.10.x and v0.11.0 built, to v0.13.0's schema; v0.12.0 upgrades 43, which v0.9.0 built, into one v0.14.0 upgrades; v0.10.2 upgrades 41 and 42 into one v0.13.0 upgrades; v0.8.0 upgrades 39 and 40 into one v0.10.2 upgrades, and below 39 takes v0.6.0 first. Unrefused, PostgreSQL and SQLite fail on the first taken name, and MySQL and MariaDB step over every existing table and record the baseline over the old schema |
 
 ## Forward only
 
@@ -136,8 +135,7 @@ later start fails on a name already taken.
 | A collision with an object made earlier in the same run is stepped over too | The probe cannot tell the two apart; the log surfaces it |
 | An index a foreign key adopted is made once and never replaced | MySQL and MariaDB adopt an index led by the key's column and refuse to drop it while the key stands |
 | A migration stopped half way, with a table and an index made, is run again on both engines in CI, and `make check-engines` fails when either did not run it | The engines agree on what a migration does and differ only in what a stop leaves |
-| The v0.13.0 upgrade's tests share databases: one per engine holds every part's rows and upgrades whole, and on MySQL and MariaDB one more per stop number takes each part's stop of that number, in the order the upgrade reaches them, and upgrades once | Building a database to v0.12.0 is most of what such a test costs. Each part changes tables of its own, and its check reads its own rows |
-| The v0.13.0 upgrade's stops are made on MySQL and MariaDB alone, and a test holds that a start failing at its last step leaves the schema and version as v0.12.0 built them on PostgreSQL and SQLite | Both run the whole upgrade in one transaction, so a stopped start leaves nothing to resume |
+| A release upgrade's stops are made on MySQL and MariaDB alone, and a test holds that a start of the v0.14.0 upgrade failing at its last step leaves the schema and version as v0.13.0 built them on PostgreSQL and SQLite | Both run the whole upgrade in one transaction, so a stopped start leaves nothing to resume |
 
 ## Release records
 
@@ -150,7 +148,7 @@ schema they build on each of the four engines, captured from the tag.
 | Each file a release shipped is the file it tagged, and each file numbered or named as the release's is one it shipped | An edit changes a schema deployments hold without changing their version |
 | The migrations up to a release's last build, on every engine, the schema the tag built | The files read column spellings and widths from helpers a later change may edit. On SQLite the description includes whether each key is `AUTOINCREMENT` and each index partial, which its listings omit |
 | The migration library's bookkeeping table is left out of the compared schema, and a record listing it is compared without it | The library chooses its column types, and its releases change them |
-| A release the baseline replaced lists no file | Its files are gone. v0.12.0's schema on each engine holds the baseline |
+| A release the baseline replaced lists no file | Its files are gone. v0.13.0's schema on each engine holds the baseline |
 | One database per engine climbs the releases, checked at each | Each rung holds the whole schema to its record |
 | A release older than the baseline keeps no record | No database this tree builds reaches its last migration |
 
@@ -199,7 +197,7 @@ refuses a tag whose release is not frozen, before building anything.
 
 `make upgrade-rehearsal FROM=<release> ENGINE=<engine>` upgrades a database an
 earlier release built and filled itself. It is step 2 of § Release records, run
-from the newest patch of every release line from v0.12 on, on each engine,
+from the newest patch of every release line from v0.13 on, on each engine,
 since a line's patches share its schema. It builds images and scans the demo's
 inventories, so it runs locally, outside the gate.
 
@@ -324,7 +322,7 @@ outage for as long as its migrations take.
 |---|---|
 | An upgrade holds the lease to change the schema after reading the version, where a migration is outstanding, and holds it to migrate again after the last migration and the statistics refresh, on every path | A start with nothing to apply holds it to migrate alone, so a replica starting beside others pauses none of them |
 | On MySQL and MariaDB, once the notice has passed and before the first statement, the upgrade writes a row to the schema change record, where the database has that table, naming the last version it applies | The lease lapses once its holder is gone; the row outlives an upgrade that fails part way |
-| On every engine, a release's migration writes a row naming its version in its own transaction, which a test holds for every release migration from v0.13.0's on | It commits with the schema and rolls back with it, so a process killed after the commit and before the migration library records the version leaves a row |
+| On every engine, a release's migration writes a row naming its version in its own transaction, which a test holds for every release migration after the baseline | It commits with the schema and rolls back with it, so a process killed after the commit and before the migration library records the version leaves a row |
 | An upgrade ending any way removes every row naming a version no later than the one then applied | A success leaves no row; a failure leaves the rows of what is still outstanding |
 | A row counts while the version applied is behind the one it names | A row left by a process ended after its last migration, or by a removal that failed, pauses nobody |
 | A start with nothing to apply removes every row the version applied has reached | The record holds only upgrades still outstanding |
@@ -382,5 +380,4 @@ outage for as long as its migrations take.
 |---|---|
 | The concurrency test does not cover the lease | Every caller takes the in-process mutex first, so goroutines driven through the normal path pass with the lease deleted. The suite drives claims from two pools directly (`design-docs/database.md` § Test harness) |
 | Any account that writes the lease table can hold the lease | It holds every start behind it, and holding it to change the schema pauses every serving instance, for as long as it writes the lapse forward. The holder the waiter's log names is what the row says; deleting the row ends it |
-| An instance of a release before the lease does not look | It serves through an upgrade; the upgrade note says to stop every instance of the earlier release first |
 | On MySQL and MariaDB a data step waits for a row as the server's own bound says, and a writer holding the row past it fails the migration. | Retrying the step where it stands loses the work before it under `innodb_rollback_on_timeout`, and retrying from the start runs again each data-definition statement already committed |

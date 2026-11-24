@@ -146,7 +146,7 @@ limit, and the kernel kills the larger on excess.
 | Background loops run from one list; the mail sender is absent with no channel and the attachment sweeper with no store | |
 | Every exit waits for the background work, a failure to serve included | Each pass fires at once, so an early return leaves them mid-query as the database closes |
 | One setting bounds both halves of the shutdown grace, and either overrunning it after a stop signal exits 1 | A supervisor reads the exit code; different codes would report half an unfinished shutdown as finished |
-| The chart stops every earlier pod before starting a new one | A pod of a release from before the migration lease serves through the upgrade, and a ReadWriteOnce claim must move |
+| The chart stops every earlier pod before starting a new one | A ReadWriteOnce claim must move |
 | A rolling update is the operator's choice | An earlier pod stops serving once the new one holds the migration lease to change the schema, and exits once the schema is past its own, so an upgrade changing the schema is an outage either way |
 | The commands are `serve`, the default, and `migrate`, each taking `--config` before or after its name | |
 
