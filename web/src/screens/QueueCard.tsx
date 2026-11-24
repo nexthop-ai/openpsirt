@@ -578,7 +578,7 @@ export function Card({
           of <span className="id">{decision.source.source}</span>
         </p>
       )}
-      {bulk && !decision.outliers && (
+      {bulk && !source && !decision.outliers && (
         <p className="hint" style={{ margin: 0 }}>
           One decision over {decision.issues.toLocaleString()} issues, read once and approved once.
         </p>
@@ -624,20 +624,34 @@ export function Card({
         </div>
       ) : (
         <div className="actions">
+          {/* A rule is agreed to as a rule: its count of issues grows with every
+              scan, and an approval covers the later ones too, so a count on the
+              button reads as a fixed batch. */}
           <button type="button" className="btn" disabled={busy} onClick={doApprove}>
-            {bulk && aside.size > 0
-              ? `Approve ${(decision.issues - rejecting).toLocaleString()}, reject ${rejecting}`
-              : bulk
-                ? `Approve all ${decision.issues.toLocaleString()}`
-                : "Approve"}
+            {source
+              ? "Approve the rule"
+              : bulk && aside.size > 0
+                ? `Approve ${(decision.issues - rejecting).toLocaleString()}, reject ${rejecting}`
+                : bulk
+                  ? `Approve all ${decision.issues.toLocaleString()}`
+                  : "Approve"}
           </button>
           <button type="button" className="btn ghost" onClick={() => setAsking(true)}>
-            {bulk ? "Reject all" : "Reject"}
+            {source ? "Reject the rule" : bulk ? "Reject all" : "Reject"}
           </button>
-          {bulk && (
-            <span className="consequence">
-              <b>{decision.records.toLocaleString()}</b> records, each expiring independently
+          {source ? (
+            <span
+              className="consequence"
+              title="Approved, it answers later issues with no second look, until it is withdrawn"
+            >
+              <b>{decision.issues.toLocaleString()}</b> issues now, and new ones as scans find them
             </span>
+          ) : (
+            bulk && (
+              <span className="consequence">
+                <b>{decision.records.toLocaleString()}</b> records, each expiring independently
+              </span>
+            )
           )}
         </div>
       )}

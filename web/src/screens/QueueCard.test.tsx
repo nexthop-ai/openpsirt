@@ -105,9 +105,11 @@ describe("a correction by source paths waiting", () => {
     const text = mount.host().textContent ?? "";
     expect(text).toContain("By source paths");
     expect(text).toContain("linux-perf built from tools/lib, tools/perf of linux");
-    expect(text).toContain("40 issues");
+    expect(text).toContain("40 issues now, and new ones as scans find them");
     expect(text).not.toContain("one decision in this build");
-    expect(button(mount.host(), "Approve all 40")).not.toBeNull();
+    expect(text).not.toContain("each expiring independently");
+    expect(button(mount.host(), "Approve the rule")).not.toBeNull();
+    expect(button(mount.host(), "Reject the rule")).not.toBeNull();
   });
 
   it("is titled by the rule and opens it, not the issue it is stored against", async () => {
