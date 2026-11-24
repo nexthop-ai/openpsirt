@@ -40,7 +40,7 @@ address can set is a narrowing nobody uses.
 | A bar filter is one control: name, value and menu. A value in force tints it. A multi-answer filter (decision state, holder) ticks and stays open; a step on a scale (severity, due) picks one and closes | A name cannot wrap away from its value |
 | A control holding several answers says the first and how many more: "Undecided +1". The bar's menus and the panel's tick lists keep the offered order, open on an arrow key, move with arrows, Home and End, close on Escape back to the control, and close on Tab as focus moves on; one keyboard handler serves both | A list left open sits over the next control |
 | The panel is shut until opened, whatever the address narrows by | It is most of a screen, and the chips already say it |
-| Exploited and fix available are two flags; a kept filter in the former single word is rewritten by the upgrade, and an address elsewhere opens without that narrowing | "Exploited, and a fix exists" is a batch somebody assembles |
+| Exploited and fix available are two flags; an address in the former single word opens without that narrowing | "Exploited, and a fix exists" is a batch somebody assembles |
 | The decision state sits beside the severity floor on the bar | What is unanswered is reached for first; urgency already leads with exploited, and the fix is a column |
 
 | Filter | Definition |

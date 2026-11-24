@@ -17,8 +17,7 @@ terminationGracePeriodSeconds: 60
 # holds.
 #
 # Under {type: RollingUpdate}, a new pod changing the schema stops every old
-# pod of v0.13.0 or later serving (a v0.12.0 pod does not, so scale to zero
-# before upgrading from it): each fails readiness and answers as upgrading while the
+# pod serving: each fails readiness and answers as upgrading while the
 # migration runs, then exits once the schema is past its own, and the new pod
 # serves once the migration ends. An upgrade that changes the schema is an
 # outage either way; one that changes nothing rolls with no pause.

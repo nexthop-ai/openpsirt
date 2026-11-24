@@ -17,7 +17,7 @@ func init() {
 
 // The v0.14.0 release's schema changed into v0.15.0's.
 //
-// Run in one transaction of its own, the way migrations 47 and 48 are.
+// Run in one transaction of its own, the way migration 48 is.
 func upV0150(ctx context.Context, sqldb *sql.DB) error {
 	return releaseUpgrade(ctx, sqldb, 49, upgradeV0150)
 }

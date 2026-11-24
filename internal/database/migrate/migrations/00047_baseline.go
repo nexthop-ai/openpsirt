@@ -18,19 +18,19 @@ func init() {
 	goose.AddMigrationContext(upBaseline, nil)
 }
 
-// Baseline is the migration that makes v0.12.0's schema, the version a
-// database v0.12.0 built records.
-const Baseline = 46
+// Baseline is the migration that makes v0.13.0's schema, the version a
+// database v0.13.0 built records.
+const Baseline = 47
 
-// The schema v0.12.0 built, made directly on an empty database.
+// The schema v0.13.0 built, made directly on an empty database.
 //
-// Numbered as v0.12.0's last migration, so a database v0.12.0 built has it
+// Numbered as v0.13.0's last migration, so a database v0.13.0 built has it
 // recorded already and applies only what follows. A database an earlier
 // release built records a version below it, and is refused before anything
 // runs (design-docs/database-migrations.md § The baseline).
 //
 // The baseline files beside this one hold each table's declaration, with the
-// reasoning for its shape. v0.12.0's record of the schema it built on each
+// reasoning for its shape. v0.13.0's record of the schema it built on each
 // engine is what holds them to it.
 //
 // Its statements are bounded in their wait for a lock as every migration's
@@ -87,6 +87,7 @@ var baseline = []baselineTable{
 	{"application_setting", settingsBaseline},
 	{"job", jobBaseline},
 	{"lease", leaseBaseline},
+	{"schema_change", schemaChangeBaseline},
 
 	// What is built, and who may see it.
 	{"product", catalogBaseline},
@@ -218,7 +219,7 @@ var baseline = []baselineTable{
 }
 
 // declaredV0110 is the baseline's declaration of one table and the indexes it
-// makes, under the name the v0.13.0 and v0.14.0 upgrades read it by.
+// makes, under the name the v0.14.0 upgrade reads it by.
 func declaredV0110(t *columnTypes, table string) []string {
 	for _, each := range baseline {
 		if each.table != table {

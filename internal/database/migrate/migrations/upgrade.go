@@ -22,8 +22,7 @@ import (
 // shape the release declares. Each release's migration supplies the order,
 // the rows and its declarations, and calls these.
 
-// inV020 runs a release's upgrade in one transaction. Migrations 45 and 46
-// call it by this name, and tagged releases froze those files.
+// inV020 runs a release's upgrade in one transaction.
 //
 // On PostgreSQL and SQLite a failure leaves the schema as it was. On MySQL and
 // MariaDB every data-definition statement commits as it runs, so a failure
@@ -150,10 +149,6 @@ type change struct {
 	// drop is the columns the release no longer declares. Whatever a column
 	// held is moved before the change, which removes it.
 	drop []string
-	// then runs once every column is in place and before any constraint is.
-	then func() error
-	// constraints is named as the release names them.
-	constraints []string
 }
 
 // addsOnly is a change SQLite can make where the table stands: columns that
@@ -164,7 +159,7 @@ func (c change) addsOnly() bool {
 			return false
 		}
 	}
-	return len(c.drop) == 0 && len(c.constraints) == 0 && c.then == nil
+	return len(c.drop) == 0
 }
 
 // added is one column, and the value existing rows take in it. No fill is a
@@ -212,23 +207,6 @@ func (u *upgrader) change(statements []string, c change) error {
 	}
 	for _, column := range c.drop {
 		stmts = append(stmts, `ALTER TABLE "`+c.table+`" DROP COLUMN "`+column+`"`)
-	}
-	if err := u.run(stmts); err != nil {
-		return err
-	}
-	if c.then != nil {
-		if err := c.then(); err != nil {
-			return err
-		}
-	}
-
-	stmts = nil
-	for _, name := range c.constraints {
-		def, err := items.constraint(name)
-		if err != nil {
-			return err
-		}
-		stmts = append(stmts, `ALTER TABLE "`+c.table+`" ADD `+def)
 	}
 	return u.run(stmts)
 }
@@ -310,13 +288,7 @@ func (u *upgrader) rebuild(made string, indexes []string, c change) error {
 	}
 	stmts = append(stmts, indexes...)
 	stmts = append(stmts, kept...)
-	if err := u.run(stmts); err != nil {
-		return err
-	}
-	if c.then != nil {
-		return c.then()
-	}
-	return nil
+	return u.run(stmts)
 }
 
 func (u *upgrader) sqliteColumns(table string) (map[string]bool, error) {
@@ -409,18 +381,15 @@ func indexNamed(indexes []string, name string) (string, error) {
 	return "", fmt.Errorf("no statement creates index %s", name)
 }
 
-// declaration is a CREATE TABLE statement read into its columns and
-// constraints.
+// declaration is a CREATE TABLE statement read into its columns.
 type declaration struct {
 	columns     []string
 	definitions map[string]string
-	constraints map[string]string
 }
 
 var (
 	lineComment = regexp.MustCompile(`--[^\n]*`)
 	leadingName = regexp.MustCompile(`^"([^"]+)"`)
-	constraint  = regexp.MustCompile(`^CONSTRAINT\s+"([^"]+)"`)
 )
 
 // declared reads a CREATE TABLE statement's body. The statements here quote
@@ -434,7 +403,7 @@ func declared(stmt string) (*declaration, error) {
 	}
 	body = body[open+1 : shut]
 
-	d := &declaration{definitions: map[string]string{}, constraints: map[string]string{}}
+	d := &declaration{definitions: map[string]string{}}
 	depth, start := 0, 0
 	var items []string
 	for i, r := range body {
@@ -453,10 +422,6 @@ func declared(stmt string) (*declaration, error) {
 	items = append(items, body[start:])
 	for _, item := range items {
 		item = strings.Join(strings.Fields(item), " ")
-		if m := constraint.FindStringSubmatch(item); m != nil {
-			d.constraints[m[1]] = item
-			continue
-		}
 		if m := leadingName.FindStringSubmatch(item); m != nil {
 			d.columns = append(d.columns, m[1])
 			d.definitions[m[1]] = item
@@ -470,13 +435,6 @@ func (d *declaration) column(name string) (string, error) {
 		return def, nil
 	}
 	return "", fmt.Errorf("no column %s is declared", name)
-}
-
-func (d *declaration) constraint(name string) (string, error) {
-	if def, ok := d.constraints[name]; ok {
-		return def, nil
-	}
-	return "", fmt.Errorf("no constraint %s is declared", name)
 }
 
 // withColumn adds a column to a table's declaration, after the column it
@@ -517,7 +475,7 @@ func (u *upgrader) hasColumn(table, column string) (bool, error) {
 
 // releaseUpgrade runs a release's upgrade to version as inV020 does, and
 // writes the record of the change in the same transaction. Every release's
-// migration from v0.13.0's on runs through it.
+// upgrade migration runs through it.
 func releaseUpgrade(ctx context.Context, sqldb *sql.DB, version int64,
 	run func(context.Context, bun.Tx) error) error {
 	return inV020(ctx, sqldb, func(ctx context.Context, tx bun.Tx) error {
@@ -538,39 +496,16 @@ func upgraderIn(ctx context.Context, tx bun.Tx) (*upgrader, error) {
 }
 
 // changeRecorded writes, in a release's upgrade transaction, the record of
-// the change to version, where the database has the table for it. It commits
-// with the schema and rolls back with it, so a process killed after the
-// commit and before the migration library records the version leaves a
-// record that keeps every serving instance paused; the upgrade that records
-// the version removes it.
+// the change to version. It commits with the schema and rolls back with it,
+// so a process killed after the commit and before the migration library
+// records the version leaves a record that keeps every serving instance
+// paused; the upgrade that records the version removes it.
 func changeRecorded(ctx context.Context, tx bun.Tx, version int64) error {
-	u, err := upgraderIn(ctx, tx)
-	if err != nil {
-		return err
-	}
-	if present, err := u.hasTable("schema_change"); err != nil || !present {
-		return err
-	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO "schema_change" ("started_at", "started_by", "target_version")
 		VALUES (?, ?, ?)`, time.Now().UTC(), fmt.Sprintf("the migration to version %d", version), version); err != nil {
 		return fmt.Errorf("record the schema change: %w", err)
 	}
 	return nil
-}
-
-// hasForeignKey reports whether a table holds a foreign key of this name. A
-// key on SQLite is part of the table and has no name the catalog answers, so
-// it is asked only of the server engines.
-func (u *upgrader) hasForeignKey(table, name string) (bool, error) {
-	query := `SELECT 1 FROM "information_schema"."TABLE_CONSTRAINTS"
-		WHERE "CONSTRAINT_SCHEMA" = DATABASE() AND "TABLE_NAME" = ? AND "CONSTRAINT_NAME" = ?
-		  AND "CONSTRAINT_TYPE" = 'FOREIGN KEY' LIMIT 1`
-	if u.engine == database.Postgres {
-		query = `SELECT 1 FROM "information_schema"."table_constraints"
-			WHERE "constraint_schema" = CURRENT_SCHEMA() AND "table_name" = ? AND "constraint_name" = ?
-			  AND "constraint_type" = 'FOREIGN KEY'`
-	}
-	return exists(u.ctx, u.tx, fmt.Sprintf("%s has foreign key %s", table, name), query, table, name)
 }
 
 // hasTable reports whether a table of this name is there.

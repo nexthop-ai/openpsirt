@@ -4,7 +4,7 @@
 package migrations
 
 // componentBaseline declares the component table, with the license an inventory
-// declares, and its indexes.
+// declares and the name with its own version taken out, and its indexes.
 func componentBaseline(t *columnTypes) []string {
 	return []string{
 		// identity is derived from the component's own content — its package
@@ -101,6 +101,11 @@ func componentBaseline(t *columnTypes) []string {
 			-- wrote it. Not part of identity, for the reason the supplier
 			-- is not: two producers state it differently or not at all.
 			"license"            ` + t.free + ` NULL,
+			-- The name with its own version taken out, folded, where the
+			-- name holds that version: what a count across versions groups
+			-- on. Null where the name holds no version, which reads the
+			-- folded name.
+			"identifying_folded" ` + t.name + ` NULL,
 			CONSTRAINT "component_identity_unique" UNIQUE ("identity")
 		)` + t.suffix,
 
@@ -117,8 +122,8 @@ func componentBaseline(t *columnTypes) []string {
 	}
 }
 
-// graphNodeBaseline declares the graph node table, with the identifiers a build
-// states for a component, and its index.
+// graphNodeBaseline declares the graph node table, with the identifiers, name
+// and version a build states for a component, and its indexes.
 func graphNodeBaseline(t *columnTypes) []string {
 	return []string{
 		`CREATE TABLE "graph_node" (
@@ -147,6 +152,21 @@ func graphNodeBaseline(t *columnTypes) []string {
 			-- built from, without credentials. An analyzer's result in that
 			-- repository is placed on the component.
 			"repository"       ` + t.free + ` NULL,
+			-- The name and version this build stated for the component, as it
+			-- stated them. The component row holds what the first report of
+			-- it stated, and a package identifier names one component
+			-- whatever version field beside it says. A scanner is given
+			-- these, and every screen shows them. Null on a node written
+			-- before they were kept, which reads the component's.
+			"name"             ` + t.free + ` NULL,
+			"version"          ` + t.free + ` NULL,
+			-- The stated name folded as the component's is, which a name
+			-- somebody types is matched on.
+			"name_folded"      ` + t.name + ` NULL,
+			-- The source package this build stated, else the stated name,
+			-- folded: what an assignment rule's source pattern is matched
+			-- on.
+			"source_folded"    ` + t.name + ` NULL,
 			CONSTRAINT "graph_node_build_fk" FOREIGN KEY ("build_id") REFERENCES "build"("id"),
 			CONSTRAINT "graph_node_component_fk" FOREIGN KEY ("component_id") REFERENCES "component"("id"),
 			CONSTRAINT "graph_node_opened_fk" FOREIGN KEY ("opened_scan_id") REFERENCES "scan"("id"),
@@ -157,6 +177,12 @@ func graphNodeBaseline(t *columnTypes) []string {
 		// Every root a build has had, live or closed. A node is never
 		// deleted, so without it that read walks the build's whole history.
 		`CREATE INDEX "graph_node_root_idx" ON "graph_node" ("build_id", "is_root", "component_id", "closed_scan_id")`,
+		// A typed name is looked up within one build, or the builds of
+		// one product.
+		`CREATE INDEX "graph_node_name_idx" ON "graph_node" ("build_id", "name_folded")`,
+		// A rule's source pattern is looked up within the builds of one
+		// product.
+		`CREATE INDEX "graph_node_source_idx" ON "graph_node" ("build_id", "source_folded")`,
 	}
 }
 
@@ -236,8 +262,8 @@ func imageVersionBaseline(t *columnTypes) []string {
 	}
 }
 
-// graphNodeV0110 is the baseline's declaration of the graph node table, under
-// the name the v0.13.0 upgrade reads it by.
-func graphNodeV0110(t *columnTypes) []string {
-	return graphNodeBaseline(t)
+// componentV0130 is the baseline's declaration of the component table, under
+// the name the v0.14.0 upgrade reads it by.
+func componentV0130(t *columnTypes) []string {
+	return componentBaseline(t)
 }

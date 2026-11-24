@@ -531,7 +531,6 @@ fixed. Nothing is notified or assigned. A tag is never checked.
 | When | On the first scanner data dated at least `scanning.check-settle` after the replacement arrived, two days unless an administrator changes it under Settings |
 | Dates | Each issue's publication date from [Issue publication dates](#issue-publication-dates). Where OSV has none, when this deployment first saw it, or, for an issue first seen at or after the replacement, the old inventory's last scan, marked publication date unknown. With the dates off, when this deployment first saw it |
 | Cost | One more scan per replaced inventory, behind every waiting scan of a build, fifty asked for at a time |
-| After upgrading | An inventory already replaced is never checked; one replaced after the upgrade is |
 
 ### CVE records
 
@@ -1422,7 +1421,7 @@ deleting by surprise.
 
 A database is upgraded in place, at startup or by `openpsirt migrate up`,
 through each later release's upgrade on the way. A database built by the
-release the [oldest section below](#from-v0110) names, or by an earlier one, is
+release the [oldest section below](#from-v0120) names, or by an earlier one, is
 refused, and that section says how to bring it forward. A database built by a
 release candidate
 or any build between releases is recreated.
@@ -1435,7 +1434,7 @@ from, and every section after it.
 | Step | |
 |---|---|
 | Back the database up | It is the only way back to the earlier release: a database is only ever upgraded, and this release refuses to start against a database a later one upgraded. On MySQL and MariaDB it is also what recovers an upgrade that fails part way |
-| Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. Coming from a release whose upgrade note says it serves through another process's upgrade, with `strategy.type: RollingUpdate`, scale the deployment to zero first: it fails on tables the upgrade drops and reshapes. A later release stops serving on its own while another process changes the schema ([Health checks](#health-checks)) |
+| Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. Every release this one upgrades stops serving on its own while another process changes the schema ([Health checks](#health-checks)) |
 | Deploy this release | It migrates at startup, answering its health check on `/healthz` meanwhile ([Health checks](#health-checks)). With `autoMigrate: false`, run `openpsirt migrate up` first |
 | Watch the log while it migrates | A schema change waits three seconds at a time for a table another session holds, and tries again with no total limit, logging `a migration is waiting for a table something else holds` with every other session holding a transaction open. A wait logged again and again names the session to end |
 
@@ -1445,108 +1444,31 @@ database a later release upgraded and serves it, failing on what changed, so
 redeploying one, `helm rollback` included, is not going back: restore the
 backup first.
 
-### From v0.11.0
+### From v0.12.0
 
-A database v0.11.0 or an earlier release built is refused at startup and by
+A database v0.12.0 or an earlier release built is refused at startup and by
 `openpsirt migrate up`, naming the version it holds and the releases that
-upgrade it. This release makes v0.12.0's schema in one step and carries none of
+upgrade it. This release makes v0.13.0's schema in one step and carries none of
 the upgrades before it.
 
 1. Back the database up.
-2. Read v0.13.0's [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.13.0/configuration/#upgrading)
+2. Read v0.14.0's [upgrade notes](https://nexthop-ai.github.io/openpsirt/0.14.0/configuration/#upgrading)
    from the section for your release on, and do what they say before upgrading
    as well as after.
-3. For a database v0.9.0 built, run `openpsirt migrate up` with v0.12.0
-   against it. That leaves v0.12.0's schema, which this release upgrades.
-4. For a database v0.8.0 or an earlier release built, follow the steps of
+3. For a database v0.12.0 built, run `openpsirt migrate up` with v0.14.0
+   against it. That leaves v0.14.0's schema, which this release upgrades.
+4. For a database v0.9.0 built, run `openpsirt migrate up` with v0.12.0
+   against it, then with v0.14.0.
+5. For a database v0.8.0 or an earlier release built, follow the steps of
    v0.13.0's [From v0.9.0](https://nexthop-ai.github.io/openpsirt/0.13.0/configuration/#from-v090)
    up to running `openpsirt migrate up` with v0.10.2, then run it with v0.13.0.
-5. For a database v0.10.0, v0.10.1, v0.10.2 or v0.11.0 built, run
-   `openpsirt migrate up` with v0.13.0 against it.
-6. Deploy this release, reading the sections from v0.12.0 on.
+6. For a database v0.10.0, v0.10.1, v0.10.2 or v0.11.0 built, run
+   `openpsirt migrate up` with v0.13.0 against it. That leaves v0.13.0's
+   schema, which this release upgrades.
+7. Deploy this release, reading the sections from v0.13.0 on.
 
-A database v0.12.0 or a later release built needs none of this, and reads the
+A database v0.13.0 or a later release built needs none of this, and reads the
 sections from its release on.
-
-### From v0.12.0
-
-| Change | What to do |
-|---|---|
-| An issue taken off an advisory and put back keeps every stretch it was on, so an advisory issued during any of them is read as naming it. v0.12.0 kept only the last stretch, and the upgrade cannot recover an earlier one | Nothing the upgrade can do. Where v0.12.0 saw an issue taken off, put back and taken off again, an advisory issued during an earlier stretch is read as not naming it: what went out is shown to readers who may not see that issue, and a rename that issuance should refuse is allowed |
-| A release marked affected on an advisory, cleared and marked again keeps every stretch it was marked for, each with who marked and who cleared it. v0.12.0 kept one row and overwrote who marked and cleared it before, and the upgrade cannot recover an earlier stretch | Nothing the upgrade can do. Where v0.12.0 saw a release marked, cleared and marked again, only the last marking and who made it are shown |
-| A variable starting `OPENPSIRT_` that names no setting stops the process at startup, naming it. v0.12.0 ignored it, so a misspelled setting kept its default | Correct or unset each variable the refusal names. Kubernetes service links are not refused |
-| A database URL with a port, no user name and no database, whose query holds an unescaped `@` followed by a host, such as `postgres://u:12?a=b@db`, is refused at startup as a password cut short. An `@` in a parameter naming a user or a credential, such as `user` or `password`, is not. v0.12.0 handed the driver the host `u` | Percent-encode each `/`, `?`, `#` and `@` in the user name and password, as `%2F`, `%3F`, `%23` and `%40` |
-| An object store endpoint, `OPENPSIRT_DIRECTORY_URL`, `OPENPSIRT_OIDC_ISSUER` or `openpsirt-upload --url` with an `@` in its path is refused, since a password holding an unescaped `/`, `?` or `#`, such as `https://key:12/ab@minio:9000`, reads that way. v0.12.0 read the host as `key` | Percent-encode each `/`, `?`, `#` and `@` in the user name and password, and an `@` in a path as `%40` |
-| A sign-in provider whose discovery document names an endpoint on another port of the issuer's host stops the process at startup. v0.12.0 compared the host name alone | Have the provider publish its endpoints on the issuer's port, or set the issuer to the address that serves them |
-| An upstream whose stored address has an `@` in its path, fragment or a query key is not read, and is refused as an address an upstream cannot have. v0.12.0 read it | Trust the upstream again at its address with each such `@` written as `%40` |
-| A published directory and an attachment store with one bucket name are refused at startup where either endpoint is unset or the two hosts share a resolved address, and two folders are compared with their links followed. v0.12.0 compared the endpoints as written | Give the directory a bucket or a folder of its own |
-| `openpsirt-upload` refuses a plain `http` address that is not this machine. v0.12.0 sent the key over it unencrypted | Use the `https` address. Inside a network you trust, give `--allow-http` |
-| `openpsirt-upload write` names each analyzer's file with the analyzer's name in lower-case letters, digits, `.`, `_` and `-`, every other character a `-` and no `.` at either end. v0.12.0 wrote the name as the analyzer gave it | Look for the new name where a script picks the file up by its name |
-| The Helm chart salts the checksum that rolls the pods when a chart-held secret changes, and keeps the salt in the Secret `<fullname>-rollout-salt`, where `<fullname>` is the name the chart's resources share: `fullnameOverride` where set, otherwise the release name followed by `-` and the chart name (`nameOverride` where set) unless the release name holds it, cut to 63 characters. The first upgrade rolls the pods once | Where the chart is rendered with no cluster, `helm template` or Argo CD, set `rolloutSalt` to a long random value, or the pods roll on every render |
-| A VEX document uploaded without `publisher` is filed under the publisher it names: an OpenVEX author or a CSAF publisher name. One naming neither is refused with 422. v0.12.0 filed it under its file name | Clear what v0.12.0 filed under a file name, as [VEX statements from v0.12.0](#vex-statements-from-v0120) says. Left alone, those statements stay in force beside the ones later uploads file under the document's own publisher |
-| A VEX document replaces only an earlier revision of itself: the same publisher and the same OpenVEX `@id` or CSAF tracking identifier. v0.12.0 replaced every earlier document from that publisher | Clear what v0.12.0 recorded under each publisher, as [VEX statements from v0.12.0](#vex-statements-from-v0120) says. Left alone, a revision stating an identifier replaces none of it, and what v0.12.0 recorded stays in force beside the revision |
-| A package whose name holds its own version, such as Debian's `linux-image-6.12.41+deb13-amd64` at `6.12.41-1`, is continued across an upgrade that renames it: its findings carry to the new version as superseded, the decisions on them carry as any version change carries them, and an upload's changes list it as changed. v0.12.0 read every such upgrade as one package removed and another added, closed its findings as removed, and opened them again with no decision. The upgrade re-keys every finding and decision on such a package | Nothing. Where two versions of one package each had a decision standing at any version for the same issue, they now meet: an approved one stands over a proposed one, otherwise the newer, and the other lapses. A finding an earlier upgrade closed as removed stays closed as it was |
-| A build's components are shown, searched and given to the scanner by the name and version that build stated. v0.12.0 used those of whichever build described the package first, in any product | Nothing. A build shows its own once its inventory is sent again; until then it keeps the names and versions v0.12.0 showed |
-| A CSAF VEX document's tracking identifier opens on its product's numeric identifier, `VEX-12-sonic-GHSA-x-y` where v0.12.0 wrote `VEX-sonic-GHSA-x-y`, so every CSAF VEX document's identifier and path change once. The first publishing pass after the upgrade writes each at its new path as a new document, version 1 in the current year's folder, and its old path answers 404, unless the pass refuses its new path as held, which it logs. Nothing is written to or left in [the published advisory directory](#the-published-advisory-directory), which holds advisories alone, so no file is orphaned | Nothing for a reader that follows the provider index or the feed. Point a link or bookmark kept to a single CSAF VEX document at its new path |
-| A reader keeping CSAF VEX documents by tracking identifier, another OpenPSIRT reading this deployment as an upstream among them, sees every old document withdrawn and a new one about each issue, with nothing linking the two | On another OpenPSIRT, review each statement again: one accepted from an old document is set aside, and decisions started from it carry the set-aside notice; one declined comes back to the review queue |
-| Turning publishing on for a product, and renaming one that publishes, are no longer refused for a name that folds like another product's | Nothing |
-| `POST /v1/advisories/{advisory}/approval` takes `{"edition": n}`, the edition agreed to, and answers 409 where the advisory has moved to another edition since. v0.12.0 took no body | Send the `edition` the advisory reported, or the oldest of the `Advisory-Edition` values its releases and its document named where those were read too. A request without it is refused |
-| A build's OpenVEX document states a decision not to fix that names no mitigation as affected, its action saying no fix is planned. v0.12.0 left such a decision out | Nothing, unless one should not be stated: the first publishing pass after the upgrade states every one |
-| Mail carries a notice as it happens only where somebody must act on it: work assigned to them, a mention, a decision or suppression rule waiting on them, a decision sent back, an embargo's disclosure date coming or arriving, a response window coming due or passed, a deferral ending, an approval withdrawn or undone, a decision lapsing, a critical finding in a release, an unanswered report and a reporter's message. Every other notice reaches mail in the daily digest, which lists it. v0.12.0 mailed every notice as it happened | Nothing. Somebody who wants the rest by mail turns the daily digest on in their own settings; without it, those notices stay in the application |
-| Mail to a server that offers no STARTTLS is refused and logged at error, and every notice and digest waits unsent until the configuration changes. v0.12.0 sent it in the clear | Give the mail server STARTTLS. For a relay on a network you accept mail crossing in the clear, set `OPENPSIRT_MAIL_ALLOW_PLAINTEXT` with no username, which is sent only after STARTTLS |
-| A process whose clock stands more than 15 seconds from the database's stops at startup, naming by how far. v0.12.0 started with any clock | Synchronize every host's clock and the database server's before upgrading |
-| A patch link's repository on github.com or gitlab.com is known by its path in lower case, as those hosts compare it. A repository recorded under a path with capitals is cloned once more under the new key, and the earlier copy is evicted like any unused one | Nothing. The first pass after the upgrade takes longer for those repositories |
-| What became of a withdrawn decision names whoever withdrew it, and a person's throughput counts a withdrawal for them, whoever proposed the decision. v0.12.0 named the proposer and counted every withdrawal for them. A decision withdrawn before the upgrade names nobody and counts toward nobody's throughput | Nothing the upgrade can do: v0.12.0 did not record who withdrew a decision |
-| The approval-quality report lists an agreement as standing from somebody who could not give it now wherever the approving rule refuses them today, so an administrator or a deactivated approver who cannot approve now is listed, and a triager who still triages there is not. v0.12.0 asked about the approver capability alone, never listed an administrator and listed a deactivated approver as still holding the right | Nothing. Expect that list to change on the first report after the upgrade |
-| `PUT /v1/decisions/{id}/elsewhere` answers 409 for a decision about a code finding recorded as a flaw. v0.12.0 set the link | Judge the flaw instead. A script setting a link on such a decision now receives the refusal |
-| The `outcome` of what stands with nobody agreeing, in `GET /v1/approvals/scrutiny`, lists `dismissed` and `not-security`, the code finding outcomes the report already returned. v0.12.0's API document left them out | Accept both values in a client generated from the API document |
-| A package identifier is stored without a credential inside a qualifier's address, such as `vcs_url` or `download_url`, and without that address's query or fragment, on components and as the build's root in published documents and advisories. A repository remote is stored without its credential, query or fragment. v0.12.0 stored each as the upload wrote it | Nothing. The upgrade takes them out of what v0.12.0 stored, the VEX documents and advisories served to anybody and the repository remotes a build or an analysis stated included. Rotate any token an inventory or an analysis run's repository remote carried, since v0.12.0 showed it to every reader of the component or module and published it where a build's root held it |
-| A component an inventory lists as depending on itself is no longer its own consumer. v0.12.0 opened a finding at that occurrence beside the component's real ones | Nothing. The build's next scanner run closes those findings as removed, since the component no longer pulls itself in. The component's other occurrences are unchanged |
-| A package identifier written `pkg://` is read as `pkg:`, an escaped slash or percent sign inside a name stays part of the name, a percent sign starting no escape is read as itself, and an identifier stating no version is read with the version stated beside it. v0.12.0 read each as another package, or every version as one | Each such component is identified anew the next time its build's inventory is sent: its findings close on the earlier component and open on the new one. Until then a scan of the build keeps finding it as it was. Decisions, labels, assignments and upgrade promises on the earlier component do not carry over, so make them again on the new one |
-| `openpsirt-upload` refuses a `--salt-file` holding fewer than 32 bytes, naming the file and its length | Replace a shorter salt with one of at least 32 bytes, such as the output of `openssl rand -hex 32`. Every fingerprint changes once, and the next run is matched as a fingerprint change |
-| A stop whose requests or background work outlast `server.shutdown_grace` after the signal exits 1, which v0.12.0 exited 0 | Nothing, unless stops routinely exit 1: raise `server.shutdown_grace`, and `TimeoutStopSec` or `terminationGracePeriodSeconds` with it |
-| A request refused by the cross-site request check is answered 403, which v0.12.0 answered 401 | Nothing for the interface. A client treating 401 as a lapsed session no longer reads this refusal as one |
-| The releases out of support leave out a retired release and every release of a retired product. The download adds `product name` and `branch or tag name` beside `product` and `branch or tag` | A script reading the download by column position reads them by name |
-| `openpsirt-upload` reduces an analyzer's markdown-only message holding a table one row a line, its cells joined by a vertical bar with a space either side, where v0.12.0's reduced it one cell a line. The message is part of how a code finding is matched | Nothing the upgrade can do. Each code finding whose message holds a table re-matches once, on the first analysis this release's `openpsirt-upload` sends: it opens as a new finding, its decision stays on the earlier one, and that decision is asked again. Upgrade `openpsirt-upload` wherever it sends for one series, since a v0.12.0 client and this one disagree on such a message |
-| The CSV downloads of findings, code findings, your own decisions, deadlines running out, last uploads and releases out of support head the branch or tag column `branch or tag`, as the security testing figures download does. v0.12.0 headed it `branch_or_tag`. The JSON downloads keep the key `branch_or_tag` | Rename the column a script reads |
-| An issue rated by the word `low` with no score ranks at 2.0, the middle of the low band. v0.12.0 ranked it at 3.0, above scanned lows scored 2.0 to 2.9 | Nothing. An open finding of such an issue keeps the old rank until it is next ranked, which a rescan of its build does, as does any change to the issue's rating, signals or incident records |
-| The findings list, the list spanning products and the by-component view sorted by severity order by the band of the rating in force, the product's own where it states one, then by score inside the band. An issue with no recognized severity word sorts in the band of its score, and below low with no score, and the planned upgrades sorted by severity, an approver's outliers and a release note's fixes rank it the same way. A planned upgrade whose worst issue is unrated reads `unrated`, which v0.12.0 drew as `medium`, and the list and its file carry that issue's score in a new `score` field and column. v0.12.0 ordered by the published score alone, so an issue with a word and no score sorted last and a product's own rating moved nothing | A script reading the planned-upgrade file by column position reads it by name |
-| `POST /v1/keys` refuses with 422 a request carrying `secret`, `withdrawn`, `created_at`, `last_used_at` or `product_name`, the fields only its answer holds. v0.12.0 accepted them and ignored them | Send `name`, `product`, `branch_or_tag` and `variant` alone |
-| A serving process stops serving while another process changes the schema, answering as it does while it migrates at start, and exits 1 once a later release has changed it ([Health checks](#health-checks)). An upgrade that changes the schema waits 46 seconds before its first change. v0.12.0 kept serving through another process's upgrade | Stop every v0.12.0 process before this upgrade, which the chart's default `Recreate` does. On ECS, set `minimumHealthyPercent` to 0 for this and every later upgrade |
-| The upstream fix state `wont-fix` is `unscheduled`, shown as "Not scheduled": upstream has scheduled no fix, which may be postponed or permanent, and the scanner does not say which. The `fix_state` field and filter of the API take and return `unscheduled`. v0.12.0 used `wont-fix` and described it as upstream having declined | Nothing for stored data: the upgrade renames it on every finding and in every saved filter. A script asking for or reading `fix_state` of `wont-fix` uses `unscheduled`. The triage outcome `wont-fix` is unchanged |
-| The image carries grype 0.121.3 to match components against vulnerabilities, where v0.12.0 carried 0.121.0, and its own inventory is generated by syft 1.57.0, where v0.12.0's was by 1.51.1 | Nothing. Matches may move once at each build's first scan after the upgrade: a match the new scanner stops reporting, with the component unchanged, closes as unexplained, never as fixed |
-| A publisher's statement that a product is affected offers a deferral where its CSAF remediation is `none_available` and a will-not-fix where it is `no_fix_planned`, with no date filled in for a deferral. Any other remediation, none, and every OpenVEX statement offer nothing, and the `offers` field of what publishers say may be `deferred`. v0.12.0 offered a will-not-fix from every affected statement | Upload each CSAF document again. v0.12.0 did not keep the remediation, so an affected statement it recorded offers nothing until its document is read again, uploaded or as a revision from the supplier |
-| Processes take turns applying the schema through a row in a new table, `schema_lease`, on every database engine. A process that dies while applying it holds the next start for at most 30 seconds. v0.12.0 took a lock held by its database session on PostgreSQL, MySQL and MariaDB, which two processes on two nodes of a cluster taking writes on every node could both hold, and a lock on the file `<database>.migrate-lock` beside a SQLite database | Where processes serve under a credential granted table by table, with `OPENPSIRT_AUTO_MIGRATE` off, grant it reading `schema_lease` and `schema_change` once the upgrade has made them; a process that cannot read either refuses to start, and pauses where it is serving. A SQLite deployment may delete `<database>.migrate-lock` |
-
-#### VEX statements from v0.12.0
-
-Every VEX statement v0.12.0 recorded carries no document identifier, so a
-later document stating an OpenVEX `@id` or a CSAF tracking identifier replaces
-none of them. Those filed under a file name also carry no real publisher. The
-document they came from is not kept, so neither can be filled in. For each
-publisher name v0.12.0's statements show, a file name or a real publisher, and
-before uploading anything new under that name:
-
-1. Upload an empty document stating no identifier, with `publisher` set to that
-   name. It sets aside every statement v0.12.0 recorded under it:
-
-   ```bash
-   echo '{"@context":"https://openvex.dev/ns/v0.2.0","author":"cleared",
-     "timestamp":"2026-11-12T00:00:00Z","version":1,"statements":[]}' > empty.json
-   curl -X POST \
-     "$OPENPSIRT/v1/products/sonic/vex-documents?publisher=debian-vex.json" \
-     -H "Origin: $OPENPSIRT" -F "statements=@empty.json"
-   ```
-
-2. Upload the publisher's current documents again, without `publisher` or with
-   the name of the real publisher.
-
-The answer to the first step says how many statements it set aside. A set-aside
-statement stays readable beside any approval granted on it, and each approved
-decision that cites one raises a "cited statement changed" alert. Where the
-second step records the same words, reasoning included, under the same
-publisher name, the alert clears; where v0.12.0 filed them under a file name, it
-stands until the decision is made again against what the second step recorded.
 
 ### From v0.13.0
 

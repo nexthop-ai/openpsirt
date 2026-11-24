@@ -195,13 +195,18 @@ func advisoryBaseline(t *columnTypes) []string {
 			"added_by"         ` + t.ref + ` NOT NULL,
 			-- Taken back off, by whom. The row stays so that the act has
 			-- somewhere to be written: deleted, who removed an issue from an
-			-- advisory is a question nothing answers. Adding it again revives
-			-- this row rather than writing a second one, which is what keeps
-			-- the pair unique.
+			-- advisory is a question nothing answers. Adding it again writes
+			-- another row, so each stretch an issuance may have named it in
+			-- is kept.
 			"removed_at"       ` + t.timestamp + ` NULL,
 			"removed_by"       ` + t.refNull + ` NULL,
-			CONSTRAINT "advisory_issue_once"
-				UNIQUE ("advisory_id", "product_id", "vulnerability_id"),
+			-- True while the issue is on the advisory and null once taken
+			-- off. Nulls are distinct under a uniqueness rule on all four
+			-- engines, so the rule below holds among the rows on the advisory
+			-- alone.
+			"live"             ` + t.boolean + ` NULL,
+			CONSTRAINT "advisory_issue_live_once"
+				UNIQUE ("advisory_id", "product_id", "vulnerability_id", "live"),
 			CONSTRAINT "advisory_issue_advisory_fk"
 				FOREIGN KEY ("advisory_id") REFERENCES "advisory"("id"),
 			CONSTRAINT "advisory_issue_product_fk"
@@ -235,12 +240,16 @@ func advisoryJudgmentBaseline(t *columnTypes) []string {
 			"set_at"           ` + t.timestamp + ` NOT NULL,
 			"set_by"           ` + t.ref + ` NOT NULL,
 			-- Cleared, by whom. The row stays so that the act has somewhere to
-			-- be written, and marking the release again revives it, which is
-			-- what keeps the release marked once.
+			-- be written. Marking the release again writes another row, so who
+			-- marked and cleared it each time is kept.
 			"removed_at"       ` + t.timestamp + ` NULL,
 			"removed_by"       ` + t.refNull + ` NULL,
-			CONSTRAINT "advisory_override_once" UNIQUE
-				("advisory_id", "product_id", "vulnerability_id", "branch_or_tag_id", "variant_id"),
+			-- True while the release is marked and null once cleared. Nulls
+			-- are distinct under a uniqueness rule on all four engines, so the
+			-- rule below holds among the rows marking it alone.
+			"live"             ` + t.boolean + ` NULL,
+			CONSTRAINT "advisory_override_live_once" UNIQUE
+				("advisory_id", "product_id", "vulnerability_id", "branch_or_tag_id", "variant_id", "live"),
 			CONSTRAINT "advisory_override_advisory_fk"
 				FOREIGN KEY ("advisory_id") REFERENCES "advisory"("id"),
 			CONSTRAINT "advisory_override_product_fk"
@@ -499,6 +508,20 @@ func vexBaseline(t *columnTypes) []string {
 			-- nobody declined.
 			"declined_at" ` + t.timestamp + ` NULL,
 			"declined_by" ` + t.refNull + ` NULL,
+			-- When the publisher made the statement: its own timestamp, else
+			-- its document's. Null where neither states one, so the upload
+			-- orders it.
+			"said_at" ` + t.timestamp + ` NULL,
+			-- The newer statement from the same publisher about the same
+			-- product and issue that set this one aside, which a statement
+			-- set aside by a revision of its own document has none of. A
+			-- plain reference without a foreign key: statements are never
+			-- deleted, so it cannot dangle.
+			"overtaken_by" ` + t.refNull + ` NULL,
+			-- The CSAF remediation category the statement gave the affected
+			-- products it names, in the format's own vocabulary. Null where it
+			-- gave none, which an OpenVEX statement never does.
+			"remediation" ` + t.name + ` NULL,
 			CONSTRAINT "received_vex_statement_product_fk" FOREIGN KEY ("product_id") REFERENCES "product"("id"),
 			CONSTRAINT "received_vex_statement_by_fk" FOREIGN KEY ("uploaded_by") REFERENCES "person"("id")
 		)` + t.suffix,
@@ -519,6 +542,12 @@ func vexBaseline(t *columnTypes) []string {
 		`CREATE INDEX "received_vex_statement_from_idx"
 			ON "received_vex_statement" ("product_id", "publisher", "source", "document_id", "superseded_at")`,
 	}
+}
+
+// receivedStatementV0130 is the baseline's declaration of the received VEX
+// statement table, under the name the v0.14.0 upgrade reads it by.
+func receivedStatementV0130(t *columnTypes) []string {
+	return vexBaseline(t)
 }
 
 // A generated VEX document going out.

@@ -83,6 +83,12 @@ func accessBaseline(t *columnTypes) []string {
 			"audits"       ` + t.boolean + ` NOT NULL,
 			"audits_derived" ` + t.boolean + ` NOT NULL,
 			"audits_derived_at" ` + t.timestamp + ` NULL,
+			-- When a sign-in in group-bound mode judged the work this person
+			-- holds against what their groups derive. Null until the first
+			-- sign-in since the switch into group-bound mode, which hands back
+			-- what assigned roles let them hold; after it, a sign-in hands
+			-- back only when something derived went.
+			"groups_judged_at" ` + t.timestamp + ` NULL,
 			-- Where to reach this person outside the application, and which
 			-- of the two sources it came from. Null is the ordinary state:
 			-- an address is optional, and somebody without one is told
