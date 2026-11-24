@@ -131,12 +131,20 @@ func unrecordLatest(t *testing.T, db *database.DB) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	unrecordAt(t, db, expected)
+}
+
+// unrecordAt takes away the record of a version a schema at that version
+// holds, so that release's upgrade is outstanding over the schema it made.
+func unrecordAt(t *testing.T, db *database.DB, version int64) {
+	t.Helper()
 	if _, err := db.ExecContext(t.Context(), `DELETE FROM "`+migrate.VersionTable+`" WHERE "version_id" = ?`,
-		expected); err != nil {
+		version); err != nil {
 		t.Fatal(err)
 	}
-	if applied, err := migrate.Version(t.Context(), db); err != nil || applied != expected-1 {
-		t.Fatalf("with the latest version's record taken away the schema is at %d (%v), not %d", applied, err, expected-1)
+	if applied, err := migrate.Version(t.Context(), db); err != nil || applied != version-1 {
+		t.Fatalf("with version %d's record taken away the schema is at %d (%v), not %d",
+			version, applied, err, version-1)
 	}
 }
 

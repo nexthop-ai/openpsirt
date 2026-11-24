@@ -11,6 +11,7 @@ Satisfies REQ-72.
 - [Release upgrades](#release-upgrades)
 - [The v0.13.0 upgrade](#the-v0130-upgrade)
 - [The v0.14.0 upgrade](#the-v0140-upgrade)
+- [The v0.15.0 upgrade](#the-v0150-upgrade)
 - [Limits](#limits)
 
 ## Release upgrades
@@ -143,6 +144,23 @@ stopped after the first, as MySQL and MariaDB leave one, adds the second.
 | A v0.13.0 database holding components named apart from their package identifier, one namespaced and escaped, one named as its identifier, one with none, and one with an address that is not one | The first two go by their own name and the name their identifier gives, folded and decoded; the others by their own name alone |
 | The same, upgraded, two components' names removed, and upgraded again with its version unrecorded | The names put back, the others left |
 | The upgrade's package name rule against the application's, over identifiers escaped, malformed, holding control characters and holding none | The same name for each |
+
+## The v0.15.0 upgrade
+
+Migration 49. One table gains a column.
+
+| Table | Gains |
+|---|---|
+| `scan_run` | Whether the run recorded the source package each finding it applied was matched through, false for every run stored before (`design-docs/findings-components.md` § Match methods). v0.13.0's runs recorded none, and nothing held tells a v0.14.0 run from one of them; each build's next scheduled scan records them (`design-docs/ingest.md` § Scheduled rescanning) |
+
+The column is added where the table lacks it, so a start that stopped after
+adding it finishes.
+
+| Check, on each engine | What it holds |
+|---|---|
+| A v0.14.0 database | Upgraded, the table built as declared |
+| The same, upgraded and run again with its version unrecorded | Upgraded the same |
+| A v0.14.0 database holding a run | The run reads as having recorded no sources |
 
 ## Limits
 

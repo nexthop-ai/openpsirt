@@ -54,6 +54,12 @@ func (f *fixture) throughSource(t *testing.T, in build, issue, componentID int64
 	if _, err := f.db.DB.NewInsert().Model(row).Exec(t.Context()); err != nil {
 		t.Fatal(err)
 	}
+	// The run that opened it is the last the build applied, as applying a
+	// scan records it.
+	if _, err := f.db.DB.NewUpdate().Table("build").Set(`"last_run_id" = ?`, in.run).
+		Where(`"id" = ?`, in.build).Exec(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	return row.ID
 }
 

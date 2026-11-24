@@ -30,7 +30,7 @@ func TestTheV0140UpgradeBuildsItsDeclarations(t *testing.T) {
 		dbtest.MigrateTo(t, db, v0130)
 		dbtest.MigrateTo(t, db, v0140)
 		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0140(db.Server.Engine))
-		unrecordLatest(t, db)
+		unrecordAt(t, db, v0140)
 		dbtest.MigrateTo(t, db, v0140)
 		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0140(db.Server.Engine))
 		leaveAtLatest(t, ctx, db)
@@ -84,7 +84,7 @@ func TestTheV0140UpgradeMakesAnIndexAStoppedStartLeftUnmade(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		unrecordLatest(t, db)
+		unrecordAt(t, db, v0140)
 		dbtest.MigrateTo(t, db, v0140)
 		declarationsAreBuilt(t, ctx, db, migrations.StatementsV0140(db.Server.Engine))
 		leaveAtLatest(t, ctx, db)
@@ -129,7 +129,7 @@ func TestTheV0140UpgradeKeepsEveryNameAComponentGoesBy(t *testing.T) {
 			bun.List([]int64{renamed, scoped})); err != nil {
 			t.Fatal(err)
 		}
-		unrecordLatest(t, db)
+		unrecordAt(t, db, v0140)
 		dbtest.MigrateTo(t, db, v0140)
 		held()
 		leaveAtLatest(t, ctx, db)

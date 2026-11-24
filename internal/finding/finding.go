@@ -256,6 +256,11 @@ type Run struct {
 	// CheckedScanID is the replaced inventory a check run read, absent on a
 	// scan of what the build holds.
 	CheckedScanID *int64 `bun:"checked_scan_id"`
+	// SourcesRecorded says the run recorded the source package each finding
+	// it applied was matched through, which every run Begin starts does. A
+	// finding whose build last applied a run that did not is not known to
+	// hold its source, so its match is unknown.
+	SourcesRecorded bool `bun:"sources_recorded,notnull"`
 }
 
 // Finding is a vulnerability at an occurrence.
@@ -605,6 +610,7 @@ func (s *Store) Sweeping(q *queue.Queue) *Store {
 // Begin records that a scanner is about to run.
 func (s *Store) Begin(ctx context.Context, run Run) (*Run, error) {
 	run.StartedAt = s.now().Truncate(time.Microsecond)
+	run.SourcesRecorded = true
 	if _, err := s.db.NewInsert().Model(&run).Exec(ctx); err != nil {
 		return nil, fmt.Errorf("record the start of a scan run: %w", err)
 	}

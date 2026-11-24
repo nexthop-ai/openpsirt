@@ -483,23 +483,17 @@ func (s *Store) withdrawAnswers(ctx context.Context, ids []int64, moment time.Ti
 	return nil
 }
 
-// matchedOtherwise is the live answers of a correction at an occurrence where
-// an open finding of the issue, in any build of the product, is not matched
-// through the correction's source: on the package's own name, a CPE, or
-// another source.
+// matchedOtherwise is the live answers of a correction at an occurrence
+// matchedOtherwiseAt holds.
 func (s *Store) matchedOtherwise(ctx context.Context, rule SourceCorrection) (map[int64]bool, error) {
+	otherwise, args := matchedOtherwiseAt(`"de"."product_id"`, `"dv"."issue_id"`, `"de"."occurrence_identity"`, rule)
 	var ids []int64
 	if err := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
 		ColumnExpr(`"de"."id"`).
 		Join(finding.DecisionOccurrenceIssue).
 		Where(`"de"."decision_id" = ?`, rule.DecisionID).
 		Where(`"de"."state" IN (?, ?)`, Proposed, Approved).
-		Where(`EXISTS (SELECT 1 FROM "finding" AS "f2"`+
-			` JOIN "build" AS "b2" ON "b2"."id" = "f2"."build_id"`+
-			` JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "b2"."branch_or_tag_id"`+
-			` WHERE "st2"."product_id" = "de"."product_id" AND `+finding.DecisionOccurrenceOf("f2")+
-			` AND "f2"."closed_at" IS NULL`+
-			` AND ("f2"."matched_through" IS NULL OR "f2"."matched_through" <> ?))`, rule.Source).
+		Where(otherwise, args...).
 		Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read what is matched otherwise than through %s: %w", rule.Source, err)
 	}
@@ -508,6 +502,41 @@ func (s *Store) matchedOtherwise(ctx context.Context, rule SourceCorrection) (ma
 		out[id] = true
 	}
 	return out, nil
+}
+
+// matchedOtherwiseAt is the condition, with its arguments, that an open
+// finding of the issue at the occurrence, in any build of the product, is not
+// matched through the correction's source: on the package's own name, a CPE,
+// or another source. The withdrawal and the answer both ask it, so an answer
+// written is never one the next pass withdraws.
+//
+// A finding holding no source is read as matched on the package only where
+// the last run its build applied recorded sources. Under an earlier run its
+// match was never read, and an unknown match withdraws nothing: withdrawing
+// on it hides nothing, and loses every answer a build not yet scanned again
+// holds.
+//
+// product, issue and occurrence are the columns the statement names them by,
+// the issue being the one findings are held under. Anything else is a
+// programming error, because each is placed in the statement as written.
+func matchedOtherwiseAt(product, issue, occurrence string, rule SourceCorrection) (string, []any) {
+	switch {
+	case product == `"de"."product_id"` && issue == `"dv"."issue_id"` && occurrence == `"de"."occurrence_identity"`:
+	case product == `"st"."product_id"` && issue == `"f"."vulnerability_id"` && occurrence == `"f"."occurrence_identity"`:
+	default:
+		panic("triage.matchedOtherwiseAt: " + product + ", " + issue + " and " + occurrence +
+			" are not columns a statement here names")
+	}
+	return `EXISTS (SELECT 1 FROM "finding" AS "f2"` +
+		` JOIN "build" AS "b2" ON "b2"."id" = "f2"."build_id"` +
+		` JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "b2"."branch_or_tag_id"` +
+		` LEFT JOIN "scan_run" AS "r2" ON "r2"."id" = "b2"."last_run_id"` +
+		` WHERE "st2"."product_id" = ` + product +
+		` AND "f2"."vulnerability_id" = ` + issue +
+		` AND "f2"."occurrence_identity" = ` + occurrence +
+		` AND "f2"."closed_at" IS NULL` +
+		` AND ("f2"."matched_through" <> ?` +
+		` OR ("f2"."matched_through" IS NULL AND "r2"."sources_recorded" = ?)))`, []any{rule.Source, true}
 }
 
 // withdrawForIncident withdraws every live answer of a correction by source
@@ -612,7 +641,8 @@ type matchedThrough struct {
 // An occurrence is covered where it is a public finding of a published issue,
 // at the package, matched through the source, and the issue's record lists
 // files, none of them under the paths. An undisclosed finding is left for a
-// person, and so is an issue this product records as attacked through.
+// person, and so is an issue this product records as attacked through, and an
+// occurrence matchedOtherwiseAt holds in any build of the product.
 //
 // A row waits for a second person unless an approval of the reasoning the
 // decision rests on stands, which is what a second person agreed to: the
@@ -847,7 +877,8 @@ func (s *Store) lineageOf(ctx context.Context, decisionID int64) ([]int64, error
 
 // matchedThrough reads the open public findings of published issues at the
 // correction's package, matched through its source, once per occurrence and
-// filed under the issue each is read as.
+// filed under the issue each is read as. An occurrence matchedOtherwiseAt
+// holds is left out: the next pass would withdraw its answer.
 func (s *Store) matchedThrough(ctx context.Context, rule SourceCorrection, buildID int64) ([]matchedThrough, error) {
 	var rows []struct {
 		ProductID          int64  `bun:"product_id"`
@@ -860,6 +891,8 @@ func (s *Store) matchedThrough(ctx context.Context, rule SourceCorrection, build
 		ScoreCenti         int    `bun:"score_centi"`
 		OnTag              int    `bun:"on_tag"`
 	}
+	otherwise, otherwiseArgs := matchedOtherwiseAt(`"st"."product_id"`, `"f"."vulnerability_id"`,
+		`"f"."occurrence_identity"`, rule)
 	query := s.db.NewSelect().
 		TableExpr(`"finding" AS "f"`).
 		Join(`JOIN "build" AS "b" ON "b"."id" = "f"."build_id"`).
@@ -883,6 +916,7 @@ func (s *Store) matchedThrough(ctx context.Context, rule SourceCorrection, build
 		Where(`"f"."visibility" = ?`, access.Public).
 		Where(`"f"."matched_through" = ?`, rule.Source).
 		Where(`COALESCE("c"."identifying_folded", "c"."name_folded") = ?`, rule.Package).
+		Where(`NOT `+otherwise, otherwiseArgs...).
 		GroupExpr(`"st"."product_id", "f"."vulnerability_id", "f"."occurrence_identity", ` +
 			`"c"."upstream_version", "c"."version", "uc"."upstream_version", "uc"."version", ` +
 			`"v"."severity", "ir"."severity", "v"."score_centi"`).

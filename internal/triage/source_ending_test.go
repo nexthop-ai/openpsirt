@@ -212,6 +212,132 @@ func TestAMatchOtherThanThroughTheSourceWithdrawsTheAnswer(t *testing.T) {
 	})
 }
 
+// A finding holding no source withdraws nothing where the last run its build
+// applied did not record sources, as every run before they were recorded did
+// not: its match was never read. Once a run recording them applies, the same
+// finding is a match on the package itself and withdraws the answer.
+func TestAMatchNeverReadWithdrawsNothing(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		w := f.perfWorld(t)
+		_, rows := f.agreedPerf(t, "")
+		older := f.build(t, f.product, "2026.10")
+		f.throughSource(t, older, w.outside, w.perf, "place-of-linux-perf", "", access.Public)
+		recorded := func(yes bool) {
+			t.Helper()
+			if _, err := f.db.DB.NewUpdate().Table("scan_run").Set(`"sources_recorded" = ?`, yes).
+				Where(`"id" = ?`, older.run).Exec(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		recorded(false)
+		pass, err := f.store.AnswerBySource(t.Context(), w.in.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pass.Withdrawn.Rows != 0 {
+			t.Errorf("a match never read withdrew %d answers, want none", pass.Withdrawn.Rows)
+		}
+		if got := f.rowOf(t, rows[w.outside].ID); got.State != triage.Approved {
+			t.Errorf("the answer is %q beside a match never read, want approved", got.State)
+		}
+
+		recorded(true)
+		if pass, err = f.store.AnswerBySource(t.Context(), w.in.build); err != nil {
+			t.Fatal(err)
+		}
+		if pass.Withdrawn.Rows != 1 {
+			t.Errorf("a match on the package itself withdrew %d answers, want one", pass.Withdrawn.Rows)
+		}
+		if got := f.rowOf(t, rows[w.outside].ID); got.State != triage.LapsedState {
+			t.Errorf("the answer is %q beside a match on the package itself, want lapsed", got.State)
+		}
+	})
+}
+
+// An answer withdrawn for a match, which the correction answers again once the
+// scan matches the occurrence through the source alone, leaves To reaffirm:
+// the rule re-answered it, and re-affirming would write it twice.
+func TestAnAnswerTheCorrectionGivesAgainLeavesToReaffirm(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		w := f.perfWorld(t)
+		decision, rows := f.agreedPerf(t, "")
+		later := f.build(t, f.product, "2026.12")
+		own := f.throughSource(t, later, w.outside, w.perf, "place-of-linux-perf", "", access.Public)
+		if pass, err := f.store.AnswerBySource(t.Context(), later.build); err != nil || pass.Withdrawn.Rows != 1 {
+			t.Fatalf("the scan withdrew %d (%v), want one", pass.Withdrawn.Rows, err)
+		}
+		listed, _, err := f.store.ToReaffirm(t.Context(), f.triager, 0, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(listed) != 1 || listed[0].Rows != 1 {
+			t.Fatalf("To reaffirm lists %+v, want the correction with its one withdrawn answer", listed)
+		}
+
+		if _, err := f.db.DB.NewUpdate().Table("finding").Set(`"matched_through" = ?`, "linux").
+			Where(`"id" = ?`, own).Exec(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		pass, err := f.store.AnswerBySource(t.Context(), later.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pass.Answered != 1 {
+			t.Fatalf("the scan answered %d, want the occurrence matched through the source again", pass.Answered)
+		}
+		answered, _ := f.answeredIssues(t, decision)
+		if row, ok := answered[w.outside]; !ok || row.ID == rows[w.outside].ID {
+			t.Fatalf("the issue is answered as %+v, want a new row", row)
+		}
+		if got := f.rowOf(t, rows[w.outside].ID); got.State != triage.LapsedState {
+			t.Errorf("the withdrawn answer is %q, want it kept lapsed", got.State)
+		}
+		if listed, _, err = f.store.ToReaffirm(t.Context(), f.triager, 0, 50, 0); err != nil || len(listed) != 0 {
+			t.Errorf("To reaffirm lists %+v (%v) once the correction answered again, want nothing", listed, err)
+		}
+		if _, err := f.store.ReaffirmDecision(t.Context(), f.triager, triage.ReaffirmingDecision{
+			PreviousDecisionID: decision, Reasoning: "Still not the kernel.", By: f.proposer,
+		}); !errors.Is(err, triage.ErrNotTheirs) {
+			t.Errorf("re-affirming the correction once it answered again gave %v, want nothing lapsed to re-affirm", err)
+		}
+	})
+}
+
+// An occurrence an open finding in another build matches otherwise is not
+// answered again by a scan of a build matching it through the source alone:
+// the next pass would withdraw it again, and its withdrawn answer stays in To
+// reaffirm.
+func TestAnOccurrenceMatchedOtherwiseElsewhereIsNotAnsweredAgain(t *testing.T) {
+	each(t, func(t *testing.T, f *fixture) {
+		w := f.perfWorld(t)
+		_, rows := f.agreedPerf(t, "")
+		later := f.build(t, f.product, "2026.12")
+		f.throughSource(t, later, w.outside, w.perf, "place-of-linux-perf", "", access.Public)
+		if pass, err := f.store.AnswerBySource(t.Context(), later.build); err != nil || pass.Withdrawn.Rows != 1 {
+			t.Fatalf("the scan withdrew %d (%v), want one", pass.Withdrawn.Rows, err)
+		}
+
+		pass, err := f.store.AnswerBySource(t.Context(), w.in.build)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pass.Answered != 0 {
+			t.Errorf("a scan of the build matching through the source answered %d, want none while another build matches otherwise",
+				pass.Answered)
+		}
+		listed, _, err := f.store.ToReaffirm(t.Context(), f.triager, 0, 50, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(listed) != 1 || listed[0].Rows != 1 {
+			t.Errorf("To reaffirm lists %+v, want the correction with its one withdrawn answer", listed)
+		}
+		if got := f.rowOf(t, rows[w.outside].ID); got.State != triage.LapsedState {
+			t.Errorf("the withdrawn answer is %q, want lapsed", got.State)
+		}
+	})
+}
+
 // An occurrence an approver set aside stays out of the correction once the
 // decision it was set aside into is withdrawn.
 func TestAnOccurrenceSetAsideIsNotAnsweredAgain(t *testing.T) {

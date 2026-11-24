@@ -5661,7 +5661,7 @@ components:
           description: The version range this match fired on. For a distribution's package reached by identifier it is an upstream range, which names no packaging revision and so cannot see a backported fix
           type: string
         matched_through:
-          description: The source package the scanner matched this through, where every detail of the match was through it. Absent where the match was on the package's own name or a CPE
+          description: The source package the scanner matched this through, where every detail of the match was through it. Absent where the match was on the package's own name, a CPE or more than one source, or where the scan that last applied it did not record sources
           type: string
         no_deadline:
           description: "The reason there is no deadline: not-rated when a flaw recorded here has no severity yet, below-minimum-severity when this product does not consider it worth triaging, nothing-to-take when upstream has released no fix, or has scheduled none on an issue nobody is exploiting, out-of-support when its release is past end of life or was built once. Where more than one holds, the narrowest is the one reported"

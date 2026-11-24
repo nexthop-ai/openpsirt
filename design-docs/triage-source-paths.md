@@ -54,6 +54,7 @@ An occurrence is answered when every condition holds.
 | No live decision holds the occurrence, under the key with versions or without | One live decision per key (`design-docs/triage.md` § One live decision per key); a standing won't-fix keyed on versions stays affected |
 | No decision set aside or returned from the correction ever held it | Answering it again would bring back, under the old agreement, what the approver excluded |
 | No incident withdrew the correction's answer there | Clearing an incident restores nothing (`design-docs/incidents.md` § Decisions against an incident) |
+| No open finding of the issue at the occurrence, in any build of the product, is matched on the package's own name, a CPE or another source, as the last run its build applied recorded it | The next pass would withdraw the answer (§ Withdrawn answers) |
 
 Each answered row records the files the record listed when it was written. The
 files are the record's, read from the snapshot each scan reads
@@ -99,7 +100,7 @@ when an incident is recorded, an answer is withdrawn for one of three reasons.
 | Reason | Withdrawn when |
 |---|---|
 | Record | The issue's record now lists a file under the paths, or lists no files |
-| Match | An open finding of the issue at the occurrence, in any build of the product, is matched on the package's own name, a CPE or another source |
+| Match | An open finding of the issue at the occurrence, in any build of the product, is matched on the package's own name, a CPE or another source, as the last run its build applied recorded it |
 | Incident | An incident is recorded through the issue in the product |
 
 | Rule | Reason |
@@ -109,11 +110,13 @@ when an incident is recorded, an answer is withdrawn for one of three reasons.
 | A list read as none, past a bound or leaving the root, withdraws it the same way | It is the same answer as a record listing none (`design-docs/ingest-scanner.md` § Program files) |
 | A record whose files changed and all still lie outside leaves the answer | The rule still holds of it |
 | A match on the package itself withdraws the answer | The match is then a claim about the package, which the correction does not answer |
+| A finding holding no source withdraws nothing where the last run its build applied did not record sources | Its match was never read; withdrawing on it hides nothing and loses every answer a build not yet scanned again holds |
 | The row lapses: the finding is open for a person, the proposer is told why, and the decision is in their To reaffirm with that reason | Lapsing is how a decision that stopped holding is handed back |
 | Re-affirming a withdrawn answer waits for a second person | The agreement was not given over what withdrew it, and the decision re-made is one no pass re-checks |
 | The answer keeps the files it was answered on, and records when it was withdrawn, why, and the files the record then listed | Fixed at that moment, since the record can move again |
 | The correction keeps standing and answers later issues | One answer withdrawn says nothing about the rest |
-| An issue whose record again puts every file outside, or matched through the source alone again, is answered again, as a new row | The rule holds of it again |
+| An issue whose record again puts every file outside, or that no build of the product matches otherwise any more, is answered again, as a new row | The rule holds of it again |
+| The withdrawn row stays lapsed and leaves To reaffirm once the new row is written | The correction answered it again; re-affirming would write it twice |
 | An answer at an occurrence no build holds open any more is not re-examined, and stays as it was | The finding it answered closed with the scan that stopped reporting it; the answer covers nothing until the issue returns, and is re-examined then |
 
 ## Readback
@@ -132,4 +135,5 @@ when an incident is recorded, an answer is withdrawn for one of three reasons.
 | Limit | Detail |
 |---|---|
 | A match through two sources, or through a source and on the package's own name, records no source | The scanner's details disagree, and a correction is a claim about one route |
+| A match on the package itself in a build not scanned since the upgrade to v0.15.0 withdraws nothing until the build's next scheduled scan | The run that last applied it is not known to have recorded sources (`design-docs/database-upgrades.md` § The v0.15.0 upgrade) |
 | A record's files are every entry's, joined | A file any of them names is one the issue may be in; 103 of 20,372 records listing files on 2026-11-18 list different files per entry |

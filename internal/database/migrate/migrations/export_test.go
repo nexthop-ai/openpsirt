@@ -51,6 +51,11 @@ func StatementsV0140(engine database.Engine) map[string][]string {
 	}
 }
 
+// StatementsV0150 is v0.15.0's declaration of each table it changes.
+func StatementsV0150(engine database.Engine) map[string][]string {
+	return map[string][]string{"scan_run": scanRunV0150(typesFor(engine))}
+}
+
 // StopV0130AfterLiveColumn adds the column marking an issue on an advisory
 // and nothing else: a start of the v0.13.0 upgrade on MySQL or MariaDB that
 // stopped after the column committed.
