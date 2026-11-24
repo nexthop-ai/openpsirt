@@ -45,6 +45,7 @@ build invalidates a decision about a leaf.
 |---|---|
 | Only the upstream version counts: `10.5.4` to `10.6` lapses a decision, a packaging revision does not | A rebuild is not reasoning becoming wrong |
 | A version change mid-chain has no rule of its own | It moves the direct consumer of something, lapsing that decision, or it does not |
+| A consumer's move lapses the decision though the finding beneath it continues (`design-docs/findings-closure.md` § Continued findings) | The finding is the component at the occurrence; the decision is keyed on both versions |
 | A rebuilt container image lapses nothing beneath it; a package inside it that moves lapses its own decision | An image stores no version (`design-docs/data-model-components.md` § Container images) |
 | A carried patch lapses nothing, so under heavy patching a decision may never be re-examined | A patch moves no version this can see |
 | A decision's age travels with it everywhere it appears | The compensating control for the line above |

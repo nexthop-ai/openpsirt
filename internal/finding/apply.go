@@ -4,8 +4,10 @@
 package finding
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/uptrace/bun"
@@ -464,7 +466,8 @@ func (run *applyRun) wanted(reported []Reported) (wantedSet, error) {
 // The second index is by occurrence *identity* rather than by component. A
 // version change makes a different component and therefore a different key, so
 // the two indexes disagree exactly where a version moved — which is the case
-// worth telling apart from every other kind of closure.
+// worth telling apart from every other kind of closure. A consumer's version
+// moving makes a different key too, and is settled by pairing (see paired).
 func heldOpen(ctx context.Context, tx bun.IDB, buildID int64) (map[key]heldFinding,
 	map[at]heldFinding, error) {
 
@@ -517,10 +520,75 @@ type applyPlan struct {
 // departure is an open finding closing because it is no longer reported.
 type departure struct {
 	f heldFinding
-	// superseded says the same issue is still wanted at the same occurrence: the
-	// row is being superseded by one against a new version rather than
-	// resolved.
+	// superseded says the same issue is still wanted at the same occurrence on
+	// another component: the row is being superseded by one against a new
+	// version rather than resolved.
 	superseded bool
+}
+
+// place is a finding without its consumer: the issue, the component, and the
+// occurrence identity. A consumer's version moving keeps the place, so an open
+// finding continues at it.
+type place struct {
+	vulnerabilityID    int64
+	componentID        int64
+	occurrenceIdentity string
+}
+
+// paired answers, for each wanted finding, the open finding it continues, and
+// the identifiers of every open finding continued.
+//
+// A finding is its issue at a component at an occurrence (REQ-17), so a
+// consumer whose version moved continues the finding beneath it, its opening,
+// deadline and assignment with it. A wanted finding held at the same key is
+// paired with that row. The rest are paired within their place: open findings
+// by identifier and wanted ones by consumer identifier, both ascending, so one
+// graph gets one answer. Only a finding a scan leaves open continues; one it
+// closes is closed where it stands.
+func paired(want wantedSet, held map[key]heldFinding) (map[key]heldFinding, map[int64]bool) {
+	matched := make(map[key]heldFinding, len(want.findings))
+	kept := make(map[int64]bool, len(held))
+	waiting := map[place][]key{}
+	for k, f := range want.findings {
+		if already, open := held[k]; open {
+			matched[k] = already
+			kept[already.ID] = true
+			continue
+		}
+		if want.patched[k] || want.cleared[k] != "" {
+			continue
+		}
+		if _, answered := want.disclaimed[k]; answered {
+			continue
+		}
+		where := place{k.vulnerabilityID, k.occurrence.componentID, f.OccurrenceIdentity}
+		waiting[where] = append(waiting[where], k)
+	}
+	if len(waiting) == 0 {
+		return matched, kept
+	}
+	left := map[place][]heldFinding{}
+	for k, f := range held {
+		if kept[f.ID] {
+			continue
+		}
+		where := place{k.vulnerabilityID, k.occurrence.componentID, f.OccurrenceIdentity}
+		if _, wanted := waiting[where]; wanted {
+			left[where] = append(left[where], f)
+		}
+	}
+	for where, rows := range left {
+		slices.SortFunc(rows, func(a, b heldFinding) int { return cmp.Compare(a.ID, b.ID) })
+		keys := waiting[where]
+		slices.SortFunc(keys, func(a, b key) int {
+			return cmp.Compare(a.occurrence.consumerID, b.occurrence.consumerID)
+		})
+		for i := range min(len(rows), len(keys)) {
+			matched[keys[i]] = rows[i]
+			kept[rows[i].ID] = true
+		}
+	}
+	return matched, kept
 }
 
 // diffOpen works out what applying a report writes, from what it wants and
@@ -533,9 +601,10 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 		patching: map[int64][]int64{}, clearing: map[string][]int64{},
 		disclaiming: map[int64][]int64{},
 	}
+	matched, kept := paired(want, held)
 	for k, f := range want.findings {
 		if want.patched[k] {
-			if already, open := held[k]; open {
+			if already, open := matched[k]; open {
 				plan.patching[*f.SuppressedBy] = append(plan.patching[*f.SuppressedBy], already.ID)
 			} else {
 				plan.arrivedPatched = append(plan.arrivedPatched, k)
@@ -543,7 +612,7 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 			continue
 		}
 		if lines := want.cleared[k]; lines != "" {
-			if already, open := held[k]; open {
+			if already, open := matched[k]; open {
 				plan.clearing[lines] = append(plan.clearing[lines], already.ID)
 			} else {
 				plan.arrivedCleared = append(plan.arrivedCleared, k)
@@ -551,7 +620,7 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 			continue
 		}
 		if statement, answered := want.disclaimed[k]; answered {
-			if already, open := held[k]; open {
+			if already, open := matched[k]; open {
 				plan.disclaiming[statement] = append(plan.disclaiming[statement], already.ID)
 			} else {
 				plan.arrivedDisclaimed = append(plan.arrivedDisclaimed, k)
@@ -561,7 +630,7 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 		if f.SuppressedBy != nil {
 			plan.suppressed++
 		}
-		already, open := held[k]
+		already, open := matched[k]
 		if !open {
 			// The same issue at the same occurrence a moment ago, on a different
 			// component, means the version moved and the issue came with it.
@@ -598,11 +667,14 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 		// carries an answer nothing else corrects.
 		clockMoved := !sameDate(already.DueAt, f.DueAt)
 		described := !same(already, f)
-		if !described && !moved && !clockMoved {
+		// A consumer at a new version continues the finding beneath it.
+		consumerMoved := value(already.ConsumerID) != value(f.ConsumerID)
+		if !described && !moved && !clockMoved && !consumerMoved {
 			continue
 		}
 		change := moving{f: f, described: described, moved: moved,
-			exploitationMoved: exploitationMoved, learned: learned, clockMoved: clockMoved}
+			exploitationMoved: exploitationMoved, learned: learned, clockMoved: clockMoved,
+			consumerMoved: consumerMoved}
 		group, grouped := plan.updates[change.key()]
 		if !grouped {
 			group = &change
@@ -615,6 +687,11 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 	// With the same issue still wanted at the same occurrence, a row closing is
 	// being superseded by one against a new version rather than resolved.
 	wantedAt := map[at]bool{}
+	// Unless it is still wanted on the same component: a row left over where
+	// a consumer's versions paired fewer than were open. No version of the
+	// component moved, so the row closes for what explains it at its
+	// occurrence.
+	wantedOn := map[place]bool{}
 	// And where what is wanted at that occurrence is patched, the row closes as
 	// patched: the version moved and the issue did not come with it.
 	patchedAt := map[at]int64{}
@@ -634,12 +711,13 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 			continue
 		}
 		wantedAt[at{f.VulnerabilityID, f.OccurrenceIdentity}] = true
+		wantedOn[place{f.VulnerabilityID, f.ComponentID, f.OccurrenceIdentity}] = true
 		if want.patched[k] {
 			patchedAt[at{f.VulnerabilityID, f.OccurrenceIdentity}] = *f.SuppressedBy
 		}
 	}
-	for k, f := range held {
-		if _, still := want.findings[k]; still {
+	for _, f := range held {
+		if kept[f.ID] {
 			continue
 		}
 		where := at{f.VulnerabilityID, f.OccurrenceIdentity}
@@ -651,7 +729,8 @@ func diffOpen(run *applyRun, want wantedSet, held map[key]heldFinding,
 			plan.disclaiming[statement] = append(plan.disclaiming[statement], f.ID)
 			continue
 		}
-		plan.departing = append(plan.departing, departure{f: f, superseded: wantedAt[where]})
+		plan.departing = append(plan.departing, departure{f: f,
+			superseded: wantedAt[where] && !wantedOn[place{f.VulnerabilityID, f.ComponentID, f.OccurrenceIdentity}]})
 	}
 	return plan
 }

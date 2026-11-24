@@ -9,6 +9,7 @@ Satisfies REQ-11, REQ-14, REQ-20, REQ-21, REQ-31, REQ-88.
 
 - [Scans as separate work](#scans-as-separate-work)
 - [The authority of a run](#the-authority-of-a-run)
+- [Continued findings](#continued-findings)
 - [Interval storage](#interval-storage)
 - [Closure reasons](#closure-reasons)
 - [Closure by a person](#closure-by-a-person)
@@ -42,6 +43,38 @@ everything open it no longer reports (REQ-21).
 | The sweep covers only the kind a scan produces (REQ-14) | A flaw recorded by hand would close silently on the next run |
 | Closing a recorded flaw by hand is asked of the rows at that build the caller may read; an unreadable row is left out first, so it answers as nothing open | A readable recorded row the caller may not triage is refused |
 
+## Continued findings
+
+A scan matches an open finding by issue, component and occurrence identity,
+because that is the finding (REQ-17). The consumer's version is no part of it,
+so a consumer at a new version, the component unchanged, continues the open
+row.
+
+| Rule | Reason |
+|---|---|
+| A continued row takes the new consumer and keeps its opening, its deadline counted from that opening, and its assignment | They describe the component's exposure, which did not change |
+| A continued row opens and closes nothing, so a run counts neither | A consumer's bump is no change at the component |
+| The consumer is written with the update, and rows moving to one consumer are one write | § Interval storage |
+| A component at a new version still supersedes (§ Closure reasons) | The issue at a new version is a new finding |
+| A decision keyed on the consumer's old version lapses as the row takes the new one (`design-docs/triage.md` § Expiry) | Decisions are keyed on both upstream versions |
+| The edge intervals keep which consumer version a row sat under | They are the change record |
+| Only a row a scan leaves open continues; one it closes as patched, unaffected or disclaimed closes where it stands | |
+
+One consumer name at two versions at once gives two rows at one occurrence
+identity on one component (`design-docs/findings.md` § Work across builds).
+Rows are paired within each issue, component and occurrence identity:
+
+1. A wanted row and an open row at the same consumer pair first.
+2. The open rows left, by finding identifier ascending, pair with the wanted rows left, by consumer component identifier ascending.
+3. Each pair continues. A wanted row left over opens. An open row left over closes for what explains it at its occurrence, never as superseded, since no version of the component moved.
+
+| Case | Outcome |
+|---|---|
+| One version held, a second arrives | The held row stays on its consumer; the second opens |
+| One version held, two new ones replace it | The held row continues under the lower consumer identifier; the other opens |
+| Two versions held, one leaves | The row on the version staying is unchanged; the other closes unexplained |
+| Two versions held, a third replaces both | The lower finding identifier continues under the third; the other closes unexplained |
+
 ## Interval storage
 
 Findings are open until closed and never deleted. A row carries when it opened
@@ -53,10 +86,10 @@ person and their reason (REQ-20). A run finding the same things writes nothing.
 | Every index answering "is this open" carries the moment, never the run | A finding no run will close must still close |
 | The run is recorded where there is one, and counts what a run changed | |
 | One writer per build: recording a run starts by taking the build row | Two runs would both write the same difference. A test overlaps two applications and fails on all three server engines with the hold removed |
-| An open finding still moves: fix state, upstream scheduling no fix, the build's answer, each stamped when it moved | Only those parts are compared; the rest is what makes it that finding |
+| An open finding still moves: fix state, upstream scheduling no fix, the build's answer, its consumer, each stamped when it moved | Only those parts are compared; the rest is what makes it that finding |
 | Findings moving to the same values are one write, grouped by every written value except the order | Each row gets what it would alone |
 | The order is chosen per finding inside the statement | Likelihood is close to unique per issue |
-| Fix, match and the build's answer are written only where one moved | |
+| Fix, match, the build's answer and the consumer are written only where one moved | |
 | An open finding is read in the comparison's columns only | Every open row is read on every scan |
 | What closed before at an occurrence is read as its latest row | A moving version gathers a closed row per move |
 | The intervals are the change record: every node, edge, finding and claim records the run that opened and closed it | No second table duplicates them |
@@ -73,7 +106,7 @@ statements, against 324,508 a finding at a time, and no row re-ranked twice.
 | Upgraded | Its upstream version moved at the occurrence; or it left the occurrence and the build, and its name ships at another upstream version |
 | Revised | The shipped version changed at the occurrence, or across the build where it left the occurrence, and the upstream version did not: a carried patch |
 | Patched | The build declares a patch fixing it (§ Build-declared claims) |
-| Superseded | The upstream version moved and the issue came along: the same issue is open at the new version |
+| Superseded | The component's upstream version moved and the issue came along: the same issue is open at the new version. A consumer's version moving supersedes nothing (§ Continued findings) |
 | Fixed | A person declared a recorded flaw fixed here; the one closure a person writes |
 | Unexplained | The component is present and unchanged at the occurrence, or moved onto the product with its consumer still there, and the scanner stopped reporting it |
 | Invalid | The record should not have existed: never shipped, wrong product, a duplicate, or a check's match on an issue published after the replacement |
