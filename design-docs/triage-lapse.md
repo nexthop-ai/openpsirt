@@ -128,7 +128,7 @@ was made at.
 | The proposer's act alone | An approver doing it sits on both sides |
 | Any row escalating sends the whole act back (REQ-28) | An approver works at the proposer's unit |
 | The carried agreement is one row, effective on all rows together | |
-| A row replaced by a later decision of another made at its occurrence after it stopped standing is not re-made; an earlier sibling at another version replaces nothing, nor do rows of one decision | The later one is what the occurrence last said |
+| A row replaced by a later decision of another made at its occurrence after it stopped standing is not re-made; an earlier sibling at another version replaces nothing, nor do rows of one decision, except a correction by source paths answering the occurrence again (`design-docs/triage-source-paths.md` § Withdrawn answers) | The later one is what the occurrence last said |
 | A row whose versions are still open is re-made at them alone | It lapsed for a rating, its code unmoved |
 | A row filed under an issue that merged into another is re-made at the findings the other holds, filed under it | A merge moves the findings and leaves the decision filed where it was made |
 | A re-made row keeps the visibility of the row it re-makes; rows leading to one occurrence and versions are re-made once, undisclosed where any of them was | Re-affirming is not an occasion to change who may see it. Rows under two names that merged lead to one finding |

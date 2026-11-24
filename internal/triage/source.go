@@ -487,6 +487,12 @@ func (s *Store) withdrawAnswers(ctx context.Context, ids []int64, moment time.Ti
 // an open finding of the issue, in any build of the product, is not matched
 // through the correction's source: on the package's own name, a CPE, or
 // another source.
+//
+// A finding holding no source is read as matched on the package only where
+// the last run its build applied recorded sources. Under an earlier run its
+// match was never read, and an unknown match withdraws nothing: withdrawing
+// on it hides nothing, and loses every answer a build not yet scanned again
+// holds.
 func (s *Store) matchedOtherwise(ctx context.Context, rule SourceCorrection) (map[int64]bool, error) {
 	var ids []int64
 	if err := s.db.NewSelect().Model((*DecisionOccurrence)(nil)).
@@ -497,9 +503,11 @@ func (s *Store) matchedOtherwise(ctx context.Context, rule SourceCorrection) (ma
 		Where(`EXISTS (SELECT 1 FROM "finding" AS "f2"`+
 			` JOIN "build" AS "b2" ON "b2"."id" = "f2"."build_id"`+
 			` JOIN "branch_or_tag" AS "st2" ON "st2"."id" = "b2"."branch_or_tag_id"`+
+			` LEFT JOIN "scan_run" AS "r2" ON "r2"."id" = "b2"."last_run_id"`+
 			` WHERE "st2"."product_id" = "de"."product_id" AND `+finding.DecisionOccurrenceOf("f2")+
 			` AND "f2"."closed_at" IS NULL`+
-			` AND ("f2"."matched_through" IS NULL OR "f2"."matched_through" <> ?))`, rule.Source).
+			` AND ("f2"."matched_through" <> ?`+
+			` OR ("f2"."matched_through" IS NULL AND "r2"."sources_recorded" = ?)))`, rule.Source, true).
 		Scan(ctx, &ids); err != nil {
 		return nil, fmt.Errorf("read what is matched otherwise than through %s: %w", rule.Source, err)
 	}

@@ -511,7 +511,10 @@ func (s *Store) writeReaffirm(ctx context.Context, plan reaffirmPlan) (Reaffirme
 // A decision made before the row stopped standing replaces nothing. Two builds
 // at two versions hold sibling decisions at one occurrence, keyed apart by the
 // versions, and one lapsing leaves the other its own. Rows of one decision are
-// one decision and do not replace each other.
+// one decision and do not replace each other, except an answer of a
+// correction by source paths: one written after an earlier answer at the
+// occurrence was withdrawn is the rule answering it again, and re-affirming
+// the earlier one would write it twice.
 func stillLatest(q *bun.SelectQuery) *bun.SelectQuery {
 	return q.Where(`NOT EXISTS (SELECT 1 FROM "decision_occurrence" AS "newer"` +
 		` WHERE "newer"."product_id" = "de"."product_id"` +
@@ -520,7 +523,8 @@ func stillLatest(q *bun.SelectQuery) *bun.SelectQuery {
 		` JOIN "vulnerability" AS "so" ON "so"."issue_id" = "sl"."issue_id"` +
 		` WHERE "sl"."id" = "newer"."vulnerability_id" AND "so"."id" = "de"."vulnerability_id")` +
 		` AND "newer"."occurrence_identity" = "de"."occurrence_identity"` +
-		` AND "newer"."decision_id" <> "de"."decision_id"` +
+		` AND ("newer"."decision_id" <> "de"."decision_id"` +
+		` OR EXISTS (SELECT 1 FROM "source_answer" AS "again" WHERE "again"."decision_occurrence_id" = "newer"."id"))` +
 		` AND "newer"."proposed_at" >= "de"."ended_at")`)
 }
 
