@@ -531,7 +531,6 @@ fixed. Nothing is notified or assigned. A tag is never checked.
 | When | On the first scanner data dated at least `scanning.check-settle` after the replacement arrived, two days unless an administrator changes it under Settings |
 | Dates | Each issue's publication date from [Issue publication dates](#issue-publication-dates). Where OSV has none, when this deployment first saw it, or, for an issue first seen at or after the replacement, the old inventory's last scan, marked publication date unknown. With the dates off, when this deployment first saw it |
 | Cost | One more scan per replaced inventory, behind every waiting scan of a build, fifty asked for at a time |
-| After upgrading | An inventory already replaced is never checked; one replaced after the upgrade is |
 
 ### CVE records
 
@@ -1435,7 +1434,7 @@ from, and every section after it.
 | Step | |
 |---|---|
 | Back the database up | It is the only way back to the earlier release: a database is only ever upgraded, and this release refuses to start against a database a later one upgraded. On MySQL and MariaDB it is also what recovers an upgrade that fails part way |
-| Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. A later release stops serving on its own while another process changes the schema ([Health checks](#health-checks)) |
+| Stop every process of the earlier release | The Helm chart does this by default: its `strategy` is `Recreate`, so every earlier pod stops before a new one starts. Every release this one upgrades stops serving on its own while another process changes the schema ([Health checks](#health-checks)) |
 | Deploy this release | It migrates at startup, answering its health check on `/healthz` meanwhile ([Health checks](#health-checks)). With `autoMigrate: false`, run `openpsirt migrate up` first |
 | Watch the log while it migrates | A schema change waits three seconds at a time for a table another session holds, and tries again with no total limit, logging `a migration is waiting for a table something else holds` with every other session holding a transaction open. A wait logged again and again names the session to end |
 

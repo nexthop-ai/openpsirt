@@ -149,10 +149,6 @@ type change struct {
 	// drop is the columns the release no longer declares. Whatever a column
 	// held is moved before the change, which removes it.
 	drop []string
-	// then runs once every column is in place and before any constraint is.
-	then func() error
-	// constraints is named as the release names them.
-	constraints []string
 }
 
 // addsOnly is a change SQLite can make where the table stands: columns that
@@ -163,7 +159,7 @@ func (c change) addsOnly() bool {
 			return false
 		}
 	}
-	return len(c.drop) == 0 && len(c.constraints) == 0 && c.then == nil
+	return len(c.drop) == 0
 }
 
 // added is one column, and the value existing rows take in it. No fill is a
@@ -211,23 +207,6 @@ func (u *upgrader) change(statements []string, c change) error {
 	}
 	for _, column := range c.drop {
 		stmts = append(stmts, `ALTER TABLE "`+c.table+`" DROP COLUMN "`+column+`"`)
-	}
-	if err := u.run(stmts); err != nil {
-		return err
-	}
-	if c.then != nil {
-		if err := c.then(); err != nil {
-			return err
-		}
-	}
-
-	stmts = nil
-	for _, name := range c.constraints {
-		def, err := items.constraint(name)
-		if err != nil {
-			return err
-		}
-		stmts = append(stmts, `ALTER TABLE "`+c.table+`" ADD `+def)
 	}
 	return u.run(stmts)
 }
@@ -309,13 +288,7 @@ func (u *upgrader) rebuild(made string, indexes []string, c change) error {
 	}
 	stmts = append(stmts, indexes...)
 	stmts = append(stmts, kept...)
-	if err := u.run(stmts); err != nil {
-		return err
-	}
-	if c.then != nil {
-		return c.then()
-	}
-	return nil
+	return u.run(stmts)
 }
 
 func (u *upgrader) sqliteColumns(table string) (map[string]bool, error) {
@@ -408,18 +381,15 @@ func indexNamed(indexes []string, name string) (string, error) {
 	return "", fmt.Errorf("no statement creates index %s", name)
 }
 
-// declaration is a CREATE TABLE statement read into its columns and
-// constraints.
+// declaration is a CREATE TABLE statement read into its columns.
 type declaration struct {
 	columns     []string
 	definitions map[string]string
-	constraints map[string]string
 }
 
 var (
 	lineComment = regexp.MustCompile(`--[^\n]*`)
 	leadingName = regexp.MustCompile(`^"([^"]+)"`)
-	constraint  = regexp.MustCompile(`^CONSTRAINT\s+"([^"]+)"`)
 )
 
 // declared reads a CREATE TABLE statement's body. The statements here quote
@@ -433,7 +403,7 @@ func declared(stmt string) (*declaration, error) {
 	}
 	body = body[open+1 : shut]
 
-	d := &declaration{definitions: map[string]string{}, constraints: map[string]string{}}
+	d := &declaration{definitions: map[string]string{}}
 	depth, start := 0, 0
 	var items []string
 	for i, r := range body {
@@ -452,10 +422,6 @@ func declared(stmt string) (*declaration, error) {
 	items = append(items, body[start:])
 	for _, item := range items {
 		item = strings.Join(strings.Fields(item), " ")
-		if m := constraint.FindStringSubmatch(item); m != nil {
-			d.constraints[m[1]] = item
-			continue
-		}
 		if m := leadingName.FindStringSubmatch(item); m != nil {
 			d.columns = append(d.columns, m[1])
 			d.definitions[m[1]] = item
@@ -469,13 +435,6 @@ func (d *declaration) column(name string) (string, error) {
 		return def, nil
 	}
 	return "", fmt.Errorf("no column %s is declared", name)
-}
-
-func (d *declaration) constraint(name string) (string, error) {
-	if def, ok := d.constraints[name]; ok {
-		return def, nil
-	}
-	return "", fmt.Errorf("no constraint %s is declared", name)
 }
 
 // withColumn adds a column to a table's declaration, after the column it

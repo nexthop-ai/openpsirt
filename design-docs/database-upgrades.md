@@ -94,4 +94,4 @@ adding it finishes.
 
 | Limit | Detail |
 |---|---|
-| A database a release before v0.13.0 built is not upgraded | The baseline makes v0.13.0's schema and no migration here reads an earlier one. v0.14.0 upgrades one v0.12.0 built first, v0.13.0 one v0.10.x or v0.11.0 built, v0.12.0 then v0.14.0 one v0.9.0 built, and v0.10.2 then v0.13.0 an earlier one (`design-docs/database-migrations.md` § The baseline) |
+| A database a release before v0.13.0 built is not upgraded | The baseline makes v0.13.0's schema and no migration here reads an earlier one. v0.14.0 upgrades one v0.12.0 built first, v0.13.0 one v0.10.x or v0.11.0 built, v0.12.0 then v0.14.0 one v0.9.0 built, and v0.10.2 then v0.13.0 an earlier one, after v0.8.0 and v0.6.0 where its version needs them (`design-docs/database-migrations.md` § The baseline) |

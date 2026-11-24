@@ -129,7 +129,7 @@ revisions. CSAF validators check the revision history and version it yields.
 | The settled digest leaves out the assembly moment, generator, version, revision history and tracking status | They move on generation or issuance, and the tracking status follows the agreement |
 | The document's own address is outside the digest | Inside, starting a directory would mark every past issuance changed |
 | The settled digest is taken at issuance; the delivered checksum by the directory writer | |
-| The settled digest is taken from the document's bytes, keys sorted, by one rule for a document generated now and an issued document's stored text | An upgrade rewriting a stored document takes its digest again by the same rule (`design-docs/database-upgrades.md`) |
+| The settled digest is taken from the document's bytes, keys sorted, by one rule for a document generated now and an issued document's stored text | Whether a document moved since it went out compares the two, so a second rule would read an unchanged document as changed |
 
 ## Publisher identity
 

@@ -66,9 +66,9 @@ What each claim does to a finding is `design-docs/findings-closure.md`
 |---|---|
 | A claim stores its product's package identifier, name and version beside the subject; a claim naming no product keys as before products were stored | zlib inside curl and every zlib are two claims |
 | A scan's claim stores the package identifier, the name, and a version stated outside the identifier, which joins its identity | 4.2 and 5.0 are two claims |
-| A claim naming no package and its version only as a branch covers that version alone, and closes and reopens once on the first scan after the upgrade | acme-fw 4.2 leaves acme-fw 5.0 open |
+| A claim naming no package and its version only as a branch covers that version alone | acme-fw 4.2 leaves acme-fw 5.0 open |
 | The carried patches read shows the version, "acme-fw 4.2", and the claim's status notes | |
-| Reasoning given joins the identity, so a new explanation closes one claim and opens another; v0.9.0's upgrade rekeys every stored claim so none reopens | |
+| Reasoning given joins the identity, so a new explanation closes one claim and opens another | |
 | The subject's name is kept as spelled and folded beside it | |
 | A claim, a published statement and a supplier's statement keep the package identifiers their document wrote, any credential in a qualifier included, and are read only by readers of their build or product; no published document names one | A token is the uploader's or the supplier's, and identity reads the identifier as written. The published documents name components and builds by the identifiers inventories state, stored without a credential (`design-docs/data-model-components.md` § Component identity) |
 
