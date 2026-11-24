@@ -225,7 +225,7 @@ export function Burndown() {
                 </section>
                 <section className="panel">
                   <h3>Added and done since day 0</h3>
-                  <AddedDone points={points} since={data.since} />
+                  <AddedDone points={points} since={data.since} ahead={data.projection} />
                   <div className="legend">
                     <span>
                       <i style={{ background: "var(--sev-high)" }} /> Added: new and returned
