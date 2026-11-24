@@ -77,6 +77,7 @@ files are the record's, read from the snapshot each scan reads
 | Agreed, it is published as not affected with its reason, as any wrong match is, for every issue it answers, later ones included; a waiting row publishes nothing | Each later answer reaches customers with no second look at that issue |
 | It is not bounded: no cap on how many occurrences it answers (REQ-27) | The reviewer approves one rule, and the re-check re-examines every answer on every scan; 229,000 occurrences are proposed in 7.3 s on SQLite, 27.7 s on PostgreSQL, 11.8 s on MySQL and 12.0 s on MariaDB, and a steady pass takes 2 to 7 s |
 | The review queue shows it as one rule over many issues: its package, paths and source, and how many issues it answers | The approver agrees to the rule, not to one issue |
+| Nothing about the one issue it is stored against is shown where it is listed: no issue identifier, severity, build or decisions elsewhere | A decision is stored against one occurrence; that issue is one of many it answers, and naming it reads as the rule being about it |
 
 ## Answers on later scans
 
@@ -127,7 +128,8 @@ when an incident is recorded, an answer is withdrawn for one of three reasons.
 | The decision | The package, source and paths |
 | A decision occurrence | The files it was answered on; where it was withdrawn, why, and the files the record then listed |
 | To reaffirm | What withdrew the answer, beside a version move and a worse rating |
-| The review queue | The package, paths and source, and the issues it answers |
+| The review queue | The package, paths and source, and the issues it answers; titled by the package and source, opening the decision |
+| The proposer's own decisions | The package, paths and source, opening the decision |
 | The finding screen | The source and files under the match evidence, and the form, filled with the package and source |
 
 ## Limits

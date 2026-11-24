@@ -94,6 +94,26 @@ func TestACorrectionBySourcePathsIsProposedAndReadBack(t *testing.T) {
 			t.Errorf("the decision reads back naming %+v", detail.Source)
 		}
 
+		// Its proposer's own list names the rule beside the one issue it is
+		// stored against.
+		var mine struct {
+			Items []struct {
+				Decision struct {
+					ID int64 `json:"id"`
+				} `json:"decision"`
+				Source *struct {
+					Package string   `json:"package"`
+					Paths   []string `json:"paths"`
+				} `json:"source"`
+			} `json:"items"`
+		}
+		httpapitest.Read(t, r, "triager", "/v1/my-decisions", &mine)
+		if len(mine.Items) != 1 || mine.Items[0].Decision.ID != made.DecisionID || mine.Items[0].Source == nil ||
+			mine.Items[0].Source.Package != "linux-perf" ||
+			!slices.Equal(mine.Items[0].Source.Paths, []string{"tools/lib", "tools/perf"}) {
+			t.Errorf("the proposer's own decisions read as %+v", mine.Items)
+		}
+
 		var rows struct {
 			Items []struct {
 				Occurrence struct {

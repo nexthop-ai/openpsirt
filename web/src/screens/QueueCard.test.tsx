@@ -109,4 +109,39 @@ describe("a correction by source paths waiting", () => {
     expect(text).not.toContain("one decision in this build");
     expect(button(mount.host(), "Approve all 40")).not.toBeNull();
   });
+
+  it("is titled by the rule and opens it, not the issue it is stored against", async () => {
+    serve(() => ({ data: { items: [], total: 0 } }));
+    const decision = decisionOf({
+      age_days: 0,
+      builds: ["master · broadcom"],
+      decision: { id: 9, kind: "source", proposed_at: "2026-11-18T00:00:00Z", proposed_by: "bo" },
+      decision_occurrence: { id: 90, outcome: "mismatched", reasoning: "Built from tools/." },
+      rows: 40,
+      issues: 40,
+      occurrences: 40,
+      occurrence: { occurrence: "p9", product: "sonic", vulnerability: "CVE-2024-26600" },
+      finding: {
+        product: "sonic",
+        branch_or_tag: "master",
+        variant: "broadcom",
+        vulnerability: "CVE-2024-26600",
+        component: "linux-perf",
+        severity: "critical",
+      },
+      counter: { elsewhere: { affected: 3 } },
+      proposed_by: "bo",
+      reasoning: "Built from tools/.",
+      source: { package: "linux-perf", source: "linux", paths: ["tools/lib", "tools/perf"] },
+    } as never);
+    mount.render(
+      screen(<Card decision={decision} marked={false} picked={false} onPick={() => {}} />),
+    );
+    await settle();
+    const title = mount.host().querySelector("header a.id");
+    expect(title?.textContent).toBe("linux-perf through linux");
+    expect(title?.getAttribute("href")).toBe("/decisions/9");
+    expect(mount.host().textContent).not.toContain("CVE-2024-26600");
+    expect(mount.host().textContent).not.toContain("Before approving");
+  });
 });

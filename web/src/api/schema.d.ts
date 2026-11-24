@@ -8792,6 +8792,8 @@ export interface components {
              * @description The number of occurrences it covers, counted once for each issue
              */
             rows: number;
+            /** @description What a correction by source paths names. Absent for any other decision */
+            source?: components["schemas"]["SourceRuleBody"];
             /** @description The moment it became that */
             when?: string;
         };

@@ -285,7 +285,13 @@ export function Card({
         {/* The issue opens its finding, which carries everything an approver
             could want; the decision record is one link further, from there. */}
         <Link
-          to={f ? findingOf(f) : decisionOccurrenceAt(decision.decisionOccurrenceId)}
+          to={
+            f
+              ? findingOf(f)
+              : source
+                ? decisionAt(decision.id)
+                : decisionOccurrenceAt(decision.decisionOccurrenceId)
+          }
           className="linkish id"
         >
           {decision.title}
