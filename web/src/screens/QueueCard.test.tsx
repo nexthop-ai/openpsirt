@@ -108,6 +108,7 @@ describe("a correction by source paths waiting", () => {
     expect(text).toContain("40 issues now, and new ones as scans find them");
     expect(text).not.toContain("one decision in this build");
     expect(text).not.toContain("each expiring independently");
+    expect(text).not.toContain("read once and approved once");
     expect(button(mount.host(), "Approve the rule")).not.toBeNull();
     expect(button(mount.host(), "Reject the rule")).not.toBeNull();
   });
