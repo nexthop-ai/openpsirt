@@ -243,6 +243,7 @@ The catalog's findings burndown page draws both panels for the scope picked.
 |---|---|
 | The left panel is the line from day 0's start, the day's added above a zero rule and its fixed and dismissed below, in two colors, and the marks as dashed rules | The trend's chart shape, with done split |
 | A dotted line runs from today's count toward zero at the rate; the chart widens by as much again as is drawn at most, and past that the line ends at the edge at the count it would reach there | Two years of history and a ten-year date on one axis flatten the history |
+| The added and done panel spans the left panel's days, the dotted line's included | A day sits at one place in both, so the two are read against each other |
 | One sentence above the chart, and the chart's label to a screen reader, say nothing is left where nothing is; otherwise they name the zero date, more than ten years, or that it is not converging and about how many a day the backlog grows | The two are one statement |
 | Day 0 is a date field, empty for the first scan | |
 | A severity switch keeps a band and worse | |

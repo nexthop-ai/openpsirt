@@ -44,6 +44,20 @@ export function projectionEnd(
   };
 }
 
+// The days both panels span: from day 0 to the dotted line's end, or to the
+// last day where there is none. One span puts a day at one place in both.
+function burnSpan(
+  points: BurnPoint[],
+  since: string,
+  ahead: Projection,
+): { first: number; right: number; end: { at: number; left: number } | null } {
+  const first = dayOf(since);
+  const last = dayOf(points[points.length - 1]?.at ?? since);
+  const drawn = Math.max(DAY_MS, last - first);
+  const end = projectionEnd(points, ahead, last + drawn);
+  return { first, right: end ? Math.max(last, end.at) : last, end };
+}
+
 // Left over time, from the start of day 0, with the day's flows beneath on
 // their own scale: new and returned up, fixed and dismissed down. A dotted line
 // runs from today to zero at the recent pace, and the chart widens to hold it,
@@ -67,11 +81,7 @@ export function Burn({
   const topH = 110,
     gap = 16,
     botH = 50;
-  const first = dayOf(since);
-  const last = dayOf(points[points.length - 1]?.at ?? since);
-  const drawn = Math.max(DAY_MS, last - first);
-  const end = projectionEnd(points, ahead, last + drawn);
-  const right = end ? Math.max(last, end.at) : last;
+  const { first, right, end } = burnSpan(points, since, ahead);
   const x = (t: number) => L + ((t - first) / Math.max(DAY_MS, right - first)) * (W - L - R);
   const xi = (i: number) => x(dayOf(points[i]?.at ?? since));
 
@@ -231,8 +241,8 @@ export function paceWords(ahead: Projection, left = 1): string {
 }
 
 // The running totals since day 0: added (new and returned) and done (fixed
-// and dismissed), from zero on one axis. Done above added is a backlog
-// shrinking.
+// and dismissed), from zero on one axis, over the left panel's days. Done
+// above added is a backlog shrinking.
 type Running = { at: string; added: number; done: number };
 
 export function running(points: BurnPoint[]): Running[] {
@@ -245,7 +255,15 @@ export function running(points: BurnPoint[]): Running[] {
   });
 }
 
-export function AddedDone({ points, since }: { points: BurnPoint[]; since: string }) {
+export function AddedDone({
+  points,
+  since,
+  ahead,
+}: {
+  points: BurnPoint[];
+  since: string;
+  ahead: Projection;
+}) {
   const rows = running(points);
   if (rows.length === 0) return null;
   const W = 560,
@@ -253,10 +271,10 @@ export function AddedDone({ points, since }: { points: BurnPoint[]; since: strin
     R = 10,
     T = 8,
     H = 130;
-  const first = dayOf(since);
-  const last = dayOf(rows[rows.length - 1]?.at ?? since);
+  // The left panel's span, so a day sits under itself in both.
+  const { first, right } = burnSpan(points, since, ahead);
   const x = (at: string) =>
-    L + ((dayOf(at) - first) / Math.max(DAY_MS, last - first)) * (W - L - R);
+    L + ((dayOf(at) - first) / Math.max(DAY_MS, right - first)) * (W - L - R);
   const hi = Math.max(1, ...rows.map((r) => Math.max(r.added, r.done))) * 1.12;
   const y = (v: number) => T + H - (v / hi) * H;
   // From zero: a burndown is read for how far it is from zero.
