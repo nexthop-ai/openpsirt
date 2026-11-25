@@ -122,6 +122,32 @@ describe("a correction by source paths on its own page", () => {
     expect(text).not.toContain("Open the finding");
     expect(text).not.toContain("6.12.115-2");
   });
+
+  it("is headed by the rule, not the issue it is stored against", async () => {
+    serve((path) => {
+      if (path === "/v1/session/me") return { data: ANA };
+      if (path === "/v1/decisions/{id}") {
+        return {
+          data: {
+            decision: { id: 2, kind: "source", proposed_by: "ana" },
+            occurrence: { product: "sonic", vulnerability: "CVE-2026-64066" },
+            argument: { outcome: "mismatched" },
+            source: { package: "linux-perf", source: "linux", paths: ["tools/perf"] },
+            happened: "waiting",
+            issues: 1,
+            occurrences: 1,
+            age_days: 1,
+          },
+        };
+      }
+      return { data: { items: [], total: 0 } };
+    });
+    mount.render(screen(<Decision who={ANA} />, "/decisions/2", "/decisions/:id", client()));
+    await settle();
+    const heading = mount.host().querySelector("h2")?.textContent ?? "";
+    expect(heading).toContain("linux-perf through linux");
+    expect(heading).not.toContain("CVE-2026-64066");
+  });
 });
 
 describe("the answer a second person gives", () => {

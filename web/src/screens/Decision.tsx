@@ -87,13 +87,16 @@ export function Decision({ who }: { who: Who }) {
     <>
       <div className="screen-head">
         {/* A decision over many issues is named by what it is about — the
-            component — because heading it with one of the twelve reads as a
-            decision about that one. */}
+            component, or the rule a correction by source paths is — because
+            heading it with one of the twelve reads as a decision about that
+            one. */}
         <h2>
           <span className="id">
-            {it.issues > 1
-              ? (it.finding?.component ?? it.occurrence.vulnerability)
-              : it.occurrence.vulnerability}
+            {it.decision.kind === "source" && it.source
+              ? `${it.source.package} through ${it.source.source}`
+              : it.issues > 1
+                ? (it.finding?.component ?? it.occurrence.vulnerability)
+                : it.occurrence.vulnerability}
           </span>{" "}
           · {labeled(it.argument.outcome)}{" "}
           {it.issues > 1 && <span className="n">{it.issues} issues</span>}
