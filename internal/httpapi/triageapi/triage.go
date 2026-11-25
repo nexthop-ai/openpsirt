@@ -152,6 +152,10 @@ type BecameBody struct {
 	// back, or argue all of it as one — and without them has nothing to choose
 	// with.
 	Outliers *OutliersBody `json:"outliers,omitempty" doc:"The issues in a bulk decision that do not look like the rest. Absent for a decision about one issue and for one nothing can still be held back from"`
+	// Source is the rule a correction by source paths is. Its occurrence and
+	// finding are one issue it answers, kept only because a decision is stored
+	// against one; the rule is what was proposed.
+	Source *SourceRuleBody `json:"source,omitempty" doc:"What a correction by source paths names. Absent for any other decision"`
 }
 
 // BecameOutput is a page of what somebody proposed.
@@ -433,6 +437,11 @@ func registerTriage(api huma.API, in core.Deps) {
 			}
 			if row.Outliers != nil {
 				entry.Outliers = outliersBody(*row.Outliers)
+			}
+			if row.Decision.Kind == triage.SourceDecision {
+				if entry.Source, err = sourceRule(ctx, store, row.Decision.ID); err != nil {
+					return nil, core.WentWrong(in.Logger, "what you proposed could not be read", err)
+				}
 			}
 			out.Body.Items = append(out.Body.Items, entry)
 		}

@@ -58,13 +58,17 @@ export type Decision = {
 };
 
 export function decisionOf(row: QueueRow): Decision {
+  // A correction by source paths is stored against one issue it answers, and
+  // that issue is not what was proposed: the card names the rule, opens the
+  // decision, and carries nothing read from the one occurrence.
+  const rule = row.decision.kind === "source" ? (row.source ?? null) : null;
   return {
     key: `decision:${row.decision.id}`,
     id: row.decision.id,
     decisionOccurrenceId: row.decision_occurrence.id ?? 0,
     kind: row.decision.kind,
     derivedFrom: row.decision.derived_from ?? null,
-    title: row.occurrence.vulnerability ?? "",
+    title: rule ? `${rule.package} through ${rule.source}` : (row.occurrence.vulnerability ?? ""),
     product: row.occurrence.product_name || row.occurrence.product || "",
     outcome: row.decision_occurrence.outcome ?? "",
     justification: row.decision_occurrence.justification ?? "",
@@ -88,8 +92,8 @@ export function decisionOf(row: QueueRow): Decision {
     occurrences: row.occurrences,
     builds: row.builds ?? [],
     outliers: row.outliers ?? null,
-    counter: row.counter ?? null,
-    finding: row.finding ?? null,
+    counter: rule ? null : (row.counter ?? null),
+    finding: rule ? null : (row.finding ?? null),
     source: row.source ?? null,
   };
 }

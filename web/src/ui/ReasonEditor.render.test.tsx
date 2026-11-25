@@ -57,20 +57,33 @@ describe("revising and withdrawing a decision's reasoning", () => {
     expect(onDone).toHaveBeenCalled();
   });
 
-  it("withdraws the decision named", async () => {
+  it("withdraws the decision named once asked twice", async () => {
     const { del } = await drawn("waiting", false);
     expect(text()).toContain("Withdrawing needs nobody");
     expect(text()).not.toContain("Revising withdraws the approval");
+    await press(mount.host(), "Withdraw…");
+    await settle();
+    expect(del).toHaveLength(0);
+    expect(text()).toContain("Withdrawing ends this decision");
     await press(mount.host(), "Withdraw");
     await settle();
     expect(only(del)[1].params?.path).toEqual({ id: 12 });
+  });
+
+  it("withdraws nothing when the confirmation is cancelled", async () => {
+    const { del } = await drawn("waiting", false);
+    await press(mount.host(), "Withdraw…");
+    await press(mount.host(), "Cancel");
+    await settle();
+    expect(del).toHaveLength(0);
+    expect(button(mount.host(), "Withdraw…")).not.toBeNull();
   });
 
   it("offers nothing to change on a decision that has ended", async () => {
     await drawn("withdrawn");
     expect(
       Array.from(mount.host().querySelectorAll("button")).map((b) => b.textContent),
-    ).not.toContain("Withdraw");
+    ).not.toContain("Withdraw…");
   });
 });
 

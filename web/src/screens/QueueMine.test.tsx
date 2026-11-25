@@ -70,6 +70,25 @@ describe("the decisions somebody proposed", () => {
     expect(mount.host().querySelector("textarea")).toBeNull();
   });
 
+  it("names a correction by source paths and opens the rule, not the issue it is stored against", async () => {
+    const rule = {
+      ...ROW,
+      decision: { id: 2, kind: "source" },
+      issues: 661,
+      rows: 10547,
+      outliers: undefined,
+      source: { package: "linux-perf", source: "linux", paths: ["tools/lib", "tools/perf"] },
+    } as unknown as Body<"BecameBody">;
+    mount.render(screen(<Became rows={[rule]} query={settled} />));
+    await settle();
+    expect(text()).toContain("By source paths");
+    expect(text()).toContain("linux-perf through linux");
+    expect(text()).not.toContain("CVE-2026-1");
+    expect(text()).not.toContain("master");
+    const links = Array.from(mount.host().querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    expect(links).toEqual(["/decisions/2"]);
+  });
+
   it("says one decision where a decision covers one issue", async () => {
     mount.render(
       screen(<Became rows={[{ ...ROW, issues: 1, outliers: undefined }]} query={settled} />),

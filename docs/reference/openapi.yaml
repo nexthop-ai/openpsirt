@@ -1596,6 +1596,9 @@ components:
           description: The number of occurrences it covers, counted once for each issue
           format: int64
           type: integer
+        source:
+          $ref: "#/components/schemas/SourceRuleBody"
+          description: What a correction by source paths names. Absent for any other decision
         when:
           description: The moment it became that
           type: string

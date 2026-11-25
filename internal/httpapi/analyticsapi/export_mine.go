@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -43,7 +44,7 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 			What: "your decisions",
 			Header: []string{
 				"decision", "proposed", "outcome", "became", "when", "by", "by name",
-				"issue", "product", "product name", core.BranchOrTagColumn, "branch or tag name",
+				"issue", "source", "product", "product name", core.BranchOrTagColumn, "branch or tag name",
 				"variant", "variant name", "component",
 				"rows", "issues", "occurrences", "reasoning",
 			},
@@ -90,11 +91,19 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 						variant, variantName = where.Variant, where.VariantName
 						component = where.Component + " " + where.Version
 					}
+					issue := named[i].Occurrence.Vulnerability
+					rule, err := sourceColumn(ctx, store, row.Decision)
+					if err != nil {
+						return nil, err
+					}
+					if rule != "" {
+						issue, branchOrTag, branchOrTagName, variant, variantName, component = "", "", "", "", "", ""
+					}
 					rows = append(rows, []string{
 						strconv.FormatInt(row.Decision.ID, 10),
 						core.Stamp(row.DecisionOccurrence.ProposedAt),
 						string(row.Decision.Outcome), string(row.Happened), when, by, byName,
-						named[i].Occurrence.Vulnerability, product, productName,
+						issue, rule, product, productName,
 						branchOrTag, branchOrTagName, variant, variantName, component,
 						strconv.Itoa(row.Rows), strconv.Itoa(row.Issues), strconv.Itoa(row.Occurrences),
 						row.Reasoning,
@@ -104,4 +113,20 @@ func registerMyDecisionsExport(api huma.API, in core.Deps) {
 			},
 		})
 	})
+}
+
+// sourceColumn names the rule a correction by source paths is, as
+// "linux-perf through linux: tools/lib, tools/perf", and is empty for any
+// other decision. A row naming such a rule leaves the issue, build and
+// component blank: they are the one occurrence it is stored against, which is
+// one of many issues it answers.
+func sourceColumn(ctx context.Context, store *triage.Store, decision triage.Decision) (string, error) {
+	if decision.Kind != triage.SourceDecision {
+		return "", nil
+	}
+	rule, err := store.SourceOf(ctx, decision.ID)
+	if err != nil || rule == nil {
+		return "", err
+	}
+	return rule.Package + " through " + rule.Source + ": " + strings.Join(rule.PathList(), ", "), nil
 }

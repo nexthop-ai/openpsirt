@@ -65,6 +65,7 @@ complete list exists to filter afterwards. A file is read one of three ways.
 | A field with no value, or one the list leaves out, is an empty cell, never zero; every signal the list carries is a column | An unscored finding as zero sorts with the 0.0-rated |
 | A cell a spreadsheet reads as a formula is neutralized | Component names arrive from others, and the files are opened by the most privileged |
 | The queue's file is the list the screen shows, with the deferral's end, the promised fix date and the target version | |
+| The queue's file and the reader's own decisions name a correction by source paths by its rule in a source column, empty for any other decision | `design-docs/triage-source-paths.md` § Readback |
 | The audit log's file carries who agrees now, standing agreements only, and the whole agreement record with dates, carried and withdrawn marks, in a column of its own | What was agreed and then withdrawn is what an audit looks for; one column mixing the two is the answer it must not be given |
 | The audit log's file includes decisions about code findings, under the same visibility (REQ-50) | |
 | The code finding queue's file is the queue, under its visibility, with no source text | `design-docs/analysis-queue.md` § Queue file |

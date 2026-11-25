@@ -13,7 +13,7 @@ import { Failed } from "../ui/Failed";
 import { Loading } from "../ui/Loading";
 import { Because } from "../ui/Outcome";
 import { Wide } from "../ui/Wide";
-import { findingOf } from "../app/routes";
+import { decisionAt, findingOf } from "../app/routes";
 import { issuesIn, toggled } from "./outliers";
 import { OutlierRows } from "../ui/OutlierRows";
 
@@ -85,6 +85,9 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
   const [because, setBecause] = useState("");
   const outliers = row.outliers;
   const decisionId = row.decision?.id ?? 0;
+  // A correction by source paths is stored against one issue it answers; the
+  // row names the rule and opens it, and nothing read from that one issue.
+  const rule = row.decision?.kind === "source" ? row.source : undefined;
 
   return (
     <>
@@ -93,7 +96,14 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
           <Happened word={row.happened} by={row.by_name || row.by} />
         </td>
         <td>
-          {row.finding ? (
+          {rule ? (
+            <>
+              <span className="bulkmark">By source paths</span>{" "}
+              <Link to={decisionAt(decisionId)} className="id" title="Open the rule">
+                {rule.paths?.join(", ")}
+              </Link>
+            </>
+          ) : row.finding ? (
             <Link to={findingOf(row.finding)} className="id">
               {row.occurrence?.vulnerability}
             </Link>
@@ -102,10 +112,12 @@ function Mine({ row }: { row: Body<"BecameBody"> }) {
           )}{" "}
           <Because code={row.decision_occurrence?.justification} />
         </td>
-        <td className="id">{row.finding?.component ?? "—"}</td>
+        <td className="id">
+          {rule ? `${rule.package} through ${rule.source}` : (row.finding?.component ?? "—")}
+        </td>
         <td className="hint">
           {row.occurrence?.product_name || row.occurrence?.product}
-          {row.finding?.branch_or_tag && (
+          {!rule && row.finding?.branch_or_tag && (
             <>
               {" "}
               · {row.finding.branch_or_tag_name || row.finding.branch_or_tag} ·{" "}

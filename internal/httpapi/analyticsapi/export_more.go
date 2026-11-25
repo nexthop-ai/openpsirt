@@ -384,7 +384,7 @@ func registerQueueExport(api huma.API, in core.Deps) {
 			Header: []string{
 				"decision", "proposed", "proposed by", "proposed by name", "age days", "outcome",
 				"deferred until", "committed to", "upgrade to",
-				"issue", "product", "product name", "component", "rows", "issues",
+				"issue", "source", "product", "product name", "component", "rows", "issues",
 				"occurrences", "builds",
 				"previously approved", "deferred days", "reasoning",
 			},
@@ -418,6 +418,14 @@ func registerQueueExport(api huma.API, in core.Deps) {
 						product, productName = where.Product, where.ProductName
 						component, version = where.Component, where.Version
 					}
+					issue, onComponent := named[i].Occurrence.Vulnerability, component+" "+version
+					rule, err := sourceColumn(ctx, store, row.Decision)
+					if err != nil {
+						return nil, err
+					}
+					if rule != "" {
+						issue, onComponent = "", ""
+					}
 					rows = append(rows, []string{
 						strconv.FormatInt(row.Decision.ID, 10),
 						core.Stamp(row.DecisionOccurrence.ProposedAt),
@@ -425,8 +433,8 @@ func registerQueueExport(api huma.API, in core.Deps) {
 						strconv.Itoa(int(store.Age(&row.DecisionOccurrence).Hours() / 24)),
 						string(row.Decision.Outcome),
 						promised.DeferredUntil, promised.CommittedTo, promised.UpgradeTo,
-						named[i].Occurrence.Vulnerability,
-						product, productName, component + " " + version,
+						issue, rule,
+						product, productName, onComponent,
 						strconv.Itoa(row.Rows), strconv.Itoa(row.Issues),
 						strconv.Itoa(row.Occurrences),
 						strings.Join(row.Builds, "; "),
