@@ -131,6 +131,7 @@ when an incident is recorded, an answer is withdrawn for one of three reasons.
 | To reaffirm | What withdrew the answer, beside a version move and a worse rating |
 | The review queue | The package, paths and source, and the issues it answers; titled by the package and source, opening the decision |
 | The proposer's own decisions | The package, paths and source, opening the decision |
+| The queue's file and the reader's own decisions file | The rule as the package through the source, then its paths; the issue, build and component left empty |
 | The finding screen | The source and files under the match evidence, and the form, filled with the package and source |
 
 ## Limits

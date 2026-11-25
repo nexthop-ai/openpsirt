@@ -4,6 +4,7 @@
 package triageapi_test
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -41,6 +42,56 @@ func scannedThroughLinux(t *testing.T, r *httpapitest.Reach) {
 			Component: linuxPerf, MatchedThrough: "linux",
 			RecordRead: true, RecordFiles: []string{"tools/perf/util/evsel.c"},
 		}})
+}
+
+// A file listing a correction by source paths names the rule, and leaves blank
+// the issue, build and component of the one occurrence it is stored against,
+// as the screens do.
+func TestAFileNamesACorrectionBySourcePathsByItsRule(t *testing.T) {
+	httpapitest.TwoReach(t, func(t *testing.T, r *httpapitest.Reach) {
+		scannedThroughLinux(t, r)
+		if got := httpapitest.AsPerson(t, r, "triager", http.MethodPost, "/v1/products/mine/source-corrections",
+			`{"package":"linux-perf","source":"linux","paths":["tools/perf","tools/lib"],`+
+				`"justification":"vulnerable_code_not_present",`+
+				`"reasoning":"linux-perf is built from tools/ alone."}`); got.Code != http.StatusCreated {
+			t.Fatalf("proposing answered %d: %s", got.Code, got.Body.String())
+		}
+
+		for _, c := range []struct{ who, at string }{
+			{"reviewer", "/v1/review-queue.csv"},
+			{"triager", "/v1/my-decisions.csv"},
+		} {
+			got := httpapitest.AsPerson(t, r, c.who, http.MethodGet, c.at, "")
+			if got.Code != http.StatusOK {
+				t.Fatalf("%s exporting %s answered %d: %s", c.who, c.at, got.Code, got.Body.String())
+			}
+			read, err := csv.NewReader(strings.NewReader(got.Body.String())).ReadAll()
+			if err != nil {
+				t.Fatalf("%s is not a spreadsheet: %v", c.at, err)
+			}
+			rows := httpapitest.RowsUnder(read)
+			if len(rows) != 2 {
+				t.Fatalf("%s holds %d rows, want the correction alone: %v", c.at, len(rows)-1, rows)
+			}
+			want := map[string]string{
+				"source": "linux-perf through linux: tools/lib, tools/perf",
+				"issue":  "", "component": "", "product": "mine",
+			}
+			if c.at == "/v1/my-decisions.csv" {
+				want["branch or tag"], want["variant"] = "", ""
+			}
+			for column, value := range want {
+				at := httpapitest.IndexOf(rows[0], column)
+				if at < 0 {
+					t.Errorf("%s has no %q column: %v", c.at, column, rows[0])
+					continue
+				}
+				if rows[1][at] != value {
+					t.Errorf("%s carries %q under %q, want %q", c.at, rows[1][at], column, value)
+				}
+			}
+		}
+	})
 }
 
 // A correction by source paths is proposed against a product, answers the
