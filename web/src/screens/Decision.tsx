@@ -283,7 +283,9 @@ function Argument({
           <Ended key={part.state} decisionId={decision.decision.id} part={part} />
         ))}
       </div>
-      {decision.finding && (
+      {/* A correction by source paths is stored against one issue it answers,
+          and that issue is not what was proposed. */}
+      {decision.finding && decision.decision.kind !== "source" && (
         <p className="hint" style={{ margin: "10px 0 0" }}>
           {decision.finding.severity && <Severity word={decision.finding.severity} />}{" "}
           <Exploited when={decision.finding.exploited} /> in{" "}

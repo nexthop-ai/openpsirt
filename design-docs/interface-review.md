@@ -85,6 +85,7 @@ agree, send back, hold rows back, and say where the work is happening.
 | The state is one word: waiting, sent back, approved, withdrawn, lapsed, agreement undone, or ended several ways; the proposer's list reads the same word | |
 | Present reach is said in acted units: one decision at one fold, its packages, their consumers, every build reached; occurrences are a title on the figure; nothing reached reads "none" | |
 | A correction by source paths shows the paths as Built from, with the package and source beneath | What the approver agrees to is the rule |
+| A correction by source paths shows no severity, version or link of the one occurrence it is stored against | That issue is one of many it answers |
 | Withdrawing asks once more, saying it cannot be revised afterwards and what it answered is open again | Nothing undoes it |
 | What it covers is what it covers now; what was agreed to is on the approval in the revision history | It grows by matching |
 | "Reach when withdrawn" and "Reach when it lapsed" sit beside the present reach, as occurrences and builds on the date they stopped; a partly lapsed decision shows both parts | A stopped row is keyed on its occurrence |
