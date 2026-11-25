@@ -198,7 +198,7 @@ describe("a decision about security testing material read by somebody who may no
     return {
       comments: text.includes("Add a comment"),
       links: buttons.includes("Link it"),
-      revises: buttons.includes("Revise reasoning") && buttons.includes("Withdraw"),
+      revises: buttons.includes("Revise reasoning") && buttons.includes("Withdraw…"),
     };
   }
 

@@ -75,6 +75,7 @@ export function ReasonEditor({
   writes?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
+  const [ending, setEnding] = useState(false);
   const [text, setText] = useState(reasoning);
   const revise = useRevise();
   const withdraw = useWithdraw();
@@ -134,7 +135,40 @@ export function ReasonEditor({
       {withdraw.error != null && (
         <Failed error={withdraw.error} what="That could not be withdrawn." />
       )}
-      {writes && revisable(state) && !editing && (
+      {/* Asked twice, because nothing undoes it: a withdrawn decision is never
+          revised again, and what it answered is open from that moment. */}
+      {writes && revisable(state) && !editing && ending && (
+        <div style={{ marginTop: 12, maxWidth: "78ch" }}>
+          <div className="alert" style={{ marginBottom: 10 }}>
+            <strong>Withdrawing ends this decision</strong>
+            <span>It can&apos;t be revised afterwards, and what it answered is open again.</span>
+          </div>
+          <div className="actions">
+            <button
+              type="button"
+              className="btn"
+              disabled={withdraw.isPending}
+              onClick={() =>
+                withdraw.mutate(
+                  { id: decisionId },
+                  {
+                    onSuccess: () => {
+                      setEnding(false);
+                      onDone();
+                    },
+                  },
+                )
+              }
+            >
+              Withdraw
+            </button>
+            <button type="button" className="btn quiet" onClick={() => setEnding(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      {writes && revisable(state) && !editing && !ending && (
         <div className="actions" style={{ marginTop: 12 }}>
           <button
             type="button"
@@ -146,13 +180,8 @@ export function ReasonEditor({
           >
             Revise reasoning
           </button>
-          <button
-            type="button"
-            className="btn quiet"
-            disabled={withdraw.isPending}
-            onClick={() => withdraw.mutate({ id: decisionId }, { onSuccess: onDone })}
-          >
-            Withdraw
+          <button type="button" className="btn quiet" onClick={() => setEnding(true)}>
+            Withdraw…
           </button>
           <span className="consequence">
             {approved
