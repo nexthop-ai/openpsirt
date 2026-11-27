@@ -148,14 +148,14 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 # measured the same way — so "whatever was latest at build time" is not good
 # enough. Taken from the project's own image, so Dependabot proposes each
 # release; the image is the binary alone, and is copied out of.
-FROM anchore/grype:v0.121.3@sha256:13113eeceab017260370cf540e1d25442c59665fd07d1b09b66d63bb0c282887 AS scanner
+FROM anchore/grype:v0.122.1@sha256:661583704a253c0448ed63998b5ea2cd9d5a76ee71eedc4aed439b8ce3e93a1c AS scanner
 
 # The generator for the image inventory, and for the interface's part of the
 # binary's.
 #
 # Pinned the same way the scanner is, and from the same project. Its image
 # has no shell, so the binary is run from the base.
-FROM anchore/syft:v1.57.1@sha256:03215d0e98b661d0ecbc8575dbc14d65be1743b5de5df6410aecb7e80f95b060 AS syft
+FROM anchore/syft:v1.57.2@sha256:e97e20b6e6d1699c60296b66ab337941724f9bd06ac279d893eda89601fc4b2a AS syft
 
 FROM ${ALPINE_IMAGE} AS inventory-tool
 COPY --from=syft /syft /out/syft
