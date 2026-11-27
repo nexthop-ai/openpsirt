@@ -993,7 +993,7 @@ same program on a host of your own. The interface is built into it.</p>
 scanner, a database, a configuration file, and a reverse proxy for TLS.</p>
 <h2 id="the-release-archive">The release archive<a class="headerlink" href="#the-release-archive" title="Permanent link">&para;</a></h2>
 <p>Download three files from the release page,
-<code>https://github.com/nexthop-ai/openpsirt/releases/tag/v0.15.0</code>:</p>
+<code>https://github.com/nexthop-ai/openpsirt/releases/tag/v0.15.1</code>:</p>
 <table>
 <thead>
 <tr>
@@ -1003,7 +1003,7 @@ scanner, a database, a configuration file, and a reverse proxy for TLS.</p>
 </thead>
 <tbody>
 <tr>
-<td><code>openpsirt_0.15.0_linux_amd64.tar.gz</code>, or <code>_arm64</code></td>
+<td><code>openpsirt_0.15.1_linux_amd64.tar.gz</code>, or <code>_arm64</code></td>
 <td>The binary, with <code>LICENSE</code>, <code>NOTICE</code> and <code>README.md</code></td>
 </tr>
 <tr>
@@ -1020,30 +1020,30 @@ scanner, a database, a configuration file, and a reverse proxy for TLS.</p>
 <pre><code>cosign verify-blob \
   --bundle SHA256SUMS.cosign.bundle \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity https://github.com/nexthop-ai/openpsirt/.github/workflows/release.yml@refs/tags/v0.15.0 \
+  --certificate-identity https://github.com/nexthop-ai/openpsirt/.github/workflows/release.yml@refs/tags/v0.15.1 \
   SHA256SUMS
 sha256sum --ignore-missing -c SHA256SUMS
-tar -xzf openpsirt_0.15.0_linux_amd64.tar.gz
-sudo install -m 0755 openpsirt_0.15.0_linux_amd64/openpsirt /usr/local/bin/openpsirt
+tar -xzf openpsirt_0.15.1_linux_amd64.tar.gz
+sudo install -m 0755 openpsirt_0.15.1_linux_amd64/openpsirt /usr/local/bin/openpsirt
 openpsirt -version
 </code></pre>
 <p>The signature says the file came from this repository's release workflow at
 that tag. <code>--ignore-missing</code> checks the files you downloaded and skips the rest.</p>
 <h2 id="the-scanner">The scanner<a class="headerlink" href="#the-scanner" title="Permanent link">&para;</a></h2>
 <p>The deployment runs the scan itself, with the scanner the image carries:
-Grype 0.121.3. Install that version. A different one reads a different
+Grype 0.122.1. Install that version. A different one reads a different
 database format and answers differently, so findings stop being comparable
 with a deployment running the image.</p>
-<pre><code>release=https://github.com/anchore/grype/releases/download/v0.121.3
-curl -fsSLO &quot;$release/grype_0.121.3_linux_amd64.tar.gz&quot;
-curl -fsSLO &quot;$release/grype_0.121.3_checksums.txt&quot;
-curl -fsSLO &quot;$release/grype_0.121.3_checksums.txt.sigstore.json&quot;
-cosign verify-blob grype_0.121.3_checksums.txt \
-  --bundle grype_0.121.3_checksums.txt.sigstore.json \
+<pre><code>release=https://github.com/anchore/grype/releases/download/v0.122.1
+curl -fsSLO &quot;$release/grype_0.122.1_linux_amd64.tar.gz&quot;
+curl -fsSLO &quot;$release/grype_0.122.1_checksums.txt&quot;
+curl -fsSLO &quot;$release/grype_0.122.1_checksums.txt.sigstore.json&quot;
+cosign verify-blob grype_0.122.1_checksums.txt \
+  --bundle grype_0.122.1_checksums.txt.sigstore.json \
   --certificate-identity-regexp '^https://github\.com/anchore/grype/\.github/workflows/release\.yaml@' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
-sha256sum -c --ignore-missing grype_0.121.3_checksums.txt
-tar -xzf grype_0.121.3_linux_amd64.tar.gz grype
+sha256sum -c --ignore-missing grype_0.122.1_checksums.txt
+tar -xzf grype_0.122.1_linux_amd64.tar.gz grype
 sudo install -m 0755 grype /usr/local/bin/grype
 </code></pre>
 <p><code>cosign verify-blob</code> checks that Anchore's release workflow signed the
